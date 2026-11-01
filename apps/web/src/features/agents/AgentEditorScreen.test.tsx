@@ -57,12 +57,31 @@ describe('agent editor', () => {
     expect(within(record).getByLabelText('Season record: coming soon')).toBeInTheDocument();
     expect(within(record).getByLabelText('Bluff stats: coming soon')).toBeInTheDocument();
     expect(screen.getByTestId('agent-voice')).toHaveTextContent(/\w/);
-    expect(screen.getByText(/dry run on Copper Hollow/)).toBeInTheDocument();
+    expect(screen.getByText(/dry run on Copper Hollow/i)).toBeInTheDocument();
     expect(screen.getByTestId('agent-back')).toHaveAttribute('href', '/maps/copper-hollow/crew?d=hard');
+  });
+
+  it('opens the system prompt panel from its tile and closes it with ✕ and Escape', async () => {
+    const { user, router } = setup();
+    const open = await screen.findByTestId('agent-prompt-open');
+    expect(open).toHaveTextContent('13/600');
+    const panel = document.getElementById(open.getAttribute('aria-controls')!)!;
+    expect(panel).toHaveAttribute('aria-label', 'System prompt for Wick');
+    expect(panel).not.toBeVisible();
+    await user.click(open);
+    expect(open).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Close the system prompt' }));
+    expect(panel).not.toBeVisible();
+    await user.click(open);
+    await user.keyboard('{Escape}');
+    expect(panel).not.toBeVisible();
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('saves and resets the system prompt', async () => {
     const { user, api } = setup();
+    await user.click(await screen.findByTestId('agent-prompt-open'));
     const prompt = await screen.findByTestId('agent-prompt');
     await user.clear(prompt);
     await user.type(prompt, '  Never say our route.  ');
@@ -85,6 +104,7 @@ describe('agent editor', () => {
 
   it('shows a save error and keeps the draft', async () => {
     const { user } = setup(WICK.id, { patch: async () => Promise.reject(new ApiError(422, 'invalid_body', 'too long')) });
+    await user.click(await screen.findByTestId('agent-prompt-open'));
     const prompt = await screen.findByTestId('agent-prompt');
     await user.type(prompt, ' Hold the switch.');
     await user.click(screen.getByTestId('agent-prompt-save'));

@@ -1,16 +1,17 @@
 'use client';
-// Agent editor (/agents/[agentId]?map=&d=), the prototype's #s-agent: the agent on the left with its
-// inner voice as a bark and ‹ › to step through the roster (also ← →), and its loadout tiles on the
-// right, sized to fit the viewport without scrolling on wide screens (prompt beside stats and record,
-// then skill, talk tier and inner voice in one row):
-//   system prompt  the owner's instructions the planner reads ahead of the skill (≤ 600 characters),
-//                  saved with PATCH /agents/:id { systemPrompt }; Reset clears them (skill alone)
-//   stats          vision, comms, voice and the role's verb on the map, explained
-//   skill          the equipped skill: its prompt when you wrote it, encrypted when bought; swap
-//                  among the skills you own
+// Agent editor (/agents/[agentId]?map=&d=), laid out as a game character screen that fits the
+// viewport: the agent large in the middle on a diagonal light beam, its inner voice as a bark and
+// ‹ › under it to step through the roster (also ← →). Left: attributes (vision, comms, voice and the
+// role's verb on the map), the record with a win-rate bar, then the name and its role plates.
+// Right: the roster slot ring, two action tiles, the skill slots and the talk tier:
+//   system prompt  the owner's instructions the planner reads ahead of the skill (≤ 600 characters);
+//                  its tile opens a panel over the right column. Saved with PATCH /agents/:id
+//                  { systemPrompt }; Reset clears them (skill alone). Escape closes the panel.
+//   inner voice    a dry run of how it thinks on the map (./voice.ts)
+//   skill          slots for the skills you own (click one to equip), the equipped skill's prompt
+//                  when you wrote it, encrypted when bought
 //   talk tier      the agent's default for unranked play (ranked is always Standard)
 //   record         all-time matches and W–L–D; the season record and bluffs are "Soon"
-//   inner voice    a dry run of how it thinks on the map (./voice.ts)
 // `map` / `d` name the crew screen it was opened from, for "Back to crew".
 import { isDifficulty, type Difficulty, type TalkTier } from '@skirm/engine/v2';
 import { DisplayHeading, Pips, Soon, fmt } from '@skirm/ui';
@@ -20,6 +21,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { AgentPortrait } from '@/features/arena/AgentPortrait';
 import { useArena } from '@/features/arena/store';
 import { MAPS, mapById, type V2Map } from '@/features/arena/world';
+import { SkillArt } from '@/features/skills/parts';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
 import { EmptyState } from '@/components/states/EmptyState';
@@ -164,6 +166,19 @@ function AgentEditor({
     onError: (err) => toast.error(err),
   });
 
+  // The system prompt panel over the right column; Escape closes it before it would go Back.
+  const [promptOpen, setPromptOpen] = useState(false);
+  useEffect(() => {
+    if (!promptOpen) return;
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || ev.defaultPrevented) return;
+      ev.preventDefault();
+      setPromptOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [promptOpen]);
+
   const saved = agent.systemPrompt ?? '';
   const [draft, setDraft] = useState(saved);
   const dirty = draft.trim() !== saved;
@@ -226,10 +241,17 @@ function AgentEditor({
 
   const ownedSkills = owned.data ?? [];
   const winPct = agent.matchesPlayed ? Math.round((agent.wins / agent.matchesPlayed) * 100) : null;
+  const backHref = from ? routes.crew(from.mapId, from.difficulty) : routes.home();
 
   return (
     <div className={e.wrap} style={{ '--ac': colour } as CSSProperties}>
-      <div className={e.assist} data-rise>
+      <div className={e.beam} aria-hidden="true" />
+      <span className={e.mark} aria-hidden="true">
+        {role}
+      </span>
+
+      {/* Centre: the agent on its light beam, its inner voice as a bark, ‹ › under it. */}
+      <div className={e.stage}>
         <AgentPortrait body={colour} head={agentBone(agent)} team="A" label={`${agent.name}, ${role}`} variant="hero" className={e.hero} />
         <div className={`${e.bark} ${out ? e.barkOut : ''}`} role="status" data-testid="agent-bark">
           <small>
@@ -238,68 +260,35 @@ function AgentEditor({
           </small>
           <span>{barkLine}</span>
         </div>
-        <div className={e.plate}>
-          <DisplayHeading level={1} className={e.plateName}>
-            {agent.name}
-          </DisplayHeading>
-          <div className={e.sw}>
-            <button type="button" aria-label="Previous agent" onClick={() => step(-1)} disabled={agents.length < 2} data-testid="agent-prev">
-              ‹
-            </button>
-            <button type="button" aria-label="Next agent" onClick={() => step(1)} disabled={agents.length < 2} data-testid="agent-next">
-              ›
-            </button>
-          </div>
-          <div className={e.plateMeta}>
-            <span className="sk-kick">
-              <b style={{ color: colour }}>{role}</b> · agent {idx + 1} of {agents.length}
-            </span>
-            <span className="sk-kick" data-testid="agent-meta">
-              {skill ? `${skill.name} v${skill.version}` : 'No skill'} · talk: {TIER_INFO[tier].label} · voice: {voice}
-            </span>
-          </div>
+        <div className={e.sw}>
+          <button type="button" aria-label="Previous agent" onClick={() => step(-1)} disabled={agents.length < 2} data-testid="agent-prev">
+            <Chev left />
+          </button>
+          <span className={e.swTrack} aria-hidden="true">
+            {agents.map((a, i) => (
+              <i key={a.id} data-on={i === idx ? '' : undefined} />
+            ))}
+          </span>
+          <button type="button" aria-label="Next agent" onClick={() => step(1)} disabled={agents.length < 2} data-testid="agent-next">
+            <Chev />
+          </button>
         </div>
       </div>
 
-      <div className={e.ed} aria-label="Agent loadout" role="region">
-        <section className={`${e.tile} ${e.sys}`} style={{ '--tc': colour } as CSSProperties} data-rise>
-          <div className={e.th}>
-            <span className={e.code}>System prompt · persona · only you can read it</span>
-            <span className={e.chip} data-testid="agent-prompt-count">
-              {draft.length}/{AGENT_SYSTEM_PROMPT_MAX}
-            </span>
-          </div>
-          <h2 className={e.name}>System prompt</h2>
-          <textarea
-            value={draft}
-            maxLength={AGENT_SYSTEM_PROMPT_MAX}
-            onChange={(ev) => setDraft(ev.target.value)}
-            placeholder={starterPersona(agent.name, role)}
-            aria-label={`System prompt for ${agent.name}`}
-            data-testid="agent-prompt"
-          />
-          <div className={e.row}>
-            <span className={e.hint}>
-              Read every tick, before the skill: voice and habits here, strategy in the skill.
-              {draft ? '' : ' Empty: the skill alone (the grey text is a starter).'}
-            </span>
-            <button type="button" className={e.btn} onClick={reset} disabled={patch.isPending || (!saved && !draft)} data-testid="agent-prompt-reset">
-              Reset
-            </button>
-            <button type="button" className={`${e.btn} ${e.primary}`} onClick={save} disabled={patch.isPending || !dirty} data-testid="agent-prompt-save">
-              Save
-            </button>
-          </div>
-        </section>
-
-        <section className={`${e.tile} ${e.st}`} data-rise style={{ '--rise-i': 1 } as CSSProperties}>
-          <span className={e.code}>Stats · {role}</span>
-          <h2 className={e.name}>Stats</h2>
+      {/* Left: attributes, record, the name and its role plates. */}
+      <div className={e.left}>
+        <section className={e.attrs} aria-label="Attributes" data-rise>
+          <h2 className={e.kick}>
+            Attributes <i aria-hidden="true">▸▸</i>
+          </h2>
           <dl className={e.stl}>
             <div>
-              <dt>VISION</dt>
+              <dt>
+                <Glyph d={GLYPH.vision} />
+                Vision
+              </dt>
               <dd>
-                {vision}
+                <b>{vision}</b>
                 <Pips value={vision} max={5} colour="var(--you)" label="Vision" />
               </dd>
               <small>
@@ -307,21 +296,34 @@ function AgentEditor({
               </small>
             </div>
             <div>
-              <dt>COMMS</dt>
+              <dt>
+                <Glyph d={GLYPH.comms} />
+                Comms
+              </dt>
               <dd>
-                {comms}
+                <b>{comms}</b>
                 <Pips value={comms} max={5} colour="var(--amber)" label="Comms" />
               </dd>
               <small>Say reaches {reachOf(comms)} tiles</small>
             </div>
             <div>
-              <dt>VOICE</dt>
-              <dd>{voice}</dd>
+              <dt>
+                <Glyph d={GLYPH.voice} />
+                Voice
+              </dt>
+              <dd>
+                <b>{voice}</b>
+              </dd>
               <small>Tone of speech and thought</small>
             </div>
             <div>
-              <dt>VERB</dt>
-              <dd className={e.verb}>{fit.effect ? fit.effect.replace(/_/g, ' ') : 'none'}</dd>
+              <dt>
+                <Glyph d={GLYPH.verb} />
+                Verb
+              </dt>
+              <dd>
+                <b className={e.verb}>{fit.effect ? fit.effect.replace(/_/g, ' ') : 'none'}</b>
+              </dd>
               <small data-testid="agent-verb">
                 {fit.verb && map ? `${fit.verb} on ${map.name}` : fit.effect ? `Not on ${map?.name ?? 'this map'}` : 'Take and deliver only'}
               </small>
@@ -329,67 +331,148 @@ function AgentEditor({
           </dl>
         </section>
 
-        <section className={`${e.tile} ${e.rec}`} style={{ '--tc': 'var(--bone)', '--rise-i': 2 } as CSSProperties} data-rise data-testid="agent-record">
-          <span className={e.code}>
-            Record · season 1 <Soon what="Season record" />
+        <section className={e.record} aria-label="Record" data-rise style={{ '--rise-i': 1 } as CSSProperties} data-testid="agent-record">
+          <div className={e.recHead}>
+            <span className={e.kick}>
+              Record <i aria-hidden="true">▸▸</i> <Soon what="Season record" />
+            </span>
+            <b>{winPct === null ? 'No matches yet' : `${winPct}% wins`}</b>
+          </div>
+          <span className={e.bar} aria-hidden="true">
+            <i style={{ width: `${winPct ?? 0}%` }} />
           </span>
-          <h2 className={e.name}>{winPct === null ? 'No matches yet' : `${winPct}% wins`}</h2>
-          <div className={e.statrow}>
-            <div>
+          <div className={e.statrow} title="All time. Season records, deliveries per match and bluffs seen through arrive with seasons.">
+            <span>
               <small>Matches</small>
               <b>{fmt(agent.matchesPlayed)}</b>
-            </div>
-            <div>
+            </span>
+            <span>
               <small>W–L–D</small>
               <b>
                 {agent.wins}–{agent.losses}–{agent.draws}
               </b>
-            </div>
-            <div>
+            </span>
+            <span>
               <small>Bluffs</small>
               <b>
                 <Soon what="Bluff stats" />
               </b>
-            </div>
+            </span>
           </div>
-          <span className={e.sub}>All time. Season records, deliveries per match and bluffs seen through arrive with seasons.</span>
         </section>
 
-        <section className={`${e.tile} ${e.third}`} style={{ '--tc': 'var(--violet)', '--rise-i': 3 } as CSSProperties} data-rise data-testid="agent-skill">
-          <span className={e.code}>Skill · equipped · {skill ? (mine ? 'yours' : 'bought, prompt encrypted') : 'none'}</span>
-          <h2 className={e.name}>
-            {skill ? skill.name : 'No skill'} {skill ? <span className={e.ver}>v{skill.version}</span> : null}
-          </h2>
-          {!skill ? (
-            <p className={e.sub}>Equip one of your skills below. Without one the agent plays the rules alone.</p>
-          ) : mine ? (
-            <div className={e.skp}>{prompt ?? (text.isError ? 'Could not load the prompt.' : 'Loading the prompt…')}</div>
-          ) : (
-            <div className={e.hid}>PROMPT ENCRYPTED · by {creator ?? 'its creator'}. You own the right to run it, never the text.</div>
-          )}
-          {ownedSkills.length ? (
-            <div className={e.chips} role="group" aria-label="Swap skill">
-              {ownedSkills.map((s) => (
+        <div className={e.plate} data-rise style={{ '--rise-i': 2 } as CSSProperties}>
+          <DisplayHeading level={1} className={e.plateName}>
+            {agent.name}
+          </DisplayHeading>
+          <div className={e.tags}>
+            <span className={e.roleTile} title={role}>
+              <Glyph d={GLYPH.role} />
+            </span>
+            <span className={e.tagTile}>
+              <small>Role</small>
+              <b style={{ color: colour }}>{role}</b>
+            </span>
+            <span className={e.tagStack}>
+              <span>{TIER_INFO[tier].label} talk</span>
+              <span>{voice} voice</span>
+            </span>
+          </div>
+          <span className={e.meta} data-testid="agent-meta">
+            {skill ? `${skill.name} v${skill.version}` : 'No skill'} · talk: {TIER_INFO[tier].label} · voice: {voice}
+          </span>
+        </div>
+      </div>
+
+      {/* Right: the slot ring, the prompt and voice tiles, the skill slots and the talk tier. */}
+      <div className={e.right} aria-label="Agent loadout" role="region">
+        <div className={e.lvRow} data-rise>
+          <div className={e.ring} style={{ '--p': `${((idx + 1) / agents.length) * 100}%` } as CSSProperties}>
+            <small>Agent</small>
+            <b>{String(idx + 1).padStart(2, '0')}</b>
+            <span>/{String(agents.length).padStart(2, '0')}</span>
+          </div>
+          <div className={e.lvBar}>
+            <small>Planner · actor</small>
+            <b>Claude Haiku 5.5</b>
+            <span className={e.max}>LIVE</span>
+          </div>
+        </div>
+
+        <div className={e.acts} data-rise style={{ '--rise-i': 1 } as CSSProperties}>
+          <button
+            type="button"
+            className={e.act}
+            aria-expanded={promptOpen}
+            aria-controls="agent-prompt-panel"
+            onClick={() => setPromptOpen((o) => !o)}
+            data-testid="agent-prompt-open"
+          >
+            <Glyph d={GLYPH.prompt} className={e.actIco} />
+            <span className={e.actTxt}>
+              <b>System prompt</b>
+              <small>{saved ? `${saved.length}/${AGENT_SYSTEM_PROMPT_MAX}` : 'Skill alone'}</small>
+            </span>
+          </button>
+          <div className={e.act} style={{ '--tc': 'var(--water)' } as CSSProperties}>
+            <Glyph d={GLYPH.voice} className={e.actIco} />
+            <span className={e.actTxt}>
+              <b>Inner voice</b>
+              <small>Dry run on {map?.name ?? 'the map'}</small>
+            </span>
+            <div className={e.voice} data-testid="agent-voice">
+              <p>{lines[0]}</p>
+            </div>
+            <button type="button" className={e.mini} onClick={() => setSeed((k) => k + 1)} data-testid="agent-voice-next">
+              Another line ▸
+            </button>
+          </div>
+        </div>
+
+        <section className={e.skills} aria-label="Skill" data-rise style={{ '--rise-i': 2 } as CSSProperties} data-testid="agent-skill">
+          <div className={e.slots} role="group" aria-label="Swap skill">
+            {ownedSkills.slice(0, 4).map((s) => {
+              const on = s.id === skill?.id && s.version === skill.version;
+              return (
                 <button
                   key={`${s.id}:${s.version}`}
                   type="button"
-                  className={e.chip}
+                  className={e.slot}
                   aria-pressed={s.id === skill?.id}
-                  disabled={patch.isPending || (s.id === skill?.id && s.version === skill.version)}
+                  aria-label={`${s.name} v${s.version}`}
+                  title={`${s.name} v${s.version}`}
+                  disabled={patch.isPending || on}
                   onClick={() => equip(s)}
                 >
-                  {s.name} v{s.version}
+                  <SkillArt name={s.name} tag={s.handles_tags[0]} className={e.slotArt} />
+                  <span>v{s.version}</span>
                 </button>
-              ))}
-            </div>
-          ) : owned.isSuccess ? (
-            <p className={e.sub}>You own no skills yet. Write one or buy one on the Exchange.</p>
-          ) : null}
+              );
+            })}
+            {ownedSkills.length < 3
+              ? Array.from({ length: 3 - ownedSkills.length }, (_, i) => <span key={i} className={`${e.slot} ${e.slotEmpty}`} aria-hidden="true" />)
+              : null}
+          </div>
+          <div className={e.skInfo}>
+            <span className={e.code}>Skill · {skill ? (mine ? 'yours' : 'bought, prompt encrypted') : 'none'}</span>
+            <b className={e.skName}>
+              {skill ? skill.name : 'No skill'} {skill ? <span className={e.ver}>v{skill.version}</span> : null}
+            </b>
+            {!skill ? (
+              <p className={e.sub}>{owned.isSuccess && !ownedSkills.length ? 'You own no skills yet. Write one or buy one on the Exchange.' : 'Equip a skill. Without one the agent plays the rules alone.'}</p>
+            ) : mine ? (
+              <p className={e.skp}>{prompt ?? (text.isError ? 'Could not load the prompt.' : 'Loading the prompt…')}</p>
+            ) : (
+              <p className={e.hid}>PROMPT ENCRYPTED · by {creator ?? 'its creator'}. You own the right to run it, never the text.</p>
+            )}
+          </div>
         </section>
 
-        <section className={`${e.tile} ${e.third}`} style={{ '--tc': 'var(--amber)', '--rise-i': 4 } as CSSProperties} data-rise>
-          <span className={e.code}>Talk tier · practice default</span>
-          <h2 className={e.name}>{TIER_INFO[tier].label}</h2>
+        <section className={e.tierBox} aria-label="Talk tier" data-rise style={{ '--rise-i': 3 } as CSSProperties}>
+          <div className={e.tierHead}>
+            <span className={e.code}>Talk tier · practice default</span>
+            <b>{TIER_INFO[tier].label}</b>
+          </div>
           <div className={e.seg} role="group" aria-label="Default talk tier">
             {TIER_ORDER.map((t) => (
               <button key={t} type="button" aria-pressed={t === tier} disabled={patch.isPending} onClick={() => (t === tier ? undefined : pickTier(t))}>
@@ -400,40 +483,76 @@ function AgentEditor({
           <span className={e.sub}>{TIER_INFO[tier].line} Ranked locks everyone to Standard.</span>
         </section>
 
-        <section className={`${e.tile} ${e.third}`} style={{ '--tc': 'var(--water)', '--rise-i': 5 } as CSSProperties} data-rise>
-          <span className={e.code}>
-            How {agent.name} thinks · dry run on {map?.name ?? 'the map'}
-          </span>
-          <h2 className={e.name}>Inner voice</h2>
-          <div className={e.voice} data-testid="agent-voice">
-            <p>{lines[0]}</p>
-            <p>{lines[1]}</p>
+        <ButtonLink href={backHref} variant="primary" className={e.back} data-testid="agent-back">
+          {from ? 'Back to crew ▸' : 'Back to Command ▸'}
+        </ButtonLink>
+
+        {/* The system prompt editor slides over the right column. */}
+        <section
+          id="agent-prompt-panel"
+          className={e.promptPanel}
+          aria-label={`System prompt for ${agent.name}`}
+          hidden={!promptOpen}
+          style={{ '--tc': colour } as CSSProperties}
+        >
+          <div className={e.th}>
+            <span className={e.code}>System prompt · persona · only you can read it</span>
+            <span className={e.chip} data-testid="agent-prompt-count">
+              {draft.length}/{AGENT_SYSTEM_PROMPT_MAX}
+            </span>
+            <button type="button" className={e.x} aria-label="Close the system prompt" onClick={() => setPromptOpen(false)}>
+              ×
+            </button>
           </div>
+          <h2 className={e.name}>System prompt</h2>
+          <textarea
+            value={draft}
+            maxLength={AGENT_SYSTEM_PROMPT_MAX}
+            onChange={(ev) => setDraft(ev.target.value)}
+            placeholder={starterPersona(agent.name, role)}
+            aria-label={`System prompt for ${agent.name}`}
+            data-testid="agent-prompt"
+          />
+          <span className={e.hint}>
+            Read every tick, before the skill: voice and habits here, strategy in the skill.
+            {draft ? '' : ' Empty: the skill alone (the grey text is a starter).'}
+          </span>
           <div className={e.row}>
-            <span className={e.hint}>Plays as subtitles in third person.</span>
-            <button type="button" className={e.btn} onClick={() => setSeed((k) => k + 1)} data-testid="agent-voice-next">
-              Another line
+            <button type="button" className={e.btn} onClick={reset} disabled={patch.isPending || (!saved && !draft)} data-testid="agent-prompt-reset">
+              Reset
+            </button>
+            <button type="button" className={`${e.btn} ${e.primary}`} onClick={save} disabled={patch.isPending || !dirty} data-testid="agent-prompt-save">
+              Save
             </button>
           </div>
         </section>
-
-        <div className={e.foot} data-rise style={{ '--rise-i': 6 } as CSSProperties}>
-          <b>{'// LOADOUT'}</b>
-          <span>Planner and actor · Claude Haiku 5.5</span>
-          <span>
-            {idx + 1} of {agents.length} agents
-          </span>
-          {from ? (
-            <ButtonLink href={routes.crew(from.mapId, from.difficulty)} variant="primary" data-testid="agent-back">
-              Back to crew ▸
-            </ButtonLink>
-          ) : (
-            <ButtonLink href={routes.home()} variant="primary" data-testid="agent-back">
-              Back to Command ▸
-            </ButtonLink>
-          )}
-        </div>
       </div>
     </div>
+  );
+}
+
+/** Line icons for the attribute rows and action tiles (22 × 22, stroked). */
+const GLYPH = {
+  vision: 'M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6zM11 8.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5',
+  comms: 'M4 15a10 10 0 0 1 14 0M7 12a6 6 0 0 1 8 0M10 9.5a2 2 0 0 1 2 0M11 18v.5',
+  voice: 'M4 5h14v9H9l-4 4v-4H4zM8 9h6M8 11.5h4',
+  verb: 'M5 17l7-7M12 4l6 6-3 3-6-6zM4 18l2 0',
+  role: 'M11 3l7 4v8l-7 4-7-4V7zM11 8v6M8 9.5l3 1.5 3-1.5',
+  prompt: 'M5 3h9l4 4v12H5zM14 3v4h4M8 11h7M8 14h7M8 17h4',
+} as const;
+
+function Glyph({ d, className }: { d: string; className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  );
+}
+
+function Chev({ left = false }: { left?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 12" aria-hidden="true">
+      <path d={left ? 'M22 6H3M8 1L3 6l5 5' : 'M2 6h19M16 1l5 5-5 5'} fill="none" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
   );
 }

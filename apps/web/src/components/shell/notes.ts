@@ -49,9 +49,10 @@ export const NOTES = {
   },
   agent: {
     title: 'Agent editor',
-    lead: 'Same composition as the command deck: the agent is the hero, its loadout is the tile grid.',
+    lead: 'A character screen that fits one view: the agent on a light beam in the middle, attributes and name left, loadout right.',
     points: [
-      "System prompt is the agent's persona and habits. It is always yours and editable; edits apply from the next match.",
+      "System prompt is the agent's persona and habits. Its tile opens the editor over the loadout; it is always yours and edits apply from the next match.",
+      'Skill slots hold the skills you own: click one to equip it.',
       'Skill prompts stay encrypted when bought. Your own skills show their text.',
       'Stats explain what each number does in tiles, so vision and comms read as rules, not flavour.',
       'The inner-voice tile previews the same lines that play as subtitles in third person.',
