@@ -1,0 +1,17 @@
+[package]
+name = "skirm-integration-tests"
+description = "near-workspaces sandbox tests for the skirm contracts (opt-in: --features sandbox)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# Off by default so `cargo test` never downloads or starts a sandbox node.
+sandbox = ["dep:near-workspaces", "dep:tokio", "dep:serde_json", "dep:anyhow"]
+
+[dependencies]
+near-workspaces = { version = "=0.22.4", optional = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"], optional = true }
+serde_json = { version = "1", optional = true }
+anyhow = { version = "1", optional = true }

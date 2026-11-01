@@ -1,0 +1,49 @@
+name: ci
+
+# Only on main (merges and direct pushes); start a run by hand from the Actions tab ("Run workflow").
+# Typecheck and unit tests run on each machine before a push (.githooks/pre-push), e2e and the full
+# stack smoke by hand (README, Testing), and the staging deploy (deploy.yml) builds the images, so
+# CI checks the contracts only.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: contracts (cargo test, wasm build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      # contracts/rust-toolchain.toml pins stable + rust-src. build.sh rebuilds std for
+      # wasm32-unknown-unknown with -Z build-std, enabled on stable by RUSTC_BOOTSTRAP=1, so no
+      # nightly toolchain and no installed wasm target are needed.
+      - name: Install the pinned toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rust-src
+          rustc --version && cargo --version
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts
+      - name: Unit tests (every contract, no network)
+        run: cargo test
+      - name: Build wasm
+        run: ./build.sh
+      # The built contracts, ready for `near contract deploy` (contracts/README.md, Deploy).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contracts-wasm
+          path: contracts/target/wasm32-unknown-unknown/release/skirm_*.wasm
+          if-no-files-found: error
+          retention-days: 14

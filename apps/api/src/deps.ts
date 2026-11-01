@@ -1,0 +1,59 @@
+// Everything the api needs from the outside world, injected as one object so tests can swap the
+// queue, the spend reader and the NEAR adapters (docs/backend-contract.md).
+import type { Repos } from '@skirm/db';
+import type { NearKeyChecker } from './near-link';
+import type {
+  BenchmarkJobData,
+  DepositVerifier,
+  Minter,
+  OwnershipReader,
+  ServerConfig,
+  Vault,
+} from '@skirm/server';
+
+/** Nest injection token for ApiDeps. */
+export const DEPS = Symbol('skirm.api.deps');
+
+/** The `benchmarks` queue as the api sees it: a minted version's benchmark or a buyer's trial. */
+export interface BenchmarkQueue {
+  enqueue(data: BenchmarkJobData): Promise<void>;
+  close?(): Promise<void>;
+}
+
+/**
+ * `V2_BRAIN` (not in ServerConfig) is read from the environment like the worker and realtime read
+ * it: 'greedy' forces the offline brain even with an OpenRouter key.
+ */
+export type ApiConfig = Pick<
+  ServerConfig,
+  'AUTH_MODE' | 'PRIVY_APP_ID' | 'PRIVY_VERIFICATION_KEY' | 'CREDITS_PER_NEAR'
+> &
+  Partial<Pick<ServerConfig, 'OPS_TOKEN' | 'COST_ALERT_DAILY_USD' | 'OPENROUTER_API_KEY'>> & {
+    V2_BRAIN?: string | undefined;
+  };
+
+/** Model spend per UTC day as the worker and realtime sum it (Redis `cost:usd:<day>`, kept 3 days). */
+export interface DailyCostReader {
+  /** USD per requested day; a day with no entry is 0, and null means the store did not answer. */
+  usd(days: string[]): Promise<Record<string, number> | null>;
+  close?(): Promise<void>;
+}
+
+export interface ApiDeps {
+  config: ApiConfig;
+  repos: Repos;
+  vault: Vault;
+  near: {
+    minter: Minter;
+    deposits: DepositVerifier;
+    ownership: OwnershipReader;
+    /** Checks NEAR link proofs outside dev mode (absent: linking is refused with 503). */
+    keys?: NearKeyChecker;
+  };
+  /** Benchmarks queued at mint and buyers' trials (the worker plays them). */
+  benchmarkQueue: BenchmarkQueue;
+  /** Daily model spend for GET /ops/stats (absent: the route reports it as unavailable). */
+  costs?: DailyCostReader;
+  /** Allowed CORS origins (default http://localhost:3000). */
+  corsOrigins?: string[];
+}

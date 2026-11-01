@@ -1,0 +1,96 @@
+{
+  "schema": "skirm.map/v2",
+  "id": "frostline-depot",
+  "code": "FD-03",
+  "name": "Frostline Depot",
+  "region": "North rail line",
+  "difficulty": 2,
+  "label": "Easy",
+  "blurb": "A rail depot buried in snow. Freight crates block the aisles and drifts seal the doors. Nothing spreads here, but the cold leaves very few steps to spare.",
+  "item": "Heat pack",
+  "deliverTo": "Warm room",
+  "goal": 3,
+  "rows": [
+    "###################################",
+    "#...#..d..*...#.....#...*..d..#...#",
+    "#.c.#..d......#.#.#.#......d..#.c.#",
+    "#...c..####.###.....###.####..c...#",
+    "##d##..c......#.....#......c..##d##",
+    "#*...#...........*...........#...*#",
+    "#..c.#.##...#.#.....#.#...##.#.c..#",
+    "#....d........#..E..#........d....#",
+    "#.............#.c.c.#.............#",
+    "#.................................#",
+    "#.........#...#.c.c.#...#.........#",
+    "#c............#c...c#............c#",
+    "#....cc.......#.#.#.#.......cc....#",
+    "#.....#.......#.....#.......#.....#",
+    "###################################"
+  ],
+  "starts": {
+    "A": [
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        1,
+        2
+      ]
+    ],
+    "B": [
+      [
+        33,
+        1
+      ],
+      [
+        32,
+        1
+      ],
+      [
+        33,
+        2
+      ]
+    ]
+  },
+  "exit": [
+    17,
+    7
+  ],
+  "verbs": [
+    {
+      "id": "shovel_a_drift",
+      "name": "Shovel a drift",
+      "effect": "remove_solid"
+    },
+    {
+      "id": "push_a_freight_crate",
+      "name": "Push a freight crate",
+      "effect": "push"
+    },
+    {
+      "id": "stack_crates",
+      "name": "Stack crates",
+      "effect": "add_solid"
+    }
+  ],
+  "hazards": [],
+  "switches": [],
+  "drops": [
+    {
+      "at": [
+        17,
+        9
+      ],
+      "tick": 40
+    }
+  ],
+  "blockSupply": 2,
+  "fog": false,
+  "steal": false,
+  "night": false
+}

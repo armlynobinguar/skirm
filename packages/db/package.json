@@ -1,0 +1,27 @@
+{
+  "name": "@skirm/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts",
+    "./migrate": "./src/migrate.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "generate": "node scripts/drizzle-kit.mjs generate && node scripts/embed-migrations.mjs",
+    "migrate": "node scripts/drizzle-kit.mjs migrate"
+  },
+  "dependencies": {
+    "@skirm/shared": "*",
+    "drizzle-orm": "^0.45.4",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0",
+    "@types/pg": "^8.11.10",
+    "@electric-sql/pglite": "^0.5.11"
+  }
+}

@@ -1,0 +1,29 @@
+# Build context for docker/node.Dockerfile. Dependencies are installed inside the image with
+# `npm ci`, so host installs (macOS native binaries) must never leak in.
+**/node_modules
+**/dist
+**/.next
+**/.next-*
+**/test-results
+**/playwright-report
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+**/.DS_Store
+
+# Not needed by the Node images (and large).
+.git
+.github
+.design-src
+.claude
+target
+**/target
+contracts/target
+
+# Local state and secrets: never bake them into an image.
+.data
+**/.env
+**/.env.*
+!.env.example
+*.pem
+*.key

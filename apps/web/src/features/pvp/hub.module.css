@@ -1,0 +1,107 @@
+/* S11 Skirmish hub (PvpLobbyScreen.tsx): the prototype's #s-hub. Tokens only. */
+
+.hub { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr) minmax(0, 360px); gap: 22px; padding-block: 4px 20px; }
+.side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.note { margin: 0; font-size: 13px; line-height: 18px; color: var(--muted); }
+.panelH { margin: 0; font: 700 20px/24px var(--font-display); letter-spacing: .04em; text-transform: uppercase; color: var(--bone); }
+.panelKick { display: block; margin: 0 0 8px; font-weight: 500; }
+
+/* Rank emblem */
+.rank { display: grid; gap: 14px; justify-items: center; text-align: center; align-content: start; }
+.emblem { display: grid; place-items: center; width: 118px; height: 118px; margin: 18px; transform: rotate(45deg); background: linear-gradient(135deg, rgba(255, 70, 85, .35), rgba(255, 70, 85, .05)); box-shadow: inset 0 0 0 2px var(--rival), 0 0 40px rgba(255, 70, 85, .25); }
+.emblem span { transform: rotate(-45deg); font: 800 44px/1 var(--font-display); color: var(--bone); }
+.statrow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.statrow div { padding: 10px; box-shadow: inset 0 0 0 1px var(--line); }
+.statrow small { display: block; font: 400 10px/14px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.statrow b { font: 800 28px/1.05 var(--font-display); color: var(--bone); }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font: 500 11px/16px var(--font-mono); letter-spacing: .04em; color: var(--you); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .45); }
+.chipWarn { color: var(--amber); box-shadow: inset 0 0 0 1px rgba(255, 181, 71, .45); }
+.seasonKick { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
+.title { font-size: 40px; }
+
+/* Earn-back (the prototype's #myEarn): real sales, royalties, season prizes and spend; rentals not offered. */
+.earn { display: grid; gap: 2px; width: 100%; text-align: left; }
+.earnH { margin: 0; font-weight: 500; }
+.earn .split { margin-top: 4px; }
+
+/* Crew picker */
+.crew { display: flex; flex-direction: column; gap: 12px; }
+.crewHead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.agents { display: grid; gap: 8px; }
+.agent { display: grid; gap: 2px; padding: 10px 12px; border: 0; text-align: left; font: inherit; color: var(--ink); background: rgba(0, 0, 0, .2); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+.agent b { font: 800 20px/1 var(--font-display); text-transform: uppercase; color: var(--bone); }
+.agent[aria-checked='true'] { box-shadow: inset 3px 0 0 var(--you), inset 0 0 0 1px var(--you); background: rgba(52, 224, 200, .08); }
+.agent:disabled { cursor: not-allowed; opacity: .6; }
+.agent:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.agentMeta { font: 400 11px/14px var(--font-mono); color: var(--muted); }
+
+/* Queue */
+.queue { display: grid; place-items: center; align-content: start; gap: 20px; padding-top: 24px; text-align: center; min-width: 0; }
+.qbtn { position: relative; display: grid; place-items: center; width: 250px; height: 250px; max-width: 100%; padding: 0; border: 0; background: none; color: var(--bone); cursor: pointer; }
+.qbtn svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.qbtn:disabled { opacity: .45; cursor: not-allowed; }
+.qbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 6px; border-radius: 50%; }
+.qbtn:hover:not(:disabled) .ring { stroke: var(--rival); }
+.ring { transition: stroke .3s; }
+.qlbl { position: relative; font: 800 46px/.9 var(--font-display); text-transform: uppercase; color: var(--bone); }
+.qlbl small { display: block; margin-top: 8px; font: 400 11px/14px var(--font-mono); letter-spacing: .2em; color: var(--muted); }
+.spin { animation: spin 2.4s linear infinite; transform-origin: 50% 50%; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.found .qlbl { color: var(--amber); }
+.rules { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; max-width: 460px; margin: 0; font-size: 13px; color: var(--muted); text-align: left; }
+.rules dt { min-width: 92px; font: 500 12px/18px var(--font-mono); letter-spacing: .06em; color: var(--bone); }
+.rules dd { margin: 0; }
+.alert { max-width: 460px; padding: 12px 14px; text-align: left; background: var(--critical-soft); box-shadow: inset 3px 0 0 var(--critical); }
+.alert p { margin: 0 0 6px; font-size: 13px; }
+.alertWarn { background: var(--warning-soft); box-shadow: inset 3px 0 0 var(--warning); }
+.alertTitle { font-weight: 700; color: var(--bone); }
+
+/* Pool and ladder */
+.pool { display: grid; gap: 4px; }
+.poolN { min-height: 58px; display: flex; align-items: center; gap: 10px; font-size: 28px; }
+.split { display: grid; gap: 4px; margin: 10px 0 0; font-size: 13px; }
+.split div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; box-shadow: inset 0 -1px 0 var(--line); }
+.split dt { color: var(--muted); }
+.split dt { min-width: 0; }
+.split dd { margin: 0; font: 500 13px/18px var(--font-mono); color: var(--bone); white-space: nowrap; }
+.split dd.spent { color: var(--rival); }
+.board { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.board li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto 36px; gap: 10px; align-items: baseline; padding: 7px 6px; font-size: 13px; box-shadow: inset 0 -1px 0 var(--line); }
+.board li.you { background: rgba(52, 224, 200, .08); }
+.board li.gap { margin-top: 8px; border-top: 1px dashed var(--line-strong); }
+.pz { font: 400 11px/16px var(--font-mono); color: var(--amber); text-align: right; }
+.board b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--bone); }
+.p { font-family: var(--font-mono); color: var(--faint); }
+.e { font: 400 12px/16px var(--font-mono); color: var(--muted); }
+.more { display: inline-block; margin-top: 10px; font: 500 11px/16px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--you); text-decoration: none; }
+
+/* VS takeover on v2_found (the prototype's .vs): you from the left, the hidden rival from the right. */
+.vs { position: fixed; inset: 0; z-index: 40; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; overflow: hidden; background: rgba(5, 8, 13, .95); }
+.vsFound { position: absolute; top: calc(70px + env(safe-area-inset-top, 0px)); left: 0; right: 0; margin: 0; padding-inline: 16px; text-align: center; }
+.vsAmber { color: var(--amber); }
+.vsMapline { position: absolute; bottom: max(28px, env(safe-area-inset-bottom, 0px)); left: 0; right: 0; margin: 0; padding-inline: 16px; text-align: center; }
+.vside { display: grid; gap: 8px; height: 100%; min-width: 0; padding: 36px; align-content: center; }
+.vside :global(.sk-disp) { font-size: clamp(44px, 6.4vw, 96px); overflow-wrap: anywhere; }
+.vsA { justify-items: start; background: linear-gradient(90deg, rgba(52, 224, 200, .25), transparent); animation: vsFromL .8s var(--ease-out) both; }
+.vsB { justify-items: end; text-align: right; background: linear-gradient(270deg, rgba(255, 70, 85, .28), transparent); animation: vsFromR .8s var(--ease-out) both; }
+.vsMid { display: grid; justify-items: center; gap: 18px; padding: 16px; }
+.vsWord { font-size: 120px; color: var(--amber); animation: vsPop .8s var(--ease-out) both .3s; }
+.vsLeft { margin-left: 10px; font-size: 18px; }
+.faces { display: flex; gap: 8px; min-height: 72px; align-items: center; }
+.face { display: block; width: 64px; height: 72px; background: rgba(0, 0, 0, .25); box-shadow: inset 0 0 0 1px var(--line); }
+@keyframes vsFromL { from { opacity: .001; transform: translate3d(-60px, 0, 0); } }
+@keyframes vsFromR { from { opacity: .001; transform: translate3d(60px, 0, 0); } }
+@keyframes vsPop { from { opacity: .001; transform: scale(2.2); } }
+
+@media (max-width: 1180px) {
+  .hub { grid-template-columns: minmax(0, 280px) minmax(0, 1fr); }
+  .right { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+}
+@media (max-width: 820px) {
+  .hub { grid-template-columns: 1fr; }
+  .queue { order: -1; }
+  .vs { grid-template-columns: 1fr; grid-template-rows: 1fr auto 1fr; }
+  .vside { height: auto; padding: 20px; }
+  .vsWord { font-size: 64px; }
+}
+@media (prefers-reduced-motion: reduce) { .spin, .vsA, .vsB, .vsWord { animation: none; } }

@@ -1,0 +1,16 @@
+[package]
+name = "skirm-seasons"
+description = "skirm seasons contract: season prize pools, top-10 standings and pull-based prize claims"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }

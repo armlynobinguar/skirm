@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>S02 Home</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="pl-tokens.css">
+<link rel="stylesheet" href="ds/promptlings/components/bundle.css">
+<script src="ds/promptlings/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500;600;700&amp;family=Pixelify+Sans:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:var(--ink)}a:hover{color:var(--ink-muted)}
+</style>
+</helmet>
+<div style="min-height: 1180px; background: var(--bg); color: var(--ink); font-family: var(--font-sans);">
+  <dc-import name="TopBar" active="play" hint-size="100%,72px"></dc-import>
+  <main style="max-width: 1360px; margin: 0 auto; padding: 32px 24px 48px; display: flex; flex-direction: column; gap: 32px; box-sizing: border-box;">
+
+    <section style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end; justify-content: space-between;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <h1 style="margin: 0; font: 600 32px/36px var(--font-display);">Play</h1>
+        <p style="margin: 0; color: var(--ink-muted);">Pick a map. Clear it with as few agents and steps as you can.</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: stretch;">
+        <div style="background: var(--surface); box-shadow: var(--elev-1); border-radius: 6px; padding: 12px 16px; min-width: 300px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; gap: 12px; font: 700 13px/18px var(--font-sans);">
+            <span>Free allowance today</span>
+            <span style="font-family: var(--font-mono); font-weight: 600;">60 / 60 credits</span>
+          </div>
+          <div role="progressbar" aria-label="Free allowance left" aria-valuemin="0" aria-valuemax="60" aria-valuenow="60" style="height: 6px; background: var(--surface-sunken); border-radius: 2px; overflow: hidden;">
+            <div style="width: 100%; height: 100%; background: var(--chalk);"></div>
+          </div>
+          <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted);">Spent before your balance. Resets 00:00 UTC.</span>
+        </div>
+        <a href="S11-PvP-lobby.dc.html" style="background: var(--surface); box-shadow: var(--elev-1); border-radius: 6px; padding: 12px 16px; display: flex; gap: 12px; align-items: center; text-decoration: none; color: var(--ink);">
+          <x-import component-from-global-scope="Promptlings.Icon" name="pvp" size="{{ 20 }}"></x-import>
+          <span style="display: flex; flex-direction: column;">
+            <span style="font: 700 13px/18px var(--font-sans);">1 free ranked match today</span>
+            <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted);">Race · 1 agent a side · 3 s steps</span>
+          </span>
+        </a>
+      </div>
+    </section>
+
+    <section aria-label="Maps" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px;">
+      <sc-for list="{{ maps }}" as="m" hint-placeholder-count="3">
+        <div style="display: flex; flex-direction: column; gap: 0; background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1);">
+          <x-import component-from-global-scope="Promptlings.MapCard" map="{{ m.map }}" cleared="{{ m.cleared }}" your-best="{{ m.yourBest }}" thumb-size="{{ 16 }}" max-tags="{{ 6 }}" style="box-shadow: none;"></x-import>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 12px 16px 16px; border-top: 1px solid var(--line);">
+            <dl style="margin: 0; display: grid; grid-template-columns: auto auto; gap: 2px 12px; font-size: 13px; line-height: 18px;">
+              <dt style="color: var(--ink-muted);">Hazard</dt><dd style="margin: 0;">{{ m.hazard }}</dd>
+              <dt style="color: var(--ink-muted);">Mechanics</dt><dd style="margin: 0; font-family: var(--font-mono);">{{ m.mechanics }}</dd>
+              <dt style="color: var(--ink-muted);">Your crew</dt><dd style="margin: 0; font-family: var(--font-mono);">{{ m.crew }}</dd>
+            </dl>
+            <a href="S03-Map-detail.dc.html" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 4px; border: 1px solid var(--line-strong); font: 700 13px/18px var(--font-sans); text-decoration: none; color: var(--ink);">Open map</a>
+          </div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section aria-labelledby="recent" style="display: flex; flex-direction: column; gap: 12px;">
+      <h2 id="recent" style="margin: 0; font: 600 24px/28px var(--font-display);">Recent runs</h2>
+      <div style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 15px; line-height: 22px; min-width: 720px;">
+          <thead>
+            <tr style="text-align: left; font: 700 13px/18px var(--font-sans); color: var(--ink-muted);">
+              <th scope="col" style="padding: 12px 16px; border-bottom: 1px solid var(--line);">When</th>
+              <th scope="col" style="padding: 12px 16px; border-bottom: 1px solid var(--line);">Map</th>
+              <th scope="col" style="padding: 12px 16px; border-bottom: 1px solid var(--line);">Crew</th>
+              <th scope="col" style="padding: 12px 16px; border-bottom: 1px solid var(--line);">Outcome</th>
+              <th scope="col" style="padding: 12px 16px; border-bottom: 1px solid var(--line); text-align: right;">Score</th>
+              <th scope="col" style="padding: 12px 16px; border-bottom: 1px solid var(--line);"><span style="position: absolute; left: -9999px;">Replay</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ runs }}" as="r" hint-placeholder-count="5">
+              <tr>
+                <td style="padding: 10px 16px; border-bottom: 1px solid var(--line); font: 500 13px/18px var(--font-mono); color: var(--ink-muted);">{{ r.when }}</td>
+                <td style="padding: 10px 16px; border-bottom: 1px solid var(--line);">{{ r.map }}</td>
+                <td style="padding: 10px 16px; border-bottom: 1px solid var(--line); font: 500 13px/18px var(--font-mono);">{{ r.crew }}</td>
+                <td style="padding: 10px 16px; border-bottom: 1px solid var(--line);">
+                  <x-import component-from-global-scope="Promptlings.Badge" tone="{{ r.tone }}">{{ r.outcome }}</x-import>
+                </td>
+                <td style="padding: 10px 16px; border-bottom: 1px solid var(--line); text-align: right; font: 600 15px/22px var(--font-mono);">{{ r.score }}</td>
+                <td style="padding: 10px 16px; border-bottom: 1px solid var(--line);"><a href="S05-Run-viewer.dc.html" style="font: 700 13px/18px var(--font-sans);">Replay</a></td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const floodGate = { name: 'Flood Gate', theme: 'Sunken canal village', rows: ['###############','#~~~~~~~~~~~~~#','#######.#######','#.....#.#.....#','#.*...#.#...*.#','#.............#','#.............#','#.*....0......#','###############'], tags: ['spreads','liquid','collectible'], unlocks: ['Builder'], goal: 'Collect 3 gems', stepLimit: 60, bestSolo: { steps: 27, score: 2325 } };
+    const ember = { name: 'Ember Warehouse', theme: 'Burning warehouse', rows: ['###############','#######.#######','#^,,,,,c,,,,,,#','#######.###.#,#','#...........#,#','#.0.........#,#','#..........E#*#','###############'], tags: ['spreads','damages','flammable','pushable','collectible','goal'], unlocks: [], goal: 'Collect the key, then reach the exit', stepLimit: 50, bestSolo: { steps: 29, score: 2130 } };
+    const magma = { name: 'Magma Mine', theme: 'Volcanic mine', rows: ['###############','#0#######LLL###','#.d.######.####','#.#*######.####','#.########.#.##','#.............#','#############.#','###########*dE#','###############'], tags: ['spreads','liquid','damages','breakable','collectible','goal'], unlocks: ['Builder','Digger'], goal: 'Collect 2 crystals, then reach the exit', stepLimit: 70, bestSolo: { steps: 57, score: 1779 } };
+    return {
+      maps: [
+        { map: floodGate, cleared: true, yourBest: 2200, hazard: 'Water, every 2 steps', mechanics: '4', crew: '1 agent · 31 steps' },
+        { map: ember, cleared: false, yourBest: undefined, hazard: 'Fire along fuel, every 2 steps', mechanics: '5', crew: 'Not cleared yet' },
+        { map: magma, cleared: true, yourBest: 1064, hazard: 'Lava, every 5 steps', mechanics: '7', crew: '2 agents · 36 steps' }
+      ],
+      runs: [
+        { when: '11 Nov 21:02', map: 'Magma Mine', crew: '2 agents', outcome: 'Cleared in 36 steps', tone: 'good', score: '1,064' },
+        { when: '11 Nov 20:15', map: 'Ember Warehouse', crew: '1 agent', outcome: 'Failed at step 24: agent lost to fire', tone: 'critical', score: '0' },
+        { when: '10 Nov 19:40', map: 'Flood Gate · tutorial', crew: '1 agent', outcome: 'Cleared in 31 steps', tone: 'good', score: '2,200' },
+        { when: '10 Nov 19:31', map: 'Flood Gate · tutorial', crew: '1 agent', outcome: 'Failed at step 24: village flooded', tone: 'critical', score: '0' },
+        { when: '10 Nov 19:12', map: 'Flood Gate · tutorial', crew: '1 agent', outcome: 'Failed at step 18: village flooded', tone: 'critical', score: '0' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

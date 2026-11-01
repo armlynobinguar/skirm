@@ -1,0 +1,97 @@
+{
+  "schema": "skirm.map/v2",
+  "id": "ashfall-orchard",
+  "code": "AO-02",
+  "name": "Ashfall Orchard",
+  "region": "Burnt hills",
+  "difficulty": 2,
+  "label": "Easy",
+  "blurb": "An apple orchard in the dry season. A spark in the north corner walks through the grass tree by tree, and the farmhouse root cellar is the only way out.",
+  "item": "Seed pack",
+  "deliverTo": "Root cellar",
+  "goal": 3,
+  "rows": [
+    "###################################",
+    "#^,,T,,T,,,...##...##...,,,T,,T,,^#",
+    "#,,,,,,,,,,...#.#.#.#...,,,,,,,,,,#",
+    "#T,,..*.,T,..,#.#.#.#,..,T,.*..,,T#",
+    "#,,.T##.,,,..,#.#.#.#,..,,,.##T.,,#",
+    "#*,..##..........*..........##..,*#",
+    "#T,,....,,.#..#.....#..#.,,....,,T#",
+    "#...,,T.......#..E..#.......T,,...#",
+    "#....#,...#.,.#.....#.,.#...,#....#",
+    "#.,.............................,.#",
+    "#....#.,.....,#.....#,.....,.#....#",
+    "#....,..,.....#.#.#.#.....,..,....#",
+    "#......##..,..#.#.#.#..,..##......#",
+    "#...........,.#.....#.,...........#",
+    "###################################"
+  ],
+  "starts": {
+    "A": [
+      [
+        1,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        1,
+        8
+      ]
+    ],
+    "B": [
+      [
+        33,
+        7
+      ],
+      [
+        32,
+        7
+      ],
+      [
+        33,
+        8
+      ]
+    ]
+  },
+  "exit": [
+    17,
+    7
+  ],
+  "verbs": [
+    {
+      "id": "light_a_backburn",
+      "name": "Light a backburn",
+      "effect": "ignite"
+    },
+    {
+      "id": "beat_out_flames",
+      "name": "Beat out flames",
+      "effect": "extinguish"
+    }
+  ],
+  "hazards": [
+    {
+      "kind": "fire",
+      "every": 3,
+      "cap": 7
+    }
+  ],
+  "switches": [],
+  "drops": [
+    {
+      "at": [
+        17,
+        9
+      ],
+      "tick": 40
+    }
+  ],
+  "blockSupply": 2,
+  "fog": false,
+  "steal": false,
+  "night": false
+}

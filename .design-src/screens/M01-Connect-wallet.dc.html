@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>M01 Connect NEAR wallet</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="pl-tokens.css">
+<link rel="stylesheet" href="ds/promptlings/components/bundle.css">
+<script src="ds/promptlings/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500;600;700&amp;family=Pixelify+Sans:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:var(--ink)}a:hover{color:var(--ink-muted)}
+</style>
+</helmet>
+<div style="min-height: 900px; background: var(--bg); color: var(--ink); font-family: var(--font-sans); display: flex; flex-direction: column;">
+  <div style="flex: 1; display: flex; flex-direction: column; min-height: 900px;">
+    <x-import component-from-global-scope="Promptlings.Modal" open="{{ true }}" inline="{{ true }}" title="Connect a NEAR wallet" on-close="{{ noop }}">
+      <div style="display: flex; flex-direction: column; gap: 16px; color: var(--ink);">
+        <p style="margin: 0; color: var(--ink-muted);">To top up credits you need a NEAR wallet. It is your account on NEAR; Promptlings never sees its keys. Playing never needs one.</p>
+        <div style="display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 4px; background: var(--surface-sunken); font-size: 13px; line-height: 18px;">
+          <span>Top up <span style="font-family: var(--font-mono);">1 NEAR</span> for <span style="font-family: var(--font-mono);">1,000</span> credits</span>
+          <x-import component-from-global-scope="Promptlings.Badge">Testnet</x-import>
+        </div>
+        <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px;">
+          <sc-for list="{{ wallets }}" as="w" hint-placeholder-count="3">
+            <li>
+              <button type="button" style="width: 100%; min-height: 56px; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 0 16px; border-radius: 4px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); cursor: pointer; text-align: left;">
+                <span style="display: flex; gap: 12px; align-items: center;">
+                  <span style="display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 4px; background: var(--chalk-soft);"><x-import component-from-global-scope="Promptlings.Icon" name="wallet"></x-import></span>
+                  <span style="display: flex; flex-direction: column;">
+                    <span style="font: 700 15px/22px var(--font-sans);">{{ w.name }}</span>
+                    <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted);">{{ w.kind }}</span>
+                  </span>
+                </span>
+                <x-import component-from-global-scope="Promptlings.Icon" name="step_fwd"></x-import>
+              </button>
+            </li>
+          </sc-for>
+        </ul>
+        <p style="margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted);">No wallet yet? Create a free testnet account in any of these; testnet NEAR has no real value.</p>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line);">
+          <x-import component-from-global-scope="Promptlings.Button" on-click="{{ noop }}">Not now</x-import>
+        </div>
+      </div>
+    </x-import>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      noop: () => {},
+      wallets: [
+        { name: 'MyNearWallet', kind: 'Web wallet' },
+        { name: 'Meteor Wallet', kind: 'Browser extension or web' },
+        { name: 'HERE Wallet', kind: 'Phone app' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

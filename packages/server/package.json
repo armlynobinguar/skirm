@@ -1,0 +1,23 @@
+{
+  "name": "@skirm/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google-cloud/kms": "^6.3.0",
+    "@skirm/db": "*",
+    "@skirm/engine": "*",
+    "@skirm/shared": "*",
+    "bullmq": "^6.4.2",
+    "ioredis": "^5.4.2",
+    "jose": "^5.9.6",
+    "zod": "^4.6.6"
+  }
+}

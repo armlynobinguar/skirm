@@ -1,0 +1,18 @@
+[package]
+name = "skirm-market"
+description = "skirm market contract: list, delist and buy skill NFTs with platform fee and NEP-199 royalty payouts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }
+# Unit tests run the skills contract's NEP-199 payout through the market's settlement.
+skirm-skills = { path = "../skills" }

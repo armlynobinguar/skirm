@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>S05 Run viewer, live</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="pl-tokens.css">
+<link rel="stylesheet" href="ds/promptlings/components/bundle.css">
+<script src="ds/promptlings/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500;600;700&amp;family=Pixelify+Sans:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:var(--ink)}a:hover{color:var(--ink-muted)}
+</style>
+</helmet>
+<div style="min-height: 1180px; background: var(--bg); color: var(--ink); font-family: var(--font-sans);">
+  <dc-import name="TopBar" active="play" hint-size="100%,72px"></dc-import>
+  <main style="max-width: 1360px; margin: 0 auto; padding: 24px 24px 48px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box;">
+    <section style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+        <x-import component-from-global-scope="Promptlings.Badge" icon="play">Live</x-import>
+        <h1 style="margin: 0; font: 600 32px/36px var(--font-display);">Flood Gate</h1>
+        <span style="font: 500 13px/18px var(--font-mono); color: var(--ink-muted);">Rook · Builder · Flood Warden</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+        <span style="font: 700 13px/18px var(--font-sans); color: var(--ink-muted);">Speed</span>
+        <span role="radiogroup" aria-label="Live speed" style="display: inline-flex; gap: 4px;">
+          <button type="button" role="radio" aria-checked="false" style="min-width: 44px; min-height: 36px; border: 1px solid var(--line-strong); border-radius: 4px; background: transparent; color: var(--ink); font: 500 13px/18px var(--font-mono);">1 step/s</button>
+          <button type="button" role="radio" aria-checked="true" style="min-width: 44px; min-height: 36px; border: 1px solid var(--chalk); border-radius: 4px; background: var(--chalk); color: var(--on-chalk); font: 600 13px/18px var(--font-mono);">2 steps/s</button>
+        </span>
+        <x-import component-from-global-scope="Promptlings.Button" variant="ghost" disabled="{{ true }}">Jump to live · you are live</x-import>
+      </div>
+    </section>
+
+    <x-import component-from-global-scope="Promptlings.RunHUD" tick="{{ 3 }}" step-limit="{{ 60 }}" agents-alive="{{ 1 }}" agents-total="{{ 1 }}" credits-spent="{{ 2 }}" credits-held="{{ 60 }}" status="running"></x-import>
+
+    <ol aria-label="Turn phase" style="margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px;">
+      <sc-for list="{{ phases }}" as="ph" hint-placeholder-count="6">
+        <sc-if value="{{ ph.on }}" hint-placeholder-val="{{ false }}">
+          <li aria-current="step" style="padding: 6px 12px; border-radius: 2px; background: var(--chalk); color: var(--on-chalk); font: 700 13px/18px var(--font-sans);">{{ ph.label }}</li>
+        </sc-if>
+        <sc-if value="{{ ph.off }}" hint-placeholder-val="{{ true }}">
+          <li style="padding: 6px 12px; border-radius: 2px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-muted); font: 700 13px/18px var(--font-sans);">{{ ph.label }}</li>
+        </sc-if>
+      </sc-for>
+    </ol>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+      <div style="flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+        <div style="position: relative; display: inline-block;">
+          <x-import component-from-global-scope="Promptlings.MapGrid" rows="{{ rows }}" tile-size="{{ 32 }}" agents="{{ agents }}" label="Flood Gate, step 3. Water has entered the spillway. Rook is two tiles below it."></x-import>
+          <sc-for list="{{ markers }}" as="mk" hint-placeholder-count="4">
+            <span aria-hidden="true" style="position: absolute; top: {{ mk.top }}px; left: {{ mk.left }}px; width: 32px; height: 32px; box-sizing: border-box; border: 2px dashed var(--chalk); pointer-events: none;">
+              <span style="position: absolute; top: -9px; left: -9px; min-width: 16px; height: 16px; padding: 0 2px; box-sizing: border-box; background: var(--chalk); color: var(--on-chalk); font: 600 11px/16px var(--font-mono); text-align: center;">{{ mk.n }}</span>
+            </span>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between;">
+          <x-import component-from-global-scope="Promptlings.TileLegend" kinds="{{ legend }}" compact="{{ true }}"></x-import>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+          <div style="background: var(--surface); box-shadow: var(--elev-1); border-radius: 6px; padding: 8px 12px; display: flex; gap: 8px; align-items: center;">
+            <span aria-hidden="true" style="width: 14px; height: 14px; background: var(--tile-water); display: inline-block;"></span>
+            <span style="font-size: 13px; line-height: 18px;">Water spreads after step <span style="font-family: var(--font-mono); font-weight: 600;">4</span> · every 2 steps</span>
+          </div>
+          <div style="background: var(--surface); box-shadow: var(--elev-1); border-radius: 6px; padding: 8px 12px; display: flex; gap: 8px; align-items: center; font-size: 13px; line-height: 18px;">
+            <x-import component-from-global-scope="Promptlings.Icon" name="tag_collectible" size="{{ 14 }}"></x-import>
+            Gems <span style="font-family: var(--font-mono); font-weight: 600;">0 / 3</span>
+          </div>
+          <div style="background: var(--surface); box-shadow: var(--elev-1); border-radius: 6px; padding: 8px 12px; display: flex; gap: 8px; align-items: center; font-size: 13px; line-height: 18px;">
+            <x-import component-from-global-scope="Promptlings.Icon" name="place_block" size="{{ 14 }}"></x-import>
+            Blocks left <span style="font-family: var(--font-mono); font-weight: 600;">2</span>
+          </div>
+        </div>
+      </div>
+
+      <aside style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <section aria-label="Agent Rook" style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px;">
+          <x-import component-from-global-scope="Promptlings.ConfidenceBar" options="{{ conf }}" agent-name="Rook · choosing step 3" tick="{{ 3 }}" max="{{ 3 }}"></x-import>
+        </section>
+
+        <section aria-labelledby="plan" style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+            <h2 id="plan" style="margin: 0; font: 700 17px/24px var(--font-sans);">Plan</h2>
+            <span style="font: 500 11px/14px var(--font-mono); color: var(--ink-muted);">written at step 0 · replans near step 20</span>
+          </div>
+          <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px;">
+            <sc-for list="{{ plan }}" as="p" hint-placeholder-count="5">
+              <li style="display: grid; grid-template-columns: 22px 64px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 4px; background: {{ p.bg }};">
+                <span style="font: 600 11px/14px var(--font-mono); text-align: center; background: var(--chalk); color: var(--on-chalk);">{{ p.n }}</span>
+                <span style="font: 500 13px/18px var(--font-mono);">{{ p.intent }}</span>
+                <span style="font: 500 13px/18px var(--font-mono); color: var(--ink-muted);">{{ p.target }}</span>
+                <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted);">{{ p.state }}</span>
+              </li>
+            </sc-for>
+          </ol>
+          <p style="margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted);">The plan shows intents and targets only. Skill text is never shown.</p>
+        </section>
+
+        <section aria-labelledby="log" style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+          <h2 id="log" style="margin: 0; font: 700 17px/24px var(--font-sans);">Run log</h2>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font: 500 13px/18px var(--font-mono);">
+              <thead>
+                <tr style="text-align: left; font: 700 13px/18px var(--font-sans); color: var(--ink-muted);">
+                  <th scope="col" style="padding: 6px 4px; border-bottom: 1px solid var(--line);">Step</th>
+                  <th scope="col" style="padding: 6px 4px; border-bottom: 1px solid var(--line);">Agent</th>
+                  <th scope="col" style="padding: 6px 4px; border-bottom: 1px solid var(--line);">Action</th>
+                  <th scope="col" style="padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: right;">p</th>
+                  <th scope="col" style="padding: 6px 4px; border-bottom: 1px solid var(--line);">World</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style="padding: 6px 4px; border-bottom: 1px solid var(--line);">02</td><td style="padding: 6px 4px; border-bottom: 1px solid var(--line);">Rook</td><td style="padding: 6px 4px; border-bottom: 1px solid var(--line);">move N</td><td style="padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: right;">0.88</td><td style="padding: 6px 4px; border-bottom: 1px solid var(--line); font-family: var(--font-sans);">Water spread into (7,2)</td></tr>
+                <tr><td style="padding: 6px 4px; border-bottom: 1px solid var(--line);">01</td><td style="padding: 6px 4px; border-bottom: 1px solid var(--line);">Rook</td><td style="padding: 6px 4px; border-bottom: 1px solid var(--line);">move N</td><td style="padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: right;">0.91</td><td style="padding: 6px 4px; border-bottom: 1px solid var(--line); font-family: var(--font-sans); color: var(--ink-muted);">None</td></tr>
+                <tr><td style="padding: 6px 4px;">00</td><td style="padding: 6px 4px;">Rook</td><td style="padding: 6px 4px; font-family: var(--font-sans);">Planner wrote a plan</td><td style="padding: 6px 4px;"></td><td style="padding: 6px 4px;"></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const at = (x, y) => ({ left: 8 + x * 32, top: 8 + y * 32 });
+    return {
+      rows: ['###############','#~~~~~~~~~~~~~#','#######~#######','#.....#.#.....#','#.*...#.#...*.#','#.............#','#.............#','#.*...........#','###############'],
+      agents: [{ id: 'rook', x: 7, y: 5 }],
+      markers: [
+        { n: '1', ...at(7, 4) },
+        { n: '2', ...at(12, 4) },
+        { n: '3', ...at(2, 4) },
+        { n: '4', ...at(2, 7) }
+      ],
+      legend: ['wall', 'water', 'gem', 'block', 'agent'],
+      phases: ['Plan', 'Observe', 'Decide', 'Validate', 'Apply', 'World rules'].map((label) => ({ label, on: label === 'Decide', off: label !== 'Decide' })),
+      conf: [
+        { action: 'place_block N', p: 0.82 },
+        { action: 'move N', p: 0.08 },
+        { action: 'wait', p: 0.04 },
+        { action: 'move E', p: 0.02 },
+        { action: 'move W', p: 0.02 },
+        { action: 'move S', p: 0.01 },
+        { action: 'place_block E', p: 0.01 }
+      ],
+      plan: [
+        { n: '1', intent: 'block', target: '(7,4) spillway', state: 'Now', bg: 'var(--chalk-soft)' },
+        { n: '2', intent: 'collect', target: 'gem (12,4)', state: 'Next', bg: 'transparent' },
+        { n: '3', intent: 'collect', target: 'gem (2,4)', state: '', bg: 'transparent' },
+        { n: '4', intent: 'collect', target: 'gem (2,7)', state: '', bg: 'transparent' },
+        { n: '5', intent: 'avoid', target: 'water', state: 'Always', bg: 'transparent' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

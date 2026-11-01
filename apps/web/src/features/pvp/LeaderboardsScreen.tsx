@@ -1,0 +1,262 @@
+'use client';
+// S14 Leaderboards (/leaderboards). Design: S14-Leaderboards.dc.html; spec: uiux.md S14.
+// Tabs: Season (GET /seasons/current for the season, its pool and your row; GET /seasons/:id/standings
+// for the rows: points from ranked v2 matches, W–L–D, Elo and the place's projected prize) and
+// All-time (GET /leaderboards/players: per-player Elo on the v2 ladder).
+// The pool says "local" while it is kept offchain (the seasons contract is not deployed yet).
+// The tab is kept in the URL (?tab=alltime) for sharing; the season is the default.
+import { Tabs, fmt } from '@skirm/ui';
+import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { EmptyState } from '@/components/states/EmptyState';
+import { QueryView } from '@/components/states/QueryView';
+import { Skeleton } from '@/components/states/Skeleton';
+import { qk, useCurrentSeason, useMe, useSeasonStandings } from '@/lib/api/queries';
+import type { PlayerLadderRow, Season, Standing } from '@/lib/api/types';
+import { routes } from '@/lib/routes';
+import { useApi } from '@/lib/services';
+import s from './pvp.module.css';
+import { fmtCountdown, nearText, useNow } from './pvpUtil';
+
+type Tab = 'season' | 'alltime';
+
+const TABS = [
+  { id: 'season', label: 'Season', icon: 'trophy' as const },
+  { id: 'alltime', label: 'All-time', icon: 'elo' as const },
+];
+
+/** Rows of a season's standings shown on the screen. */
+const STANDINGS_LIMIT = 100;
+/** Rows of the all-time ladder. */
+const LADDER_LIMIT = 100;
+
+function readTab(): Tab {
+  if (typeof window === 'undefined') return 'season';
+  return new URLSearchParams(window.location.search).get('tab') === 'alltime' ? 'alltime' : 'season';
+}
+
+function writeTab(tab: Tab) {
+  try {
+    const qs = tab === 'alltime' ? '?tab=alltime' : '';
+    window.history.replaceState(window.history.state, '', window.location.pathname + qs);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function LeaderboardsScreen() {
+  const [tab, setTab] = useState<Tab>('season');
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setTab(readTab());
+    setReady(true);
+  }, []);
+  useEffect(() => {
+    if (ready) writeTab(tab);
+  }, [ready, tab]);
+
+  return (
+    <div className={s.page} data-testid="screen-s14">
+      <h1 className="app-h1">Leaderboards</h1>
+      <div className={s.tabsRow}>
+        <div className={s.tabsGrow} data-testid="s14-tabs">
+          <Tabs tabs={TABS} value={tab} onChange={(id) => setTab(id as Tab)} label="Leaderboard" />
+        </div>
+      </div>
+      <div role="tabpanel" aria-label={tab === 'season' ? 'Season' : 'All-time'}>
+        {tab === 'season' ? <SeasonBoard /> : <AllTime />}
+      </div>
+    </div>
+  );
+}
+
+function SeasonBoard() {
+  const current = useCurrentSeason();
+  return (
+    <section aria-labelledby="s14-season" className={s.card} data-testid="s14-season">
+      <QueryView query={current} loading={<Skeleton rows={6} label="Loading the season" />}>
+        {(d) => <SeasonBody season={d.season} you={d.you} />}
+      </QueryView>
+    </section>
+  );
+}
+
+function SeasonBody({ season, you }: { season: Season; you: Standing | undefined }) {
+  const standings = useSeasonStandings(season.id, { limit: STANDINGS_LIMIT });
+  const now = useNow(1000, season.status === 'open');
+  const left = Date.parse(season.endsAt) - now;
+  return (
+    <>
+      <div className={s.cardHead}>
+        <h2 id="s14-season" className={s.h2}>
+          Season {season.number}
+        </h2>
+        <span className={s.meta} data-testid="s14-season-countdown">
+          {season.status !== 'open' ? (season.status === 'paid' ? 'Ended · prizes paid' : 'Ended · prizes being settled') : left > 0 ? `Ends in ${fmtCountdown(left)}` : 'Ending now'}
+        </span>
+      </div>
+      <p className={s.lede} data-testid="s14-season-pool">
+        Prize pool <b className={s.mono}>{nearText(season.poolYocto)}</b>
+        {season.poolSource === 'local' ? (
+          <>
+            {' '}
+            <span className={s.chip} title="Kept offchain until the seasons contract is deployed" data-testid="s14-pool-local">
+              local
+            </span>
+          </>
+        ) : null}{' '}
+        · paid to the top {season.splitBps.length}. Ranked wins earn 25 points, draws 12, losses 5.
+      </p>
+      <QueryView
+        query={standings}
+        loading={<Skeleton rows={6} label="Loading the standings" />}
+        empty={(d) =>
+          d.rows.length === 0 && (
+            <EmptyState action={<Link href={routes.pvp()} className="app-link-strong">Queue for ranked</Link>}>
+              No ranked matches this season yet. Win one to take the first place.
+            </EmptyState>
+          )
+        }
+      >
+        {(d) => <StandingsTable rows={d.rows} total={d.total} you={you} />}
+      </QueryView>
+    </>
+  );
+}
+
+function StandingsTable({ rows, total, you }: { rows: Standing[]; total: number; you: Standing | undefined }) {
+  const youIn = !!you && rows.some((r) => r.account.id === you.account.id);
+  return (
+    <>
+      <div className={s.tableWrap}>
+        <table className={s.table} aria-label="Season standings">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Player</th>
+              <th scope="col" className={s.num}>
+                Points
+              </th>
+              <th scope="col" className={s.num}>
+                W–L–D
+              </th>
+              <th scope="col" className={s.num}>
+                Elo
+              </th>
+              <th scope="col" className={s.num}>
+                Projected prize
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <StandingRow key={r.account.id} r={r} you={!!you && r.account.id === you.account.id} />
+            ))}
+            {you && !youIn ? <StandingRow r={you} you /> : null}
+          </tbody>
+        </table>
+      </div>
+      {total > rows.length ? (
+        <p className={s.note}>
+          Top {fmt(rows.length)} of {fmt(total)} players.
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+function StandingRow({ r, you }: { r: Standing; you: boolean }) {
+  return (
+    <tr className={you ? s.youRow : undefined} data-testid={`s14-season-row-${r.rank}`} data-you={you || undefined}>
+      <td className={s.rank}>{r.rank}</td>
+      <td>
+        {r.account.handle}
+        {you ? ' · you' : ''}
+      </td>
+      <td className={s.num}>{fmt(r.points)}</td>
+      <td className={s.num}>
+        {r.wins}–{r.losses}–{r.draws}
+      </td>
+      <td className={s.num}>{fmt(r.elo)}</td>
+      <td className={s.num}>{r.projectedPrizeYocto === null ? '—' : nearText(r.projectedPrizeYocto)}</td>
+    </tr>
+  );
+}
+
+function AllTime() {
+  const api = useApi();
+  const me = useMe();
+  const ladder = useQuery({ queryKey: qk.leaderboards.players(LADDER_LIMIT), queryFn: () => api.playerLadder(LADDER_LIMIT) });
+  const myId = me.data?.account.id;
+  return (
+    <section aria-labelledby="s14-alltime" className={s.card} data-testid="s14-alltime">
+      <div className={s.cardHead}>
+        <h2 id="s14-alltime" className={s.h2}>
+          All-time
+        </h2>
+        <span className={s.meta}>Elo per player, ranked v2 matches</span>
+      </div>
+      <QueryView
+        query={ladder}
+        loading={<Skeleton rows={6} label="Loading the ladder" />}
+        empty={(d) =>
+          d.rows.length === 0 && (
+            <EmptyState action={<Link href={routes.pvp()} className="app-link-strong">Queue for ranked</Link>}>
+              No ranked matches yet. Win one to take the first place.
+            </EmptyState>
+          )
+        }
+      >
+        {(d) => {
+          const youRow = d.you ?? d.rows.find((r) => r.account.id === myId);
+          const youIn = !!youRow && d.rows.some((r) => r.account.id === youRow.account.id);
+          return (
+            <div className={s.tableWrap}>
+              <table className={s.table} aria-label="All-time ladder">
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Player</th>
+                    <th scope="col">Title</th>
+                    <th scope="col" className={s.num}>
+                      Elo
+                    </th>
+                    <th scope="col" className={s.num}>
+                      W–L–D
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.rows.map((r) => (
+                    <LadderLine key={r.account.id} r={r} you={!!youRow && r.account.id === youRow.account.id} />
+                  ))}
+                  {youRow && !youIn ? <LadderLine r={youRow} you /> : null}
+                </tbody>
+              </table>
+            </div>
+          );
+        }}
+      </QueryView>
+      <p className={s.note}>Every player starts at 1,200. Only ranked matches move Elo.</p>
+    </section>
+  );
+}
+
+function LadderLine({ r, you }: { r: PlayerLadderRow; you: boolean }) {
+  return (
+    <tr className={you ? s.youRow : undefined} data-testid={`s14-alltime-row-${r.rank}`} data-you={you || undefined}>
+      <td className={s.rank}>{r.rank}</td>
+      <td>
+        {r.account.handle}
+        {you ? ' · you' : ''}
+      </td>
+      <td>{r.title}</td>
+      <td className={s.num}>{fmt(r.elo)}</td>
+      <td className={s.num}>
+        {r.wins}–{r.losses}–{r.draws}
+      </td>
+    </tr>
+  );
+}

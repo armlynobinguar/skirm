@@ -1,0 +1,5 @@
+# Migrations are hashed byte for byte (packages/db embeds them in src/migrations.generated.ts),
+# so keep them LF on every OS; a CRLF checkout on Windows would embed different hashes.
+packages/db/migrations/** text eol=lf
+# Git hooks run under sh; a CRLF checkout breaks the shebang.
+.githooks/** text eol=lf

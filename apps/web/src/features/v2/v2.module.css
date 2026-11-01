@@ -1,0 +1,102 @@
+/* v2 match screen: lock-in, the void card and the debrief (the VS card reuses match.module.css; the live HUD is hud/hud.module.css). */
+.wait,
+.ended { display: grid; justify-items: center; gap: 14px; max-width: 640px; margin: 12vh auto 0; padding: 24px 16px; text-align: center; }
+/* Cards over the live arena: a dark glass backing so text never sits on the board. */
+.ended,
+.lock { background: rgba(5, 8, 13, .84); border: 1px solid var(--line); backdrop-filter: blur(6px); }
+.ended :global(.sk-disp) { font-size: clamp(56px, 9vw, 120px); color: var(--bone); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.note { margin: 0; color: var(--muted); }
+.hash { margin: 0; font: 400 11px/16px var(--font-mono); color: var(--faint); overflow-wrap: anywhere; }
+.hash code { color: var(--text); }
+
+.lock { display: grid; gap: 16px; max-width: 920px; margin: 4vh auto 0; padding: 20px; }
+.head { display: flex; justify-content: space-between; align-items: end; gap: 16px; }
+.head :global(.sk-disp) { margin: 4px 0 0; font-size: clamp(36px, 5vw, 64px); }
+.squad { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.squad > li { display: grid; gap: 10px; padding: 14px 16px; }
+.name { font: 800 22px/1 var(--font-display); text-transform: uppercase; color: var(--bone); }
+.tiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tier { display: grid; gap: 2px; padding: 10px 12px; text-align: left; color: var(--text); background: rgba(9, 15, 23, .8); border: 1px solid var(--line); cursor: pointer; }
+.tier b { font: 700 15px/1.1 var(--font-display); text-transform: uppercase; }
+.tier small { font: 400 11px/15px var(--font-mono); color: var(--muted); }
+.tier[data-on] { border-color: var(--you); box-shadow: inset 0 0 0 1px var(--you); }
+.tier:disabled { cursor: default; opacity: .75; }
+.tier:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.est { font: 500 12px/16px var(--font-mono); color: var(--amber); }
+
+@media (max-width: 640px) {
+  .tiers { grid-template-columns: 1fr; }
+}
+
+/* The debrief (the prototype's s-result): verdict and stars on the left, the match report on the right. */
+.result { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 28px; align-items: center; min-height: calc(100vh - 140px); max-width: 1360px; margin: 0 auto; padding: 20px 16px; }
+.verdict { display: grid; gap: 14px; min-width: 0; }
+.verdictWord { margin: 0; font: 800 clamp(76px, 10.5vw, 160px)/.88 var(--font-display); text-transform: uppercase; color: var(--you); text-shadow: 0 8px 50px rgba(0, 0, 0, .5); animation: fromL .8s var(--ease-out) both; }
+.verdictWord[data-fail] { color: var(--rival); }
+.scoreLine { display: flex; flex-wrap: wrap; align-items: baseline; gap: 18px; font: 800 64px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.sa { color: var(--you); }
+.sb { color: var(--rival); }
+.dash { color: var(--faint); }
+.scoreLine small { font: 400 12px/16px var(--font-mono); letter-spacing: .14em; color: var(--muted); }
+.stars { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.stars li { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; font-size: 13px; color: var(--muted); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+.stars i { flex: none; width: 26px; height: 26px; background: var(--line-strong); clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+.stars li[data-got] { color: var(--bone); }
+.stars li[data-got] i { background: var(--amber); animation: starin .6s var(--ease-out) both; animation-delay: var(--sd); }
+@keyframes starin { from { opacity: 0; transform: scale(2.4) rotate(-40deg); } }
+.acts { display: flex; flex-wrap: wrap; gap: 10px; }
+.tally { display: grid; gap: 12px; padding: 20px; animation: fromR .8s var(--ease-out) both; }
+.big { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.right { text-align: right; }
+.bigN { font: 800 80px/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--you); }
+.bigN[data-neg] { color: var(--rival); }
+.mvp { font: 800 44px/1 var(--font-display); text-transform: uppercase; color: var(--bone); overflow-wrap: anywhere; }
+.trow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 9px; font-size: 14px; color: var(--muted); box-shadow: inset 0 -1px 0 var(--line); }
+.trow b { font: 500 14px/18px var(--font-mono); text-align: right; color: var(--bone); }
+.verify { display: flex; align-items: center; gap: 10px; overflow: hidden; padding: 10px 12px; font: 400 11px/16px var(--font-mono); letter-spacing: .06em; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.verify[data-ok] { color: var(--you); background: rgba(52, 224, 200, .06); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .35); }
+.verify span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.verify code { color: var(--text); }
+@keyframes fromL { from { opacity: .001; transform: translate3d(-40px, 0, 0); } }
+@keyframes fromR { from { opacity: .001; transform: translate3d(60px, 0, 0); } }
+
+@media (max-width: 820px) {
+  .result { grid-template-columns: 1fr; min-height: 0; }
+  .scoreLine { font-size: 48px; }
+  .bigN { font-size: 60px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .verdictWord, .tally, .stars li[data-got] i { animation: none; }
+}
+
+/* The debrief's Comms transcript: under the verdict and the report, the whole width. */
+.transcript { grid-column: 1 / -1; display: grid; gap: 10px; padding: 16px 20px; }
+.lines { display: grid; gap: 6px; max-height: 360px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.lines li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding-left: 10px; font-size: 14px; color: var(--text); box-shadow: inset 2px 0 0 var(--c); }
+.lines b { font: 700 13px/18px var(--font-display); text-transform: uppercase; color: var(--c); }
+.tk, .ch, .heard { font: 400 11px/16px var(--font-mono); color: var(--muted); }
+.ch { letter-spacing: .12em; text-transform: uppercase; }
+.tx { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+.heard { color: var(--amber); }
+
+/* Match found: the VS takeover (Accept) and the accept / lock-in countdown. */
+.vs { position: fixed; inset: 0; z-index: 40; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; overflow: hidden; background: rgba(5, 8, 13, .95); }
+.found { position: absolute; top: 70px; left: 0; right: 0; padding-inline: 16px; text-align: center; }
+.vside { display: grid; gap: 8px; height: 100%; min-width: 0; padding: 36px; align-content: center; }
+.vside :global(.sk-disp) { font-size: clamp(44px, 6.4vw, 96px); overflow-wrap: anywhere; }
+.va { justify-items: start; background: linear-gradient(90deg, rgba(52, 224, 200, .25), transparent); animation: fromL .8s var(--ease-out) both; }
+.vb { justify-items: end; text-align: right; background: linear-gradient(270deg, rgba(255, 70, 85, .28), transparent); animation: fromR .8s var(--ease-out) both; }
+.vmid { display: grid; justify-items: center; gap: 18px; padding: 16px; }
+.vsWord { font-size: 120px; color: var(--amber); animation: pop2 .8s var(--ease-out) both .3s; }
+.vsCount { font: 800 64px/1 var(--font-display); color: var(--bone); }
+.crewMeta { font: 400 11px/16px var(--font-mono); color: var(--muted); }
+@keyframes pop2 { from { opacity: 0; transform: scale(2.2); } }
+
+@media (max-width: 820px) {
+  .vs { grid-template-columns: 1fr; grid-template-rows: 1fr auto 1fr; }
+  .vside { height: auto; padding: 20px; }
+  .vsWord { font-size: 64px; }
+}
+@media (prefers-reduced-motion: reduce) { .va, .vb, .vsWord { animation: none; } }

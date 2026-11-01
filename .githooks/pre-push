@@ -1,0 +1,68 @@
+#!/bin/sh
+# Runs the test suites ci.yml runs before a push leaves this machine, so a PR branch reaches GitHub
+# already tested. Enabled for every clone by the root package.json's `prepare` script (npm install /
+# npm ci sets core.hooksPath to .githooks). Skip once with `git push --no-verify`; ci.yml is still
+# the gate.
+#
+# Only the parts of the repo the pushed commits touch are tested: contracts/ runs cargo test,
+# anything else runs typecheck and test through Turborepo (cached, so unchanged workspaces are
+# fast). The Postgres/Redis suites run too when TEST_DATABASE_URL and TEST_REDIS_URL are set.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+zero=0000000000000000000000000000000000000000
+changed=""
+pushing=0
+
+# stdin: one "<local ref> <local sha> <remote ref> <remote sha>" line per ref being pushed.
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue # deleting a remote branch, nothing to test
+  pushing=1
+  base=$(git merge-base "$local_sha" origin/main 2>/dev/null || true)
+  if [ -n "$base" ]; then
+    files=$(git diff --name-only "$base" "$local_sha")
+  else
+    files=$(git ls-tree -r --name-only "$local_sha") # no common history with main: test everything
+  fi
+  changed="$changed
+$files"
+done
+
+[ "$pushing" = 1 ] || exit 0
+if [ -z "$(printf '%s' "$changed" | tr -d '[:space:]')" ]; then
+  echo "pre-push: no changes against origin/main, skipping tests"
+  exit 0
+fi
+
+# The suites run on the working tree, not the pushed commits.
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "pre-push: warning: uncommitted changes are included in this test run" >&2
+fi
+
+if printf '%s\n' "$changed" | grep -v '^contracts/' | grep -q .; then
+  echo "pre-push: npm run typecheck && npm test"
+  npm run typecheck
+  npm test
+
+  # Full stack smoke, opt-in per machine: `git config skirm.smoke true` (needs Docker).
+  # SKIRM_SMOKE=0 git push skips it once.
+  if [ "$(git config --bool skirm.smoke 2>/dev/null)" = true ] && [ "${SKIRM_SMOKE:-}" != 0 ]; then
+    if ! docker info >/dev/null 2>&1; then
+      echo "pre-push: skirm.smoke is on but Docker is not running" >&2
+      echo "pre-push: start Docker, or skip the smoke once with SKIRM_SMOKE=0 git push" >&2
+      exit 1
+    fi
+    echo "pre-push: npm run smoke"
+    npm run smoke </dev/null
+  fi
+fi
+
+if printf '%s\n' "$changed" | grep -q '^contracts/'; then
+  if ! command -v cargo >/dev/null 2>&1; then
+    echo "pre-push: contracts/ changed but cargo is not installed (see contracts/README.md)" >&2
+    echo "pre-push: install Rust, or push with --no-verify and let ci.yml test it" >&2
+    exit 1
+  fi
+  echo "pre-push: cargo test (contracts)"
+  (cd contracts && cargo test)
+fi

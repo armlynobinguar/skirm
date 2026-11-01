@@ -1,0 +1,4 @@
+[toolchain]
+channel = "stable"
+# build.sh rebuilds std for wasm32-unknown-unknown with -C target-cpu=mvp, which needs rust-src.
+components = ["rust-src"]

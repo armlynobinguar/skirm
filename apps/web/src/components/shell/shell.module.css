@@ -1,0 +1,34 @@
+/* Shell extras: the design notes aside (the prototype's #notes). The top bar and the account card
+   are app-topbar-* and app-dock-* in globals.css. Tokens only. */
+
+.notes {
+  position: fixed;
+  z-index: 30;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  display: grid;
+  gap: 10px;
+  width: min(420px, calc(100% - 32px));
+  max-height: min(62vh, 560px);
+  overflow: auto;
+  padding: 16px 18px;
+  background: rgba(20, 16, 6, .95);
+  box-shadow: inset 0 0 0 1px rgba(255, 181, 71, .5);
+  animation: rise .45s var(--ease-out) both;
+}
+@keyframes rise { from { opacity: 0; transform: translate3d(0, 18px, 0); } to { opacity: 1; transform: none; } }
+.notes h3 {
+  margin: 0;
+  font: 800 24px/1 var(--font-display);
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.notes p,
+.notes li { margin: 0; font-size: 13px; line-height: 1.5; color: #e8dcc4; }
+.notes ul { display: grid; gap: 6px; margin: 0; padding-left: 18px; }
+.notes :global(.sk-kick) { color: rgba(255, 181, 71, .85); }
+.notes p:global(.sk-kick) { margin-top: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .notes { animation: none; }
+}

@@ -1,0 +1,92 @@
+{
+  "schema": "skirm.map/v2",
+  "id": "saltmarsh-weir",
+  "code": "SW-01",
+  "name": "Saltmarsh Weir",
+  "region": "Tidal flats",
+  "difficulty": 1,
+  "label": "Tutorial",
+  "blurb": "Boardwalk village on a salt marsh. The weir along the top has cracked open one tile wide, and the tide spills down into the lanes.",
+  "item": "Water jug",
+  "deliverTo": "Stilt shelter",
+  "goal": 2,
+  "rows": [
+    "###############################",
+    "#~~~~~~~~~~..#...#..~~~~~~~~~~#",
+    "####.######..#...#..######.####",
+    "#...,...*....#...#....*...,...#",
+    "#.##..##.....#...#.....##..##.#",
+    "#..#..#..c...#...#...c..#..#..#",
+    "#..#...........E...........#..#",
+    "#............#...#............#",
+    "##...........##*##...........##",
+    "#.....,...#..#...#..#...,.....#",
+    "#...,........#...#........,...#",
+    "#............#...#............#",
+    "###############################"
+  ],
+  "starts": {
+    "A": [
+      [
+        1,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        2,
+        8
+      ]
+    ],
+    "B": [
+      [
+        29,
+        7
+      ],
+      [
+        28,
+        7
+      ],
+      [
+        28,
+        8
+      ]
+    ]
+  },
+  "exit": [
+    15,
+    6
+  ],
+  "verbs": [
+    {
+      "id": "sandbag_the_gap",
+      "name": "Sandbag the gap",
+      "effect": "add_solid"
+    },
+    {
+      "id": "push_a_fish_crate",
+      "name": "Push a fish crate",
+      "effect": "push"
+    },
+    {
+      "id": "open_a_sluice",
+      "name": "Open a sluice",
+      "effect": "add_liquid"
+    }
+  ],
+  "hazards": [
+    {
+      "kind": "water",
+      "every": 4,
+      "cap": 7
+    }
+  ],
+  "switches": [],
+  "drops": [],
+  "blockSupply": 2,
+  "fog": false,
+  "steal": false,
+  "night": false
+}

@@ -1,0 +1,38 @@
+# Builds and pushes the Node service images on Cloud Build (no local Docker needed), for GCP deploys
+# (docs/deploy.md, Staging). Run from the repo root:
+#
+#   gcloud builds submit --config=docker/cloudbuild.yaml \
+#     --substitutions=_REG=us-central1-docker.pkg.dev/<project>/skirm,_TAG=$(git rev-parse --short HEAD) .
+#
+# Builds migrate, api, worker and realtime, or only the ones in _APPS (a comma list; scripts/deploy-gcp.sh
+# passes the pieces it is about to deploy). Each step builds and pushes its image, or does nothing.
+# web needs the public api/realtime URLs at build time, so it has its own config:
+# docker/cloudbuild.web.yaml.
+substitutions:
+  _REG: ''
+  _TAG: ''
+  _APPS: migrate,api,worker,realtime
+options:
+  env: ['DOCKER_BUILDKIT=1']
+  machineType: E2_HIGHCPU_8
+timeout: 3600s
+steps:
+  - id: migrate
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args: ['-c', 'case ,${_APPS}, in *,migrate,*) docker build -f docker/node.Dockerfile --build-arg APP=migrate -t ${_REG}/migrate:${_TAG} . && docker push ${_REG}/migrate:${_TAG} ;; esac']
+  - id: api
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['migrate']
+    entrypoint: bash
+    args: ['-c', 'case ,${_APPS}, in *,api,*) docker build -f docker/node.Dockerfile --build-arg APP=api -t ${_REG}/api:${_TAG} . && docker push ${_REG}/api:${_TAG} ;; esac']
+  - id: worker
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['migrate']
+    entrypoint: bash
+    args: ['-c', 'case ,${_APPS}, in *,worker,*) docker build -f docker/node.Dockerfile --build-arg APP=worker -t ${_REG}/worker:${_TAG} . && docker push ${_REG}/worker:${_TAG} ;; esac']
+  - id: realtime
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['migrate']
+    entrypoint: bash
+    args: ['-c', 'case ,${_APPS}, in *,realtime,*) docker build -f docker/node.Dockerfile --build-arg APP=realtime -t ${_REG}/realtime:${_TAG} . && docker push ${_REG}/realtime:${_TAG} ;; esac']

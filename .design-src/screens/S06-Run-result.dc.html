@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>S06 Run result, cleared</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="pl-tokens.css">
+<link rel="stylesheet" href="ds/promptlings/components/bundle.css">
+<script src="ds/promptlings/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500;600;700&amp;family=Pixelify+Sans:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:var(--ink)}a:hover{color:var(--ink-muted)}
+</style>
+</helmet>
+<div style="min-height: 1100px; background: var(--bg); color: var(--ink); font-family: var(--font-sans);">
+  <dc-import name="TopBar" active="play" hint-size="100%,72px"></dc-import>
+  <main style="max-width: 1360px; margin: 0 auto; padding: 24px 24px 48px; display: flex; flex-direction: column; gap: 24px; box-sizing: border-box;">
+    <section aria-label="Outcome" style="background: var(--good-soft); border-radius: 6px; padding: 20px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between;">
+      <div style="display: flex; gap: 16px; align-items: center;">
+        <span style="display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 4px; background: var(--good); color: var(--on-good);">
+          <x-import component-from-global-scope="Promptlings.Icon" name="check" size="{{ 24 }}"></x-import>
+        </span>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <h1 style="margin: 0; font: 600 32px/36px var(--font-display); color: var(--ink);">Map cleared in 27 steps</h1>
+          <span style="color: var(--ink-muted);">Flood Gate · Rook · 1 agent · new best, up <span style="font-family: var(--font-mono);">100</span> from <span style="font-family: var(--font-mono);">2,200</span></span>
+        </div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <a href="S05-Run-viewer.dc.html" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 4px; background: var(--chalk); color: var(--on-chalk); font: 700 15px/22px var(--font-sans); text-decoration: none;">
+          <x-import component-from-global-scope="Promptlings.Icon" name="replay"></x-import>
+          Replay
+        </a>
+        <a href="S04-Crew-builder.dc.html" style="display: inline-flex; align-items: center; height: 44px; padding: 0 16px; border-radius: 4px; border: 1px solid var(--line-strong); color: var(--ink); font: 700 15px/22px var(--font-sans); text-decoration: none;">Improve crew</a>
+        <a href="S04-Crew-builder.dc.html" style="display: inline-flex; align-items: center; height: 44px; padding: 0 16px; border-radius: 4px; border: 1px solid var(--line-strong); color: var(--ink); font: 700 15px/22px var(--font-sans); text-decoration: none;">Retry · up to 60 credits</a>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+      <section aria-label="Final board" style="flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+        <x-import component-from-global-scope="Promptlings.MapGrid" rows="{{ rows }}" tile-size="{{ 32 }}" agents="{{ agents }}" animate="{{ false }}" label="Flood Gate after step 27: block in the spillway, all three gems collected"></x-import>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+          <span style="display: inline-flex; gap: 6px; align-items: center; padding: 4px 8px; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--line-strong); font: 500 13px/18px var(--font-mono);">
+            <x-import component-from-global-scope="Promptlings.Icon" name="check" size="{{ 13 }}"></x-import>
+            Recorded on NEAR · replay 7f3a…c91e
+          </span>
+          <a href="https://testnet.nearblocks.io/" style="font: 700 13px/18px var(--font-sans); display: inline-flex; min-height: 44px; align-items: center;">View transaction</a>
+        </div>
+      </section>
+
+      <div style="flex: 999 1 560px; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; align-items: start;">
+        <section aria-labelledby="score" style="display: flex; flex-direction: column; gap: 12px;">
+          <h2 id="score" style="margin: 0; font: 600 24px/28px var(--font-display);">Score</h2>
+          <x-import component-from-global-scope="Promptlings.ScoreBreakdown" agents="{{ 1 }}" steps="{{ 27 }}" step-limit="{{ 60 }}" upkeep="{{ 25 }}" skills="{{ 1 }}" rank-text="#3 on Flood Gate, 1 agent"></x-import>
+          <div style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 12px 16px; display: flex; flex-direction: column; gap: 6px;">
+            <div style="font: 700 12px/16px var(--font-sans); color: var(--ink-muted);">Upkeep by skill</div>
+            <div style="display: flex; justify-content: space-between; font: 500 13px/18px var(--font-mono);"><span>Flood Warden · Rook</span><span>−25</span></div>
+          </div>
+        </section>
+
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <section aria-labelledby="where" style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap;">
+              <h2 id="where" style="margin: 0; font: 700 17px/24px var(--font-sans);">Where you sit</h2>
+              <span style="font: 500 13px/18px var(--font-mono); color: var(--ink-muted);">top 7% of 122 cleared runs</span>
+            </div>
+            <x-import component-from-global-scope="Promptlings.ScoreHistogram" bins="{{ bins }}" min="{{ 0 }}" max="{{ 2500 }}" your-score="{{ 2300 }}" caption="Flood Gate score" height="{{ 80 }}"></x-import>
+          </section>
+
+          <section aria-labelledby="credits" style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <h2 id="credits" style="margin: 0; font: 700 17px/24px var(--font-sans);">Credits</h2>
+            <dl style="margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; font-size: 15px; line-height: 22px;">
+              <dt>Held at start</dt><dd style="margin: 0; font-family: var(--font-mono); text-align: right;">60</dd>
+              <dt>Used · 27 agent steps</dt><dd style="margin: 0; font-family: var(--font-mono); text-align: right;">27</dd>
+              <dt style="color: var(--good); font-weight: 700;">Returned</dt><dd style="margin: 0; font: 600 15px/22px var(--font-mono); text-align: right; color: var(--good);">33</dd>
+            </dl>
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted);">Paid from your free allowance, so 33 of 60 credits are left today. Your balance stays at <span style="font-family: var(--font-mono);">946</span>.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      rows: ['###############','#~~~~~~~~~~~~~#','#######~#######','#.....#~#.....#','#.....#=#.....#','#.............#','#.............#','#.............#','###############'],
+      agents: [{ id: 'rook', x: 2, y: 7 }],
+      bins: [4, 6, 9, 14, 31, 12, 8, 11, 19, 8]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+/* skirm design tokens: the v2 Arena look (Skirm Arena Deck prototype). One dark theme; there is no
+ * light mode. Teal (--you) is always the player and red (--rival) is always the rival, on every screen.
+ *
+ * Two layers of names:
+ * - Palette names from the prototype (--bone, --you, --rival, --amber, --panel, ...), for new screens.
+ * - Semantic names (--bg, --surface, --ink, --chalk, --good, ...) that existing components and CSS
+ *   modules already use, mapped onto the palette. Note: --ink is the TEXT colour here (the
+ *   prototype's background "ink" is --bg), so no existing var(--ink) flips meaning. */
+@import url('https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  color-scheme: dark;
+
+  /* Palette */
+  --ink-2: #0a1119;
+  --panel: rgba(9, 15, 23, 0.88);
+  --panel-solid: #0c141d;
+  --bone: #ece8e1;
+  --text: #dfe6ea;
+  --muted: #93a4b1;
+  --faint: #7d8f9c;
+  --you: #34e0c8;
+  --you-ink: #04201c;
+  --you-hover: #5ef0dc;
+  --rival: #ff4655;
+  --rival-hover: #ff6370;
+  --amber: #ffb547;
+  --violet: #a98bff;
+  --water: #3b8fe8;
+  --fire: #ff8a3a;
+  --lava: #ff5a2a;
+  --cut: 14px;
+  --tape: repeating-linear-gradient(-45deg, var(--amber) 0 8px, transparent 8px 16px);
+  /* Film grain (a 140px noise tile) and fine diagonal hatching: the texture on tabs, tiles and buttons. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.32'/%3E%3C/svg%3E");
+  --hatch: repeating-linear-gradient(-45deg, rgba(255, 255, 255, .03) 0 1px, transparent 1px 5px);
+  --hatch-dark: repeating-linear-gradient(-45deg, rgba(0, 0, 0, .07) 0 1px, transparent 1px 5px);
+
+  /* Semantic names used across the app */
+  --bg: #05080d;
+  --surface: #0c141d;
+  --surface-raised: #111c27;
+  --surface-sunken: #0a1119;
+  --line: rgba(140, 175, 200, 0.2);
+  --line-strong: rgba(140, 175, 200, 0.38);
+  --ink: #dfe6ea;
+  --ink-muted: #93a4b1;
+  --ink-faint: #7d8f9c;
+  --chalk: #34e0c8;
+  --on-chalk: #04201c;
+  --chalk-soft: rgba(255, 255, 255, 0.06);
+  --focus: #ffb547;
+  --good: #34e0c8;
+  --good-soft: rgba(52, 224, 200, 0.14);
+  --on-good: #04201c;
+  --warning: #ffb547;
+  --warning-soft: rgba(255, 181, 71, 0.14);
+  --on-warning: #05080d;
+  --critical: #ff4655;
+  --critical-soft: rgba(255, 70, 85, 0.16);
+  --on-critical: #ffffff;
+  --crew-a: #34e0c8;
+  --crew-b: #ff4655;
+
+  /* Board tiles */
+  --tile-floor: #1c2321;
+  --tile-grid: #2a3330;
+  --tile-wall: #5a625d;
+  --tile-wall-mark: #363d39;
+  --tile-water: #3b8fe8;
+  --tile-water-mark: #a8c8ff;
+  --tile-lava: #ff5a2a;
+  --tile-lava-mark: #ffd27a;
+  --tile-fire: #ff8a3a;
+  --tile-fire-mark: #5e2400;
+  --tile-grass: #2f6e38;
+  --tile-grass-mark: #93d27f;
+  --tile-crate: #c48b4f;
+  --tile-crate-mark: #4a2c10;
+  --tile-dirt: #4e3524;
+  --tile-dirt-mark: #b08860;
+  --tile-block: #a3aca7;
+  --tile-block-mark: #3f4743;
+  --tile-gem: #4fd6f2;
+  --tile-gem-mark: #0b3442;
+  --tile-exit: #a98bff;
+  --tile-exit-mark: #1d1240;
+  --tile-agent: #f4efe2;
+  --tile-agent-mark: #121614;
+  --tile-mark: #ffb547;
+  --tile-mark-halo: #05080d;
+
+  --elev-1: inset 0 0 0 1px rgba(140, 175, 200, 0.2);
+  --elev-2: inset 0 0 0 1px rgba(140, 175, 200, 0.3), 0 8px 24px rgba(0, 0, 0, 0.6);
+  --elev-3: inset 0 0 0 1px rgba(140, 175, 200, 0.38), 0 18px 48px rgba(0, 0, 0, 0.8);
+  --focus-ring: 0 0 0 2px #05080d, 0 0 0 4px #ffb547;
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius-0: 0px;
+  --radius-1: 0px;
+  --radius-2: 0px;
+  --radius-3: 0px;
+  --radius-full: 9999px;
+  --tile-size-xs: 8px;
+  --tile-size-sm: 16px;
+  --tile-size-md: 24px;
+  --tile-size-lg: 32px;
+  --tile-size-xl: 48px;
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-step: 180ms;
+  --duration-spread: 320ms;
+  --duration-loop: 1600ms;
+  --duration-toast: 5000ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-step: cubic-bezier(0.3, 0, 0.2, 1);
+  --ease-spread: cubic-bezier(0.1, 0.7, 0.3, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-wipe: cubic-bezier(0.75, 0, 0.2, 1);
+  --duration-wipe: 720ms;
+  --duration-rise: 700ms;
+  --font-display: "Saira Condensed", "Arial Narrow", sans-serif;
+  --font-sans: "Barlow", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+.display-xl { font-family: var(--font-display); font-size: 48px; line-height: 52px; font-weight: 800; text-transform: uppercase; }
+.display-lg { font-family: var(--font-display); font-size: 32px; line-height: 36px; font-weight: 800; text-transform: uppercase; }
+.display-md { font-family: var(--font-display); font-size: 24px; line-height: 28px; font-weight: 700; text-transform: uppercase; }
+.title { font-family: var(--font-sans); font-size: 17px; line-height: 24px; font-weight: 700; }
+.body { font-family: var(--font-sans); font-size: 15px; line-height: 22px; font-weight: 400; }
+.label { font-family: var(--font-sans); font-size: 13px; line-height: 18px; font-weight: 700; }
+.small { font-family: var(--font-sans); font-size: 13px; line-height: 18px; font-weight: 400; }
+.hud { font-family: var(--font-mono); font-size: 20px; line-height: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); font-size: 13px; line-height: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.mono-sm { font-family: var(--font-mono); font-size: 11px; line-height: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }

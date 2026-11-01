@@ -1,0 +1,180 @@
+# Local stack: Postgres 16, Redis 7, a one-shot migrate job, and the api / worker / realtime / web
+# services, all built from docker/node.Dockerfile (APP build-arg picks the service).
+#
+#   docker compose up -d --build     # web on http://localhost:3000, api on :4000,
+#                                    # realtime on ws://localhost:4001/ws
+#   scripts/smoke.sh                 # end-to-end check
+#   docker compose down -v           # stop and drop data (then prune images, see docs/deploy.md)
+#
+# Postgres and Redis are reachable only inside the compose network (no host ports), so they never
+# clash with a native Postgres/Redis on 5432/6379. Optional overrides (model keys, Privy, NEAR) come
+# from a .env file next to this one; the in-network URLs below always win over .env.
+#
+# The browser talks to api and realtime directly, so web is built with their public URLs
+# (PUBLIC_API_URL, PUBLIC_WS_URL; NEXT_PUBLIC_* is inlined at build time) and the api allows CORS
+# from the web origin (CORS_ORIGINS). To serve on other hosts or ports, set all three and rebuild:
+#   PUBLIC_API_URL=http://myhost:4000 PUBLIC_WS_URL=ws://myhost:4001/ws \
+#   CORS_ORIGINS=http://myhost:3000 docker compose up --build
+
+x-node-env: &node-env
+  NODE_ENV: production
+  DATABASE_URL: postgres://skirm:skirm@postgres:5432/skirm
+  REDIS_URL: redis://redis:6379
+  AUTH_MODE: ${AUTH_MODE:-dev}
+  # v2 brain: greedy plays offline (no model calls, no spend). Set V2_BRAIN=haiku and
+  # OPENROUTER_API_KEY in .env to play Haiku through OpenRouter.
+  V2_BRAIN: ${V2_BRAIN:-greedy}
+  # v2 tick in milliseconds (minimum 50); unset or empty means the game's 2000.
+  V2_TICK_MS: ${V2_TICK_MS:-}
+  API_PORT: 4000
+  REALTIME_PORT: 4001
+  PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+  PUBLIC_WS_URL: ${PUBLIC_WS_URL:-ws://localhost:4001/ws}
+  # Browser origins the api accepts (the web service below).
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+
+x-node-service: &node-service
+  restart: unless-stopped
+  env_file:
+    - path: .env
+      required: false
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: skirm
+      POSTGRES_PASSWORD: skirm
+      POSTGRES_DB: skirm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U skirm -d skirm']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    image: skirm-migrate:local
+    build:
+      context: .
+      dockerfile: docker/node.Dockerfile
+      args:
+        APP: migrate
+    environment:
+      DATABASE_URL: postgres://skirm:skirm@postgres:5432/skirm
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    <<: *node-service
+    image: skirm-api:local
+    build:
+      context: .
+      dockerfile: docker/node.Dockerfile
+      args:
+        APP: api
+    environment:
+      <<: *node-env
+    ports:
+      - '4000:4000'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  worker:
+    <<: *node-service
+    image: skirm-worker:local
+    build:
+      context: .
+      dockerfile: docker/node.Dockerfile
+      args:
+        APP: worker
+    environment:
+      <<: *node-env
+
+  realtime:
+    <<: *node-service
+    image: skirm-realtime:local
+    build:
+      context: .
+      dockerfile: docker/node.Dockerfile
+      args:
+        APP: realtime
+    environment:
+      <<: *node-env
+    ports:
+      - '4001:4001'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('net').connect(4001,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  web:
+    image: skirm-web:local
+    build:
+      context: .
+      dockerfile: docker/node.Dockerfile
+      args:
+        APP: web
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL:-ws://localhost:4001/ws}
+        NEXT_PUBLIC_AUTH_MODE: ${AUTH_MODE:-dev}
+        NEXT_PUBLIC_PRIVY_APP_ID: ${PRIVY_APP_ID:-}
+        NEXT_PUBLIC_PRIVY_CLIENT_ID: ${PRIVY_CLIENT_ID:-}
+        NEXT_PUBLIC_NEAR_NETWORK: ${NEAR_NETWORK:-testnet}
+        NEXT_PUBLIC_NEAR_CONTRACT_SKILLS: ${NEAR_CONTRACT_SKILLS:-skills.playskirm.testnet}
+        NEXT_PUBLIC_NEAR_CONTRACT_MARKET: ${NEAR_CONTRACT_MARKET:-market.playskirm.testnet}
+        NEXT_PUBLIC_NEAR_CONTRACT_DEPOSITS: ${NEAR_CONTRACT_DEPOSITS:-deposits.playskirm.testnet}
+        NEXT_PUBLIC_NEAR_CONTRACT_REGISTRY: ${NEAR_CONTRACT_REGISTRY:-registry.playskirm.testnet}
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  pgdata:
+

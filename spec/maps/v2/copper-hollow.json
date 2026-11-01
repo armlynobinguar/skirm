@@ -1,0 +1,131 @@
+{
+  "schema": "skirm.map/v2",
+  "id": "copper-hollow",
+  "code": "CH-05",
+  "name": "Copper Hollow",
+  "region": "Abandoned mine",
+  "difficulty": 3,
+  "label": "Standard",
+  "blurb": "A copper mine after a cave-in. Rubble fills every tunnel, a miner is cut off in the middle, and the old pump shaft in the corner is leaking.",
+  "item": "Lamp oil",
+  "deliverTo": "Cage lift",
+  "goal": 4,
+  "rows": [
+    "#########################################",
+    "#...dd.#...d...#.........#...d...#.dd...#",
+    "#....d.#.*.d...#.#..*..#.#...d.*.#.d....#",
+    "#...dd.#...dd..#.#.....#.#..dd...#.dd...#",
+    "#.d.....d#####....d...d....#####d.....d.#",
+    "#.d.##.........d.........d.........##.d.#",
+    "##d##..###d###.##...*...##.###d###..##d##",
+    "#....d.#.....#.....#.#.....#.....#.d....#",
+    "#.*..d.#.dd..#..d..#.#..d..#..dd.#.d..*.#",
+    "#....d...dd.....d...E...d.....dd...d....#",
+    "#.dd.##.....#..d...#.#...d..#.....##.dd.#",
+    "#..d..#.d#d.#......#.#......#.d#d.#..d..#",
+    "###.###.....###.##.....##.###.....###.###",
+    "#...........d.......V.......d...........#",
+    "#.d.##d.######.##d.....d##.######.d##.d.#",
+    "#~~.d........#..#.......#..#........d.~~#",
+    "#~~..d....d..#..#...*...#..#..d....d..~~#",
+    "#~~~.dd..d....d...........d....d..dd.~~~#",
+    "#########################################"
+  ],
+  "starts": {
+    "A": [
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        1,
+        2
+      ]
+    ],
+    "B": [
+      [
+        39,
+        1
+      ],
+      [
+        38,
+        1
+      ],
+      [
+        39,
+        2
+      ]
+    ]
+  },
+  "exit": [
+    20,
+    9
+  ],
+  "verbs": [
+    {
+      "id": "dig_rubble",
+      "name": "Dig rubble",
+      "effect": "remove_solid"
+    },
+    {
+      "id": "shore_a_tunnel",
+      "name": "Shore a tunnel",
+      "effect": "add_solid"
+    },
+    {
+      "id": "start_the_pump",
+      "name": "Start the pump",
+      "effect": "add_liquid"
+    }
+  ],
+  "hazards": [
+    {
+      "kind": "water",
+      "every": 4,
+      "cap": 7
+    }
+  ],
+  "switches": [
+    {
+      "at": [
+        20,
+        13
+      ],
+      "name": "Start the pump",
+      "kind": "water",
+      "lanes": {
+        "A": [
+          539,
+          540,
+          541,
+          542,
+          543
+        ],
+        "B": [
+          563,
+          564,
+          565,
+          566,
+          567
+        ]
+      }
+    }
+  ],
+  "drops": [
+    {
+      "at": [
+        20,
+        12
+      ],
+      "tick": 40
+    }
+  ],
+  "blockSupply": 2,
+  "fog": true,
+  "steal": true,
+  "night": false
+}

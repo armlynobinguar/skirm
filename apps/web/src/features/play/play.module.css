@@ -1,0 +1,190 @@
+/* Play group screens (S02-S06, M03). Tokens only; layouts follow the artboards in
+ * .design-src/screens/. Phones from 360px: the shell pads 16px; nothing here scrolls the page
+ * sideways (wide tables scroll inside their card). */
+
+.page { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+.titleBlock { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.titleBlock p { margin: 0; }
+.crumbs { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.crumbs a { color: var(--ink-muted); }
+.eyebrow { font: 700 12px/16px var(--font-sans); color: var(--ink-muted); margin-bottom: var(--space-2); }
+.monoMuted { font: 500 13px/18px var(--font-mono); color: var(--ink-muted); }
+.monoStrong { font: 600 15px/22px var(--font-mono); }
+.inkMono { font-family: var(--font-mono); color: var(--ink); }
+.num { text-align: right; }
+.strongLink { display: inline-flex; gap: 6px; align-items: center; min-height: 44px; font: 700 13px/18px var(--font-sans); }
+.flatCard { box-shadow: none !important; }
+.chip { display: inline-flex; gap: 6px; align-items: center; padding: 4px 8px; border-radius: var(--radius-0); box-shadow: inset 0 0 0 1px var(--line-strong); font: 500 13px/18px var(--font-mono); }
+.goodText { color: var(--good) !important; font-weight: 700; }
+.rule { height: 1px; background: var(--line-strong); margin: 4px 0; }
+.errList { margin: var(--space-1) 0 0; padding-left: 18px; }
+.skelTitle { width: 280px; max-width: 100%; height: 36px; }
+.skelGrid { width: 100%; max-width: 496px; height: 300px; }
+.skelBanner { width: 100%; height: 96px; }
+
+.split { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: flex-start; }
+.mainCol { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-6); }
+.sideCol { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-6); }
+.headRow { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: flex-end; justify-content: space-between; }
+.ctaCol { display: flex; flex-direction: column; gap: var(--space-1); align-items: flex-end; }
+
+/* ---------- S02 Home ---------- */
+.homeHead { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: flex-end; justify-content: space-between; }
+.homeHead > :first-child { flex: 1 1 280px; }
+.homeChips { flex: 0 1 auto; justify-content: flex-end; display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: stretch; min-width: 0; }
+.allowanceCard { background: var(--panel); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); box-shadow: var(--elev-1); border-radius: var(--radius-3); padding: 12px 16px; min-width: min(300px, 100%); display: flex; flex-direction: column; gap: var(--space-2); }
+.allowanceTop { display: flex; justify-content: space-between; gap: 12px; font: 700 13px/18px var(--font-sans); }
+.chipCard { background: var(--panel); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); box-shadow: var(--elev-1); border-radius: var(--radius-3); padding: 12px 16px; display: flex; gap: 12px; align-items: center; text-decoration: none; color: var(--ink); }
+.chipText { display: flex; flex-direction: column; font-size: 13px; line-height: 18px; }
+.tutorialCard { background: var(--chalk-soft); border-radius: var(--radius-3); padding: var(--space-5); display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; justify-content: space-between; }
+.tutorialCard p { max-width: 640px; }
+.mapGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: var(--space-6); }
+.mapTile { display: flex; flex-direction: column; background: var(--panel); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); border-radius: var(--radius-3); box-shadow: var(--elev-1); min-width: 0; overflow: hidden; }
+.mapTileLoading { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.mapTileFoot { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 12px 16px 16px; border-top: 1px solid var(--line); margin-top: auto; }
+.factList { margin: 0; display: grid; grid-template-columns: auto auto; gap: 2px 12px; font-size: 13px; line-height: 18px; }
+.factList dt { color: var(--ink-muted); }
+.factList dd { margin: 0; }
+/* position: relative keeps the sr-only header text (position: absolute) inside the scroller; without it it widens the page at 360 px. */
+.tableCard { position: relative; background: var(--panel); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); border-radius: var(--radius-3); box-shadow: var(--elev-1); overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 22px; min-width: 720px; }
+.table th { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); font: 700 13px/18px var(--font-sans); color: var(--ink-muted); }
+.table td { padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.table th.num, .table td.num { text-align: right; }
+
+/* ---------- S03 Map detail ---------- */
+.previewCard .gridBox { width: auto; flex: 1 1 480px; }
+.previewCard { flex-direction: row; flex-wrap: wrap; gap: var(--space-6); align-items: flex-start; }
+.gridBox { flex: 1 1 auto; min-width: 0; max-width: 100%; width: 100%; }
+.legendBox { flex: 1 1 220px; min-width: 0; }
+.board { display: flex; flex-direction: column; }
+.tagsBox { background: var(--surface); border-radius: var(--radius-3); }
+.actionList { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px 16px; font: 500 13px/18px var(--font-mono); }
+.actionList li { display: flex; gap: 6px; align-items: center; }
+.unlockList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.unlockList li { display: flex; gap: var(--space-2); align-items: center; }
+.ruleList { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 15px; line-height: 22px; }
+.ruleList dt { color: var(--ink-muted); }
+.ruleList dd { margin: 0; }
+.replayList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.replayList li { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.replayWho { display: flex; flex-direction: column; }
+
+/* ---------- S04 Crew builder ---------- */
+.crewAside { flex: 1 1 320px; min-width: 0; max-width: 400px; display: flex; flex-direction: column; gap: var(--space-4); }
+@media (max-width: 760px) { .crewAside { max-width: none; } }
+.unlockRow { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; justify-content: space-between; }
+.selectLabel { display: flex; gap: var(--space-2); align-items: center; font: 700 13px/18px var(--font-sans); }
+.select { min-height: 40px; padding: 0 8px; background: var(--surface-sunken); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--radius-1); font: 400 15px/22px var(--font-sans); }
+.slotGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: var(--space-4); align-items: start; }
+.slotCard { display: flex; flex-direction: column; gap: 12px; background: var(--panel); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); border-radius: var(--radius-3); box-shadow: var(--elev-1); padding: 4px 4px 16px; min-width: 0; }
+.slotBody { padding: 0 12px; display: flex; flex-direction: column; gap: var(--space-2); }
+.skillSlots { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.skillSlot { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 4px 4px 4px 8px; background: var(--chalk-soft); border-radius: var(--radius-1); }
+.addSkill { min-height: 44px; border: 1px dashed var(--line-strong); border-radius: var(--radius-1); background: transparent; color: var(--ink-muted); font: 700 13px/18px var(--font-sans); cursor: pointer; }
+.addSkill:hover { color: var(--ink); }
+.picker { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-1); }
+.pickerItem { display: flex; justify-content: space-between; gap: 8px; align-items: center; min-height: 44px; padding: 0 8px; border: 0; border-radius: var(--radius-1); background: var(--surface-sunken); color: var(--ink); font: 700 13px/18px var(--font-sans); cursor: pointer; text-align: left; }
+.pickerItem:hover { background: var(--chalk-soft); }
+.twoCards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--space-4); align-items: start; }
+.previewTable { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 22px; }
+.previewTable th { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); font: 700 13px/18px var(--font-sans); color: var(--ink-muted); }
+.previewTable th.num { text-align: right; }
+.previewTable td { padding: 6px 4px; font-family: var(--font-mono); color: var(--ink-muted); }
+.previewTable tr.rowOn { background: var(--chalk-soft); }
+.previewTable tr.rowOn td { color: var(--ink); }
+.modeField { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: var(--space-1); font-size: 15px; line-height: 22px; }
+.modeField label { display: flex; gap: var(--space-2); align-items: center; min-height: 32px; }
+.costList { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; font-size: 15px; line-height: 22px; }
+.costList dd { margin: 0; text-align: right; }
+.costTotal { border-top: 1px solid var(--line); padding-top: 8px; }
+.startRow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: flex-end; }
+.skillGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--space-6); }
+
+/* ---------- S05 Run viewer ---------- */
+.viewerHead { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.viewerControls { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; justify-content: flex-end; margin-top: calc(-1 * var(--space-4)); }
+.viewerControls:empty { display: none; }
+.speedBtn { min-width: 44px; min-height: 36px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-1); background: transparent; color: var(--ink); font: 500 13px/18px var(--font-mono); cursor: pointer; }
+.speedOn { border-color: var(--chalk); background: var(--chalk); color: var(--on-chalk); font-weight: 600; }
+.phases { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px; }
+.phases li { padding: 6px 12px; border-radius: var(--radius-0); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-muted); font: 700 13px/18px var(--font-sans); }
+.phases li.phaseOn { background: var(--chalk); color: var(--on-chalk); box-shadow: none; }
+.viewerSplit { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: flex-start; }
+.viewerGridCol { flex: 1 1 520px; min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.viewerAside { flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+.gridWrap { position: relative; display: inline-block; max-width: 100%; }
+.planMarker { position: absolute; box-sizing: border-box; border: 2px dashed var(--chalk); pointer-events: none; }
+.planMarkerNum { position: absolute; top: -9px; left: -9px; min-width: 16px; height: 16px; padding: 0 2px; box-sizing: border-box; background: var(--chalk); color: var(--on-chalk); font: 600 11px/16px var(--font-mono); text-align: center; }
+.scrubBox { background: var(--panel); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); border-radius: var(--radius-3); box-shadow: var(--elev-1); padding: var(--space-3); }
+.chipRow { display: flex; flex-wrap: wrap; gap: 12px; }
+.statChip { background: var(--panel); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); box-shadow: var(--elev-1); border-radius: var(--radius-3); padding: 8px 12px; display: inline-flex; gap: 8px; align-items: center; font-size: 13px; line-height: 18px; }
+.swatch { width: 14px; height: 14px; display: inline-block; }
+.agentLost { opacity: 0.6; filter: grayscale(1); }
+.lostText { margin: 0; display: flex; gap: 6px; align-items: center; font-weight: 700; }
+.planList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.planList li { display: grid; grid-template-columns: 22px 72px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: var(--radius-1); }
+.planList li.planNow { background: var(--chalk-soft); }
+.planList li.planDone { opacity: 0.6; text-decoration: line-through; }
+.planNum { font: 600 11px/14px var(--font-mono); text-align: center; background: var(--chalk); color: var(--on-chalk); }
+.logBox { overflow: auto; max-height: 360px; }
+.logTable { width: 100%; border-collapse: collapse; font: 500 13px/18px var(--font-mono); }
+.logTable th { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); font: 700 13px/18px var(--font-sans); color: var(--ink-muted); position: sticky; top: 0; background: var(--surface); }
+.logTable td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.logTable th.num, .logTable td.num { text-align: right; }
+.logMuted td { color: var(--ink-muted); }
+.logWorld { font-family: var(--font-sans); }
+.goodBanner { background: var(--good-soft); }
+.keysHint { margin: 0; }
+
+/* Phone (S05-Run-viewer-phone.dc.html): speed controls go to the bottom, the log and plan stack. */
+@media (max-width: 720px) {
+  .viewerControls { order: 99; justify-content: space-between; margin-top: 0; }
+  .speedBtn { min-height: 44px; }
+  .phases { flex-wrap: nowrap; overflow-x: auto; }
+  .phases li { flex: none; padding: 4px 8px; }
+  .viewerGridCol .gridBox { text-align: center; }
+  .chipRow { gap: 8px; }
+  .statChip { padding: 6px 8px; }
+  .planList li { grid-template-columns: 20px 60px 1fr; }
+  .planList li > :last-child { display: none; }
+  .keysHint { display: none; }
+}
+
+/* ---------- S06 Run result ---------- */
+.outcome { border-radius: var(--radius-3); padding: 20px 24px; display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; justify-content: space-between; }
+.outcomeGood { background: var(--good-soft); }
+.outcomeBad { background: var(--critical-soft); }
+.outcomeNeutral { background: var(--surface-raised); }
+.outcomeIcon { display: inline-grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: var(--radius-1); }
+.iconGood { background: var(--good); color: var(--on-good); }
+.iconBad { background: var(--critical); color: var(--on-critical); }
+.boardCol { flex: 0 1 auto; min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.resultCols { flex: 999 1 560px; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--space-6); align-items: start; }
+.upkeepCard { padding: 12px 16px; gap: 6px; }
+.upkeepRow { display: flex; justify-content: space-between; font: 500 13px/18px var(--font-mono); }
+
+/* ---------- M03 Coach marks ---------- */
+.coachWrap { position: relative; display: flex; flex-direction: column; gap: var(--space-4); }
+.coachScrim { position: fixed; inset: 0; z-index: 30; background: #0a0d0cb3; }
+.coachTarget { position: relative; z-index: 31; align-self: flex-start; max-width: 100%; border-radius: var(--radius-3); box-shadow: var(--focus-ring); background: var(--surface); }
+.coachCard { position: relative; z-index: 31; max-width: 420px; background: var(--surface-raised); border-radius: var(--radius-3); box-shadow: var(--elev-3); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.coachCard p { margin: 0; }
+.coachArrow { position: absolute; top: -8px; left: 32px; width: 16px; height: 16px; background: var(--surface-raised); transform: rotate(45deg); }
+.coachCount { font: 500 13px/18px var(--font-mono); color: var(--focus); }
+.coachBody { color: var(--ink-muted); }
+.coachCode { font-family: var(--font-mono); color: var(--ink); }
+.coachSteps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.coachSteps li { display: flex; gap: 8px; align-items: center; }
+.coachStepNum { font: 600 11px/14px var(--font-mono); min-width: 16px; text-align: center; padding: 1px 2px; box-shadow: inset 0 0 0 1px currentColor; }
+.coachSteps li.coachStepOn { color: var(--ink); font-weight: 700; }
+.coachSteps li.coachStepDone { text-decoration: line-through; }
+
+/* Reduced motion (S16 setting or the OS): no transitions or animations on the viewer. The board's
+   own one-step spread outline (.sk-anim-spread under .is-still) is the reduced-motion cue and stays. */
+.still :global(*:not(.sk-anim-spread)),
+.still :global(*::before),
+.still :global(*::after) { animation: none !important; }
+.still :global(*) { transition: none !important; scroll-behavior: auto !important; }
+
+/* 2D / 3D board switch above the run board. */

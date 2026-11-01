@@ -1,0 +1,17 @@
+{
+  "name": "@skirm/decision-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./v2": "./src/v2/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@skirm/engine": "*"
+  }
+}

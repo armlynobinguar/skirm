@@ -1,0 +1,212 @@
+/* skirm components (prefix sk-), in the v2 Arena look: square edges, cut-corner panels, condensed
+ * uppercase display type, teal for you and red for the rival. Every colour, space and shadow is a
+ * token from tokens.css, which also loads the fonts. */
+
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 22px; -webkit-font-smoothing: antialiased; }
+.sk-pad { padding: var(--space-4); }
+.sk-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.sk-stack { display: flex; flex-direction: column; gap: var(--space-3); }
+.sk-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.sk-muted { color: var(--ink-muted); }
+.sk-eyebrow { font: 500 11px/16px var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: var(--space-2); }
+.sk-text-good { color: var(--good); }
+.sk-text-warning { color: var(--warning); }
+.sk-text-critical { color: var(--critical); }
+.sk-icon { flex: none; display: block; }
+.sk-chiprow { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; margin: 0; }
+
+/* Focus: one ring everywhere. */
+:where(.sk-btn, .sk-tab, .sk-iconbtn, .sk-pack):focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* ---------- Card ---------- */
+.sk-card { background: var(--panel); border-radius: 0; box-shadow: var(--elev-1); padding: var(--space-4); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); }
+
+/* ---------- Button ---------- */
+.sk-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); height: 36px; padding: 0 var(--space-4); border-radius: 0; border: 1px solid transparent; font: 700 16px/18px var(--font-display); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard); }
+.sk-btn:active:not(:disabled) { transform: translateY(1px); }
+.sk-btn:disabled { cursor: not-allowed; opacity: .5; }
+.sk-btn.is-loading { opacity: 1; cursor: progress; }
+.sk-btn-sm { height: 28px; padding: 0 var(--space-2); gap: 6px; }
+.sk-btn-lg { height: 44px; padding: 0 var(--space-5); font-size: 19px; line-height: 22px; }
+.sk-btn-block { display: flex; width: 100%; }
+.sk-btn-primary { background: var(--you); color: var(--you-ink); clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
+.sk-btn-primary:hover:not(:disabled) { background: var(--you-hover); }
+.sk-btn-secondary { background: rgba(255, 255, 255, .03); color: var(--bone); border-color: var(--line-strong); }
+.sk-btn-secondary:hover:not(:disabled) { background: var(--chalk-soft); }
+.sk-btn-ghost { background: transparent; color: var(--ink); }
+.sk-btn-ghost:hover:not(:disabled) { background: var(--chalk-soft); }
+.sk-btn-danger { background: var(--rival); color: #fff; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
+.sk-btn-danger:hover:not(:disabled) { background: var(--rival-hover); }
+.sk-btn-primary, .sk-btn-secondary, .sk-btn-danger { background-image: var(--grain), var(--hatch); background-size: 140px 140px, auto; }
+.sk-btn-primary, .sk-btn-danger { background-image: var(--grain), var(--hatch-dark); }
+.sk-btn .sk-ak { width: 20px; height: 20px; }
+.sk-btn-primary, .sk-btn-danger, .sk-btn[aria-pressed="true"] { --nacc: currentColor; }
+.sk-iconbtn { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-2); background: transparent; color: var(--ink-muted); cursor: pointer; }
+.sk-iconbtn:hover { background: var(--chalk-soft); color: var(--ink); }
+.sk-iconbtn.is-primary { background: var(--chalk); color: var(--on-chalk); }
+/* Loading: three tiles lighting in tick order. */
+.sk-tickdots { display: inline-flex; gap: 3px; }
+.sk-tickdots i { width: 5px; height: 5px; background: currentColor; opacity: .25; animation: sk-tickdot 900ms steps(1) infinite; }
+.sk-tickdots i:nth-child(2) { animation-delay: 300ms; }
+.sk-tickdots i:nth-child(3) { animation-delay: 600ms; }
+@keyframes sk-tickdot { 0% { opacity: 1; } 33% { opacity: .25; } }
+
+/* ---------- TextField ---------- */
+.sk-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sk-field-label { font: 500 11px/16px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-muted); }
+.sk-input-wrap { display: flex; align-items: center; gap: var(--space-2); min-height: 40px; padding: 0 var(--space-3); background: var(--surface-sunken); border: 1px solid var(--line-strong); border-radius: var(--radius-2); color: var(--ink-muted); transition: border-color var(--duration-fast) var(--ease-standard); }
+.sk-input-wrap.is-multi { align-items: stretch; padding: var(--space-2) var(--space-3); }
+.sk-input-wrap:focus-within { box-shadow: var(--focus-ring); border-color: var(--ink-muted); }
+.sk-field.is-error .sk-input-wrap { border-color: var(--critical); }
+.sk-field.is-disabled .sk-input-wrap { opacity: .55; }
+.sk-input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--ink); font: 400 15px/22px var(--font-sans); padding: 0; }
+.sk-input.is-mono { font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+textarea.sk-input { resize: vertical; min-height: 88px; }
+.sk-input::placeholder { color: var(--ink-faint); }
+.sk-input-affix { display: inline-flex; align-items: center; font: 500 13px/18px var(--font-mono); color: var(--ink-muted); }
+.sk-field-msg { display: flex; gap: 6px; align-items: center; font: 400 13px/18px var(--font-sans); color: var(--ink-muted); }
+.sk-field-msg.is-error { color: var(--critical); }
+
+/* ---------- Tabs ---------- */
+.sk-tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.sk-tab { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 10px var(--space-4); background: none; border: 0; border-radius: 0; color: var(--ink-muted); font: 700 18px/20px var(--font-display); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+.sk-tab:hover { color: var(--ink); background: var(--chalk-soft); }
+.sk-tab.is-selected { color: var(--ink); }
+.sk-tab.is-selected::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--you); }
+.sk-tab:disabled { opacity: .45; cursor: not-allowed; }
+.sk-tab-count { font: 500 11px/14px var(--font-mono); padding: 1px 5px; border-radius: var(--radius-1); background: var(--surface-sunken); color: var(--ink-muted); }
+
+/* ---------- Toast ---------- */
+.sk-toast { display: flex; align-items: flex-start; gap: var(--space-3); width: 100%; max-width: 400px; box-sizing: border-box; padding: var(--space-3); background: var(--panel-solid); color: var(--bone); border-radius: 0; border-left: 4px solid var(--you); box-shadow: var(--elev-2); animation: sk-in var(--duration-base) var(--ease-standard) both; }
+.sk-toast-icon { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: var(--radius-1); background: var(--chalk-soft); color: var(--ink); }
+.sk-tone-good .sk-toast-icon { background: var(--good-soft); color: var(--good); }
+.sk-tone-warning .sk-toast-icon { background: var(--warning-soft); color: var(--warning); }
+.sk-tone-critical .sk-toast-icon { background: var(--critical-soft); color: var(--critical); }
+.sk-toast-body { flex: 1; min-width: 0; padding-top: 3px; }
+.sk-toast-title { font: 700 13px/18px var(--font-sans); }
+.sk-toast-text { font: 400 13px/18px var(--font-sans); color: var(--ink-muted); margin-top: 2px; }
+.sk-toast-action { flex: none; align-self: center; }
+@keyframes sk-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Modal ---------- */
+.sk-scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--space-4); background: rgba(3, 5, 8, .72); }
+.sk-scrim.is-inline { position: relative; inset: auto; z-index: auto; min-height: 100%; box-sizing: border-box; }
+.sk-modal { width: min(460px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--panel-solid); color: var(--ink); border-radius: 0; box-shadow: var(--elev-3); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); animation: sk-in var(--duration-base) var(--ease-standard) both; outline: none; }
+.sk-modal.is-lg { width: min(720px, 100%); }
+.sk-modal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-5) var(--space-5) 0; }
+.sk-modal-title { margin: 0; font: 800 32px/32px var(--font-display); text-transform: uppercase; color: var(--bone); }
+.sk-modal-body { padding: var(--space-3) var(--space-5) var(--space-5); color: var(--ink-muted); }
+.sk-modal-body p { margin: 0 0 var(--space-3); }
+.sk-modal-foot { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-top: 1px solid var(--line); }
+
+/* ---------- Badge and chips ---------- */
+.sk-badge { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 var(--space-2); border-radius: 0; background: var(--chalk-soft); color: var(--ink); font: 500 11px/16px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.sk-badge.sk-tone-good { background: var(--good-soft); color: var(--good); }
+.sk-badge.sk-tone-warning { background: var(--warning-soft); color: var(--warning); }
+.sk-badge.sk-tone-critical { background: var(--critical-soft); color: var(--critical); }
+.sk-badge.sk-tone-you { background: var(--you); color: var(--you-ink); }
+.sk-badge.is-solid.sk-tone-good { background: var(--good); color: var(--on-good); }
+.sk-badge.is-solid.sk-tone-warning { background: var(--warning); color: var(--on-warning); }
+.sk-badge.is-solid.sk-tone-critical { background: var(--critical); color: var(--on-critical); }
+.sk-chip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 var(--space-2); box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius-1); color: var(--ink); background: transparent; font: 500 12px/16px var(--font-mono); white-space: nowrap; }
+.sk-chip-count { color: var(--ink-muted); }
+.sk-chip-unlock { font-family: var(--font-sans); font-weight: 700; }
+.sk-chip-unlock.is-owned { background: var(--chalk-soft); border-color: transparent; }
+.sk-chip-unlock.is-needed { border-style: dashed; }
+.sk-chip-unlock.is-missing { background: var(--warning-soft); border-color: transparent; color: var(--warning); }
+.sk-chip-note { font: 400 11px/14px var(--font-sans); color: inherit; opacity: .9; }
+.sk-chip-unlock.is-needed .sk-chip-note { color: var(--ink-muted); }
+.sk-chip-scope { font-family: var(--font-sans); font-weight: 700; color: var(--ink-muted); }
+.sk-chip-scope.is-mvp { border-style: solid; border-color: var(--ink); color: var(--ink); }
+.sk-chip-scope.is-stretch { border-style: dashed; }
+.sk-chip-scope.is-roadmap { border-style: dotted; border-width: 2px; }
+
+/* ---------- Agents ---------- */
+.sk-avatar { position: relative; display: inline-block; flex: none; }
+.sk-avatar svg { display: block; overflow: visible; }
+.sk-avatar.is-lost { opacity: .7; }
+.sk-avatar.is-acting::after { content: ""; position: absolute; inset: -3px; border-radius: var(--radius-full); border: 2px solid var(--chalk); animation: sk-acting var(--duration-loop) var(--ease-standard) infinite; }
+@keyframes sk-acting { 0% { opacity: .9; transform: scale(.9); } 100% { opacity: 0; transform: scale(1.25); } }
+.sk-agentchip { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1); border: 1px solid var(--line); border-radius: var(--radius-2); background: var(--surface); }
+.sk-agentchip-name { font: 700 13px/18px var(--font-sans); }
+.sk-agentchip-meta { display: flex; align-items: center; gap: 6px; font: 400 12px/16px var(--font-sans); color: var(--ink-muted); }
+
+/* Reduced motion: loops stop. */
+@media (prefers-reduced-motion: reduce) {
+  .sk-tickdots i, .sk-avatar.is-acting::after { animation: none; }
+  .sk-toast, .sk-modal { animation: none; }
+}
+
+/* ---------- Meter ---------- */
+.sk-meter { display: block; height: 6px; background: var(--surface-sunken); border-radius: var(--radius-1); overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
+.sk-meter-fill { display: block; height: 100%; background: var(--chalk); transition: width var(--duration-step) var(--ease-step); }
+.sk-meter.sk-tone-warning .sk-meter-fill { background: var(--warning); }
+
+/* ---------- Credits ---------- */
+.sk-credits { display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); background: var(--surface); border-radius: var(--radius-2); box-shadow: var(--elev-1); }
+.sk-credits-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-1); background: var(--chalk-soft); color: var(--ink); }
+.sk-credits.is-low .sk-credits-icon { background: var(--warning-soft); color: var(--warning); }
+.sk-credits-num { font: 600 17px/22px var(--font-mono); font-variant-numeric: tabular-nums; }
+.sk-credits-unit { font: 400 13px/18px var(--font-sans); color: var(--ink-muted); }
+.sk-credits-free { font: 400 12px/16px var(--font-sans); color: var(--ink-muted); }
+.sk-topup { display: flex; flex-direction: column; gap: var(--space-3); width: 100%; max-width: 360px; box-sizing: border-box; }
+.sk-topup-head { display: flex; align-items: center; justify-content: space-between; }
+.sk-topup-title { margin: 0; font: 700 17px/24px var(--font-sans); }
+.sk-topup-packs { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+.sk-pack { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--space-3); border: 1px solid var(--line-strong); border-radius: var(--radius-2); background: transparent; color: var(--ink); cursor: pointer; text-align: left; }
+.sk-pack:hover { background: var(--chalk-soft); }
+.sk-pack.is-on { border-color: var(--chalk); box-shadow: inset 0 0 0 1px var(--chalk); background: var(--chalk-soft); }
+.sk-pack-near { font: 600 15px/20px var(--font-mono); }
+.sk-pack-credits { font: 400 12px/16px var(--font-sans); color: var(--ink-muted); }
+.sk-topup-note { margin: 0; font: 400 13px/18px var(--font-sans); color: var(--ink-muted); }
+
+/* ---------- Logo ---------- */
+.sk-logo { display: inline-flex; align-items: center; gap: .3em; color: var(--ink); }
+.sk-logo-mark { display: block; flex: none; }
+.sk-logo-word { font-family: var(--font-display); font-weight: 800; line-height: 1; letter-spacing: .14em; text-transform: uppercase; color: var(--bone); }
+
+/* ---------- skirm additions (React port) ---------- */
+.sk-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---------- v2 Arena primitives ---------- */
+/* Panel: the cut-corner HUD panel. Modifiers: is-you / is-rival put a 3px side colour on top. */
+.sk-panel { position: relative; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: var(--space-4); }
+.sk-panel.is-flush { padding: 0; }
+.sk-panel.is-you { box-shadow: inset 0 3px 0 var(--you), inset 0 0 0 1px var(--line); }
+.sk-panel.is-rival { box-shadow: inset 0 3px 0 var(--rival), inset 0 0 0 1px var(--line); }
+/* Kicker: the small mono uppercase label above a value or heading. <b> inside is teal. */
+.sk-kick { font: 500 11px/16px var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+.sk-kick b { color: var(--you); font-weight: 500; }
+.sk-kick .is-rival { color: var(--rival); }
+/* Display heading: condensed, heavy, uppercase. */
+.sk-disp { margin: 0; font-family: var(--font-display); font-weight: 800; text-transform: uppercase; line-height: .9; letter-spacing: .01em; color: var(--bone); text-wrap: balance; }
+/* Hazard tape strip. */
+.sk-tape { display: block; height: 6px; background: var(--tape); opacity: .85; }
+/* Code-drawn icons (AkIcon): lines in currentColor, one accent stroke in --nacc. .sk-ni is the small
+   dark plate one sits on in tabs and tiles. */
+.sk-ak { display: block; flex: none; overflow: visible; }
+.sk-ni { position: relative; display: grid; place-items: center; flex: none; width: 28px; height: 28px; color: var(--muted); background: rgba(0, 0, 0, .4); box-shadow: inset 0 0 0 1px var(--line); transition: color .2s, background-color .2s, box-shadow .2s; }
+.sk-ni .sk-ak { width: 26px; height: 26px; }
+/* Pips: a 0..max bar of small segments (attributes such as vision and comms). */
+.sk-pips { display: inline-flex; gap: 3px; vertical-align: middle; }
+.sk-pips i { width: 10px; height: 4px; background: var(--line-strong); }
+.sk-pips i.is-on { background: var(--sk-pips-colour, var(--amber)); }
+/* Diamond chip: mono label with a rotated square marker in its colour. */
+.sk-dchip { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 9px; font: 500 11px/16px var(--font-mono); letter-spacing: .06em; color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); background: rgba(255, 255, 255, .02); white-space: nowrap; }
+.sk-dchip i { flex: none; width: 7px; height: 7px; transform: rotate(45deg); background: var(--sk-dchip-colour, var(--you)); }
+.sk-dchip.is-on { background: var(--you); color: var(--you-ink); box-shadow: none; }
+/* Segmented control: one of several mono options. */
+.sk-seg { display: inline-flex; flex-wrap: wrap; box-shadow: inset 0 0 0 1px var(--line-strong); }
+.sk-seg button { min-height: 34px; padding: 0 12px; border: 0; background: none; font: 500 12px/16px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); cursor: pointer; transition: background-color var(--duration-base), color var(--duration-base); }
+.sk-seg button[aria-pressed="true"] { background: var(--bone); color: var(--bg); }
+.sk-seg button:hover:not([aria-pressed="true"]):not(:disabled) { color: var(--bone); }
+/* Soon: a designed feature that is not live yet. Amber hazard-dashed outline, never a value. */
+.sk-soon { display: inline-flex; align-items: center; min-height: 20px; padding: 0 8px; font: 600 10px/14px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--amber); box-shadow: inset 0 0 0 1px rgba(255, 181, 71, .45); background: rgba(255, 181, 71, .06); white-space: nowrap; }
+.sk-seg button:disabled { opacity: .35; cursor: not-allowed; }
+.sk-seg button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sk-seg.is-block { display: flex; width: 100%; }
+.sk-seg.is-block button { flex: 1; }
+/* Entrance: children marked data-rise slide up in order (set --rise-i for the stagger). */
+@keyframes sk-rise { from { opacity: .001; transform: translate3d(0, 18px, 0); } to { opacity: 1; transform: none; } }
+[data-rise] { animation: sk-rise var(--duration-rise) var(--ease-out) both; animation-delay: calc(var(--rise-i, 0) * 70ms + 80ms); }
+@media (prefers-reduced-motion: reduce) { [data-rise] { animation: none; } }

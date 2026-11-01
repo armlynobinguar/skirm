@@ -1,0 +1,490 @@
+{
+ "v": 3,
+ "layout": "files",
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-10-25T09:16:00Z"
+ },
+ "title": "Promptlings Design System",
+ "namespace": "Promptlings",
+ "libraries": [
+  {
+   "name": "react",
+   "version": "18.3.1"
+  },
+  {
+   "name": "react-dom",
+   "version": "18.3.1"
+  }
+ ],
+ "sections": {},
+ "groups": [
+  "Logos",
+  "Tiles",
+  "Icons"
+ ],
+ "assetGroups": {
+  "Logos": {
+   "name": "Logos",
+   "tile": "l",
+   "order": [
+    "promptlings-mark.svg",
+    "promptlings-wordmark-dark.svg",
+    "promptlings-wordmark-light.svg"
+   ],
+   "files": {
+    "promptlings-mark.svg": {
+     "name": "promptlings-mark.svg",
+     "blob": "56afbb3e3511c0011e7fb9ff849af799",
+     "size": 414,
+     "type": "image/svg+xml"
+    },
+    "promptlings-wordmark-dark.svg": {
+     "name": "promptlings-wordmark-dark.svg",
+     "blob": "dc8adf5befdf656a1a58a9d2367e40ae",
+     "size": 10251,
+     "type": "image/svg+xml"
+    },
+    "promptlings-wordmark-light.svg": {
+     "name": "promptlings-wordmark-light.svg",
+     "blob": "95265975e6c708cdfff9b1b1cf9867c1",
+     "size": 10287,
+     "type": "image/svg+xml"
+    }
+   }
+  },
+  "Tiles": {
+   "name": "Tiles",
+   "tile": "m",
+   "order": [
+    "tile-floor.svg",
+    "tile-wall.svg",
+    "tile-water.svg",
+    "tile-lava.svg",
+    "tile-fire.svg",
+    "tile-grass.svg",
+    "tile-crate.svg",
+    "tile-dirt.svg",
+    "tile-block.svg",
+    "tile-gem.svg",
+    "tile-exit.svg",
+    "tile-agent.svg",
+    "tile-mark.svg",
+    "tile-agent-crew-a.svg",
+    "tile-agent-crew-b.svg"
+   ],
+   "files": {
+    "tile-agent-crew-a.svg": {
+     "name": "tile-agent-crew-a.svg",
+     "blob": "bfab0e764200f712cdd0f5e23f5b76ab",
+     "size": 882,
+     "type": "image/svg+xml"
+    },
+    "tile-agent-crew-b.svg": {
+     "name": "tile-agent-crew-b.svg",
+     "blob": "6a8f892e8528777a3b9a0ab4dd611f29",
+     "size": 882,
+     "type": "image/svg+xml"
+    },
+    "tile-agent.svg": {
+     "name": "tile-agent.svg",
+     "blob": "cf3acf9f77485d2ca8922b27ba494b7f",
+     "size": 406,
+     "type": "image/svg+xml"
+    },
+    "tile-block.svg": {
+     "name": "tile-block.svg",
+     "blob": "9965a2d59648f4a6ade46ff85f2e9fa1",
+     "size": 318,
+     "type": "image/svg+xml"
+    },
+    "tile-crate.svg": {
+     "name": "tile-crate.svg",
+     "blob": "8385fb1097049840d89f4f9e6dcbb59b",
+     "size": 328,
+     "type": "image/svg+xml"
+    },
+    "tile-dirt.svg": {
+     "name": "tile-dirt.svg",
+     "blob": "d2cd0d48868366a5e48d33a218424f47",
+     "size": 589,
+     "type": "image/svg+xml"
+    },
+    "tile-exit.svg": {
+     "name": "tile-exit.svg",
+     "blob": "148a02df19ec4801c93c8d70385a06ef",
+     "size": 232,
+     "type": "image/svg+xml"
+    },
+    "tile-fire.svg": {
+     "name": "tile-fire.svg",
+     "blob": "a81dace1377e9960556e3c7b9dffc26d",
+     "size": 403,
+     "type": "image/svg+xml"
+    },
+    "tile-floor.svg": {
+     "name": "tile-floor.svg",
+     "blob": "71c29cf8a9b86c9cbd3f1b0876c18d0a",
+     "size": 271,
+     "type": "image/svg+xml"
+    },
+    "tile-gem.svg": {
+     "name": "tile-gem.svg",
+     "blob": "2059b43835c1f7b1d0154d44b394db79",
+     "size": 448,
+     "type": "image/svg+xml"
+    },
+    "tile-grass.svg": {
+     "name": "tile-grass.svg",
+     "blob": "d461ee3b18813e3dd88915813b03f7fc",
+     "size": 339,
+     "type": "image/svg+xml"
+    },
+    "tile-lava.svg": {
+     "name": "tile-lava.svg",
+     "blob": "8dc880c94d1ad4892e492d8b22530cf2",
+     "size": 394,
+     "type": "image/svg+xml"
+    },
+    "tile-mark.svg": {
+     "name": "tile-mark.svg",
+     "blob": "6bfa12e13499d7545274ba3e11789da2",
+     "size": 578,
+     "type": "image/svg+xml"
+    },
+    "tile-wall.svg": {
+     "name": "tile-wall.svg",
+     "blob": "d558ca90aa5033503a15d9f176dfbff8",
+     "size": 333,
+     "type": "image/svg+xml"
+    },
+    "tile-water.svg": {
+     "name": "tile-water.svg",
+     "blob": "1e38762c71b684b4696ca596768363ce",
+     "size": 428,
+     "type": "image/svg+xml"
+    }
+   }
+  },
+  "Icons": {
+   "name": "Icons",
+   "tile": "s",
+   "order": [
+    "agent.svg",
+    "check.svg",
+    "close.svg",
+    "credits.svg",
+    "crew.svg",
+    "critical.svg",
+    "dig.svg",
+    "drop.svg",
+    "elo.svg",
+    "extinguish.svg",
+    "info.svg",
+    "lock.svg",
+    "map.svg",
+    "minus.svg",
+    "move.svg",
+    "pause.svg",
+    "pick-up.svg",
+    "place-block.svg",
+    "play.svg",
+    "plus.svg",
+    "pvp.svg",
+    "replay.svg",
+    "royalty.svg",
+    "skill.svg",
+    "step-back.svg",
+    "step-fwd.svg",
+    "steps.svg",
+    "tag-blocks.svg",
+    "tag-breakable.svg",
+    "tag-collectible.svg",
+    "tag-damages.svg",
+    "tag-flammable.svg",
+    "tag-goal.svg",
+    "tag-liquid.svg",
+    "tag-pushable.svg",
+    "tag-solid.svg",
+    "tag-spreads.svg",
+    "tick.svg",
+    "timer.svg",
+    "trophy.svg",
+    "wait.svg",
+    "wallet.svg",
+    "warning.svg"
+   ],
+   "files": {
+    "agent.svg": {
+     "name": "agent.svg",
+     "blob": "731be6992744ccc69acea45a22c92702",
+     "size": 276,
+     "type": "image/svg+xml"
+    },
+    "check.svg": {
+     "name": "check.svg",
+     "blob": "a4c1c41b8ac98671ea0a76b3139504c4",
+     "size": 211,
+     "type": "image/svg+xml"
+    },
+    "close.svg": {
+     "name": "close.svg",
+     "blob": "c91f80aace999fe848a4cdbc59596c11",
+     "size": 223,
+     "type": "image/svg+xml"
+    },
+    "credits.svg": {
+     "name": "credits.svg",
+     "blob": "097b8cecaba4c58e1ff3d9a5a7cf49af",
+     "size": 346,
+     "type": "image/svg+xml"
+    },
+    "crew.svg": {
+     "name": "crew.svg",
+     "blob": "4a87cff8d2040ccb0d66e987ad72cdfc",
+     "size": 288,
+     "type": "image/svg+xml"
+    },
+    "critical.svg": {
+     "name": "critical.svg",
+     "blob": "f230bbf2ee395aeac07795e9b95f3a3c",
+     "size": 248,
+     "type": "image/svg+xml"
+    },
+    "dig.svg": {
+     "name": "dig.svg",
+     "blob": "500afee7e8ffc03141eb1b67a7876a0a",
+     "size": 236,
+     "type": "image/svg+xml"
+    },
+    "drop.svg": {
+     "name": "drop.svg",
+     "blob": "9bd6f0fe50513c06e0e5a02a2c7b0c13",
+     "size": 235,
+     "type": "image/svg+xml"
+    },
+    "elo.svg": {
+     "name": "elo.svg",
+     "blob": "2d0770f5901cd5bf9362f8ecb1947f6a",
+     "size": 230,
+     "type": "image/svg+xml"
+    },
+    "extinguish.svg": {
+     "name": "extinguish.svg",
+     "blob": "0c3c34006f2fbe238c80dc66cd1db86c",
+     "size": 269,
+     "type": "image/svg+xml"
+    },
+    "info.svg": {
+     "name": "info.svg",
+     "blob": "97fee995839448a9c4cdaa5de64f836c",
+     "size": 260,
+     "type": "image/svg+xml"
+    },
+    "lock.svg": {
+     "name": "lock.svg",
+     "blob": "84a6f0795a7dc5a19a0c0de73d44e29e",
+     "size": 247,
+     "type": "image/svg+xml"
+    },
+    "map.svg": {
+     "name": "map.svg",
+     "blob": "ee31aa3806c3366b211d336c364408b3",
+     "size": 260,
+     "type": "image/svg+xml"
+    },
+    "minus.svg": {
+     "name": "minus.svg",
+     "blob": "69f60be034439b6fe8ec2203800ce22c",
+     "size": 204,
+     "type": "image/svg+xml"
+    },
+    "move.svg": {
+     "name": "move.svg",
+     "blob": "d008e5a7ba1873b1b181aac455473c8e",
+     "size": 261,
+     "type": "image/svg+xml"
+    },
+    "pause.svg": {
+     "name": "pause.svg",
+     "blob": "204dfb2b8907a69ed6e2b1db1a5cebee",
+     "size": 216,
+     "type": "image/svg+xml"
+    },
+    "pick-up.svg": {
+     "name": "pick-up.svg",
+     "blob": "71d09ad68b54a04c52afc673899a1195",
+     "size": 237,
+     "type": "image/svg+xml"
+    },
+    "place-block.svg": {
+     "name": "place-block.svg",
+     "blob": "8e7571e7ff832830cbb084afc29923a5",
+     "size": 236,
+     "type": "image/svg+xml"
+    },
+    "play.svg": {
+     "name": "play.svg",
+     "blob": "fef969c101ace4879999a7e7a1555168",
+     "size": 213,
+     "type": "image/svg+xml"
+    },
+    "plus.svg": {
+     "name": "plus.svg",
+     "blob": "17f3dcd2c09de808acdc3b734e511adf",
+     "size": 211,
+     "type": "image/svg+xml"
+    },
+    "pvp.svg": {
+     "name": "pvp.svg",
+     "blob": "affb8bd345e32dab56b4c6816c27edb9",
+     "size": 263,
+     "type": "image/svg+xml"
+    },
+    "replay.svg": {
+     "name": "replay.svg",
+     "blob": "c7064a77b17ca5a8da0c7677ceef61d4",
+     "size": 237,
+     "type": "image/svg+xml"
+    },
+    "royalty.svg": {
+     "name": "royalty.svg",
+     "blob": "161efb3548e18f782e788c00f057f27c",
+     "size": 303,
+     "type": "image/svg+xml"
+    },
+    "skill.svg": {
+     "name": "skill.svg",
+     "blob": "a7d1d7e431544d65b0fb4008e549296e",
+     "size": 240,
+     "type": "image/svg+xml"
+    },
+    "step-back.svg": {
+     "name": "step-back.svg",
+     "blob": "7be2777bd29c1b66a5effa4aec0685d1",
+     "size": 222,
+     "type": "image/svg+xml"
+    },
+    "step-fwd.svg": {
+     "name": "step-fwd.svg",
+     "blob": "eaf41b6a91847de891fcba3d0ae8b17d",
+     "size": 221,
+     "type": "image/svg+xml"
+    },
+    "steps.svg": {
+     "name": "steps.svg",
+     "blob": "cdd646fffcabee4308689a807e4ad4e9",
+     "size": 224,
+     "type": "image/svg+xml"
+    },
+    "tag-blocks.svg": {
+     "name": "tag-blocks.svg",
+     "blob": "b5fc6c014442204d0593974740fb255d",
+     "size": 235,
+     "type": "image/svg+xml"
+    },
+    "tag-breakable.svg": {
+     "name": "tag-breakable.svg",
+     "blob": "14ee1c4b87d929e51751bcd2f9cbf73d",
+     "size": 244,
+     "type": "image/svg+xml"
+    },
+    "tag-collectible.svg": {
+     "name": "tag-collectible.svg",
+     "blob": "ebc8fd0d9d91d86e8fb938caffa96231",
+     "size": 221,
+     "type": "image/svg+xml"
+    },
+    "tag-damages.svg": {
+     "name": "tag-damages.svg",
+     "blob": "ea2026b180c2af34d2deb65ea3799225",
+     "size": 224,
+     "type": "image/svg+xml"
+    },
+    "tag-flammable.svg": {
+     "name": "tag-flammable.svg",
+     "blob": "d05963d43f28fa771bb6387242969050",
+     "size": 314,
+     "type": "image/svg+xml"
+    },
+    "tag-goal.svg": {
+     "name": "tag-goal.svg",
+     "blob": "8d86c60f516c442dc4259079e75e668d",
+     "size": 233,
+     "type": "image/svg+xml"
+    },
+    "tag-liquid.svg": {
+     "name": "tag-liquid.svg",
+     "blob": "bf7207171a8e6f1556ed344d673053e5",
+     "size": 312,
+     "type": "image/svg+xml"
+    },
+    "tag-pushable.svg": {
+     "name": "tag-pushable.svg",
+     "blob": "69a56c488c41135bacfbdd0e1a59585e",
+     "size": 235,
+     "type": "image/svg+xml"
+    },
+    "tag-solid.svg": {
+     "name": "tag-solid.svg",
+     "blob": "e4493c9231f54862c1e12f6623c3eeb8",
+     "size": 257,
+     "type": "image/svg+xml"
+    },
+    "tag-spreads.svg": {
+     "name": "tag-spreads.svg",
+     "blob": "23fdf912cdc698314bcf1777a569a245",
+     "size": 274,
+     "type": "image/svg+xml"
+    },
+    "tick.svg": {
+     "name": "tick.svg",
+     "blob": "469a3377a63cb3e29e76db4ea525bd05",
+     "size": 233,
+     "type": "image/svg+xml"
+    },
+    "timer.svg": {
+     "name": "timer.svg",
+     "blob": "259d39cf4df3b5fc8e4f6e6727802653",
+     "size": 288,
+     "type": "image/svg+xml"
+    },
+    "trophy.svg": {
+     "name": "trophy.svg",
+     "blob": "45f573e60c5d371daca68a4ba76dbb65",
+     "size": 312,
+     "type": "image/svg+xml"
+    },
+    "wait.svg": {
+     "name": "wait.svg",
+     "blob": "ef460f9700b73822050af6784f2de800",
+     "size": 298,
+     "type": "image/svg+xml"
+    },
+    "wallet.svg": {
+     "name": "wallet.svg",
+     "blob": "1b4b361aa3732fe8ca7d870fc90b2b67",
+     "size": 238,
+     "type": "image/svg+xml"
+    },
+    "warning.svg": {
+     "name": "warning.svg",
+     "blob": "0ac12e23a119cd642182f594de7db8e9",
+     "size": 236,
+     "type": "image/svg+xml"
+    }
+   }
+  }
+ },
+ "blobs": {},
+ "docs": {
+  "readme": "project/README.md",
+  "sections": []
+ },
+ "lastChange": {
+  "by": "Tyron",
+  "via": "Claude Code",
+  "at": "2026-10-25T09:47:00Z",
+  "note": "Score rounding half up and 25-point skill upkeep; Flood Gate duo 1,213; shipped tokens.css; added Consuming in code; Mint skill label exception."
+ }
+}

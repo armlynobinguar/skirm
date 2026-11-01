@@ -1,0 +1,2 @@
+# Upload context for `gcloud builds submit` (docker/cloudbuild*.yaml): same exclusions as the image build.
+#!include:.dockerignore

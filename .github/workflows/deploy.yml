@@ -1,0 +1,58 @@
+name: deploy
+
+# Redeploys what changed on staging with scripts/deploy-gcp.sh on every push to main (or by hand
+# from the Actions tab, optionally with services=all or a list). It does not wait for ci: tests run before each push (.githooks/pre-push), and the Cloud Build
+# image build is the check here; if it fails, nothing is deployed. A separate workflow because ci
+# cancels in-progress runs per ref, which would kill a deploy halfway; here deploys queue and never
+# cancel. Auth is Workload Identity Federation, no keys (docs/deploy.md, "Deploy from CI").
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'auto (only what changed since the running images), all, or a comma list such as web,api'
+        default: auto
+        required: true
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  staging:
+    name: staging (Cloud Run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging
+    steps:
+      # The pushed commit, not whatever main points at by the time a queued deploy starts.
+      # Full history: the script diffs each running image's commit against this one.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy
+        run: scripts/deploy-gcp.sh
+        env:
+          PROJECT: ${{ vars.GCP_PROJECT }}
+          PRIVY_APP_ID: ${{ vars.PRIVY_APP_ID }}
+          # Custom domain (playskirm.xyz); empty falls back to the run.app URLs.
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+          PUBLIC_WS_URL: ${{ vars.PUBLIC_WS_URL }}
+          CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+          # Platform signer account; only read when the <env>-near-ops-key secret exists.
+          NEAR_OPS_ACCOUNT: ${{ vars.NEAR_OPS_ACCOUNT }}
+          # Pinned so a deploy never switches on paid model calls by itself (the offline greedy brain).
+          V2_BRAIN: greedy
+          # Pushes deploy only the pieces whose inputs changed (scripts/deploy-gcp.sh, "Only what changed").
+          SERVICES: ${{ inputs.services || 'auto' }}

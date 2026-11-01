@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>S12 Live match, Race on Ember Warehouse</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="pl-tokens.css">
+<link rel="stylesheet" href="ds/promptlings/components/bundle.css">
+<script src="ds/promptlings/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500;600;700&amp;family=Pixelify+Sans:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:var(--ink)}a:hover{color:var(--ink-muted)}
+</style>
+</helmet>
+<div style="min-height: 1120px; background: var(--bg); color: var(--ink); font-family: var(--font-sans);">
+  <dc-import name="TopBar" active="pvp" hint-size="100%,72px"></dc-import>
+  <main style="max-width: 1360px; margin: 0 auto; padding: 20px 24px 48px; display: flex; flex-direction: column; gap: 16px; box-sizing: border-box;">
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <x-import component-from-global-scope="Promptlings.Badge" icon="play">Live</x-import>
+        <h1 style="margin: 0; font: 600 24px/28px var(--font-display);">Race · Ember Warehouse</h1>
+        <span style="font: 500 13px/18px var(--font-mono); color: var(--ink-muted);">free ranked · 3 s steps · step limit 50</span>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <span style="display: inline-flex; gap: 6px; align-items: center; font: 500 13px/18px var(--font-mono); color: var(--ink-muted);"><x-import component-from-global-scope="Promptlings.Icon" name="agent" size="{{ 14 }}"></x-import>37 watching</span>
+        <x-import component-from-global-scope="Promptlings.Button" variant="secondary" size="sm">Share</x-import>
+      </div>
+    </div>
+
+    <x-import component-from-global-scope="Promptlings.PvPHeader" crew-a="{{ crewA }}" crew-b="{{ crewB }}" elapsed-ms="{{ 42000 }}" tick="{{ 14 }}" mode="Race" ranked="{{ true }}"></x-import>
+
+    <ol aria-label="Step phase" style="margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px; justify-content: center;">
+      <sc-for list="{{ phases }}" as="ph" hint-placeholder-count="5">
+        <sc-if value="{{ ph.on }}" hint-placeholder-val="{{ false }}">
+          <li aria-current="step" style="padding: 6px 12px; border-radius: 2px; background: var(--chalk); color: var(--on-chalk); font: 700 13px/18px var(--font-sans);">{{ ph.label }}</li>
+        </sc-if>
+        <sc-if value="{{ ph.off }}" hint-placeholder-val="{{ true }}">
+          <li style="padding: 6px 12px; border-radius: 2px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-muted); font: 700 13px/18px var(--font-sans);">{{ ph.label }}</li>
+        </sc-if>
+      </sc-for>
+    </ol>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 24px;">
+      <sc-for list="{{ sides }}" as="s" hint-placeholder-count="2">
+        <section aria-label="{{ s.aria }}" style="display: flex; flex-direction: column; gap: 12px; align-items: center;">
+          <div style="align-self: stretch; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <span style="display: flex; gap: 8px; align-items: center; font: 700 17px/24px var(--font-sans);">
+              <span style="display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 2px; box-shadow: inset 0 0 0 2px {{ s.color }}; color: {{ s.color }}; font: 700 13px/18px var(--font-mono);">{{ s.letter }}</span>
+              {{ s.title }}
+            </span>
+            <span style="font: 500 13px/18px var(--font-mono); color: var(--ink-muted);">{{ s.progress }}</span>
+          </div>
+          <x-import component-from-global-scope="Promptlings.MapGrid" rows="{{ s.rows }}" tile-size="{{ 32 }}" agents="{{ s.agents }}" label="{{ s.label }}"></x-import>
+          <div style="align-self: stretch; background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+            <div style="flex: 1 1 260px; min-width: 0;">
+              <x-import component-from-global-scope="Promptlings.ConfidenceBar" options="{{ s.conf }}" agent-name="{{ s.agent }}" crew="{{ s.crew }}" tick="{{ 15 }}" max="{{ 3 }}"></x-import>
+            </div>
+            <div style="flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; align-items: center;">
+              <svg width="56" height="56" viewBox="0 0 56 56" role="img" aria-label="{{ s.ringLabel }}">
+                <circle cx="28" cy="28" r="24" fill="none" stroke-width="5" style="stroke: var(--surface-sunken);"></circle>
+                <circle cx="28" cy="28" r="24" fill="none" stroke-width="5" stroke-dasharray="{{ s.dash }}" transform="rotate(-90 28 28)" style="stroke: {{ s.color }};"></circle>
+              </svg>
+              <span style="font: 500 11px/14px var(--font-mono); color: var(--ink-muted); text-align: center;">{{ s.ringText }}</span>
+            </div>
+            <dl style="flex: 1 1 100%; margin: 0; display: flex; gap: 16px; font: 500 13px/18px var(--font-mono); color: var(--ink-muted);">
+              <div style="display: flex; gap: 6px;"><dt>Waited</dt><dd style="margin: 0; color: var(--ink);">0</dd></div>
+              <div style="display: flex; gap: 6px;"><dt>Timed out</dt><dd style="margin: 0; color: var(--ink);">0</dd></div>
+              <div style="display: flex; gap: 6px;"><dt>Limit</dt><dd style="margin: 0; color: var(--ink);">2.5 s per action</dd></div>
+            </dl>
+          </div>
+        </section>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+      <section aria-labelledby="feed" style="flex: 999 1 560px; min-width: 0; background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+        <h2 id="feed" style="margin: 0; font: 700 17px/24px var(--font-sans);">Events</h2>
+        <ul style="margin: 0; padding: 0; list-style: none;">
+          <sc-for list="{{ feed }}" as="e" hint-placeholder-count="4">
+            <li style="display: grid; grid-template-columns: 56px 24px 1fr; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line);">
+              <span style="font: 500 13px/18px var(--font-mono); color: var(--ink-muted);">T {{ e.t }}</span>
+              <span style="font: 700 13px/18px var(--font-mono); color: {{ e.color }};">{{ e.crew }}</span>
+              <span>{{ e.text }}</span>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+      <aside style="flex: 1 1 320px; min-width: 0;">
+        <x-import component-from-global-scope="Promptlings.TileLegend" kinds="{{ legend }}" compact="{{ true }}"></x-import>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const circ = 2 * Math.PI * 24;
+    const ring = (used) => (circ * used).toFixed(1) + ' ' + circ.toFixed(1);
+    return {
+      crewA: { name: 'Tyron · Rook', elo: 1248, agents: 1, progress: 'Key 0/1', you: true },
+      crewB: { name: 'reefwalker · Kite', elo: 1231, agents: 1, progress: 'Key 0/1' },
+      phases: ['Same state to both', 'A decides', 'B decides', 'Resolve together', 'World rules'].map((label) => ({ label, on: label.indexOf('decides') > 0, off: label.indexOf('decides') < 0 })),
+      sides: [
+        { aria: 'Crew A board', letter: 'A', crew: 'a', color: 'var(--crew-a)', title: 'Tyron · Rook', agent: 'Rook · picking step 15', progress: 'Key 0/1 · crate pushed at T 8',
+          rows: ['###############','#######c#######','#^^^^^^.,,,,,,#','#######.###.#,#','#...........#,#','#...........#,#','#..........E#*#','###############'],
+          agents: [{ id: 'a', x: 13, y: 2, crew: 'a' }], label: 'Crew A board at step 14: crate pushed north, fire stopped at the gap. Rook is at (13,2).',
+          conf: [{ action: 'move S', p: 0.91 }, { action: 'move W', p: 0.05 }, { action: 'wait', p: 0.04 }],
+          dash: ring(0.16), ringLabel: 'Crew A picked in 0.4 of 2.5 seconds', ringText: '0.4 s of 2.5' },
+        { aria: 'Crew B board', letter: 'B', crew: 'b', color: 'var(--crew-b)', title: 'reefwalker · Kite', agent: 'Kite · picking step 15', progress: 'Key 0/1 · fire past (7,2)',
+          rows: ['###############','#######.#######','#^^^^^^^^,,,,,#','#######.###.#,#','#...........#,#','#...........#,#','#..........E#*#','###############'],
+          agents: [{ id: 'b', x: 13, y: 2, crew: 'b' }], label: 'Crew B board at step 14: the crate burned, fire is at (8,2) and moving east. Kite is at (13,2).',
+          conf: [{ action: 'move S', p: 0.86 }, { action: 'wait', p: 0.08 }, { action: 'move W', p: 0.06 }],
+          dash: ring(0.6), ringLabel: 'Crew B still picking, 1.5 of 2.5 seconds used', ringText: '1.5 s of 2.5' }
+      ],
+      feed: [
+        { t: '14', crew: 'B', color: 'var(--crew-b)', text: 'Fire spread to (8,2)' },
+        { t: '12', crew: 'B', color: 'var(--crew-b)', text: 'Fire burned the crate at (7,2)' },
+        { t: '8', crew: 'A', color: 'var(--crew-a)', text: 'Rook pushed the crate north to (7,1)' },
+        { t: '1', crew: '', color: 'var(--ink-muted)', text: 'Match started after a 5 s countdown' }
+      ],
+      legend: ['wall', 'fire', 'grass', 'crate', 'gem', 'exit', 'agent']
+    };
+  }
+}
+</script>
+</body>
+</html>

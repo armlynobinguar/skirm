@@ -1,0 +1,1 @@
+ALTER TYPE "public"."registry_status" ADD VALUE 'local';

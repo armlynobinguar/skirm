@@ -1,0 +1,80 @@
+// The player's NEAR wallet, as the app sees it. One instance per tab (Services.wallet). The real one
+// is NEAR Connect (./nearConnect.ts, loaded on first use); tests use FakeWallet (src/test/fakeWallet.ts).
+//
+// Money and ownership always go through this wallet outside dev mode (arch.md, "Money and
+// ownership"): the browser signs, then sends the transaction hash to the api, which reads it back
+// through RPC. skirm never sees the wallet's keys.
+import { ApiError } from '../api/errors';
+
+/** A function call in the wallet-selector action format (NEAR Connect accepts it as is). */
+export interface FunctionCallAction {
+  type: 'FunctionCall';
+  params: {
+    methodName: string;
+    args: Record<string, unknown>;
+    /** Gas units as a decimal string (1 Tgas = 10^12). */
+    gas: string;
+    /** Attached yoctoNEAR as a decimal string. */
+    deposit: string;
+  };
+}
+
+export interface NearTransaction {
+  receiverId: string;
+  actions: FunctionCallAction[];
+}
+
+/** NEP-413 `signMessage` input. `nonce` is 32 random bytes. */
+export interface SignMessageInput {
+  message: string;
+  recipient: string;
+  nonce: Uint8Array;
+}
+
+/** NEP-413 result: `signature` is base64, `publicKey` is `ed25519:<base58>`. */
+export interface SignedMessage {
+  accountId: string;
+  publicKey: string;
+  signature: string;
+}
+
+export interface NearWallet {
+  readonly network: 'testnet' | 'mainnet';
+  /** The connected account, or null. Only known after `restore()` / `connect()`. */
+  accountId(): string | null;
+  /** Called whenever the connected account changes (connect, disconnect, account switch). */
+  subscribe(fn: (accountId: string | null) => void): () => void;
+  /** Loads the connector and reads a session kept from an earlier visit; the account or null. */
+  restore(): Promise<string | null>;
+  /** Opens the wallet picker and signs in; resolves with the account id. */
+  connect(): Promise<string>;
+  disconnect(): Promise<void>;
+  signMessage(input: SignMessageInput): Promise<SignedMessage>;
+  /** Signs and sends one transaction; resolves once it is final with its hash. */
+  signAndSendTransaction(tx: NearTransaction): Promise<{ txHash: string }>;
+  signAndSendTransactions(txs: NearTransaction[]): Promise<Array<{ txHash: string }>>;
+}
+
+export type WalletErrorCode =
+  | 'wallet_rejected'
+  | 'wallet_wrong_account'
+  | 'wallet_tx_failed'
+  | 'wallet_no_account'
+  | 'wallet_unsupported'
+  | 'wallet_failed';
+
+/**
+ * A wallet-side failure. An ApiError subclass (status 400, never 0) so the shared error copy, M02's
+ * "Cancelled. Nothing was sent." and the Details disclosure handle it like any other error.
+ */
+export class WalletError extends ApiError {
+  constructor(
+    code: WalletErrorCode,
+    message: string,
+    readonly cause?: unknown,
+  ) {
+    super(400, code, message);
+  }
+}
+
+export const isWalletError = (e: unknown): e is WalletError => e instanceof WalletError;

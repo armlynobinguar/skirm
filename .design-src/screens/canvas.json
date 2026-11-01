@@ -1,0 +1,55 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-25T09:26:39Z"},
+  "title": "Promptlings Screens",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 1000, "title": "S01 Sign in", "expand": "fill"},
+    "S02-Home.dc.html": {"x": 1520, "y": 0, "w": 1440, "h": 1180, "title": "S02 Home", "expand": "fill", "is_interactive": true},
+    "S03-Map-detail.dc.html": {"x": 3040, "y": 0, "w": 1440, "h": 1300, "title": "S03 Map detail · Flood Gate", "expand": "fill"},
+    "S04-Crew-builder.dc.html": {"x": 4560, "y": 0, "w": 1440, "h": 1320, "title": "S04 Crew builder · Flood Gate", "expand": "fill"},
+    "S05-Run-viewer.dc.html": {"x": 6080, "y": 0, "w": 1440, "h": 1180, "title": "S05 Run viewer · Live, step 3", "expand": "fill"},
+    "S06-Run-result.dc.html": {"x": 7600, "y": 0, "w": 1440, "h": 1100, "title": "S06 Run result · Cleared", "expand": "fill"},
+    "M03-Coach-mark.dc.html": {"x": 9120, "y": 0, "w": 1440, "h": 900, "title": "M03 Tutorial coach mark", "expand": "fill"},
+    "S05-Run-viewer-phone.dc.html": {"x": 10640, "y": 0, "w": 390, "h": 1900, "title": "S05 Run viewer · phone", "expand": "fill"},
+
+    "S07-My-skills.dc.html": {"x": 0, "y": 2320, "w": 1440, "h": 900, "title": "S07 My skills", "expand": "fill"},
+    "S08-Skill-editor.dc.html": {"x": 1520, "y": 2320, "w": 1440, "h": 1400, "title": "S08 Skill editor", "expand": "fill"},
+
+    "S09-Marketplace.dc.html": {"x": 0, "y": 4140, "w": 1440, "h": 1320, "title": "S09 Marketplace", "expand": "fill"},
+    "S10-Skill-detail.dc.html": {"x": 1520, "y": 4140, "w": 1440, "h": 1400, "title": "S10 Skill detail · Dam First", "expand": "fill"},
+    "M02-Confirm-transaction.dc.html": {"x": 3040, "y": 4140, "w": 1440, "h": 900, "title": "M02 Confirm transaction", "expand": "fill"},
+
+    "S11-PvP-lobby.dc.html": {"x": 0, "y": 5960, "w": 1440, "h": 1080, "title": "S11 PvP lobby", "expand": "fill"},
+    "S12-Live-match.dc.html": {"x": 1520, "y": 5960, "w": 1440, "h": 1120, "title": "S12 Live match · Race, Ember Warehouse", "expand": "fill"},
+    "S13-Match-result.dc.html": {"x": 3040, "y": 5960, "w": 1440, "h": 1000, "title": "S13 Match result", "expand": "fill"},
+    "S14-Leaderboards.dc.html": {"x": 4560, "y": 5960, "w": 1440, "h": 1240, "title": "S14 Leaderboards", "expand": "fill"},
+    "S12-Live-match-phone.dc.html": {"x": 6080, "y": 5960, "w": 390, "h": 2000, "title": "S12 Live match · phone, spectator", "expand": "fill"},
+
+    "S15-Credits.dc.html": {"x": 0, "y": 8380, "w": 1440, "h": 1160, "title": "S15 Credits", "expand": "fill"},
+    "S16-Profile.dc.html": {"x": 1520, "y": 8380, "w": 1440, "h": 1100, "title": "S16 Profile and settings", "expand": "fill"},
+    "M01-Connect-wallet.dc.html": {"x": 3040, "y": 8380, "w": 1440, "h": 900, "title": "M01 Connect NEAR wallet", "expand": "fill"},
+
+    "TopBar.dc.html": {"x": 0, "y": 9960, "w": 1440, "h": 72, "title": "Shared · top bar"}
+  },
+  "order": [
+    "Main.dc.html", "S02-Home.dc.html", "S03-Map-detail.dc.html", "S04-Crew-builder.dc.html", "S05-Run-viewer.dc.html", "S06-Run-result.dc.html", "M03-Coach-mark.dc.html", "S05-Run-viewer-phone.dc.html",
+    "S07-My-skills.dc.html", "S08-Skill-editor.dc.html",
+    "S09-Marketplace.dc.html", "S10-Skill-detail.dc.html", "M02-Confirm-transaction.dc.html",
+    "S11-PvP-lobby.dc.html", "S12-Live-match.dc.html", "S13-Match-result.dc.html", "S14-Leaderboards.dc.html", "S12-Live-match-phone.dc.html",
+    "S15-Credits.dc.html", "S16-Profile.dc.html", "M01-Connect-wallet.dc.html",
+    "TopBar.dc.html"
+  ],
+  "notes": {
+    "areaPlay": {"x": 0, "y": -300, "text": "Play · S01–S06, M03", "kind": "title1", "maxW": 11030},
+    "areaSkills": {"x": 0, "y": 2020, "text": "Skills · S07–S08", "kind": "title1", "maxW": 2960},
+    "areaMarket": {"x": 0, "y": 3840, "text": "Market · S09–S10, M02", "kind": "title1", "maxW": 4480},
+    "areaPvP": {"x": 0, "y": 5660, "text": "PvP · S11–S14", "kind": "title1", "maxW": 6470},
+    "areaAccount": {"x": 0, "y": 8080, "text": "Account · S15–S16, M01", "kind": "title1", "maxW": 4480},
+    "areaShared": {"x": 0, "y": 9660, "text": "Shared component", "kind": "title1", "maxW": 1440}
+  },
+  "designSystems": [
+    {"title": "Promptlings Design System", "namespace": "promptlings", "artifact": "https://claude.ai/artifact/Min655MxghPZs5tDwBwNMk", "version": "1792919888-73ef", "copiedAt": "2026-10-25T09:26:39Z"}
+  ]
+}

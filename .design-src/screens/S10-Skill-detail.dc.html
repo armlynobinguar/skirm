@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>S10 Skill detail, Dam First</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="pl-tokens.css">
+<link rel="stylesheet" href="ds/promptlings/components/bundle.css">
+<script src="ds/promptlings/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700&amp;family=Atkinson+Hyperlegible+Mono:wght@400;500;600;700&amp;family=Pixelify+Sans:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:var(--ink)}a:hover{color:var(--ink-muted)}
+</style>
+</helmet>
+<div class="pl-paper" style="min-height: 1400px; background: var(--bg); color: var(--ink); font-family: var(--font-sans);">
+  <dc-import name="TopBar" active="market" hint-size="100%,72px"></dc-import>
+  <main style="max-width: 1360px; margin: 0 auto; padding: 24px 24px 48px; display: flex; flex-direction: column; gap: 24px; box-sizing: border-box;">
+    <nav aria-label="Breadcrumb" style="font-size: 13px; line-height: 18px; color: var(--ink-muted);"><a href="S09-Marketplace.dc.html" style="color: var(--ink-muted);">Market</a> / Dam First</nav>
+
+    <section style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between;">
+      <div style="display: flex; gap: 16px; align-items: center; min-width: 0;">
+        <span style="display: inline-grid; place-items: center; width: 56px; height: 56px; border-radius: 4px; background: var(--chalk); color: var(--on-chalk);">
+          <x-import component-from-global-scope="Promptlings.Icon" name="skill" size="{{ 28 }}"></x-import>
+        </span>
+        <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+          <h1 style="margin: 0; font: 600 32px/36px var(--font-display);">Dam First</h1>
+          <span style="color: var(--ink-muted);">by tidecaller · listed by reefwalker</span>
+          <p style="margin: 0; max-width: 560px;">Finds the one tile a spreading liquid needs and blocks it before doing anything else.</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
+            <x-import component-from-global-scope="Promptlings.UnlockChip" unlock="Builder" state="needed"></x-import>
+            <x-import component-from-global-scope="Promptlings.TagChip" tag="spreads"></x-import>
+            <x-import component-from-global-scope="Promptlings.TagChip" tag="liquid"></x-import>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+        <span style="font: 600 32px/36px var(--font-mono);">1.5 NEAR</span>
+        <span style="display: inline-flex; gap: 6px; align-items: center; font-size: 13px; line-height: 18px; color: var(--ink-muted);"><x-import component-from-global-scope="Promptlings.Icon" name="royalty" size="{{ 13 }}"></x-import>5% to creator on resale</span>
+        <a href="M02-Confirm-transaction.dc.html" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 4px; background: var(--chalk); color: var(--on-chalk); font: 700 15px/22px var(--font-sans); text-decoration: none;">Buy · 1.5 NEAR</a>
+        <span style="font-size: 13px; line-height: 18px; color: var(--ink-muted);">You get the right to use it. Its text stays hidden.</span>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+      <div style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 24px;">
+        <section aria-labelledby="proof" style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <h2 id="proof" style="margin: 0; font: 600 24px/28px var(--font-display);">Proof by tag</h2>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 15px; line-height: 22px; min-width: 520px;">
+              <thead>
+                <tr style="text-align: left; font: 700 13px/18px var(--font-sans); color: var(--ink-muted);">
+                  <th scope="col" style="padding: 8px 0; border-bottom: 1px solid var(--line);">Tag</th>
+                  <th scope="col" style="padding: 8px 0; border-bottom: 1px solid var(--line);">Clear rate</th>
+                  <th scope="col" style="padding: 8px 0; border-bottom: 1px solid var(--line); text-align: right;">Runs</th>
+                  <th scope="col" style="padding: 8px 0; border-bottom: 1px solid var(--line); text-align: right;">Average score</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ proof }}" as="p" hint-placeholder-count="2">
+                  <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid var(--line);"><x-import component-from-global-scope="Promptlings.TagChip" tag="{{ p.tag }}"></x-import></td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid var(--line);">
+                      <span style="display: flex; gap: 12px; align-items: center;">
+                        <span style="width: 160px; height: 8px; background: var(--surface-sunken); border-radius: 2px;"><span style="display: block; width: {{ p.pct }}%; height: 100%; background: var(--chalk);"></span></span>
+                        <span style="font: 600 15px/22px var(--font-mono);">{{ p.pct }}%</span>
+                      </span>
+                    </td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid var(--line); text-align: right; font-family: var(--font-mono);">{{ p.runs }}</td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid var(--line); text-align: right; font-family: var(--font-mono);">{{ p.avg }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <p style="margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted);">Public runs only. Both tags come from the same 45 runs: water and lava are both <code style="font-family: var(--font-mono);">spreads</code> and <code style="font-family: var(--font-mono);">liquid</code>.</p>
+        </section>
+
+        <section aria-labelledby="maps" style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <h2 id="maps" style="margin: 0; font: 600 24px/28px var(--font-display);">Results by map</h2>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 15px; line-height: 22px; min-width: 620px;">
+              <thead>
+                <tr style="text-align: left; font: 700 13px/18px var(--font-sans); color: var(--ink-muted);">
+                  <th scope="col" style="padding: 8px 0; border-bottom: 1px solid var(--line);">Map</th>
+                  <th scope="col" style="padding: 8px 0; border-bottom: 1px solid var(--line);">Fit</th>
+                  <th scope="col" style="padding: 8px 0; border-bottom: 1px solid var(--line); text-align: right;">Clear rate</th>
+                  <th scope="col" style="padding: 8px 0; border-bottom: 1px solid var(--line); text-align: right;">Best score</th>
+                  <th scope="col" style="padding: 8px 0; border-bottom: 1px solid var(--line); text-align: right;">Best crew</th>
+                </tr>
+              </thead>
+              <tbody style="font-family: var(--font-mono);">
+                <tr>
+                  <td style="padding: 10px 0; border-bottom: 1px solid var(--line); font-family: var(--font-sans);">Flood Gate</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid var(--line);"><x-import component-from-global-scope="Promptlings.Badge" tone="good">Usable</x-import></td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid var(--line); text-align: right;">94% of 36</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid var(--line); text-align: right;">2,300</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid var(--line); text-align: right;">1 agent · 27 steps</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 0; border-bottom: 1px solid var(--line); font-family: var(--font-sans);">Magma Mine</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid var(--line);"><x-import component-from-global-scope="Promptlings.Badge" tone="good">Usable</x-import></td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid var(--line); text-align: right;">33% of 9</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid var(--line); text-align: right;">1,754</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid var(--line); text-align: right;">1 agent · 57 steps</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 0; font-family: var(--font-sans);">Ember Warehouse</td>
+                  <td style="padding: 10px 0;" colspan="4"><x-import component-from-global-scope="Promptlings.UnlockChip" unlock="Builder" state="missing"></x-import> <span style="font: 400 13px/18px var(--font-sans); color: var(--ink-muted);">Needs Builder. This map does not offer it.</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <aside style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 24px;">
+        <section aria-labelledby="replays" style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+          <h2 id="replays" style="margin: 0; font: 700 17px/24px var(--font-sans);">Public replays with this skill</h2>
+          <ul style="margin: 0; padding: 0; list-style: none;">
+            <sc-for list="{{ replays }}" as="r" hint-placeholder-count="3">
+              <li style="display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line);">
+                <span style="display: flex; flex-direction: column;">
+                  <span style="font-weight: 700;">{{ r.who }} · {{ r.map }}</span>
+                  <span style="font: 500 13px/18px var(--font-mono); color: var(--ink-muted);">{{ r.meta }}</span>
+                </span>
+                <a href="S05-Run-viewer.dc.html" style="font: 700 13px/18px var(--font-sans); display: inline-flex; min-height: 44px; align-items: center;">Watch</a>
+              </li>
+            </sc-for>
+          </ul>
+        </section>
+
+        <section aria-labelledby="sales" style="background: var(--surface); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+          <h2 id="sales" style="margin: 0; font: 700 17px/24px var(--font-sans);">Sale history</h2>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px;">
+            <thead>
+              <tr style="text-align: left; font: 700 13px/18px var(--font-sans); color: var(--ink-muted);">
+                <th scope="col" style="padding: 6px 0; border-bottom: 1px solid var(--line);">Date</th>
+                <th scope="col" style="padding: 6px 0; border-bottom: 1px solid var(--line);">Event</th>
+                <th scope="col" style="padding: 6px 0; border-bottom: 1px solid var(--line); text-align: right;">Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding: 8px 0; border-bottom: 1px solid var(--line); font-family: var(--font-mono);">12 Nov</td><td style="padding: 8px 0; border-bottom: 1px solid var(--line);">Listed by reefwalker</td><td style="padding: 8px 0; border-bottom: 1px solid var(--line); text-align: right; font-family: var(--font-mono);">1.5 NEAR</td></tr>
+              <tr><td style="padding: 8px 0; border-bottom: 1px solid var(--line); font-family: var(--font-mono);">6 Nov</td><td style="padding: 8px 0; border-bottom: 1px solid var(--line);">lowtide to reefwalker</td><td style="padding: 8px 0; border-bottom: 1px solid var(--line); text-align: right; font-family: var(--font-mono);">1.2 NEAR</td></tr>
+              <tr><td style="padding: 8px 0; border-bottom: 1px solid var(--line); font-family: var(--font-mono);">3 Nov</td><td style="padding: 8px 0; border-bottom: 1px solid var(--line);">tidecaller to lowtide</td><td style="padding: 8px 0; border-bottom: 1px solid var(--line); text-align: right; font-family: var(--font-mono);">1.0 NEAR</td></tr>
+              <tr><td style="padding: 8px 0; font-family: var(--font-mono);">2 Nov</td><td style="padding: 8px 0;">Minted by tidecaller · 5% royalty</td><td style="padding: 8px 0; text-align: right; color: var(--ink-muted);">–</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      proof: [
+        { tag: 'spreads', pct: 82, runs: '37 of 45', avg: '2,007' },
+        { tag: 'liquid', pct: 82, runs: '37 of 45', avg: '2,007' }
+      ],
+      replays: [
+        { who: 'tidecaller', map: 'Flood Gate', meta: '1 agent · 27 steps · 2,300' },
+        { who: 'lowtide', map: 'Flood Gate', meta: '1 agent · 28 steps · 2,275' },
+        { who: 'reefwalker', map: 'Magma Mine', meta: '1 agent · 57 steps · 1,754' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

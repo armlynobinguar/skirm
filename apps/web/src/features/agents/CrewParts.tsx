@@ -1,0 +1,308 @@
+'use client';
+// The crew pieces the casual crew screen (/maps/[mapId]/crew) and the match lock-in share, from the
+// prototype's #s-crew: one card per agent (portrait, role icon, verb fit on the map, skill, vision and
+// comms pips, voice, talk tier), the empty "Add agent" slot, the roster strip, the credit estimate,
+// the difficulty picker and the goal box.
+import { TICK_MS, type TalkTier } from '@skirm/engine/v2';
+import { Pips, fmt } from '@skirm/ui';
+import Link from 'next/link';
+import type { CSSProperties, ReactNode } from 'react';
+import { AgentPortrait } from '@/features/arena/AgentPortrait';
+import { ROLE_ICON } from '@/features/arena/roles';
+import { DIFFS, goalOf, type V2Map } from '@/features/arena/world';
+import type { Agent } from '@/lib/api/types';
+import {
+  TIER_INFO,
+  TIER_ORDER,
+  agentBone,
+  agentColour,
+  agentComms,
+  agentRole,
+  agentVision,
+  agentVoice,
+  clock,
+  fmtRate,
+  reachOf,
+  verbFit,
+} from './agentView';
+import c from './crew.module.css';
+
+/** Effect class as a label: "add_solid" → "add solid". */
+const effectLabel = (e: string) => e.replace(/_/g, ' ');
+
+function RoleIcon({ path, size = 30 }: { path: string; size?: number }) {
+  return (
+    <svg viewBox="0 0 30 30" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={path} />
+    </svg>
+  );
+}
+
+/** The talk tier choice of one agent. Ranked offers Standard only. */
+export function TalkTierPicker({
+  name,
+  value,
+  ranked,
+  disabled,
+  onChange,
+}: {
+  name: string;
+  value: TalkTier;
+  ranked: boolean;
+  disabled?: boolean;
+  onChange: (t: TalkTier) => void;
+}) {
+  return (
+    <div className={c.seg} role="radiogroup" aria-label={`Talk tier for ${name}`}>
+      {TIER_ORDER.map((t) => {
+        const on = (ranked ? 'standard' : value) === t;
+        return (
+          <button
+            key={t}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            disabled={disabled || (ranked && t !== 'standard')}
+            title={`${TIER_INFO[t].note} · ${fmtRate(TIER_INFO[t].rate)} credits per tick`}
+            onClick={() => (on ? undefined : onChange(t))}
+          >
+            {TIER_INFO[t].label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export interface CrewCardProps {
+  /** The agent's name (known even before /me loads, from the queued crew). */
+  name: string;
+  /** The full agent, when this account's agents are loaded. */
+  agent: Agent | undefined;
+  map: V2Map | undefined;
+  tier: TalkTier;
+  ranked: boolean;
+  /** Locked in, or searching: nothing on the card changes. */
+  disabled?: boolean;
+  /** The equipped skill is the player's own (its prompt is readable); null while unknown. */
+  skillMine?: boolean | null;
+  onTier: (t: TalkTier) => void;
+  /** Omit for no remove button. */
+  onRemove?: () => void;
+  /** The agent editor, when leaving this screen is safe. */
+  editHref?: string;
+  index: number;
+  'data-testid'?: string;
+}
+
+/** One agent of the crew, the prototype's `.op` card. */
+export function CrewCard({ name, agent, map, tier, ranked, disabled, skillMine, onTier, onRemove, editHref, index, 'data-testid': testId }: CrewCardProps) {
+  const role = agent ? agentRole(agent) : null;
+  const fit = role ? verbFit(role, map) : null;
+  const colour = agent ? agentColour(agent) : 'var(--you)';
+  const skill = agent?.skills[0];
+  return (
+    <div className={c.op} style={{ '--c': colour, animationDelay: `${index * 90}ms` } as CSSProperties} data-testid={testId}>
+      <span className={c.band} aria-hidden="true" />
+      {role ? (
+        <span className={c.cls}>
+          <RoleIcon path={ROLE_ICON[role]} />
+          <span>{role}</span>
+        </span>
+      ) : null}
+      {editHref ? (
+        <Link className={c.edit} href={editHref} aria-label={`Open the agent editor for ${name}`}>
+          <RoleIcon path="M4 18l1-4 9-9 3 3-9 9-4 1zM12 7l3 3" size={14} />
+          <span>Edit</span>
+        </Link>
+      ) : null}
+      {onRemove ? (
+        <button type="button" className={c.rm} onClick={onRemove} disabled={disabled} aria-label={`Remove ${name}`}>
+          ×
+        </button>
+      ) : null}
+      <AgentPortrait
+        body={agent ? agentColour(agent) : '#34e0c8'}
+        head={agent ? agentBone(agent) : '#ece8e1'}
+        label={role ? `${name}, ${role}` : name}
+        className={c.portrait}
+      />
+      <div className={c.info}>
+        <div className={c.nm}>
+          <b>{name}</b>
+          {fit ? <span>{fit.effect ? effectLabel(fit.effect) : 'no verb'}</span> : null}
+        </div>
+        {fit ? (
+          <div className={c.chips}>
+            {fit.verb ? (
+              <span className={c.chip} data-fit="">
+                {fit.verb}
+              </span>
+            ) : (
+              <span className={c.chip} data-muted="">
+                {fit.effect ? 'verb not on this map' : 'take + deliver only'}
+              </span>
+            )}
+          </div>
+        ) : null}
+        {agent ? (
+          <SkillLine skill={skill} mine={skillMine ?? null} href={editHref} />
+        ) : null}
+        {agent ? (
+          <div className={c.attrs}>
+            <span>VISION</span>
+            <Pips value={agentVision(agent)} max={5} colour={colour} label="Vision" />
+            <span>COMMS</span>
+            <span>
+              <Pips value={agentComms(agent)} max={5} colour={colour} label="Comms" /> <span className={c.reach}>{reachOf(agentComms(agent))} tiles</span>
+            </span>
+            <span>VOICE</span>
+            <span>{agentVoice(agent)}</span>
+          </div>
+        ) : null}
+        <div className={c.talk}>
+          <span className="sk-kick">Talk tier</span>
+          <TalkTierPicker name={name} value={tier} ranked={ranked} disabled={disabled} onChange={onTier} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkillLine({ skill, mine, href }: { skill: Agent['skills'][number] | undefined; mine: boolean | null; href?: string }) {
+  const body = (
+    <>
+      <small>
+        {skill ? `Skill · v${skill.version}${mine === null ? '' : mine ? ' · yours' : ' · prompt encrypted'}` : 'Skill'}
+      </small>
+      <b>{skill ? skill.name : 'No skill equipped'}</b>
+      {skill && mine === false ? (
+        <span className={c.redact} aria-hidden="true">
+          <i style={{ width: 60 }} />
+          <i style={{ width: 34 }} />
+          <i style={{ width: 48 }} />
+        </span>
+      ) : null}
+    </>
+  );
+  return href ? (
+    <Link className={c.sk} href={href} title="Open the agent editor">
+      {body}
+    </Link>
+  ) : (
+    <div className={c.sk}>{body}</div>
+  );
+}
+
+/** An empty slot (0-based `index`): points at the roster. */
+export function EmptySlot({ index, onAdd, disabled }: { index: number; onAdd: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" className={`${c.op} ${c.empty}`} onClick={onAdd} disabled={disabled}>
+      <span>
+        <span className={c.plus} aria-hidden="true">
+          +
+        </span>
+        <span className="sk-kick">Add agent</span>
+        <span className={c.emptyNote}>
+          {index === 2 ? 'A third agent covers more verbs. Fielding more than the rival gives them a 10 s head start.' : 'Pick from your roster below.'}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+/** Every agent on the account; pressed ones are in the crew. */
+export function RosterStrip({
+  agents,
+  picked,
+  onToggle,
+  disabled,
+  testPrefix,
+}: {
+  agents: Agent[];
+  picked: readonly string[];
+  onToggle: (id: string) => void;
+  disabled?: boolean;
+  testPrefix: string;
+}) {
+  return (
+    <div className={c.roster} role="group" aria-label="Your roster" id={`${testPrefix}-roster`}>
+      {agents.map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          className={c.rpick}
+          aria-pressed={picked.includes(a.id)}
+          disabled={disabled}
+          onClick={() => onToggle(a.id)}
+          style={{ '--c': agentColour(a) } as CSSProperties}
+          data-testid={`${testPrefix}-roster-${a.id}`}
+        >
+          <AgentPortrait body={agentColour(a)} head={agentBone(a)} label={a.name} className={c.face} />
+          <span>{a.name}</span>
+          <small>{agentRole(a)}</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The hold for a full clock (engine holdFor: whole credits, rounded up once) and the per-tick rates behind it. */
+export function CreditEstimate({ ticks, rates, hold, children, 'data-testid': testId }: { ticks: number; rates: number[]; hold: number; children?: ReactNode; 'data-testid'?: string }) {
+  return (
+    <div className={`sk-panel ${c.est}`} data-testid={testId}>
+      <span className="sk-kick">Estimated credits · full {clock((ticks * TICK_MS) / 1000)}</span>
+      <div className={c.estN}>{fmt(hold)}</div>
+      <div className={c.formula}>
+        {ticks} ticks × ({rates.length ? rates.map((r, i) => (
+          <span key={i}>
+            {i ? ' + ' : ''}
+            <b>{fmtRate(r)}</b>
+          </span>
+        )) : <b>0</b>}) credits per tick
+      </div>
+      {children}
+      <p className={c.fine}>Unused credits come back when the match ends early.</p>
+    </div>
+  );
+}
+
+/** Easy … Mega Agentic. `lock` (ranked) leaves Normal only. */
+export function DifficultyPicker({ value, lock, onChange }: { value: number; lock: boolean; onChange?: (i: number) => void }) {
+  const di = lock ? 1 : value;
+  return (
+    <div className={c.dseg} role="group" aria-label="Difficulty">
+      {DIFFS.map((d, i) => (
+        <button
+          key={d.k}
+          type="button"
+          style={{ '--dc': d.c } as CSSProperties}
+          aria-pressed={i === di}
+          disabled={lock && i !== 1}
+          title={`${d.n}: ${d.line}`}
+          onClick={() => (i === di ? undefined : onChange?.(i))}
+          data-testid={`diff-${d.k}`}
+        >
+          {i === 4 ? 'Mega' : d.n}
+          <small>{i === 4 ? 'AGENTIC' : ['I', 'II', 'III', 'IV'][i]}</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The goal of `map` at difficulty index `di`. */
+export function GoalBox({ map, di, lock }: { map: V2Map; di: number; lock: boolean }) {
+  const d = DIFFS[di] ?? DIFFS[1]!;
+  const g = goalOf(map, di);
+  return (
+    <div className={c.goalbox} style={{ '--dc': d.c } as CSSProperties} data-testid="goal-box">
+      <small>
+        {d.n} · goal on {map.name}
+      </small>
+      <b>{g.t}</b>
+      <span>{g.d}</span>
+      <small className={c.goalFoot}>{lock ? 'Ranked always plays Normal, so both crews chase the same goal.' : d.line}</small>
+    </div>
+  );
+}

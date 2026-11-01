@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["skills", "market", "registry", "deposits", "seasons", "integration-tests"]
+# `cargo test` at the root runs the contract unit tests only; the sandbox tests are opt-in.
+default-members = ["skills", "market", "registry", "deposits", "seasons"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+near-sdk = { version = "=5.29.1", default-features = false, features = ["wee_alloc"] }
+near-contract-standards = "=5.29.1"
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
