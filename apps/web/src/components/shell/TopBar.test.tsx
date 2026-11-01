@@ -23,10 +23,10 @@ describe('TopBar', () => {
   it('shows Sign in when signed out', async () => {
     renderWithProviders(<AppShell>hi</AppShell>, { path: '/leaderboards' });
     const bar = screen.getByTestId('topbar');
-    const dock = screen.getByTestId('account-dock');
+    const dock = within(bar).getByTestId('account-dock');
     expect(await within(dock).findByTestId('topbar-signin')).toHaveAttribute('href', '/');
     expect(within(dock).getByText('Testnet')).toBeInTheDocument();
-    expect(within(bar).queryByText('Testnet')).not.toBeInTheDocument();
+    expect(within(dock).queryByTestId('account-badge')).not.toBeInTheDocument();
     expect(within(dock).queryByTestId('topbar-credits')).not.toBeInTheDocument();
     expect(within(bar).getByTestId('nav-leaderboards')).toHaveAttribute('aria-current', 'page');
     expect(within(bar).getByTestId('topbar-crumb')).toHaveTextContent('/ Ladder');
@@ -81,14 +81,29 @@ describe('TopBar', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('keeps the account in one card off the top bar, and hides it on the live match', async () => {
+  it('puts the account badge in the top bar; a click opens the card, Escape and a link close it', async () => {
     const me = meFixture({ credits: { balance: 1240, held: 0, allowanceLeft: 60, allowanceResetAt: '', available: 1300 } });
-    const view = renderWithProviders(<AppShell>hi</AppShell>, { handle: 'ada', path: '/market', api: { me: async () => me } });
-    const dock = screen.getByTestId('account-dock');
-    expect(await within(dock).findByText('1,240')).toBeInTheDocument();
-    expect(within(dock).getByTestId('topbar-account')).toHaveTextContent('ada');
-    expect(within(screen.getByTestId('topbar')).queryByTestId('topbar-credits')).not.toBeInTheDocument();
-    view.unmount();
+    const { user, unmount } = renderWithProviders(<AppShell>hi</AppShell>, { handle: 'ada', path: '/market', api: { me: async () => me } });
+    const bar = screen.getByTestId('topbar');
+    const badge = within(bar).getByTestId('account-badge');
+    expect(await within(badge).findByText('1,240 CR')).toBeInTheDocument();
+    expect(badge).toHaveTextContent('ada');
+    expect(badge).toHaveAttribute('aria-expanded', 'false');
+    const card = document.getElementById(badge.getAttribute('aria-controls')!)!;
+    expect(card).not.toBeVisible();
+    expect(within(card).getByTestId('topbar-account')).toHaveTextContent('ada');
+
+    await user.click(badge);
+    expect(badge).toHaveAttribute('aria-expanded', 'true');
+    expect(card).toBeVisible();
+    expect(within(card).getByText('1,240')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(card).not.toBeVisible();
+
+    await user.click(badge);
+    await user.click(within(card).getByTestId('topbar-credits'));
+    expect(badge).toHaveAttribute('aria-expanded', 'false');
+    unmount();
     renderWithProviders(<AppShell>hi</AppShell>, { handle: 'ada', path: '/matches/m_1', api: { me: async () => me } });
     expect(screen.queryByTestId('account-dock')).not.toBeInTheDocument();
   });

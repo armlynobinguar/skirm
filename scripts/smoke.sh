@@ -158,6 +158,7 @@ const out = { steps: [], error: null };
     await page.waitForURL(/\/play$/, { timeout: 15000 });
     await page.getByTestId('screen-s02').waitFor({ timeout: 15000 });
     const dock = page.getByTestId('account-dock');
+    await dock.getByTestId('account-badge').filter({ hasText: handle }).click({ timeout: 15000 });
     await dock.getByTestId('topbar-account').filter({ hasText: handle }).waitFor({ timeout: 15000 });
     out.steps.push(`Home as ${handle}`);
     await dock.getByTestId('topbar-allowance').filter({ hasText: '60 free' }).waitFor({ timeout: 15000 });

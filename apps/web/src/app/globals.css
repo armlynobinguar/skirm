@@ -67,25 +67,30 @@ a.app-topbar-chip:hover, button.app-topbar-chip:hover { color: var(--bone); back
 .app-topbar-link[aria-current='page'] .sk-ni { color: var(--bone); background: rgba(52, 224, 200, .13); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .6); }
 .app-topbar-serial { position: absolute; top: 3px; right: 12px; font: normal 400 7px/1 var(--font-mono); letter-spacing: .14em; color: var(--faint); }
 .app-topbar-link[aria-current='page'] .app-topbar-serial { color: var(--you); }
-.app-topbar-right { margin-left: auto; }
+/* z-index: the account card drops over the tab row when the tabs wrap to their own row. */
+.app-topbar-right { position: relative; z-index: 2; margin-left: auto; }
 .app-topbar-toggle { gap: 6px; padding: 0 11px 0 8px; font: 500 11px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; cursor: pointer; }
 .app-topbar-toggle .sk-ak { width: 20px; height: 20px; }
 .app-topbar-toggle[aria-pressed='true'] { --nacc: var(--bg); color: var(--bg); background-color: var(--amber); box-shadow: none; }
 button.app-topbar-toggle[aria-pressed='true']:hover { color: var(--bg); background-color: var(--amber); }
 
-/* ---------- Account card (AccountDock) ---------- */
-/* One card: the network and your handle on top, then credits, wallet and Elo as three cells. It
- * floats bottom right only where the screen has room for it beside the content (1400 × 820 and
- * up); anywhere smaller it closes the page instead, so it never covers a screen's own controls.
- * Floating, its z-index sits under the screens' own drawers (12 and up). */
-.app-dock { display: grid; width: auto; margin: 0 max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); color: var(--ink); background-color: rgba(9, 15, 23, .93); background-image: var(--grain); background-size: 140px 140px; box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-@media (min-width: 821px) { .app-dock { align-self: flex-end; width: min(500px, calc(100% - 32px)); } }
-@media (min-width: 1400px) and (min-height: 820px) {
-  .app-dock { position: fixed; z-index: 10; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); margin: 0; filter: drop-shadow(0 10px 18px rgba(0, 0, 0, .55)); }
-  /* Room under the page for the card, and toasts stack above it. */
-  .app-shell:has(.app-dock) .app-main { padding-bottom: 150px; }
-  body:has(.app-dock) .app-toasts { bottom: calc(var(--space-4) + 132px); }
-}
+/* ---------- Account badge and card (AccountDock) ---------- */
+/* The badge is the last chip of the top bar: an amber diamond, the handle and the credit balance.
+ * Clicking it drops the account card under it, right-aligned: the network and handle on top, then
+ * credits, wallet and Elo as three cells. The card floats over the screen (z-index above the
+ * screens' drawers) and is hidden while closed. */
+.app-acct { position: relative; display: flex; }
+.app-acct-badge { gap: 9px; max-width: 280px; padding: 0 14px 0 11px; color: var(--bone); cursor: pointer; text-decoration: none; }
+.app-acct-badge[aria-expanded='true'] { background-color: rgba(10, 30, 34, .97); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .38); }
+a.app-acct-badge .app-dock-net { font-size: 9.5px; }
+.app-acct-dia { flex: none; width: 9px; height: 9px; background: var(--amber); transform: rotate(45deg); box-shadow: 0 0 10px rgba(255, 181, 71, .55); }
+.app-acct-handle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 15px/1 var(--font-display); letter-spacing: .06em; text-transform: uppercase; }
+.app-acct-cr { flex: none; padding-left: 9px; font: 500 11px/1 var(--font-mono); letter-spacing: .08em; color: var(--you); box-shadow: inset 1px 0 0 var(--line); white-space: nowrap; }
+.app-acct-chev { flex: none; width: 10px; height: 6px; color: var(--muted); transition: transform .25s var(--ease-out); }
+.app-acct-badge[aria-expanded='true'] .app-acct-chev { transform: rotate(180deg); color: var(--you); }
+.app-dock { position: absolute; z-index: 40; top: calc(100% + 8px); right: 0; display: grid; width: min(500px, calc(100vw - 32px)); color: var(--ink); background-color: rgba(9, 15, 23, .96); background-image: var(--grain); background-size: 140px 140px; box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: app-dock-in .25s var(--ease-out) both; }
+.app-dock[hidden] { display: none; }
+@keyframes app-dock-in { from { opacity: 0; transform: translate3d(0, -8px, 0); } }
 .app-dock-head { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 9px 26px 9px 14px; box-shadow: inset 0 -1px 0 var(--line); }
 .app-dock-net { display: inline-flex; align-items: center; gap: 7px; flex: none; font: 500 10.5px/1 var(--font-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
 .app-dock-net i { width: 7px; height: 7px; background: var(--amber); transform: rotate(45deg); }
@@ -100,6 +105,7 @@ a.app-dock-cell:hover { color: var(--ink); background-color: rgba(255, 255, 255,
 .app-dock-cell b { font: 800 26px/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--bone); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-dock-cell span:not(.app-skeleton) { font: 400 11px/15px var(--font-mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-dock-skeleton { width: 80px; height: 26px; }
+@media (max-width: 600px) { .app-acct-cr { display: none; } .app-acct-badge { max-width: 160px; } }
 @media (max-width: 420px) {
   .app-dock-cell { padding: 8px 10px 10px; }
   .app-dock-cell b { font-size: 22px; }
@@ -200,5 +206,6 @@ a.app-dock-cell:hover { color: var(--ink); background-color: rgba(255, 255, 255,
 @media (prefers-reduced-motion: reduce) {
   .app-skeleton { animation: none; }
   .app-wipe { display: none; }
+  .app-dock { animation: none; }
   .s01-tap { animation: none; }
 }

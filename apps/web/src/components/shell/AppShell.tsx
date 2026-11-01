@@ -1,10 +1,9 @@
-// Signed-in screen frame: the persistent arena canvas, skip link, the HUD top bar, main column, the
-// account card, the screen wipe, the design notes aside and the global keys (N, Escape). Used by
+// Signed-in screen frame: the persistent arena canvas, skip link, the HUD top bar (with the account
+// badge), main column, the screen wipe, the design notes aside and the global keys (N, Escape). Used by
 // src/app/(shell)/layout.tsx, so every route under (shell) gets it; S01 (src/app/page.tsx) does not.
 // Next keeps this layout mounted across (shell) navigations, so the arena never unmounts.
 import type { ReactNode } from 'react';
 import { ArenaCanvas } from '@/features/arena/ArenaCanvas';
-import { AccountDock } from './AccountDock';
 import { GlobalKeys } from './GlobalKeys';
 import { NotesAside } from './NotesAside';
 import { RouteWipe } from './RouteWipe';
@@ -21,7 +20,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main id="main" className="app-main" tabIndex={-1}>
         {children}
       </main>
-      <AccountDock />
       <RouteWipe />
       <NotesAside />
       <GlobalKeys />

@@ -1,12 +1,16 @@
 'use client';
-// The account card, pinned bottom right over the arena (on phones it closes the page instead): the
-// network, your handle (links to your profile) or a Sign in link, then three cells: credits with the
-// free allowance and held amount, the NEAR wallet (linked account and its balance, read from the
-// chain), and ranked Elo with its rank title. Hidden on the live match and run screens, whose HUD
-// owns the bottom of the screen. The test ids keep their topbar- names (e2e and the smoke use them).
+// The account badge, the last chip group of the top bar: the network diamond, your handle and your
+// credits. Clicking it opens the account card under it: the network, your handle (links to your
+// profile), then three cells: credits with the free allowance and held amount, the NEAR wallet
+// (linked account and its balance, read from the chain), and ranked Elo with its rank title. The card
+// stays in the DOM while closed (hidden), so its figures are always readable by tests. Escape, a
+// click outside, a link inside and a route change close it. Signed out, the badge is a Sign in link.
+// Hidden on the live match and run screens, whose HUD owns the screen. The test ids keep their
+// topbar- names (e2e and the smoke use them).
 import { fmt } from '@skirm/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useId, useRef, useState } from 'react';
 import { nearShort, useNearBalance } from '@/features/play/useNearBalance';
 import { useMe } from '@/lib/api/queries';
 import type { Me } from '@/lib/api/types';
@@ -15,7 +19,7 @@ import { config } from '@/lib/config';
 import { DAILY_FREE_ALLOWANCE } from '@/lib/constants';
 import { navGroupOf, routes, screenOf } from '@/lib/routes';
 
-/** Screens with a full-screen HUD: the card stays off them. */
+/** Screens with a full-screen HUD: the badge stays off them. */
 const LIVE_SCREENS = new Set(['match']);
 
 export function AccountDock() {
@@ -23,18 +27,86 @@ export function AccountDock() {
   const screen = screenOf(pathname);
   const session = useSession();
   const me = useMe();
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+
+  // A route change closes the card.
+  useEffect(() => setOpen(false), [pathname]);
+
+  // Escape and a click outside close it. Escape is taken here so it does not also go Back.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      e.preventDefault();
+      setOpen(false);
+    };
+    const onDown = (e: PointerEvent) => {
+      if (root.current && !root.current.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onDown);
+    };
+  }, [open]);
+
   if (screen && LIVE_SCREENS.has(screen.key)) return null;
   const credits = me.data?.credits;
   const handle = me.data?.account.handle ?? session.handle ?? 'Account';
+  const network = config.near.network === 'testnet' ? 'Testnet' : 'Mainnet';
+  const netTitle = `Every match and purchase runs on NEAR ${config.near.network}`;
+
+  if (session.status !== 'signedIn')
+    return (
+      <div className="app-acct" data-testid="account-dock">
+        {session.status === 'signedOut' ? (
+          <Link href={routes.signIn()} className="app-acct-badge app-topbar-chip" data-testid="topbar-signin">
+            <span className="app-dock-net" title={netTitle}>
+              <i aria-hidden="true" />
+              {network}
+            </span>
+            <b className="app-acct-handle">Sign in</b>
+          </Link>
+        ) : null}
+      </div>
+    );
 
   return (
-    <aside className="app-dock" aria-label="Account" data-testid="account-dock">
-      <div className="app-dock-head">
-        <span className="app-dock-net" title={`Every match and purchase runs on NEAR ${config.near.network}`}>
-          <i aria-hidden="true" />
-          {config.near.network === 'testnet' ? 'Testnet' : 'Mainnet'}
-        </span>
-        {session.status === 'signedIn' ? (
+    <div className="app-acct" ref={root} data-testid="account-dock">
+      <button
+        type="button"
+        className="app-acct-badge app-topbar-chip"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={`Account: ${handle}`}
+        title={`${handle} · ${network}`}
+        onClick={() => setOpen((o) => !o)}
+        data-testid="account-badge"
+      >
+        <i className="app-acct-dia" aria-hidden="true" />
+        <b className="app-acct-handle">{handle}</b>
+        {credits ? <span className="app-acct-cr">{fmt(credits.balance)} CR</span> : null}
+        <svg className="app-acct-chev" viewBox="0 0 10 6" aria-hidden="true">
+          <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </button>
+      <aside
+        id={panelId}
+        className="app-dock"
+        aria-label="Account"
+        hidden={!open}
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest('a')) setOpen(false);
+        }}
+      >
+        <div className="app-dock-head">
+          <span className="app-dock-net" title={netTitle}>
+            <i aria-hidden="true" />
+            {network}
+          </span>
           <Link
             href={routes.account()}
             className="app-dock-handle"
@@ -44,13 +116,7 @@ export function AccountDock() {
           >
             {handle}
           </Link>
-        ) : session.status === 'signedOut' ? (
-          <Link href={routes.signIn()} className="app-dock-handle" data-testid="topbar-signin">
-            Sign in
-          </Link>
-        ) : null}
-      </div>
-      {session.status === 'signedIn' ? (
+        </div>
         <div className="app-dock-stats">
           <Link href={routes.credits()} className="app-dock-cell" data-testid="topbar-credits">
             <small>Credits</small>
@@ -72,8 +138,8 @@ export function AccountDock() {
           <WalletCell me={me.data} />
           <EloCell me={me.data} />
         </div>
-      ) : null}
-    </aside>
+      </aside>
+    </div>
   );
 }
 

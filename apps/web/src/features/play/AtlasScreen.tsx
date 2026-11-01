@@ -1,16 +1,18 @@
 'use client';
 // Map atlas (/maps): the prototype's map picker over the arena. Starter maps on the left in teal,
 // veteran maps on the right in red; the chosen map's name, number and vitals in the middle over its
-// own arena (the arena store switches the map). Under it the difficulty picker (Easy to Mega
-// Agentic, the prototype's DIFFS) and the goal box for that map and difficulty. Details opens a
-// drawer with the goal, every difficulty's goal, items, pressure, layout, difficulty features and
-// the themed verbs with their effect classes.
+// own arena (the arena store switches the map). The map's number sits in a pulsing diamond, the play
+// button: clicking it opens a menu beside it with Practice (at the picked difficulty), Ranked and
+// Details; Escape, a click outside or a second click closes it. Under the diamond the difficulty
+// picker (Easy to Mega Agentic, the prototype's DIFFS) and the goal box for that map and difficulty.
+// Details opens a drawer with the goal, every difficulty's goal, items, pressure, layout, difficulty
+// features and the themed verbs with their effect classes.
 // Ranked goes to the Skirmish hub and always plays Normal; Practice goes to the casual crew screen
 // with the picked difficulty (`?d=`).
 import { RANKED_DIFFICULTY } from '@skirm/engine/v2';
 import { DisplayHeading, Kicker } from '@skirm/ui';
 import Link from 'next/link';
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { MiniMap } from '@/features/arena/MiniMap';
 import { useArena } from '@/features/arena/store';
 import { DIFFS, MAPS, VERB_ICON, diffIndex, goalOf, isStarter, type DifficultyKey, type EffectClass, type V2Map } from '@/features/arena/world';
@@ -116,8 +118,29 @@ function Ico({ d }: { d: string }) {
 export function AtlasScreen() {
   const { mapIdx, setMap } = useArena();
   const [details, setDetails] = useState(false);
+  const [menu, setMenu] = useState(false);
   const [diff, setDiff] = useState<DifficultyKey>(RANKED_DIFF);
   const sfx = useSfx();
+  const play = useRef<HTMLDivElement>(null);
+
+  // Escape and a click outside close the play menu. Escape is taken here so it does not also go Back.
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      e.preventDefault();
+      setMenu(false);
+    };
+    const onDown = (e: PointerEvent) => {
+      if (play.current && !play.current.contains(e.target as Node)) setMenu(false);
+    };
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onDown);
+    };
+  }, [menu]);
   const m = MAPS[mapIdx] ?? MAPS[0]!;
   const pick = (i: number) => {
     sfx.play('click');
@@ -162,33 +185,73 @@ export function AtlasScreen() {
             <circle cx="20" cy="20" r="5" fill="none" stroke="currentColor" strokeWidth="2" />
             <path d="M20 9v6M20 25v6M10 15l5 3M25 22l5 3M10 25l5-3M25 18l5-3" stroke="currentColor" strokeWidth="2" />
           </svg>
-          <div className={styles.dia}>
-            <span>{String(mapIdx + 1).padStart(2, '0')}</span>
+          <div ref={play} className={styles.play} data-open={menu ? '' : undefined}>
+            <i className={styles.pulse} aria-hidden="true" />
+            <i className={styles.pulse} aria-hidden="true" />
+            <button
+              type="button"
+              className={styles.dia}
+              aria-expanded={menu}
+              aria-controls="atlas-menu"
+              aria-label={`Play ${m.name}`}
+              onClick={() => {
+                sfx.play('click');
+                setMenu((o) => !o);
+              }}
+              data-testid="atlas-play"
+            >
+              <span>
+                {String(mapIdx + 1).padStart(2, '0')}
+                <small>Play</small>
+              </span>
+            </button>
+            <div id="atlas-menu" className={styles.menu} aria-label={`Play ${m.name}`} role="group" data-testid="atlas-menu">
+              <Link
+                href={routes.crew(m.id, diff)}
+                className={`${styles.mi} ${styles.miPractice}`}
+                tabIndex={menu ? undefined : -1}
+                data-testid="atlas-practice"
+              >
+                <span className={styles.miIco} aria-hidden="true">
+                  <Ico d="M7 5l10 6-10 6z" />
+                </span>
+                <span className={styles.miLabel}>Practice · {D.n}</span>
+              </Link>
+              <Link
+                href={routes.pvp()}
+                className={`${styles.mi} ${styles.miRanked}`}
+                title="Ranked always plays Normal"
+                tabIndex={menu ? undefined : -1}
+                data-testid="atlas-ranked"
+              >
+                <span className={styles.miIco} aria-hidden="true">
+                  <Ico d="M5 17L17 5M13 5h4v4M5 5l4 4M13 13l4 4" />
+                </span>
+                <span className={styles.miLabel}>Ranked</span>
+              </Link>
+              <button
+                type="button"
+                className={styles.mi}
+                tabIndex={menu ? undefined : -1}
+                onClick={() => {
+                  sfx.play('click');
+                  setMenu(false);
+                  setDetails(true);
+                }}
+                data-testid="atlas-details"
+              >
+                <span className={styles.miIco} aria-hidden="true">
+                  <Ico d="M11 10v6M11 6.5v.5M3 11a8 8 0 1 0 16 0a8 8 0 1 0-16 0" />
+                </span>
+                <span className={styles.miLabel}>Details</span>
+              </button>
+            </div>
           </div>
           <div className={styles.hz} data-testid="atlas-vitals">
             {vitals(m, diff)}
           </div>
           <div className={styles.dpick}>
             <DiffPicker map={m} value={diff} onChange={pickDiff} />
-          </div>
-          <div className={styles.go}>
-            <button
-              type="button"
-              className="sk-btn sk-btn-secondary sk-btn-lg"
-              onClick={() => {
-                sfx.play('click');
-                setDetails(true);
-              }}
-              data-testid="atlas-details"
-            >
-              Details
-            </button>
-            <Link href={routes.crew(m.id, diff)} className="sk-btn sk-btn-secondary sk-btn-lg" data-testid="atlas-practice">
-              Practice · {D.n}
-            </Link>
-            <Link href={routes.pvp()} className="sk-btn sk-btn-danger sk-btn-lg" title="Ranked always plays Normal" data-testid="atlas-ranked">
-              Ranked
-            </Link>
           </div>
         </section>
 

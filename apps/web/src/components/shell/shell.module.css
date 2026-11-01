@@ -1,5 +1,5 @@
-/* Shell extras: the design notes aside (the prototype's #notes). The top bar and the account card
-   are app-topbar-* and app-dock-* in globals.css. Tokens only. */
+/* Shell extras: the design notes aside (the prototype's #notes). The top bar and the account badge
+   are app-topbar-*, app-acct-* and app-dock-* in globals.css. Tokens only. */
 
 .notes {
   position: fixed;

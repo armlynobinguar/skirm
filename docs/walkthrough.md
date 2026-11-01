@@ -11,7 +11,7 @@ The `data-testid` values in brackets are stable selectors for agents driving a b
 1. Open http://localhost:3000. You see the sign-in screen [`screen-s01`].
 2. Type a handle, for example `judge1`, in **Handle**, then click **Sign in** [`s01-signin`].
 3. **See:**
-   - Home (the Command deck) at `/play` [`screen-s02`, `s02-deck`], with your handle in the account dock [`topbar-account`].
+   - Home (the Command deck) at `/play` [`screen-s02`, `s02-deck`], with your handle on the account badge in the top bar [`account-badge`]; click it to open the account card [`topbar-account`].
    - Credits **0** and **60 free** [`topbar-credits`, `topbar-allowance`].
    - Six tiles: **Skirmish** (ranked) [`s02-tile-ranked`], **Map atlas** [`s02-tile-atlas`], **Crew** [`s02-tile-crew`], **Skills** (the Exchange) [`s02-tile-skills`], **Ladder** [`s02-tile-ladder`] and **Practice · Vs Greedy bot** [`s02-tile-practice`].
 
@@ -26,7 +26,7 @@ Every new account starts with the same crew: **Rook**, **Wren** and **Moss**, ea
 3. Click **Accept** [`v2-accept`]. The bot accepts and locks in by itself. **See** the lock-in [`v2-lockin`], with the hold reading **Free practice · nothing is held or charged** [`v2-hold`].
 4. Click **Lock in ▸** [`v2-lock`]. **See** the live arena [`v2-live`]: both crews on the shared map, the clock, the score and the comms feed. Press **Enter** to skip the intro.
 5. **See** the end: the verdict **Victory**, **Defeat** or **Draw** [`v2-verdict`] (on Copper Hollow, Easy the greedy crews usually finish 3–0 inside 60 ticks, mostly for your side), the match log hash, 64 hex characters [`v2-hash`], and the comms transcript [`v2-transcript`]. The NEAR line reads **Casual match · not written to the registry** [`v2-registry`].
-6. **See** the account dock still at **0** and **60 free** [`topbar-allowance`]: practice on the greedy brain holds and charges nothing.
+6. **See** the account card (click the account badge) still at **0** and **60 free** [`topbar-allowance`]: practice on the greedy brain holds and charges nothing.
 
 ### 3. Ranked in two browsers
 
@@ -68,7 +68,7 @@ Use two separate browser profiles (a normal and a private window), signed in as 
 
 ### 7. Credits and profile
 
-1. Click the credits in the account dock [`topbar-credits`] or open `/account/credits` [`screen-s15`]. **See** available **0** [`s15-balance-available`], held **0** [`s15-balance-held`] and the allowance **60 / 60** with its reset time [`s15-allowance`, `s15-allowance-reset`] on a fresh account (less after a ranked match).
+1. Open the account badge and click the credits [`topbar-credits`] or open `/account/credits` [`screen-s15`]. **See** available **0** [`s15-balance-available`], held **0** [`s15-balance-held`] and the allowance **60 / 60** with its reset time [`s15-allowance`, `s15-allowance-reset`] on a fresh account (less after a ranked match).
 2. In the top-up panel [`s15-topup`], pick **0.5 NEAR** and click **Top up 0.5 NEAR**. The dialog [`m02-confirm-transaction`] reads **Top up 500 credits** [`m02-item`] and **0.5 NEAR** [`m02-price`]. Click **Confirm in wallet · …** [`m02-confirm`] (dev mode signs nothing), then **Done** [`m02-done-close`].
 3. **See** available **500** [`s15-balance-available`] and a **Top-up** row, "0.5 NEAR at 1,000 credits per NEAR", **+500** in the ledger [`s15-ledger`]. A ranked match adds hold, charge and refund rows that link to its result.
 4. Open **Profile** [`screen-s16`]. **See** Rook, Wren and Moss [`s16-agent-name`], your rank: Elo [`s16-rank-elo`], title [`s16-rank-title`] and record [`s16-rank-record`], your recent matches [`s16-matches`, `s16-match-<matchId>`] with practice ones marked, and the NEAR account panel [`s16-near-none`, `s16-connect-wallet`].

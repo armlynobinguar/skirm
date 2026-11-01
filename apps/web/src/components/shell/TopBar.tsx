@@ -2,15 +2,16 @@
 // HUD top bar (v2 Arena look, the prototype's #top). There is no bar: Back, logo, the section tabs
 // and the SFX and Notes toggles are separate chips floating over the arena, in three groups. Tabs
 // carry a code-drawn icon (AkIcon) and a serial code (PLY·01 to LDR·05). Groups: Back, logo and a
-// crumb naming the screen; the nav; and the toggles. The account (network, handle, credits, wallet,
-// Elo) lives in one card at the bottom of the screen instead (AccountDock.tsx). Every screen except
-// S01 renders it via AppShell.
+// crumb naming the screen; the nav; and the toggles with the account badge last (AccountDock.tsx:
+// handle and credits; a click opens the card with network, credits, wallet and Elo). Every screen
+// except S01 renders it via AppShell.
 import { AkIcon, Logo, type AkIconName } from '@skirm/ui';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { usePreferences } from '@/lib/preferences';
 import { navGroupOf, routes, screenOf, type NavGroup } from '@/lib/routes';
 import { sfxEngine, useSfx } from '@/lib/sfx';
+import { AccountDock } from './AccountDock';
 import { notesStore, useNotesOpen } from './notes';
 
 const NAV: { id: NavGroup; label: string; href: string; icon: AkIconName; serial: string }[] = [
@@ -106,6 +107,7 @@ export function TopBar() {
           <AkIcon name="notes" />
           Notes
         </button>
+        <AccountDock />
       </div>
     </header>
   );

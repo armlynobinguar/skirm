@@ -95,6 +95,18 @@
 .lockFacts dd { margin: 0; color: var(--text); }
 .hash { font: 400 12px/16px var(--font-mono); overflow-wrap: anywhere; }
 
+/* Wide screens: the page fits the viewport (under the top bar and the main column's padding) and
+   only the card grid and the drawer scroll, so the head, the filters and the drawer stay in view. */
+@media (min-width: 761px) {
+  .page { height: calc(100dvh - 128px); min-height: 520px; }
+  .mk { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .list { min-height: 0; }
+  .grid { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+  .drawer { position: static; align-self: start; max-height: 100%; }
+}
+/* The top bar takes a second row for the tabs here. */
+@media (min-width: 761px) and (max-width: 1040px) { .page { height: calc(100dvh - 172px); } }
+
 @media (max-width: 1180px) {
   .mk { grid-template-columns: minmax(0, 1fr) minmax(0, 360px); }
   .disp { font-size: 38px; }

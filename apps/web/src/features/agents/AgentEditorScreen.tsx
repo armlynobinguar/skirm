@@ -1,7 +1,8 @@
 'use client';
 // Agent editor (/agents/[agentId]?map=&d=), the prototype's #s-agent: the agent on the left with its
 // inner voice as a bark and ‹ › to step through the roster (also ← →), and its loadout tiles on the
-// right:
+// right, sized to fit the viewport without scrolling on wide screens (prompt beside stats and record,
+// then skill, talk tier and inner voice in one row):
 //   system prompt  the owner's instructions the planner reads ahead of the skill (≤ 600 characters),
 //                  saved with PATCH /agents/:id { systemPrompt }; Reset clears them (skill alone)
 //   stats          vision, comms, voice and the role's verb on the map, explained
@@ -279,8 +280,8 @@ function AgentEditor({
           />
           <div className={e.row}>
             <span className={e.hint}>
-              The planner reads this every tick, before the skill. It sets voice and habits; the skill sets strategy.
-              {draft ? '' : ' Empty: the skill alone (the grey text is a starter you can write over).'}
+              Read every tick, before the skill: voice and habits here, strategy in the skill.
+              {draft ? '' : ' Empty: the skill alone (the grey text is a starter).'}
             </span>
             <button type="button" className={e.btn} onClick={reset} disabled={patch.isPending || (!saved && !draft)} data-testid="agent-prompt-reset">
               Reset
@@ -328,7 +329,33 @@ function AgentEditor({
           </dl>
         </section>
 
-        <section className={e.tile} style={{ '--tc': 'var(--violet)', '--rise-i': 2 } as CSSProperties} data-rise data-testid="agent-skill">
+        <section className={`${e.tile} ${e.rec}`} style={{ '--tc': 'var(--bone)', '--rise-i': 2 } as CSSProperties} data-rise data-testid="agent-record">
+          <span className={e.code}>
+            Record · season 1 <Soon what="Season record" />
+          </span>
+          <h2 className={e.name}>{winPct === null ? 'No matches yet' : `${winPct}% wins`}</h2>
+          <div className={e.statrow}>
+            <div>
+              <small>Matches</small>
+              <b>{fmt(agent.matchesPlayed)}</b>
+            </div>
+            <div>
+              <small>W–L–D</small>
+              <b>
+                {agent.wins}–{agent.losses}–{agent.draws}
+              </b>
+            </div>
+            <div>
+              <small>Bluffs</small>
+              <b>
+                <Soon what="Bluff stats" />
+              </b>
+            </div>
+          </div>
+          <span className={e.sub}>All time. Season records, deliveries per match and bluffs seen through arrive with seasons.</span>
+        </section>
+
+        <section className={`${e.tile} ${e.third}`} style={{ '--tc': 'var(--violet)', '--rise-i': 3 } as CSSProperties} data-rise data-testid="agent-skill">
           <span className={e.code}>Skill · equipped · {skill ? (mine ? 'yours' : 'bought, prompt encrypted') : 'none'}</span>
           <h2 className={e.name}>
             {skill ? skill.name : 'No skill'} {skill ? <span className={e.ver}>v{skill.version}</span> : null}
@@ -360,7 +387,7 @@ function AgentEditor({
           ) : null}
         </section>
 
-        <section className={e.tile} style={{ '--tc': 'var(--amber)', '--rise-i': 3 } as CSSProperties} data-rise>
+        <section className={`${e.tile} ${e.third}`} style={{ '--tc': 'var(--amber)', '--rise-i': 4 } as CSSProperties} data-rise>
           <span className={e.code}>Talk tier · practice default</span>
           <h2 className={e.name}>{TIER_INFO[tier].label}</h2>
           <div className={e.seg} role="group" aria-label="Default talk tier">
@@ -373,33 +400,7 @@ function AgentEditor({
           <span className={e.sub}>{TIER_INFO[tier].line} Ranked locks everyone to Standard.</span>
         </section>
 
-        <section className={e.tile} style={{ '--tc': 'var(--bone)', '--rise-i': 4 } as CSSProperties} data-rise data-testid="agent-record">
-          <span className={e.code}>
-            Record · season 1 <Soon what="Season record" />
-          </span>
-          <h2 className={e.name}>{winPct === null ? 'No matches yet' : `${winPct}% wins`}</h2>
-          <div className={e.statrow}>
-            <div>
-              <small>Matches</small>
-              <b>{fmt(agent.matchesPlayed)}</b>
-            </div>
-            <div>
-              <small>W–L–D</small>
-              <b>
-                {agent.wins}–{agent.losses}–{agent.draws}
-              </b>
-            </div>
-            <div>
-              <small>Bluffs</small>
-              <b>
-                <Soon what="Bluff stats" />
-              </b>
-            </div>
-          </div>
-          <span className={e.sub}>All time. Season records, deliveries per match and bluffs seen through arrive with seasons.</span>
-        </section>
-
-        <section className={e.tile} style={{ '--tc': 'var(--water)', '--rise-i': 5 } as CSSProperties} data-rise>
+        <section className={`${e.tile} ${e.third}`} style={{ '--tc': 'var(--water)', '--rise-i': 5 } as CSSProperties} data-rise>
           <span className={e.code}>
             How {agent.name} thinks · dry run on {map?.name ?? 'the map'}
           </span>

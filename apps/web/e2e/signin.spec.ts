@@ -12,7 +12,9 @@ test('dev sign-in lands on Home with the shared header', async ({ page }) => {
   const dock = page.getByTestId('account-dock');
   await expect(page.getByTestId('screen-s02')).toBeVisible();
   await expect(header.getByTestId('nav-play')).toHaveAttribute('aria-current', 'page');
-  // The network, handle, credits, wallet and Elo sit in the account card, not the top bar.
+  // The account badge in the top bar opens the card with the network, handle, credits, wallet and Elo.
+  await expect(header.getByTestId('account-badge')).toContainText(handle);
+  await header.getByTestId('account-badge').click();
   await expect(dock.getByText('Testnet', { exact: true })).toBeVisible();
   // A new account has 60 free credits and the starter crew (Rook leads on the Command deck).
   await expect(dock.getByTestId('topbar-allowance')).toHaveText(/60 free/);

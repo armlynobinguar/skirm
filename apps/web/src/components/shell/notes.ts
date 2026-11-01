@@ -17,7 +17,7 @@ export const NOTES = {
       'Menu tiles use the same icon language: a textured plate with the icon top-right, a large faint copy as a watermark, a serial code (OP·01 to PRC·06), grain and hatching across the tile, hazard tape in the corner, and a halftone in the tile colour that strengthens on hover.',
       'Header icons are drawn in code, Arknights-style: a halftone dot gradient (real dots, sized by position), fine hatching, corner brackets and one teal accent stroke each; PvP adds a red guard for the rival side. Tabs carry film grain, diagonal hatching and a serial code (PLY·01 to LDR·05); the active tab adds a teal halftone fade from the right.',
       'The header has no bar. Back, logo, the five section tabs and the SFX and Notes toggles are separate chips floating over the arena, like the menu tiles. The active tab gets a teal underline.',
-      'Your account sits in one card at the bottom right: network and handle on top, then credits, wallet and ranked Elo with its title. It steps aside on the live match.',
+      'Your account is the last chip of the top bar: handle and credits. Click it for the card with network, credits, wallet and ranked Elo with its title. It steps aside on the live match.',
       'Every mode is 2-crew PvP on closed maps.',
       "The lead agent's barks carry a channel tag (TEAM, SAY, HEARD), the same tags the match uses.",
       'The ticker states the season split, talk rule and fees from the v2 design doc.',
@@ -28,6 +28,7 @@ export const NOTES = {
     lead: 'All 10 maps, sized by difficulty: 31×13 up to 55×25.',
     points: [
       'Pick Easy, Normal, Hard, Agentic or Mega Agentic under the map. The goal box changes with it: 50 goals in all.',
+      'The map number is the play button: click the diamond for Practice at the picked difficulty, Ranked or Details.',
       'Agentic levels change the rivals, not just the hazard: Open talk, more bluffs, fog, and on Mega a full 3-agent crew and a 4:00 clock.',
       'Map tiers (Starter, Veteran, Extreme) never share a name with a difficulty.',
       'Difficulty sets size, middle-band width, routes, contested items, switches, supply drops, fog and stealing. Goals rise from 2 to 6.',

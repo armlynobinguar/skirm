@@ -350,7 +350,7 @@ act(() => realtime.emit({ type: 'v2_frame', matchId: 'mat_1', frame: v2FrameFixt
 - inside a screen: `sNN-<thing>` in kebab case, e.g. `s09-tag-filter-liquid`, `s11-find-match`,
   `s16-rank-elo`; the v2 match screens use `v2-<thing>` (`v2-accept`, `v2-verdict`). Repeated rows add an id: `s07-skill-row-<skillId>`.
 - shared: `topbar`, `nav-play|skills|market|pvp|leaderboards`, `topbar-credits`,
-  `topbar-allowance`, `topbar-account`, `topbar-signin`, `signin-required`, `skeleton`,
+  `topbar-allowance`, `topbar-account`, `topbar-signin`, `account-badge`, `signin-required`, `skeleton`,
   `error-card`, `empty-state`, `toasts`.
 Prefer `getByRole`/`getByLabelText` in tests where they read well; testids are for e2e and
 judges.

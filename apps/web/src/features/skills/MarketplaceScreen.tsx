@@ -9,7 +9,8 @@
 // Cards carry public metadata, the creator, the price in yoctoNEAR (formatted with bigint) and the
 // proof line: the version's ranked v2 win rate and its benchmark score ("Not benchmarked" when it has
 // none, e.g. on an offline server). The corner chip marks a starter, a draft or a minted version.
-// Sorts: ranked win rate, benchmark score, price and newest.
+// Sorts: ranked win rate, benchmark score, price and newest. On wide screens the page fits the viewport
+// and only the card grid and the drawer scroll (exchange.module.css).
 import { Badge, Button, TextField } from '@skirm/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';

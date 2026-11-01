@@ -40,7 +40,9 @@ describe('Map atlas', () => {
 
   it('opens the details drawer with goal, features and themed verbs', async () => {
     const { user } = renderWithProviders(<AtlasScreen />, { handle: 'ada', path: '/maps' });
+    await user.click(screen.getByTestId('atlas-play'));
     await user.click(screen.getByTestId('atlas-details'));
+    expect(screen.getByTestId('atlas-play')).toHaveAttribute('aria-expanded', 'false');
     const d = screen.getByTestId('atlas-drawer');
     expect(d).toHaveTextContent('First crew to deliver 4 lamps to the cage lift wins on Normal. At 5:00, more delivered wins.');
     expect(within(d).getByTestId('atlas-goals')).toHaveTextContent(
@@ -54,6 +56,28 @@ describe('Map atlas', () => {
     expect(verbs.getByText('remove_solid')).toBeInTheDocument();
     await user.click(within(d).getByRole('button', { name: 'Close details' }));
     expect(screen.queryByTestId('atlas-drawer')).not.toBeInTheDocument();
+  });
+
+  it('opens the play menu from the diamond; a second click, Escape or a click outside closes it', async () => {
+    const { user } = renderWithProviders(<AtlasScreen />, { handle: 'ada', path: '/maps' });
+    const play = screen.getByTestId('atlas-play');
+    expect(play).toHaveAttribute('aria-expanded', 'false');
+    expect(play).toHaveAccessibleName('Play Copper Hollow');
+    expect(play).toHaveTextContent('05');
+    const menu = screen.getByTestId('atlas-menu');
+    expect(within(menu).getByTestId('atlas-practice')).toHaveAttribute('tabindex', '-1');
+    await user.click(play);
+    expect(play).toHaveAttribute('aria-expanded', 'true');
+    expect(within(menu).getByTestId('atlas-practice')).not.toHaveAttribute('tabindex');
+    expect(within(menu).getByTestId('atlas-ranked')).toHaveAttribute('href', '/pvp');
+    await user.click(play);
+    expect(play).toHaveAttribute('aria-expanded', 'false');
+    await user.click(play);
+    await user.keyboard('{Escape}');
+    expect(play).toHaveAttribute('aria-expanded', 'false');
+    await user.click(play);
+    await user.click(screen.getByTestId('atlas-map-saltmarsh-weir'));
+    expect(play).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('picks a difficulty: goal box, vitals, Practice link with ?d=, Normal by default', async () => {
@@ -82,6 +106,7 @@ describe('Map atlas', () => {
     // The pick stays when the map changes, and the drawer's Practice link carries it.
     await user.click(screen.getByTestId('atlas-map-saltmarsh-weir'));
     expect(screen.getByTestId('atlas-goal')).toHaveTextContent('High tide');
+    await user.click(screen.getByTestId('atlas-play'));
     await user.click(screen.getByTestId('atlas-details'));
     expect(screen.getByTestId('atlas-drawer-practice')).toHaveAttribute('href', '/maps/saltmarsh-weir/crew?d=mega');
   });

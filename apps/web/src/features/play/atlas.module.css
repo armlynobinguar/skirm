@@ -1,6 +1,6 @@
 /* Map atlas (AtlasScreen.tsx): the prototype's #s-maps. Tokens only. */
 
-.screen { position: relative; margin: calc(-1 * var(--space-6)) -24px 0; padding: 0 24px; min-height: calc(100vh - 56px); }
+.screen { position: relative; margin: calc(-1 * var(--space-6)) -24px calc(-1 * var(--space-12)); padding: 0 24px; min-height: calc(100dvh - 56px); }
 /* Teal glow bottom-left, red bottom-right, dark centre: starter vs veteran. */
 .shade {
   position: fixed;
@@ -17,13 +17,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
   gap: 32px;
-  padding-block: 28px 24px;
+  padding-block: 12px 16px;
   align-items: start;
   max-width: 1600px;
   margin: 0 auto;
 }
 
-.sideH { margin: 0 0 22px; text-align: center; text-transform: uppercase; letter-spacing: .38em; font: 600 13px/18px var(--font-sans); }
+.sideH { margin: 0 0 16px; text-align: center; text-transform: uppercase; letter-spacing: .38em; font: 600 13px/18px var(--font-sans); }
 .teal { color: var(--you); }
 .red { color: var(--rival); }
 .orn { display: block; position: relative; height: 1px; margin-top: 12px; background: rgba(236, 232, 225, .45); }
@@ -32,13 +32,13 @@
 .orn::after { right: 0; }
 .orn i { position: absolute; left: 50%; top: -5px; width: 9px; height: 9px; border-left: 1.5px solid var(--bone); border-bottom: 1.5px solid var(--bone); transform: translateX(-50%) rotate(-45deg); }
 
-.cards { display: grid; gap: 16px; }
+.cards { display: grid; gap: 12px; }
 .card {
   --team: var(--you);
   position: relative;
   display: grid;
   grid-template-columns: 5px 56px minmax(0, 1fr);
-  grid-template-rows: 66px auto;
+  grid-template-rows: 60px auto;
   padding: 0;
   border: 0;
   text-align: left;
@@ -80,25 +80,87 @@
 .cap small { font: 400 11px/14px var(--font-mono); color: var(--muted); white-space: nowrap; }
 .cap small:first-of-type { margin-left: auto; }
 
-.center { display: flex; flex-direction: column; align-items: center; min-width: 0; padding-top: 10px; text-align: center; }
-.big { font: 800 clamp(56px, 7.6vw, 132px)/.82 var(--font-display); text-transform: uppercase; letter-spacing: .01em; color: var(--bone); text-wrap: balance; text-shadow: 0 8px 50px rgba(0, 0, 0, .6); }
-.sub { margin-top: 22px; font-size: 14px; line-height: 1.5; letter-spacing: .42em; text-transform: uppercase; color: var(--bone); }
-.emblem { width: 38px; height: 38px; margin-top: 10px; color: var(--bone); }
-.dia { display: grid; place-items: center; width: 104px; height: 104px; margin-top: 28px; transform: rotate(45deg); background: rgba(5, 8, 13, .3); box-shadow: inset 0 0 0 1px rgba(236, 232, 225, .38); }
-.dia span { transform: rotate(-45deg); font: 800 48px/1 var(--font-display); color: #fff; }
-.hz { max-width: 40ch; margin-top: 30px; font: 400 12.5px/18px var(--font-mono); color: #cdd6dd; }
-.go { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px; }
+.center { display: flex; flex-direction: column; align-items: center; min-width: 0; padding-top: 4px; text-align: center; }
+.big { font: 800 clamp(52px, 6.4vw, 112px)/.82 var(--font-display); text-transform: uppercase; letter-spacing: .01em; color: var(--bone); text-wrap: balance; text-shadow: 0 8px 50px rgba(0, 0, 0, .6); }
+.sub { margin-top: 14px; font-size: 13px; line-height: 1.5; letter-spacing: .42em; text-transform: uppercase; color: var(--bone); }
+.emblem { width: 30px; height: 30px; margin-top: 8px; color: var(--bone); }
+/* The play diamond: the map's number in a rotated square, two outlines pulsing outward from it.
+   Clicking it opens the menu beside it (the items slide out one after another); --side flips the
+   slide direction when the menu drops below on narrower screens. */
+.play { --dia: 100px; position: relative; display: grid; place-items: center; width: calc(var(--dia) * 1.42); height: calc(var(--dia) * 1.42); margin-top: 6px; }
+.dia {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: var(--dia);
+  height: var(--dia);
+  padding: 0;
+  border: 0;
+  color: #fff;
+  transform: rotate(45deg);
+  background: rgba(5, 8, 13, .45);
+  box-shadow: inset 0 0 0 1px rgba(236, 232, 225, .5), 0 0 24px rgba(52, 224, 200, .12);
+  cursor: pointer;
+  transition: background .2s, box-shadow .25s, transform .3s var(--ease-out);
+}
+.dia:hover { background: rgba(10, 30, 34, .7); box-shadow: inset 0 0 0 1px var(--you), 0 0 30px rgba(52, 224, 200, .3); }
+.dia:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.play[data-open] .dia { transform: rotate(45deg) scale(.94); background: rgba(10, 30, 34, .85); box-shadow: inset 0 0 0 2px var(--you), 0 0 36px rgba(52, 224, 200, .4); }
+.dia span { display: grid; justify-items: center; gap: 3px; transform: rotate(-45deg); font: 800 44px/1 var(--font-display); }
+.dia small { font: 500 9px/1 var(--font-mono); letter-spacing: .3em; padding-left: .3em; text-transform: uppercase; color: var(--you); }
+.pulse { position: absolute; left: 50%; top: 50%; width: var(--dia); height: var(--dia); margin: calc(var(--dia) / -2) 0 0 calc(var(--dia) / -2); pointer-events: none; box-shadow: inset 0 0 0 1.5px var(--you); opacity: 0; animation: pulseOut 2.4s var(--ease-out) infinite; }
+.pulse + .pulse { animation-delay: 1.2s; }
+.play[data-open] .pulse { animation-play-state: paused; opacity: 0; }
+@keyframes pulseOut {
+  0% { opacity: .75; transform: rotate(45deg) scale(1); }
+  100% { opacity: 0; transform: rotate(45deg) scale(1.75); }
+}
+
+.menu { --side: -14px; position: absolute; z-index: 3; left: calc(100% + 4px); top: 50%; display: grid; gap: 8px; width: max-content; transform: translateY(-50%); visibility: hidden; pointer-events: none; transition: visibility 0s .3s; }
+.menu::before { content: ""; position: absolute; left: -22px; top: 50%; width: 18px; height: 1px; background: var(--you); opacity: 0; transition: opacity .2s; }
+.play[data-open] .menu { visibility: visible; pointer-events: auto; transition: none; }
+.play[data-open] .menu::before { opacity: .8; }
+.mi {
+  --mc: var(--bone);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: var(--bone);
+  text-decoration: none;
+  background: none;
+  cursor: pointer;
+  opacity: 0;
+  transform: translate3d(var(--side), 0, 0);
+  transition: opacity .2s, transform .3s var(--ease-out);
+}
+.mi:nth-child(2) { transition-delay: .05s; }
+.mi:nth-child(3) { transition-delay: .1s; }
+.play[data-open] .mi { opacity: 1; transform: none; }
+.miPractice { --mc: var(--you); }
+.miRanked { --mc: var(--rival); }
+.miIco { position: relative; z-index: 1; display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; color: var(--mc); background: rgba(9, 15, 23, .95); box-shadow: inset 0 0 0 1.5px var(--mc), 0 4px 14px rgba(0, 0, 0, .5); transition: background .2s, color .2s; }
+.miIco svg { width: 18px; height: 18px; }
+.miLabel { margin-left: -6px; padding: 0 16px 0 18px; font: 700 15px/36px var(--font-display); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; background: rgba(9, 15, 23, .92); box-shadow: inset 0 0 0 1px var(--line-strong); clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); transition: background .2s, color .2s; }
+.mi:hover .miIco, .mi:focus-visible .miIco { color: var(--bg); background: var(--mc); }
+.mi:hover .miLabel, .mi:focus-visible .miLabel { color: var(--bg); background: var(--mc); }
+.mi:focus-visible { outline: none; }
+
+.hz { max-width: 40ch; margin-top: 10px; font: 400 12.5px/18px var(--font-mono); color: #cdd6dd; }
 
 /* Difficulty picker and goal box (the prototype's .dseg / .goalbox); --dc is the difficulty colour. */
-.dpick { display: grid; gap: 8px; width: min(470px, 100%); margin-top: 22px; }
+.dpick { display: grid; gap: 8px; width: min(470px, 100%); margin-top: 14px; }
 .dseg { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
 .dseg button {
   display: grid;
   place-items: center;
   gap: 2px;
   min-width: 0;
-  min-height: 46px;
-  padding: 5px 2px;
+  min-height: 42px;
+  padding: 4px 2px;
   border: 0;
   font: 700 15px/1 var(--font-display);
   letter-spacing: .03em;
@@ -116,14 +178,14 @@
 .dseg button:disabled { opacity: .28; cursor: not-allowed; }
 .goalbox {
   display: grid;
-  gap: 5px;
-  padding: 11px 13px;
+  gap: 4px;
+  padding: 9px 12px;
   text-align: left;
   background: rgba(0, 0, 0, .28);
   box-shadow: inset 3px 0 0 var(--dc), inset 0 0 0 1px var(--line);
   animation: goalIn .4s var(--ease-out) both;
 }
-.goalbox b { font: 800 24px/1 var(--font-display); text-transform: uppercase; color: var(--bone); }
+.goalbox b { font: 800 22px/1 var(--font-display); text-transform: uppercase; color: var(--bone); }
 .goalbox span { font-size: 13.5px; color: var(--text); }
 .goalbox small { font: 400 10.5px/14px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dc); }
 .goalbox small.f { letter-spacing: .06em; text-transform: none; color: var(--faint); }
@@ -172,15 +234,25 @@
 .foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px 20px 18px; box-shadow: inset 0 1px 0 var(--line); }
 .foot > * { flex: 1; }
 
-@media (max-width: 1180px) { .grid { gap: 20px; } }
+@media (max-width: 1180px) {
+  .grid { gap: 20px; }
+  /* No room beside the diamond: the menu drops below it as a panel over the picker. */
+  .menu { --side: 0px; left: 50%; top: calc(100% + 6px); padding: 10px; background: rgba(5, 8, 13, .96); box-shadow: inset 0 0 0 1px var(--line-strong), 0 12px 30px rgba(0, 0, 0, .6); transform: translate3d(-50%, -10px, 0); opacity: 0; transition: visibility 0s .3s, opacity .2s, transform .3s var(--ease-out); }
+  .play[data-open] .menu { opacity: 1; }
+  .play[data-open] .menu { transform: translate3d(-50%, 0, 0); }
+  .menu::before { left: 50%; top: -12px; width: 1px; height: 10px; }
+  .mi { transform: translate3d(0, -8px, 0); }
+}
 @media (max-width: 820px) {
   .screen { margin-inline: -16px; padding-inline: 16px; }
   .grid { grid-template-columns: 1fr; gap: 24px; }
   .center { order: -1; min-height: 46vh; justify-content: flex-end; }
-  .dia { width: 96px; height: 96px; margin-top: 22px; }
-  .dia span { font-size: 44px; }
-  .hz { margin-top: 24px; }
+  .play { --dia: 92px; }
+  .dia span { font-size: 40px; }
   .drawer { top: 56px; left: 16px; width: auto; }
 }
 @media (max-width: 420px) { .dseg button { font-size: 12px; letter-spacing: 0; } }
-@media (prefers-reduced-motion: reduce) { .drawer, .goalbox { animation: none; } .card, .dseg button { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .drawer, .goalbox, .pulse { animation: none; }
+  .card, .dseg button, .dia, .mi, .menu { transition: none; }
+}

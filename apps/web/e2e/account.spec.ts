@@ -42,6 +42,7 @@ test('fresh account tops up with a dev deposit and links a NEAR account', async 
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/s15-after-topup.png`, fullPage: true });
 
   // S16: the starter agents and the account rank, then link a NEAR account through M01 (dev mode trusts the id).
+  await page.getByTestId('account-badge').click();
   await page.getByTestId('topbar-account').click();
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByTestId('screen-s16')).toBeVisible();
