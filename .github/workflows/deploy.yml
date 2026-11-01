@@ -52,7 +52,8 @@ jobs:
           CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
           # Platform signer account; only read when the <env>-near-ops-key secret exists.
           NEAR_OPS_ACCOUNT: ${{ vars.NEAR_OPS_ACCOUNT }}
-          # Pinned so a deploy never switches on paid model calls by itself (the offline greedy brain).
-          V2_BRAIN: greedy
+          # Staging plays Haiku 5.5 through OpenRouter (the <env>-openrouter-api-key secret); without
+          # that secret every agent falls back to the offline greedy brain.
+          V2_BRAIN: haiku
           # Pushes deploy only the pieces whose inputs changed (scripts/deploy-gcp.sh, "Only what changed").
           SERVICES: ${{ inputs.services || 'auto' }}

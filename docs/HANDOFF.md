@@ -59,7 +59,7 @@ The judge invariant: `apps/realtime/test/v2-practice.test.ts` plays a fresh acco
 1. **Full stack smoke.** Run `npm run smoke` with Docker (README, "Full stack smoke") and the Playwright e2e before the next cross-service push.
 2. **OpenRouter API key** (`OPENROUTER_API_KEY`, GCP `<env>-openrouter-api-key`). Without it every match plays greedy and benchmarks and trials end `needs_model`. With it: a real gauntlet run, a check of OpenRouter's billed `usage.cost` against `PRICES.haiku` before the rates are locked, and tuning of mid-match scoring stalls.
 3. **NEAR:** the five contracts are live on testnet ([contracts/README.md](../contracts/README.md#deployed-on-testnet-2026-11-01)). Set `NEAR_OPS_ACCOUNT` and `<env>-near-ops-key` so the backend signs; the worker then opens the first season onchain and the market split funds its pool.
-4. **Staging:** a private `<env>-bench-secret`, the Privy app id and verification key, and a deploy with `scripts/deploy-gcp.sh` (it picks Haiku when the OpenRouter secret exists; CI pins greedy).
+4. **Staging:** a private `<env>-bench-secret`, the Privy app id and verification key, and a deploy with `scripts/deploy-gcp.sh` (it picks Haiku when the OpenRouter secret exists; CI deploys staging with Haiku).
 5. **Submission:** demo video and feature freeze, make `TyronVT/skirm` public, and the X post after the user approves the payload.
 
 ## Known limitations (deferred on purpose)
