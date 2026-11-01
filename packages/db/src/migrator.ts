@@ -30,8 +30,8 @@ export function addsEnumValue(m: Pick<MigrationMeta, 'sql'>): boolean {
  * The next run of pending migrations to apply in one transaction: everything after `lastMillis`,
  * up to and including the first migration that adds an enum value. Postgres refuses to use an
  * enum value in the transaction that added it ("unsafe use of new value"), so that migration's
- * transaction must commit before a later migration may use the value (e.g. 0003 adds
- * registry_status 'local', 0011 uses it as a column default).
+ * transaction must commit before a later migration may use the value (e.g. one migration adds an
+ * enum value and the next uses it as a column default).
  */
 export function nextBatch(migrations: MigrationMeta[], lastMillis: number | null): MigrationMeta[] {
   const batch: MigrationMeta[] = [];
