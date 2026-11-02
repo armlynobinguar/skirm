@@ -21,7 +21,9 @@ describe('greedy practice sweep', () => {
       if (runs.every((r) => r.ticks < 150 && r.result.reason !== 'eliminated' && r.score.A + r.score.B > 0)) clean.push(def.id);
     }
     expect(clean).toEqual([...PRACTICE_MAPS]);
-    for (const out of ['saltmarsh-weir', 'basalt-stair']) expect(clean).not.toContain(out);
+    // Basalt Stair on Normal, 1v1: one greedy agent cannot deliver 6 across a 55×25 map in time.
+    expect(clean).toContain('saltmarsh-weir');
+    expect(clean).not.toContain('basalt-stair');
   }, 60_000);
 
   it('plays the default practice to a result before tick 80, 1v1 and 2v2, with a valid log', async () => {

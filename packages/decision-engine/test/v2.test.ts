@@ -1,4 +1,4 @@
-import { MAPS_V2, createMatch, observe, stepMatch, type AgentSpec } from '@skirm/engine/v2';
+import { MAPS_V2, createMatch, observe, stepMatch, type AgentSpec, type Observation } from '@skirm/engine/v2';
 import { describe, expect, it, vi } from 'vitest';
 import { createGreedyBrain, createHaikuBrain, createV2Brain, filterSpeech, maySpeak, parseReply, systemPrompt, turnPrompt } from '../src/v2';
 
@@ -136,5 +136,56 @@ describe('greedy brain', () => {
       stepMatch(s, { actions });
     }
     expect(s.score.A + s.score.B).toBeGreaterThan(0);
+  });
+
+  /** A hand-made view: `rows` with `@` where the agent stands, legal moves onto open tiles. */
+  function view(rows: string[], o: { carrying?: number; others?: [number, number][]; exit?: [number, number] } = {}): Observation {
+    const y = rows.findIndex((r) => r.includes('@'));
+    const x = rows[y]!.indexOf('@');
+    const clean = rows.map((r) => r.replace('@', '.'));
+    const ey = clean.findIndex((r) => r.includes('E'));
+    const ex: [number, number] = o.exit ?? [ey >= 0 ? clean[ey]!.indexOf('E') : -1, ey];
+    const step = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] } as const;
+    const legal: Observation['legal'] = [{ type: 'wait' }];
+    for (const d of ['N', 'E', 'S', 'W'] as const) if ('.*E,'.includes(clean[y + step[d][1]]![x + step[d][0]]!)) legal.push({ type: 'move', dir: d });
+    const other = (p: [number, number], i: number) => ({ id: `o${i}`, name: `O${i}`, team: 'B' as const, role: 'Runner' as const, x: p[0], y: p[1], carrying: 0, down: false });
+    return {
+      tick: 10,
+      ticksLeft: 100,
+      map: { id: 'm', name: 'M', w: clean[0]!.length, h: clean.length, goal: 3, item: 'Lamp oil', deliverTo: 'Lift', exit: ex },
+      rows: clean,
+      me: { id: 'me', name: 'Me', team: 'A', role: 'Runner', x, y, carrying: o.carrying ?? 0, capacity: 2, tier: 'standard' },
+      teammates: [],
+      rivals: (o.others ?? []).map(other),
+      score: { mine: 0, rival: 0 },
+      blocksLeft: 2,
+      verbs: [],
+      heard: [],
+      legal,
+    };
+  }
+  const act = async (o: Observation) => (await createGreedyBrain().act(o, { skills: [], plan: null, canSpeak: false })).action;
+
+  it('steps off the delivery point when it has nothing left to do', async () => {
+    expect(await act(view(['#####', '#.@.#', '#####'], { exit: [2, 1] }))).toMatchObject({ type: 'move' });
+    // Elsewhere, alone and idle, it waits.
+    expect(await act(view(['#####', '#@.E#', '#####']))).toEqual({ type: 'wait' });
+  });
+
+  it('steps aside for an agent next to it when idle, but not onto the delivery point', async () => {
+    // A corridor: the rival below needs the tile; the only free sides are W and E (N is the delivery point).
+    const o = view(['#######', '###E###', '##.@.##', '###.###', '#######'], { others: [[3, 3]] });
+    const a = await act(o);
+    expect(a.type).toBe('move');
+    expect(a.type === 'move' && ['W', 'E']).toContain(a.type === 'move' && a.dir);
+  });
+
+  it('routes around tiles next to lava when there is another way', async () => {
+    // Item to the south-east; the straight row runs along the lava, the row below does not, and the
+    // item itself may sit next to lava (the last step is allowed).
+    expect(await act(view(['#######', '#LLLLL#', '#@....#', '#....*#', '#######']))).toEqual({ type: 'move', dir: 'S' });
+    expect(await act(view(['#######', '#LLLLL#', '#@...*#', '#.....#', '#######']))).toEqual({ type: 'move', dir: 'S' });
+    // With no other way it still goes.
+    expect(await act(view(['#######', '#LLLLL#', '#@...*#', '#######']))).toEqual({ type: 'move', dir: 'E' });
   });
 });

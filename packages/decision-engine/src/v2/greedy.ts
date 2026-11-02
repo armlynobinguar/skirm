@@ -1,6 +1,8 @@
 // A deterministic offline brain for dev, tests and benchmarks without model keys: walk (and dig) to
 // the nearest item the crew has seen, explore when it has seen none, deliver when full or when the
-// crew has enough, and use a switch now and then when next to one. It never speaks except a callout when it delivers.
+// crew has enough, and use a switch now and then when next to one. It routes around tiles next to
+// lava (the next wave takes them, and lava removes an agent) when it can. With nothing to do it never
+// idles on the delivery point or next to another agent, where it would block a corridor someone needs. It never speaks except a callout when it delivers.
 import { CALLOUTS, type Action, type Observation } from '@skirm/engine/v2';
 
 const STEP: Record<'N' | 'E' | 'S' | 'W', [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
@@ -17,8 +19,10 @@ export function greedyAct(o: Observation): Action {
     firstStep(o, (c) => c === '*') ??
     firstStep(o, (c) => c === '?') ??
     (o.me.carrying ? firstStep(o, deliver) : null);
-  const move = dir ? o.legal.find((a) => a.type === 'move' && a.dir === dir) : undefined;
+  // Nothing to fetch or deliver: step out of the way rather than block someone who has.
+  const move = dir ? o.legal.find((a) => a.type === 'move' && a.dir === dir) : standAside(o);
   if (!move) return { type: 'wait' };
+  if (!dir) return move;
   // Two agents stepping onto one tile both stay put, so a pair heading for the same tile would stall
   // forever: when another agent is next to the tile, yield on about half the ticks (by id and tick).
   const nx = o.me.x + STEP[dir!][0];
@@ -33,11 +37,38 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-/** Breadth-first over the seen map ('?' counts as open): the first step toward the nearest goal tile. */
+/**
+ * An idle agent on the delivery point or next to another agent moves: off the delivery point, away
+ * from lava, and to a tile next to nobody when it can. Elsewhere it stays put (undefined).
+ */
+function standAside(o: Observation): Action | undefined {
+  const isExit = (x: number, y: number) => x === o.map.exit[0] && y === o.map.exit[1];
+  const others = [...o.teammates, ...o.rivals].filter((a) => !a.down);
+  const nextToSomeone = (x: number, y: number) => others.some((a) => Math.abs(a.x - x) + Math.abs(a.y - y) === 1);
+  if (!isExit(o.me.x, o.me.y) && !nextToSomeone(o.me.x, o.me.y)) return undefined;
+  const moves = o.legal
+    .filter((a): a is Extract<Action, { type: 'move' }> => a.type === 'move')
+    .map((a) => ({ a, x: o.me.x + STEP[a.dir][0], y: o.me.y + STEP[a.dir][1] }))
+    .filter((m) => !isExit(m.x, m.y) && o.rows[m.y]?.[m.x] !== 'd' && !nearLava(o, m.x, m.y));
+  return (moves.find((m) => !nextToSomeone(m.x, m.y)) ?? moves[0])?.a;
+}
+
+/** Is a tile lava or next to it (where the next lava wave can reach)? */
+function nearLava(o: Observation, x: number, y: number): boolean {
+  for (const [dx, dy] of [[0, 0], ...Object.values(STEP)] as [number, number][]) if (o.rows[y + dy]?.[x + dx] === 'L') return true;
+  return false;
+}
+
+/** The first step toward the nearest goal tile: around lava when possible, else the plain route. */
 function firstStep(o: Observation, goal: (c: string, x: number, y: number) => boolean): 'N' | 'E' | 'S' | 'W' | null {
+  return search(o, goal, true) ?? search(o, goal, false);
+}
+
+/** Breadth-first over the seen map ('?' counts as open), optionally keeping off tiles next to lava. */
+function search(o: Observation, goal: (c: string, x: number, y: number) => boolean, safe: boolean): 'N' | 'E' | 'S' | 'W' | null {
   const h = o.rows.length;
   const w = o.rows[0]?.length ?? 0;
-  const open = (c: string) => c === '.' || c === ',' || c === '*' || c === 'E' || c === 'd' || c === '?';
+  const walkable = (c: string) => c === '.' || c === ',' || c === '*' || c === 'E' || c === 'd' || c === '?';
   const first = new Map<number, 'N' | 'E' | 'S' | 'W'>();
   const start = o.me.y * w + o.me.x;
   const q = [start];
@@ -52,7 +83,9 @@ function firstStep(o: Observation, goal: (c: string, x: number, y: number) => bo
       const ny = y + STEP[d][1];
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
       const k = ny * w + nx;
-      if (seen.has(k) || !open(o.rows[ny]![nx]!)) continue;
+      const c = o.rows[ny]![nx]!;
+      // The safe route keeps off tiles next to lava, except the goal tile itself (the last step).
+      if (seen.has(k) || !walkable(c) || (safe && nearLava(o, nx, ny) && !goal(c, nx, ny))) continue;
       seen.add(k);
       first.set(k, j === start ? d : first.get(j)!);
       q.push(k);

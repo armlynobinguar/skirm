@@ -30,7 +30,8 @@ describe('v2 practice data', () => {
     expect(new Set(PRACTICE_MAPS).size).toBe(PRACTICE_MAPS.length);
     expect(DEFAULT_PRACTICE).toEqual({ mapId: 'copper-hollow', difficulty: 'easy' });
     expect(isPracticeMap(DEFAULT_PRACTICE.mapId)).toBe(true);
-    expect(isPracticeMap('saltmarsh-weir')).toBe(false);
+    expect(isPracticeMap('saltmarsh-weir')).toBe(true);
+    expect(isPracticeMap('basalt-stair')).toBe(false);
     expect(isPracticeMap('nowhere')).toBe(false);
   });
 
