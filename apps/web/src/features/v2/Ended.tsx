@@ -244,7 +244,18 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
           <p className={v.note}>{watch ? 'Each crew’s report goes to its own player.' : 'The full report was not stored for this match.'}</p>
         )}
         <Row label="Season points">
-          <Soon what="Season points" />
+          {d?.season ? (
+            <b style={{ color: 'var(--amber)' }} data-testid="v2-season-points">
+              +{fmt(d.season.points)} · Season {d.season.number}
+            </b>
+          ) : !d ? (
+            <b>—</b>
+          ) : data.ranked ? (
+            // A ranked result stored before the points were recorded on the report.
+            <Soon what="Season points" />
+          ) : (
+            <b data-testid="v2-season-points">Ranked only</b>
+          )}
         </Row>
         <div className={v.verify} data-ok={data.registry === 'written' || undefined} data-testid="v2-registry">
           <span>

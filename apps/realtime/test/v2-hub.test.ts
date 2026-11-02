@@ -1,6 +1,7 @@
 // v2 over the hub: two players queue, accept, lock in and play a whole match with the greedy brain;
 // the result and Elo land in v2_matches, the credits settle, the debrief and registry job go out and
 // the frames can be replayed. Casual searches pair by map and difficulty; crews change at lock-in.
+import { seasonPoints } from '@skirm/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { RealtimeHub } from '../src/hub';
 import { FakeSocket, delay, makeDeps, type TestDeps } from './helpers';
@@ -74,6 +75,10 @@ describe('v2 matches over the hub', () => {
     const delta = row.eloDeltas!.find((d) => d.team === 'A')?.delta ?? null;
     expect(end.debrief).toMatchObject({ eloDelta: delta, registry: 'pending', difficulty: 'normal', credits: { held: 30, used, returned: 30 - used } });
     expect(end.debrief!.agents.map((a) => a.agentId)).toEqual([ana.agents[0]!.id]);
+    // The season points the stored result gave Ana arrive with v2_end too.
+    const outcome = end.result!.winner === 'draw' ? 'draw' : end.result!.winner === 'A' ? 'win' : 'loss';
+    expect(end.debrief!.season).toEqual({ number: 1, points: seasonPoints(outcome) });
+    expect((await deps.repos.v2Matches.get(found.matchId))!.debriefs?.A?.season).toEqual(end.debrief!.season);
     expect(deps.registryJobs).toContainEqual({ kind: 'v2_match', id: found.matchId });
     // Rook runs the starter skill, which Ana did not write: her plan is withheld.
     const own = ana.inbox.ofType('v2_frame').flatMap((f) => f.frame.agents.filter((a) => a.team === 'A'));

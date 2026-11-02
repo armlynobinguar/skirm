@@ -347,13 +347,13 @@ describe('v2 match: difficulty, lock-in crew changes, plans, debrief and frames'
   it('ends with each crew’s debrief (Elo, credits, talk, MVP) and keeps every frame for replay', async () => {
     const h = harness({
       send: (t, msg) => (h.inbox[t].push(msg), h.answer(t, msg)),
-      finish: async () => ({ eloDelta: { A: 12, B: -12 }, registry: 'pending' }),
+      finish: async () => ({ eloDelta: { A: 12, B: -12 }, registry: 'pending', season: { A: { number: 3, points: 25 }, B: { number: 3, points: 5 } } }),
     });
     const end = await h.m.play();
     const endA = of(h.inbox.A, 'v2_end')[0]!;
     const d = endA.debrief!;
     const held = holdFor(h.m.state!.agents.filter((a) => a.team === 'A'), false);
-    expect(d).toMatchObject({ eloDelta: 12, registry: 'pending', difficulty: 'normal' });
+    expect(d).toMatchObject({ eloDelta: 12, registry: 'pending', difficulty: 'normal', season: { number: 3, points: 25 } });
     const used = h.credits.charged.A!;
     expect(d.credits).toEqual({ held, used, returned: held - used });
     expect(d.agents.map((a) => a.agentId)).toEqual(['wick', 'moss']);
@@ -361,7 +361,7 @@ describe('v2 match: difficulty, lock-in crew changes, plans, debrief and frames'
     expect(['wick', 'moss']).toContain(d.mvp);
     const said = of(h.inbox.watch, 'v2_frame').flatMap((f) => f.frame.events).filter((e) => e.kind === 'said' && ['wick', 'moss'].includes(e.agent));
     expect(d.talk.sent).toBe(said.length);
-    expect(of(h.inbox.B, 'v2_end')[0]!.debrief).toMatchObject({ eloDelta: -12 });
+    expect(of(h.inbox.B, 'v2_end')[0]!.debrief).toMatchObject({ eloDelta: -12, season: { number: 3, points: 5 } });
     expect(of(h.inbox.watch, 'v2_end')[0]!.debrief).toBeUndefined();
 
     expect(h.m.framesOf('A')).toHaveLength(end.result!.ticks + 1);

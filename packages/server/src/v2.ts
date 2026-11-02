@@ -48,6 +48,8 @@ export interface V2Debrief {
   registry: 'pending' | 'written' | null;
   agents: V2DebriefAgent[];
   difficulty?: Difficulty;
+  /** Ranked: the season this result counted towards and the standings points it gave; absent otherwise. */
+  season?: { number: number; points: number };
 }
 
 export type V2ClientMessage =

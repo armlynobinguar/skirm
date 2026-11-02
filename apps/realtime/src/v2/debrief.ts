@@ -61,6 +61,8 @@ export interface DebriefInput {
   void: boolean;
   eloDelta: number | null;
   registry: V2Debrief['registry'];
+  /** Ranked: the season the result counted towards and its points (from the stored result). */
+  season?: V2Debrief['season'];
 }
 
 export function buildDebrief(i: DebriefInput): V2Debrief {
@@ -79,5 +81,6 @@ export function buildDebrief(i: DebriefInput): V2Debrief {
     registry: i.registry,
     agents,
     difficulty: i.difficulty,
+    ...(i.season ? { season: i.season } : {}),
   };
 }
