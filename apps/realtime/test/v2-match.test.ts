@@ -233,8 +233,9 @@ describe('v2 match: whole-credit charges never exceed the hold', () => {
     { A: ['open', 'open', 'open'], B: ['quiet', 'quiet', 'quiet'] },
   ];
 
+  // Each case plays every crew mix over the whole clock, which outruns the default 5 s on a slow machine.
   for (const [difficulty, ticks] of [['normal', 150], ['hard', 135], ['mega', 120]] as const) {
-    it(`charges only positive whole credits, at most the hold, over the ${ticks}-tick ${difficulty} clock`, async () => {
+    it(`charges only positive whole credits, at most the hold, over the ${ticks}-tick ${difficulty} clock`, { timeout: 30_000 }, async () => {
       for (const tiers of MIXES) {
         const { end, credits, s } = await playClock({ tiers, difficulty });
         expect(s.limit).toBe(ticks);

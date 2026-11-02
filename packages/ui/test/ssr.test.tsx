@@ -4,8 +4,12 @@ import { describe, expect, it } from 'vitest';
 import * as React from 'react';
 import { renderToString } from 'react-dom/server';
 
+// Importing the whole library cold takes well over the default 5 s when every workspace tests at
+// once (the pre-push hook), though it is under a second on its own.
+const COLD_IMPORT_MS = 30_000;
+
 describe('SSR safety', () => {
-  it('imports and renders every component without a DOM', async () => {
+  it('imports and renders every component without a DOM', { timeout: COLD_IMPORT_MS }, async () => {
     expect(typeof (globalThis as { window?: unknown }).window).toBe('undefined');
     const ui = await import('../src');
     const el = (
