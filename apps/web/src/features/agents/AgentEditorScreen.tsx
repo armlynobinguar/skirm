@@ -11,7 +11,9 @@
 //   skill          slots for the skills you own (click one to equip), the equipped skill's prompt
 //                  when you wrote it, encrypted when bought
 //   talk tier      the agent's default for unranked play (ranked is always Standard)
-//   record         all-time matches and W–L–D; the season record and bluffs are "Soon"
+//   record         this season's record (all time when no season is open) from GET /agents/:id/record:
+//                  win rate, matches, deliveries per match, bluffs landed of told and rival bluffs seen
+//                  through; the agent's own counters with "Soon" until it loads or if it fails
 // `map` / `d` name the crew screen it was opened from, for "Back to crew".
 import { isDifficulty, type Difficulty, type TalkTier } from '@skirm/engine/v2';
 import { DisplayHeading, Pips, Soon, fmt } from '@skirm/ui';
@@ -131,6 +133,8 @@ function AgentEditor({
 
   const written = useQuery({ queryKey: qk.skills.list('written'), queryFn: () => api.skills('written') });
   const owned = useQuery({ queryKey: qk.skills.list('owned'), queryFn: () => api.skills('owned') });
+  // The record falls back to the agent's own counters while it loads or when it cannot be read.
+  const record = useQuery({ queryKey: qk.agentRecord(agent.id), queryFn: () => api.agentRecord(agent.id), retry: false });
   const mine = !!skill && !!written.data?.some((s) => s.id === skill.id);
   const text = useQuery({
     queryKey: qk.skills.one(skill?.id ?? '', skill?.version),
@@ -240,7 +244,10 @@ function AgentEditor({
   const barkLine = sampleInner(who, map, seed + 7 + bark)[bark % 3];
 
   const ownedSkills = owned.data ?? [];
-  const winPct = agent.matchesPlayed ? Math.round((agent.wins / agent.matchesPlayed) * 100) : null;
+  const rec = record.data ? (record.data.season ?? record.data.allTime) : null;
+  const played = rec ? rec.matches : agent.matchesPlayed;
+  const winPct = played ? Math.round(((rec ? rec.wins : agent.wins) / played) * 100) : null;
+  const span = record.data?.season ? 'this season' : 'all time';
   const backHref = from ? routes.crew(from.mapId, from.difficulty) : routes.home();
 
   return (
@@ -334,31 +341,60 @@ function AgentEditor({
         <section className={e.record} aria-label="Record" data-rise style={{ '--rise-i': 1 } as CSSProperties} data-testid="agent-record">
           <div className={e.recHead}>
             <span className={e.kick}>
-              Record <i aria-hidden="true">▸▸</i> <Soon what="Season record" />
+              Record <i aria-hidden="true">▸▸</i>{' '}
+              {rec ? (
+                <span data-testid="agent-record-span">{record.data?.season ? `Season ${record.data.season.number}` : 'All time'}</span>
+              ) : (
+                <Soon what="Season record" />
+              )}
             </span>
             <b>{winPct === null ? 'No matches yet' : `${winPct}% wins`}</b>
           </div>
           <span className={e.bar} aria-hidden="true">
             <i style={{ width: `${winPct ?? 0}%` }} />
           </span>
-          <div className={e.statrow} title="All time. Season records, deliveries per match and bluffs seen through arrive with seasons.">
-            <span>
-              <small>Matches</small>
-              <b>{fmt(agent.matchesPlayed)}</b>
-            </span>
-            <span>
-              <small>W–L–D</small>
-              <b>
-                {agent.wins}–{agent.losses}–{agent.draws}
-              </b>
-            </span>
-            <span>
-              <small>Bluffs</small>
-              <b>
-                <Soon what="Bluff stats" />
-              </b>
-            </span>
-          </div>
+          {rec ? (
+            <>
+              <div className={e.statrow} title={`${rec.wins}–${rec.losses}–${rec.draws} (W–L–D) ${span}. Practice against the bot does not count.`}>
+                <span>
+                  <small>Matches</small>
+                  <b>{fmt(rec.matches)}</b>
+                </span>
+                <span>
+                  <small>Deliv/match</small>
+                  <b>{rec.matches ? (rec.delivered / rec.matches).toFixed(1) : '–'}</b>
+                </span>
+                <span title={`${rec.bluffsLanded} of ${rec.bluffsTold} bluffs believed by the rival`}>
+                  <small>Bluffs</small>
+                  <b>
+                    {fmt(rec.bluffsLanded)}/{fmt(rec.bluffsTold)}
+                  </b>
+                </span>
+              </div>
+              <small className={e.recSub} data-testid="agent-record-seen">
+                Saw through {fmt(rec.seenThrough)} rival bluff{rec.seenThrough === 1 ? '' : 's'} {span}.
+              </small>
+            </>
+          ) : (
+            <div className={e.statrow} title="All time.">
+              <span>
+                <small>Matches</small>
+                <b>{fmt(agent.matchesPlayed)}</b>
+              </span>
+              <span>
+                <small>W–L–D</small>
+                <b>
+                  {agent.wins}–{agent.losses}–{agent.draws}
+                </b>
+              </span>
+              <span>
+                <small>Bluffs</small>
+                <b>
+                  <Soon what="Bluff stats" />
+                </b>
+              </span>
+            </div>
+          )}
         </section>
 
         <div className={e.plate} data-rise style={{ '--rise-i': 2 } as CSSProperties}>

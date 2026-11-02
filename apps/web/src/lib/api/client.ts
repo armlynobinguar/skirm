@@ -19,6 +19,7 @@ import type {
   MarketDetail,
   MarketQuery,
   Me,
+  AgentRecord,
   MyMatch,
   MintResponse,
   PlayerLadder,
@@ -52,6 +53,8 @@ export interface ApiClient {
   myMatches(): Promise<MyMatch[]>;
 
   agents(): Promise<Agent[]>;
+  /** GET /agents/:id/record: the agent's season and all-time record, bluffs included. */
+  agentRecord(agentId: string): Promise<AgentRecord>;
   /** PATCH /agents/:id: name, look, skills, unlocks, v2 role/vision/comms/tier and `systemPrompt` (≤ 600). */
   patchAgent(agentId: string, patch: AgentPatch): Promise<Agent>;
 
@@ -168,6 +171,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     myMatches: () => get('/me/matches'),
 
     agents: () => get('/agents'),
+    agentRecord: (id) => get(`/agents/${enc(id)}/record`),
     patchAgent: (id, patch) => json('PATCH', `/agents/${enc(id)}`, { body: patch }),
 
     skills: (tab = 'written') => get('/skills', { tab }),

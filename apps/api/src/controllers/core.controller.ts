@@ -231,6 +231,26 @@ export class CoreController {
   }
 
   /**
+   * One of the caller's agents' record from its v2 matches (practice against the bot left out):
+   * this season's, while a season is open, and all time. Matches, W–L–D, items delivered, bluffs
+   * told and landed, and rival bluffs seen through.
+   */
+  @Get('agents/:id/record')
+  async agentRecord(@Param('id') id: string, @CurrentAccount() acc?: AccountRow) {
+    const account = mustAccount(acc);
+    const agent = idOr404(agentId, id, 'agent');
+    const { agents, seasons, v2Matches } = this.deps.repos;
+    const row = await agents.get(agent);
+    if (!row || row.ownerId !== account.id) throw new ApiError(404, 'not_found', 'agent not found');
+    const current = await seasons.current();
+    const [allTime, season] = await Promise.all([
+      v2Matches.agentRecord(agent),
+      current ? v2Matches.agentRecord(agent, { since: current.startsAt, until: current.endsAt }) : null,
+    ]);
+    return { allTime, season: current && season ? { number: current.number, endsAt: current.endsAt.toISOString(), ...season } : null };
+  }
+
+  /**
    * Name, skills (≤3, owned), unlocks, the v2 role, vision, comms and talk tier, and the owner's
    * instructions (`systemPrompt`, ≤600 characters); refused (409 `agent_busy`) while the agent is in a live match.
    * Appearance is cosmetic and can change at any time, also mid-match; a premium colour needs the

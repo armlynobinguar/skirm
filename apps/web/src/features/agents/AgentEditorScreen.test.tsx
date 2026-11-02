@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { skillRowFixture } from '@/features/skills/testFixtures';
 import { ApiError } from '@/lib/api/errors';
-import type { AgentPatch, SkillWithText } from '@/lib/api/types';
+import type { AgentPatch, AgentRecord, SkillWithText } from '@/lib/api/types';
 import { agentFixture, meFixture } from '@/test/fixtures';
 import { renderWithProviders } from '@/test/render';
 import { AgentEditorScreen } from './AgentEditorScreen';
@@ -26,7 +26,12 @@ const PIKE = agentFixture({ id: 'agt_pike', name: 'Pike', role: 'Digger' });
 const MINE = skillRowFixture({ id: 'skl_mine', version: 2, name: 'Dam First' });
 const BOUGHT = skillRowFixture({ id: 'skl_bought', version: 5, name: 'Clean Sweep', creatorAccount: { id: 'acc_k', handle: 'kai.testnet', nearAccountId: null } });
 
-function setup(agentId = WICK.id, o: { mapId?: string; difficulty?: string; patch?: (id: string, p: AgentPatch) => Promise<never> | ReturnType<typeof agentFixture> } = {}) {
+const COUNTS = { matches: 5, wins: 3, losses: 1, draws: 1, delivered: 9, bluffsTold: 4, bluffsLanded: 1, seenThrough: 2 };
+
+function setup(
+  agentId = WICK.id,
+  o: { mapId?: string; difficulty?: string; patch?: (id: string, p: AgentPatch) => Promise<never> | ReturnType<typeof agentFixture>; record?: AgentRecord } = {},
+) {
   return renderWithProviders(<AgentEditorScreen agentId={agentId} mapId={o.mapId} difficulty={o.difficulty} />, {
     handle: 'ada',
     path: `/agents/${agentId}`,
@@ -35,11 +40,33 @@ function setup(agentId = WICK.id, o: { mapId?: string; difficulty?: string; patc
       skills: async (tab) => (tab === 'written' ? [MINE] : [MINE, BOUGHT]),
       skill: async () => ({ ...MINE, prompt: 'Dam the left channel first.', reflexes: null }) as SkillWithText,
       patchAgent: async (id, p) => (o.patch ? o.patch(id, p) : { ...WICK, ...p, id }) as never,
+      ...(o.record ? { agentRecord: async () => o.record! } : {}),
     },
   });
 }
 
 describe('agent editor', () => {
+  it('shows the season record from the record endpoint, bluffs included', async () => {
+    setup(WICK.id, { record: { allTime: { ...COUNTS, matches: 8 }, season: { number: 2, endsAt: '2026-11-10T00:00:00.000Z', ...COUNTS } } });
+    expect(await screen.findByTestId('agent-record-span')).toHaveTextContent('Season 2');
+    const record = screen.getByTestId('agent-record');
+    expect(record).toHaveTextContent('60% wins');
+    expect(record).toHaveTextContent('Matches5');
+    expect(record).toHaveTextContent('Deliv/match1.8');
+    expect(record).toHaveTextContent('Bluffs1/4');
+    expect(screen.getByTestId('agent-record-seen')).toHaveTextContent('Saw through 2 rival bluffs this season.');
+    expect(within(record).queryByText('Soon')).toBeNull();
+  });
+
+  it('shows the all-time record when no season is open', async () => {
+    setup(WICK.id, { record: { allTime: { ...COUNTS, matches: 0, wins: 0, losses: 0, draws: 0, delivered: 0, bluffsTold: 0, bluffsLanded: 0, seenThrough: 1 }, season: null } });
+    expect(await screen.findByTestId('agent-record-span')).toHaveTextContent('All time');
+    const record = screen.getByTestId('agent-record');
+    expect(record).toHaveTextContent('No matches yet');
+    expect(record).toHaveTextContent('Deliv/match–');
+    expect(screen.getByTestId('agent-record-seen')).toHaveTextContent('Saw through 1 rival bluff all time.');
+  });
+
   it('shows the system prompt, stats, skill prompt, tier, record and inner voice', async () => {
     setup(WICK.id, { mapId: 'copper-hollow', difficulty: 'hard' });
     const prompt = await screen.findByTestId('agent-prompt');

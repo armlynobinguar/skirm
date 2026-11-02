@@ -402,6 +402,7 @@ export interface V2DebriefAgentRecord {
   delivered: number;
   used: number;
   picks: number;
+  bluffs?: { told: number; landed: number; seenThrough: number };
 }
 
 /**

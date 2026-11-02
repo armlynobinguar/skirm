@@ -110,6 +110,8 @@ export interface AgentState {
   inbox: HeardMessage[];
   /** A bluff this agent believed: it treats `tile` as empty until tick `until` (bluff.ts). */
   avoid: { tile: number; until: number } | null;
+  /** Bluffs it told and the rival believed, and rival bluffs it heard and doubted (the agent record). */
+  bluffs: { told: number; landed: number; seenThrough: number };
 }
 
 export type MatchEvent =
@@ -243,6 +245,7 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
         lastSpoke: -Infinity,
         inbox: [],
         avoid: null,
+        bluffs: { told: 0, landed: 0, seenThrough: 0 },
       });
     });
   const diff = crews.A.length - crews.B.length;
