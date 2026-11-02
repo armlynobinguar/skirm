@@ -105,6 +105,8 @@ export interface V2Setup {
   practice?: boolean;
   /** Crews that hold and pay nothing: the bot, or a practice player on the offline greedy brain. */
   free?: Partial<Record<Team, true>>;
+  /** Extra ticks a crew waits at the start (the practice bot on Easy, practiceRival). */
+  hold?: Partial<Record<Team, number>>;
 }
 
 /** What the hub knows once the result is written: each player's Elo change and the registry line. */
@@ -260,7 +262,7 @@ export class V2Match {
   }
 
   private create(a: AgentSpec[], b: AgentSpec[]): MatchState {
-    return createMatch(this.setup.map, { A: a, B: b }, { ranked: this.setup.ranked, difficulty: this.difficulty });
+    return createMatch(this.setup.map, { A: a, B: b }, { ranked: this.setup.ranked, difficulty: this.difficulty, ...(this.setup.hold ? { hold: this.setup.hold } : {}) });
   }
 
   /** Every frame a view was sent; empty until the match went live. */

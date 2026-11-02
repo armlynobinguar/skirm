@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOT_HANDLE, DEFAULT_PRACTICE, MAPS_V2, PRACTICE_MAPS, ROLES, V2_REPLAN_EVERY, botCrew, createMatch, isPracticeMap, mapV2 } from '../src/v2';
+import { BOT_HANDLE, DEFAULT_PRACTICE, DIFFICULTIES, MAPS_V2, PRACTICE_MAPS, ROLES, V2_REPLAN_EVERY, botCrew, createMatch, isPracticeMap, legalActions, mapV2, practiceRival, stepMatch } from '../src/v2';
 
 describe('v2 practice data', () => {
   it('builds bot crews of 1 to 3 Standard agents with unique ids and one role each', () => {
@@ -32,6 +32,40 @@ describe('v2 practice data', () => {
     expect(isPracticeMap(DEFAULT_PRACTICE.mapId)).toBe(true);
     expect(isPracticeMap('saltmarsh-weir')).toBe(false);
     expect(isPracticeMap('nowhere')).toBe(false);
+  });
+
+  it('gives bot crews the tier asked for', () => {
+    expect(botCrew(2, 'b', 'open').map((a) => a.tier)).toEqual(['open', 'open']);
+  });
+
+  it('shapes the bot by difficulty: Easy waits 12 s on Quiet, Agentic talks Open, Mega fields a full crew', () => {
+    expect(practiceRival('easy', 1, 3)).toEqual({ size: 1, tier: 'quiet', hold: 6 });
+    expect(practiceRival('normal', 2, 3)).toEqual({ size: 2, tier: 'standard', hold: 0 });
+    expect(practiceRival('hard', 1, 3)).toEqual({ size: 1, tier: 'standard', hold: 0 });
+    expect(practiceRival('agentic', 2, 3)).toEqual({ size: 2, tier: 'open', hold: 0 });
+    expect(practiceRival('mega', 1, 3)).toEqual({ size: 3, tier: 'open', hold: 0 });
+    // Never more than the map takes, and never fewer than the player.
+    expect(practiceRival('mega', 1, 2).size).toBe(2);
+    expect(practiceRival('mega', 2, 1).size).toBe(2);
+    for (const d of DIFFICULTIES) expect(practiceRival(d, 3, 3).size).toBe(3);
+  });
+
+  it('holds a crew for the extra ticks on top of the head start', () => {
+    const map = mapV2('copper-hollow')!;
+    // Mega: the bot fields 3 against 1, so the player gets 10 ticks; Easy's wait adds to the bot's own.
+    const mega = createMatch(map, { A: botCrew(1, 'p'), B: botCrew(3, 'b') }, { difficulty: 'mega' });
+    expect(mega.holdTicks).toEqual({ A: 0, B: 10 });
+    const easy = createMatch(map, { A: botCrew(1, 'p'), B: botCrew(1, 'b') }, { difficulty: 'easy', hold: { B: 6 } });
+    expect(easy.holdTicks).toEqual({ A: 0, B: 6 });
+    const both = createMatch(map, { A: botCrew(2, 'p'), B: botCrew(1, 'b') }, { hold: { B: 6 } });
+    expect(both.holdTicks).toEqual({ A: 5, B: 6 });
+    // The held crew stands still for its ticks, then moves.
+    const bot = easy.agents.find((a) => a.team === 'B')!;
+    for (let t = 0; t < 6; t++) {
+      expect(legalActions(easy, bot.id)).toEqual([{ type: 'wait' }]);
+      stepMatch(easy, { actions: {} });
+    }
+    expect(legalActions(easy, bot.id).length).toBeGreaterThan(1);
   });
 
   it('pins the plan cadence and the bot handle', () => {

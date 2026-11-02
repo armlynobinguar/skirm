@@ -67,6 +67,8 @@ export interface MatchOptions {
   ticks?: number;
   /** Casual difficulty (DIFF_MODS, see withDifficulty); Normal when unset. Ignored in ranked. */
   difficulty?: Difficulty;
+  /** Extra ticks a crew holds at the start, on top of the head start (the practice bot on Easy). */
+  hold?: Partial<Record<Team, number>>;
 }
 
 export type Action = { type: 'wait' } | { type: 'move'; dir: Dir } | { type: 'verb'; verb: string; dir?: Dir } | { type: 'switch' };
@@ -168,7 +170,7 @@ export interface MatchState {
   score: Record<Team, number>;
   /** Tick each crew reached its current score (tiebreak). */
   scoredAt: Record<Team, number>;
-  /** Ticks each crew waits at the start: the larger crew waits 5 per agent of difference. */
+  /** Ticks each crew waits at the start: the larger crew waits 5 per agent of difference, plus any `hold`. */
   holdTicks: Record<Team, number>;
   blocks: Record<Team, number>;
   /** Dig hits so far per dirt tile. */
@@ -243,7 +245,10 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
     agents,
     score: { A: 0, B: 0 },
     scoredAt: { A: 0, B: 0 },
-    holdTicks: { A: diff > 0 ? diff * HEAD_START_TICKS_PER_AGENT : 0, B: diff < 0 ? -diff * HEAD_START_TICKS_PER_AGENT : 0 },
+    holdTicks: {
+      A: (diff > 0 ? diff * HEAD_START_TICKS_PER_AGENT : 0) + Math.max(0, opts.hold?.A ?? 0),
+      B: (diff < 0 ? -diff * HEAD_START_TICKS_PER_AGENT : 0) + Math.max(0, opts.hold?.B ?? 0),
+    },
     blocks: { A: def.blockSupply, B: def.blockSupply },
     dig: {},
     dropped: {},
