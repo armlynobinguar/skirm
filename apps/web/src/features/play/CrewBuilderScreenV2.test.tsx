@@ -193,10 +193,10 @@ describe('S04 v2 crew screen', () => {
     expect(realtime.sentOf('v2_queue')[0]).toMatchObject({ opponent: 'bot' });
   });
 
-  it('does not mark a map greedy cannot play out cleanly as quick', async () => {
+  it('marks the largest map quick too: greedy plays every map out cleanly', async () => {
     renderWithProviders(<V2CrewScreen mapId="basalt-stair" />, { handle: 'ada', search: '?opponent=bot', api: { me: async () => me(), skills: async () => [] } });
     await screen.findByTestId(`s04-card-${WICK.id}`);
     expect(screen.getByTestId('s04-map-line')).toHaveTextContent('practice vs Greedy bot');
-    expect(screen.queryByTestId('s04-quick')).not.toBeInTheDocument();
+    expect(screen.getByTestId('s04-quick')).toBeInTheDocument();
   });
 });

@@ -109,7 +109,10 @@ export function judgeBluffs(s: MatchState, planned: readonly PlannedBluff[], spo
   const ev: MatchEvent[] = [];
   for (const b of planned) {
     const said = spoken.find((e) => e.kind === 'said' && e.agent === b.liar.id && e.text === b.say.text);
-    if (!said || said.kind !== 'said' || !said.heardBy.includes(b.victim.id)) continue;
+    if (!said || said.kind !== 'said') continue;
+    // The engine spoke it for the agent (not the agent's own message): marked for stats that count a brain's speech.
+    said.bluff = true;
+    if (!said.heardBy.includes(b.victim.id)) continue;
     const T = s.tally[b.liar.team];
     T.lies++;
     b.liar.bluffs.told++;

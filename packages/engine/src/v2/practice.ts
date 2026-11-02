@@ -66,6 +66,7 @@ export const PRACTICE_MAPS: readonly string[] = [
   'dust-bowl-silos',
   'monsoon-terraces',
   'sunken-metro',
+  'basalt-stair',
   'blackout-harbor',
 ];
 
