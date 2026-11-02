@@ -312,9 +312,11 @@ function greedy(s: MatchState, id: string): Action {
   let target: [number, number] = o.map.exit;
   if (o.me.carrying === 0) {
     let best = Infinity;
+    // Items in sight only: this walker has no pathfinding, and a known item across walls would stall it.
+    const inSight = (x: number, y: number) => s.visible[o.me.team][y * o.map.w + x];
     o.rows.forEach((r, y) => [...r].forEach((c, x) => {
       const d = Math.abs(x - o.me.x) + Math.abs(y - o.me.y);
-      if (c === '*' && d < best) {
+      if (c === '*' && d < best && inSight(x, y)) {
         best = d;
         target = [x, y];
       }

@@ -174,7 +174,8 @@ export async function playHeadless(opts: HeadlessOptions): Promise<HeadlessResul
     });
     const ev = stepMatch(s, { actions, says });
     appendTick(log, { tick: s.tick, actions, says });
-    for (const e of ev) if (e.kind === 'said') stats[teamOf(s, e.agent)].says++;
+    // The brain's own messages; bluffs the engine told for an agent are not its speech.
+    for (const e of ev) if (e.kind === 'said' && !e.bluff) stats[teamOf(s, e.agent)].says++;
     if (s.result) break;
     if (s.tick % replanEvery === 0) await Promise.all(TEAMS.map(replan));
   }

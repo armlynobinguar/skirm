@@ -93,6 +93,8 @@ function genArena(m) {
   own.sort((a, b) => (Math.abs(a[0]-S[0]) + Math.abs(a[1]-S[1])) - (Math.abs(b[0]-S[0]) + Math.abs(b[1]-S[1])));
   const keepFrom = Math.max(0, Math.floor(own.length / 2) - Math.floor(sp.own / 2));
   own.forEach((p, i) => { if (i < keepFrom || i >= keepFrom + sp.own) L[p[1]][p[0]] = '.'; });
+  // no hazard source within 3 tiles of the start, so the first waves cannot box a crew in at spawn
+  L.forEach((r, y) => r.forEach((c, x) => { if ('~^L'.includes(c) && Math.abs(x - S[0]) + Math.abs(y - S[1]) <= 3) L[y][x] = '.'; }));
   // routes into the middle; the ones with a switch get a floodable stretch
   const routeRows = []; for (let k = 0; k < sp.routes; k++) routeRows.push(Math.round((k + 1) * (H - 1) / (sp.routes + 1)));
   for (let y = 1; y < H - 1; y++) L[y][sepX] = '#';
@@ -108,10 +110,9 @@ function genArena(m) {
   for (let k = 0; k < sp.valves; k++) C[grab(nearest(routeRows[k] + (routeRows[k] < ey ? -1 : 1)))] = 'V';
   const spread = n => { const out = []; for (let i = 0; i < n; i++) out.push(free[Math.floor((i + .5) * free.length / n)]); return out; };
   spread(sp.drops.length).forEach(y => { C[grab(y)] = 'D'; });
-  C[grab(spread(1)[0])] = 'X';
-  // pairs of contested items in the band, mirrored so neither side is closer
-  const bandRows = []; for (let y = 2; y < H - 2; y++) if (!routeRows.includes(y) && Math.abs(y - ey) > 1) bandRows.push(y);
-  for (let p = 0; p < (sp.cont - 1) / 2; p++) { const y = bandRows[Math.floor((p + .5) * bandRows.length / ((sp.cont - 1) / 2))]; const x = sepX + 2 + (p % 2); L[y][x] = 'X'; }
+  // every contested item on the center column, as in hand-built Copper Hollow: the same distance
+  // from both crews, so each one is a race (off-center pairs went to whichever crew was nearer)
+  spread(sp.cont).forEach(y => { C[grab(nearest(y))] = 'X'; });
   const pack = () => ({left:L.map(r => r.join('')), center:C.join('')});
   // make sure everything matters is reachable from the start; carve through walls if not
   for (let pass = 0; pass < 12; pass++) {
