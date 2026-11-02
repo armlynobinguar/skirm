@@ -31,6 +31,11 @@ export interface Observation {
   blocksLeft: number;
   verbs: { id: string; name: string; effect: string }[];
   heard: HeardMessage[];
+  /**
+   * What the agent makes of a rival's bluff: one it believed (the item reads as gone until
+   * `ticksLeft` runs out) or one it saw through last tick. Absent otherwise.
+   */
+  bluff?: { by: string; at: [number, number]; believed: boolean; ticksLeft: number };
   legal: Action[];
 }
 
@@ -81,8 +86,19 @@ export function observe(s: MatchState, agentId: string): Observation {
     blocksLeft: s.blocks[a.team],
     verbs: def.verbs.map((v) => ({ id: v.id, name: v.name, effect: v.effect })),
     heard: a.inbox,
+    ...bluffView(s, a),
     legal: legalActions(s, a.id),
   };
+}
+
+/** A bluff still believed, or one seen through on the tick just played. */
+function bluffView(s: MatchState, a: AgentState): Pick<Observation, 'bluff'> {
+  const b = a.heardBluff;
+  if (!b) return {};
+  const at: [number, number] = [b.tile % s.map.w, (b.tile / s.map.w) | 0];
+  if (b.believed && a.avoid && s.tick < a.avoid.until) return { bluff: { by: b.by, at, believed: true, ticksLeft: a.avoid.until - s.tick } };
+  if (!b.believed && b.tick === s.tick) return { bluff: { by: b.by, at, believed: false, ticksLeft: 0 } };
+  return {};
 }
 
 /** "move N", "dig_rubble E", "switch", "wait": an action as one token for prompts and logs. */
