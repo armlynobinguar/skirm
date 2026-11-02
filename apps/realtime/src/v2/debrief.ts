@@ -1,7 +1,7 @@
 // The debrief each crew gets with v2_end (its own numbers only): per-agent counts from the engine's
 // agent state (MVP = delivered × 3 + used + picks), messages sent and rival team talk overheard from
 // the tick events, the goal report, credits held / used / returned, the Elo change and the registry line.
-import { evaluateGoals, type Difficulty, type MatchEvent, type MatchState, type Team } from '@skirm/engine/v2';
+import { evaluateGoals, seenThrough, type Difficulty, type MatchEvent, type MatchState, type Team } from '@skirm/engine/v2';
 import type { V2Debrief, V2DebriefAgent } from '@skirm/server';
 
 /** Counts the talk the debrief needs from each tick's events (agent counts live in the engine). */
@@ -41,6 +41,13 @@ export function mvpOf(agents: readonly V2DebriefAgent[]): string | null {
   return best?.agentId ?? null;
 }
 
+/** The crew's bluffs told and landed, and the rival's heard and seen through (the engine's tallies). */
+export function bluffsOf(s: MatchState, team: Team): NonNullable<V2Debrief['bluffs']> {
+  const mine = s.tally[team];
+  const rival = s.tally[team === 'A' ? 'B' : 'A'];
+  return { told: mine.lies, believed: mine.believed, heard: rival.lies, seenThrough: seenThrough(s, team) };
+}
+
 export interface DebriefInput {
   /** null when the match never went live (void before the start). */
   state: MatchState | null;
@@ -67,6 +74,7 @@ export function buildDebrief(i: DebriefInput): V2Debrief {
     mvp: mvpOf(agents),
     goals,
     talk: { ...i.tally.talk[i.team] },
+    ...(i.state ? { bluffs: bluffsOf(i.state, i.team) } : {}),
     credits: { held: i.held, used, returned: i.held - used },
     registry: i.registry,
     agents,

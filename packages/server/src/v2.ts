@@ -38,6 +38,8 @@ export interface V2Debrief {
   goals: { title: string; met: boolean; available?: boolean; progress?: string | null }[];
   /** Messages your crew sent, and rival team messages your agents overheard. */
   talk: { sent: number; overheard: number };
+  /** Bluffs your crew told and the rival believed; rival bluffs your agents heard and saw through. Absent before bluffs were judged. */
+  bluffs?: { told: number; believed: number; heard: number; seenThrough: number };
   /** Credits held at lock-in, charged for the ticks played, and returned. */
   credits: { held: number; used: number; returned: number };
   /** Ranked results go to the NEAR registry: pending until the worker writes it; null for casual. */

@@ -2,6 +2,7 @@
 // sight, what it heard last tick and its legal actions. This is the only view a decision engine gets.
 import type { Dir, Tile } from './map';
 import type { Action, AgentState, MatchState, Role } from './match';
+import { avoidedTile } from './bluff';
 import { legalActions } from './match';
 import type { HeardMessage, TalkTier } from './talk';
 
@@ -58,6 +59,13 @@ export function observe(s: MatchState, agentId: string): Observation {
   if (!a) throw new Error(`no agent ${agentId}`);
   const { w, h, def } = s.map;
   const rows = rowsFor(s, a.team);
+  // A bluff it believed: the item reads as open floor until the bluff wears off.
+  const gone = avoidedTile(s, a);
+  if (gone !== null) {
+    const x = gone % w;
+    const y = (gone / w) | 0;
+    if (rows[y]![x] === '*') rows[y] = rows[y]!.slice(0, x) + '.' + rows[y]!.slice(x + 1);
+  }
   const visible = s.visible[a.team];
   const view = (o: AgentState): SeenAgent => ({ id: o.id, name: o.name, team: o.team, role: o.role, x: o.x, y: o.y, carrying: o.carrying.length, down: o.down > 0 });
   const rival = a.team === 'A' ? 'B' : 'A';

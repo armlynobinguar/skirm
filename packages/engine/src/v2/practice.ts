@@ -36,18 +36,21 @@ export interface PracticeRival {
   tier: TalkTier;
   /** Extra ticks the bot holds at the start (MatchOptions.hold for its side). */
   hold: number;
+  /** Bluffs the bot may tell (MatchOptions.lieCap for its side). */
+  lieCap: number;
 }
 
 /**
  * How the bot plays at a difficulty (the rival-only rules of DIFF_MODS): its crew matches the
  * player's, or is a full three on Mega Agentic (as many as the map takes); it talks at the level's
- * tier (Quiet on Easy, Open on Agentic and Mega); it waits the level's extra ticks (12 s on Easy).
+ * tier (Quiet on Easy, Open on Agentic and Mega); it waits the level's extra ticks (12 s on Easy);
+ * it bluffs up to the level's cap (1 on Easy to 9 on Mega).
  * A bot crew larger than the player's also gives the player the usual head start.
  */
 export function practiceRival(difficulty: Difficulty, playerSize: 1 | 2 | 3, crewLimit: number): PracticeRival {
   const D = DIFF_MODS[difficulty];
   const size = (D.fullRival ? Math.max(playerSize, Math.min(3, crewLimit)) : playerSize) as 1 | 2 | 3;
-  return { size, tier: D.rivalTier, hold: D.rivalWaitTicks };
+  return { size, tier: D.rivalTier, hold: D.rivalWaitTicks, lieCap: D.rivalLies };
 }
 
 /**

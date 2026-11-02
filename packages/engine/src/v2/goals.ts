@@ -1,6 +1,6 @@
 // Match goals: one per map per difficulty (the prototype's GOALS), checked when the match ends.
-// Every goal also needs the delivery race won. Goals that hinge on intent the engine cannot see
-// (a bluff told or seen through) are reported as unavailable rather than guessed.
+// Every goal also needs the delivery race won. Bluffs are the engine's own (bluff.ts), so bluff goals
+// are judged like the rest.
 import type { Difficulty } from './difficulty';
 import { DIFFICULTIES } from './difficulty';
 import type { Team } from './map';
@@ -39,7 +39,7 @@ export interface GoalOutcome {
   check: GoalCheck;
   /** The check passed (for the difficulty's goal: and the match was won). */
   met: boolean;
-  /** False when the engine cannot judge the check (bluffs): shown as "Soon", never as missed. */
+  /** False when the engine cannot judge the check: shown as "Soon", never as missed. Every check is judged today. */
   available: boolean;
   /** Progress line, e.g. "2/3 verbs" or "nobody swept"; null when unavailable. */
   progress: string | null;
@@ -254,30 +254,35 @@ export function checkGoal(s: MatchState, team: Team, goal: GoalDef): Omit<GoalOu
     }
     case 'quiet':
       return atMost(T.sent, `${T.sent}/${n} messages`);
-    case 'see':
     case 'bluff':
-      // A bluff is model talk the engine cannot tell from the truth.
-      return { met: false, available: false, progress: null };
+      return atLeast(T.believed, 'bluffs landed');
+    case 'see':
+      return atLeast(seenThrough(s, team), 'seen through');
   }
+}
+
+/** Rival bluffs this crew's agents heard and did not believe. */
+export function seenThrough(s: MatchState, team: Team): number {
+  const R = s.tally[team === 'A' ? 'B' : 'A'];
+  return R.lies - R.believed;
 }
 
 /**
  * The end-of-match goal report for one crew: the difficulty's goal first (needs the win), then the
- * result screen's stars, each judged on its own: won, took a middle item, landed a bluff and saw
- * through one (unavailable: the engine cannot see intent), nobody swept.
+ * result screen's stars, each judged on its own: won, took a middle item, landed a bluff, saw
+ * through one, nobody swept.
  */
 export function evaluateGoals(s: MatchState, team: Team, difficulty: Difficulty): GoalOutcome[] {
   const goal = goalFor(s.map.def.id, difficulty);
   const T = s.tally[team];
   const won = s.result?.winner === team;
   const star = (title: string, check: GoalCheck, met: boolean, progress: string | null): GoalOutcome => ({ title, check, met, available: true, progress });
-  const soon = (title: string, check: GoalCheck): GoalOutcome => ({ title, check, met: false, available: false, progress: null });
   return [
     { title: goal.title, check: goal.check, ...checkGoal(s, team, goal) },
     star('Won the match', 'win', won, `${s.score[team]}/${s.map.def.goal} delivered`),
     star(`Took a middle ${s.map.def.item.toLowerCase()}`, 'mid', T.middle.length > 0, `${T.middle.length} middle`),
-    soon('Landed a bluff', 'bluff'),
-    soon('Saw through a bluff', 'see'),
+    star('Landed a bluff', 'bluff', T.believed > 0, `${T.believed} landed`),
+    star('Saw through a bluff', 'see', seenThrough(s, team) > 0, `${seenThrough(s, team)} seen through`),
     star('Nobody swept', 'clean', !T.swept, T.swept ? `${T.swept} swept` : 'nobody swept'),
   ];
 }

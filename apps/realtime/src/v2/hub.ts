@@ -427,7 +427,7 @@ export class V2Hub {
   private async startPractice(user: { accountId: string; handle: string }, entries: V2CrewEntry[], map: MapDefV2, difficulty: Difficulty): Promise<void> {
     const matchId = newId('mat');
     await this.launch(matchId, [user.accountId], async () => {
-      // The difficulty shapes the bot: crew size, talk tier and a late start (practiceRival).
+      // The difficulty shapes the bot: crew size, talk tier, a late start and its bluff cap (practiceRival).
       const rival = practiceRival(difficulty, entries.length as 1 | 2 | 3, crewLimitOf(map));
       const botAgents = botCrew(rival.size, `bot_${matchId}`, rival.tier);
       const bot: V2Side = { accountId: SYSTEM_ACCOUNT_ID, handle: BOT_HANDLE, crew: botAgents, skills: botAgents.map(() => []) };
@@ -436,7 +436,7 @@ export class V2Hub {
       const free: V2Setup['free'] = this.deps.brain.kind === 'greedy' ? { A: true, B: true } : { B: true };
       await this.deps.repos.v2Matches.create({ id: matchId, mapId: map.id, ranked: false, practice: true, teamA: user.accountId, teamB: SYSTEM_ACCOUNT_ID, crews: { A: crewRecords(sides.A), B: crewRecords(bot) }, difficulty });
       const hold = rival.hold ? { B: rival.hold } : undefined;
-      const match = this.newMatch({ matchId, map, ranked: false, difficulty, sides, practice: true, free, ...(hold ? { hold } : {}) }, { A: this.deps.brain, B: createGreedyBrain() }, (t, msg) => {
+      const match = this.newMatch({ matchId, map, ranked: false, difficulty, sides, practice: true, free, lieCap: { B: rival.lieCap }, ...(hold ? { hold } : {}) }, { A: this.deps.brain, B: createGreedyBrain() }, (t, msg) => {
         if (t === 'A') return this.deps.send(user.accountId, msg);
         if (msg.type === 'v2_found') queueMicrotask(() => match.accept('B'));
         else if (msg.type === 'v2_lockin') queueMicrotask(() => match.lockIn('B', bot.crew.map(() => rival.tier)));

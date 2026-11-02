@@ -39,11 +39,11 @@ describe('v2 practice data', () => {
   });
 
   it('shapes the bot by difficulty: Easy waits 12 s on Quiet, Agentic talks Open, Mega fields a full crew', () => {
-    expect(practiceRival('easy', 1, 3)).toEqual({ size: 1, tier: 'quiet', hold: 6 });
-    expect(practiceRival('normal', 2, 3)).toEqual({ size: 2, tier: 'standard', hold: 0 });
-    expect(practiceRival('hard', 1, 3)).toEqual({ size: 1, tier: 'standard', hold: 0 });
-    expect(practiceRival('agentic', 2, 3)).toEqual({ size: 2, tier: 'open', hold: 0 });
-    expect(practiceRival('mega', 1, 3)).toEqual({ size: 3, tier: 'open', hold: 0 });
+    expect(practiceRival('easy', 1, 3)).toEqual({ size: 1, tier: 'quiet', hold: 6, lieCap: 1 });
+    expect(practiceRival('normal', 2, 3)).toEqual({ size: 2, tier: 'standard', hold: 0, lieCap: 3 });
+    expect(practiceRival('hard', 1, 3)).toEqual({ size: 1, tier: 'standard', hold: 0, lieCap: 4 });
+    expect(practiceRival('agentic', 2, 3)).toEqual({ size: 2, tier: 'open', hold: 0, lieCap: 6 });
+    expect(practiceRival('mega', 1, 3)).toEqual({ size: 3, tier: 'open', hold: 0, lieCap: 9 });
     // Never more than the map takes, and never fewer than the player.
     expect(practiceRival('mega', 1, 2).size).toBe(2);
     expect(practiceRival('mega', 2, 1).size).toBe(2);

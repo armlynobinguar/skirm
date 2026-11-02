@@ -3,6 +3,7 @@ export * from './map';
 export * from './maps';
 export * from './match';
 export * from './talk';
+export * from './bluff';
 export * from './observe';
 export * from './log';
 export * from './frame';
