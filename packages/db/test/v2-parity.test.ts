@@ -104,12 +104,23 @@ describe('v2 matches: difficulty and debriefs', () => {
     // The stored delta and registry come from the result, not from what the caller sent.
     const r = await ctx.repos.v2Matches.finish(ranked.id, { winner: 'A', reason: 'goal', debriefs: { A: debrief({ eloDelta: 99, registry: 'written' }) } });
     expect(r.debriefs?.A).toMatchObject({ eloDelta: 16, registry: 'pending' });
+    // The season the ranked win counted towards and its standings points (DEFAULTS.season.points.win).
+    expect(r.debriefs?.A?.season).toEqual({ number: 1, points: 25 });
+    expect((await ctx.repos.v2Matches.get(ranked.id))!.debriefs?.A?.season).toEqual({ number: 1, points: 25 });
+    expect(c.debriefs?.A?.season).toBeUndefined();
     expect(r.debriefs?.B).toBeUndefined();
     expect(v2DebriefOf(r, 'B')).toBeNull();
 
     await ctx.repos.v2Matches.setRegistry(ranked.id, 'recorded', 'tx1');
     const after = (await ctx.repos.v2Matches.get(ranked.id))!;
     expect(v2DebriefOf(after, 'A')).toMatchObject({ eloDelta: 16, registry: 'written', mvp: 'agt_1' });
+
+    // A draw gives both crews the draw points, a loss the loss points.
+    const draw = await ctx.repos.v2Matches.create({ mapId: 'copper-hollow', ranked: true, teamA: ana.id, teamB: ben.id });
+    const dr = await ctx.repos.v2Matches.finish(draw.id, { winner: 'draw', reason: 'time', debriefs: { A: debrief(), B: debrief() } });
+    expect([dr.debriefs?.A?.season, dr.debriefs?.B?.season]).toEqual([{ number: 1, points: 12 }, { number: 1, points: 12 }]);
+    const lost = await ctx.repos.v2Matches.create({ mapId: 'copper-hollow', ranked: true, teamA: ana.id, teamB: ben.id });
+    expect((await ctx.repos.v2Matches.finish(lost.id, { winner: 'B', reason: 'goal', debriefs: { A: debrief() } })).debriefs?.A?.season).toEqual({ number: 1, points: 5 });
   });
 });
 

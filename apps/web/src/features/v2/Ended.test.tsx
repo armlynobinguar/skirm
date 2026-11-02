@@ -12,6 +12,25 @@ afterEach(() => arenaStore().setLive(null));
 const soonCount = () => document.querySelectorAll('[data-soon]').length;
 
 describe('v2 result screen', () => {
+  it('shows the season points a ranked result gave, and "Ranked only" for a casual match', async () => {
+    const ranked = renderWithProviders(<V2ResultScreen matchId="mat_v2" />, {
+      handle: 'ada',
+      path: '/matches/mat_v2/result',
+      search: '',
+      api: { v2Match: async () => v2MatchRecordFixture({ debrief: v2DebriefFixture({ season: { number: 2, points: 25 } }) }) },
+    });
+    expect(await screen.findByTestId('v2-season-points')).toHaveTextContent('+25 · Season 2');
+    ranked.unmount();
+
+    renderWithProviders(<V2ResultScreen matchId="mat_v2" />, {
+      handle: 'ada',
+      path: '/matches/mat_v2/result',
+      search: '',
+      api: { v2Match: async () => v2MatchRecordFixture({ ranked: false, debrief: v2DebriefFixture() }) },
+    });
+    expect(await screen.findByTestId('v2-season-points')).toHaveTextContent('Ranked only');
+  });
+
   it('shows the bluffs told and landed, and the rival bluffs seen through', async () => {
     renderWithProviders(<V2ResultScreen matchId="mat_v2" />, {
       handle: 'ada',
@@ -79,7 +98,9 @@ describe('v2 result screen', () => {
     expect(screen.getByTestId('v2-registry')).toHaveTextContent('Casual match · not written to the registry');
     // A goal the engine cannot judge yet (bluffs) is "Soon" on its star and its report row.
     expect(within(screen.getByTestId('v2-stars')).getByText('Soon')).toBeInTheDocument();
-    expect(soonCount()).toBe(5);
+    // Season points are not "Soon" on a casual match: it says "Ranked only".
+    expect(soonCount()).toBe(4);
+    expect(screen.getByTestId('v2-season-points')).toHaveTextContent('Ranked only');
   });
 
   it('gives a spectator the result by crew handle, with no verdict, stars or report of their own', async () => {

@@ -111,10 +111,11 @@ export interface V2Setup {
   lieCap?: Partial<Record<Team, number>>;
 }
 
-/** What the hub knows once the result is written: each player's Elo change and the registry line. */
+/** What the hub knows once the result is written: each player's Elo change, the registry line and (ranked) the season points. */
 export interface V2Finish {
   eloDelta: Partial<Record<Team, number>>;
   registry: V2Debrief['registry'];
+  season?: Partial<Record<Team, NonNullable<V2Debrief['season']>>>;
 }
 
 /** Most agents a crew fields on this map (both sides start from the same number of tiles). */
@@ -317,6 +318,7 @@ export class V2Match {
       void: !end.result,
       eloDelta: end.result ? (fin.eloDelta[team] ?? null) : null,
       registry: end.result ? fin.registry : null,
+      ...(end.result && fin.season?.[team] ? { season: fin.season[team] } : {}),
     });
   }
 

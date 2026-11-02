@@ -493,6 +493,11 @@ export class V2Hub {
       return null;
     });
     if (row) for (const d of row.eloDeltas ?? []) out.eloDelta[d.team] = d.delta;
+    // The season points finish stored in each crew's debrief (ranked only).
+    for (const t of TEAMS) {
+      const season = row?.debriefs?.[t]?.season;
+      if (season) (out.season ??= {})[t] = season;
+    }
     if (row?.registryStatus === 'pending') {
       out.registry = 'pending';
       await this.deps.registry

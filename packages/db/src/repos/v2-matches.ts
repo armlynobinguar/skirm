@@ -3,7 +3,7 @@
 // that closes the match; that transaction also adds the season standings and the skill versions'
 // ranked records.
 import { and, desc, eq, gte, lt, or, sql } from 'drizzle-orm';
-import { updateMatch, type EloResult } from '@skirm/shared';
+import { seasonPoints, updateMatch, type EloResult } from '@skirm/shared';
 import type { Executor } from '../client';
 import { newId } from '../ids';
 import { accounts, matchMessages, v2Matches, type V2CrewRecord, type V2CrewStatsRecord, type V2DebriefRecord, type V2EloDeltaRecord } from '../schema';
@@ -267,7 +267,20 @@ export class V2MatchesRepo {
         );
       const season = await new SeasonsRepo(t, this.clock).recordRanked(t, row!);
       await new ProofRepo(t).recordMatchStats(t, row!);
-      return season ? { ...row!, seasonId: season.id } : row!;
+      if (!season) return row!;
+      // Each crew's debrief says which season the result counted towards and the points it gave.
+      let stored = row!.debriefs;
+      if (stored) {
+        stored = { ...stored };
+        for (const team of ['A', 'B'] as const) {
+          const d = stored[team];
+          if (!d) continue;
+          const outcome = input.winner === 'draw' ? 'draw' : input.winner === team ? 'win' : 'loss';
+          stored[team] = { ...d, season: { number: season.number, points: seasonPoints(outcome) } };
+        }
+        await t.update(v2Matches).set({ debriefs: stored }).where(eq(v2Matches.id, id));
+      }
+      return { ...row!, seasonId: season.id, debriefs: stored };
     });
   }
 
