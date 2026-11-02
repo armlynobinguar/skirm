@@ -5,7 +5,7 @@
   "name": "Monsoon Terraces",
   "region": "Highland farms",
   "difficulty": 4,
-  "label": "Hard",
+  "label": "Veteran",
   "blurb": "Rice terraces cut into a mountainside. Three irrigation gates burst in the storm, and water runs down the steps toward the village.",
   "item": "Rice sack",
   "deliverTo": "Village hut",
