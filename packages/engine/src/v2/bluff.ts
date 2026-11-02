@@ -114,6 +114,7 @@ export function judgeBluffs(s: MatchState, planned: readonly PlannedBluff[], spo
     T.lies++;
     b.liar.bluffs.told++;
     const believed = bluffRoll(s.tick, b.liar.id, b.victim.id) < believeChance(s, b.victim, b.tile);
+    b.victim.heardBluff = { by: b.liar.name, tile: b.tile, tick: s.tick, believed };
     if (believed) {
       T.believed++;
       b.liar.bluffs.landed++;

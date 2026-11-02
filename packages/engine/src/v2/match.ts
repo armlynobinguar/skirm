@@ -110,6 +110,8 @@ export interface AgentState {
   inbox: HeardMessage[];
   /** A bluff this agent believed: it treats `tile` as empty until tick `until` (bluff.ts). */
   avoid: { tile: number; until: number } | null;
+  /** The last bluff told to this agent: who, about which tile, on which tick, and whether it believed it. */
+  heardBluff: { by: string; tile: number; tick: number; believed: boolean } | null;
   /** Bluffs it told and the rival believed, and rival bluffs it heard and doubted (the agent record). */
   bluffs: { told: number; landed: number; seenThrough: number };
 }
@@ -245,6 +247,7 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
         lastSpoke: -Infinity,
         inbox: [],
         avoid: null,
+        heardBluff: null,
         bluffs: { told: 0, landed: 0, seenThrough: 0 },
       });
     });

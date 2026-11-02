@@ -49,6 +49,23 @@ describe('v2 prompts', () => {
     expect(parseReply('3', legal, false).action).toBe(legal[2]);
   });
 
+  it('explains bluffs in the rules and tells a fooled agent what it believes', () => {
+    expect(systemPrompt([])).toContain('What you can see is never a lie');
+    const s = match();
+    const wick = s.agents.find((a) => a.id === 'wick')!;
+    const tile = 3 * s.map.w + 20;
+    wick.heardBluff = { by: 'Wren', tile, tick: s.tick, believed: true };
+    wick.avoid = { tile, until: s.tick + 5 };
+    expect(observe(s, 'wick').bluff).toEqual({ by: 'Wren', at: [20, 3], believed: true, ticksLeft: 5 });
+    expect(turnPrompt(observe(s, 'wick'), null, false)).toContain('You believe Wren: the lamp oil at 20,3 is gone. You cannot see it, so you treat it as gone for 5 more ticks.');
+    wick.heardBluff = { by: 'Wren', tile, tick: s.tick, believed: false };
+    wick.avoid = null;
+    expect(turnPrompt(observe(s, 'wick'), null, false)).toContain('you did not believe it');
+    // A doubted bluff is news for one turn only; a believed one lasts as long as the belief.
+    s.tick++;
+    expect(observe(s, 'wick').bluff).toBeUndefined();
+  });
+
   it('knows when a tier may speak', () => {
     expect(maySpeak('standard', 10, 5)).toBe(true);
     expect(maySpeak('standard', 9, 5)).toBe(false);
