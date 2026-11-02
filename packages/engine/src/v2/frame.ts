@@ -123,6 +123,12 @@ export function frameFor(s: MatchState, view: FrameView, events: MatchEvent[], e
       if (mine(e.agent)) out.push(e);
       continue;
     }
+    // A bluff: the liar's crew and the target's crew both know of it (the target heard it), even
+    // when the other agent is out of sight.
+    if (e.kind === 'bluff') {
+      if (mine(e.agent) || mine(e.victim)) out.push(e);
+      continue;
+    }
     // Hazards, drops and switches are public; agent events only for agents this side can see.
     if ('agent' in e && !mine(e.agent) && !shown.has(e.agent)) continue;
     out.push(e);
