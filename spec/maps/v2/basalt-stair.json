@@ -5,7 +5,7 @@
   "name": "Basalt Stair",
   "region": "Volcanic ridge",
   "difficulty": 5,
-  "label": "Brutal",
+  "label": "Extreme",
   "blurb": "A mountain pass on a waking volcano. Lava creeps down from the vent, and only placed stone or a dug channel slows it.",
   "item": "Ash mask",
   "deliverTo": "Cave mouth",
