@@ -19,6 +19,7 @@ const METHODS: (keyof ApiClient)[] = [
   'earnBack',
   'myMatches',
   'agents',
+  'agentRecord',
   'patchAgent',
   'skills',
   'createSkill',

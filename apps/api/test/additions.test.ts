@@ -124,3 +124,62 @@ describe('GET /me/matches', () => {
     expect((await h.http().get('/me/matches')).status).toBe(401);
   });
 });
+
+describe('GET /agents/:id/record', () => {
+  const crewOf = (id: string, name: string) => [{ id, name, role: 'Runner', vision: 3, comms: 3, tier: 'standard' }];
+  const debrief = (agentId: string, delivered: number, bluffs?: { told: number; landed: number; seenThrough: number }) => ({
+    eloDelta: null,
+    mvp: agentId,
+    goals: [],
+    talk: { sent: 0, overheard: 0 },
+    credits: { held: 0, used: 0, returned: 0 },
+    registry: null,
+    agents: [{ agentId, name: 'x', delivered, used: 0, picks: delivered, ...(bluffs ? { bluffs } : {}) }],
+  });
+
+  it("counts an agent's season and all-time results, bluffs included, leaving out practice and void matches", async () => {
+    const fay = await h.as('fay');
+    const gus = await h.as('gus');
+    const [mine] = (await fay.get('/agents')).body as { id: string; name: string }[];
+    const [theirs] = (await gus.get('/agents')).body as { id: string; name: string }[];
+    const crews = (side: 'A' | 'B') =>
+      side === 'A' ? { A: crewOf(mine!.id, mine!.name), B: crewOf(theirs!.id, theirs!.name) } : { A: crewOf(theirs!.id, theirs!.name), B: crewOf(mine!.id, mine!.name) };
+
+    expect((await fay.get(`/agents/${mine!.id}/record`)).body.allTime).toMatchObject({ matches: 0, wins: 0 });
+
+    // Ranked win on side A with bluffs (this opens a season), a casual draw on side B stored before
+    // bluffs were judged, a practice win and a void: two matches count.
+    const ranked = await h.repos.v2Matches.create({ mapId: 'copper-hollow', ranked: true, teamA: fay.accountId, teamB: gus.accountId, crews: crews('A') });
+    await h.repos.v2Matches.finish(ranked.id, { winner: 'A', reason: 'goal', decidedBy: 'goal', score: { A: 4, B: 1 }, ticks: 90, debriefs: { A: debrief(mine!.id, 3, { told: 2, landed: 1, seenThrough: 1 }) } });
+    const draw = await h.repos.v2Matches.create({ mapId: 'copper-hollow', ranked: false, teamA: gus.accountId, teamB: fay.accountId, crews: crews('B') });
+    await h.repos.v2Matches.finish(draw.id, { winner: 'draw', reason: 'time', decidedBy: 'draw', score: { A: 1, B: 1 }, ticks: 150, debriefs: { B: debrief(mine!.id, 1) } });
+    const practice = await h.repos.v2Matches.create({ mapId: 'copper-hollow', ranked: false, practice: true, teamA: fay.accountId, teamB: gus.accountId, crews: crews('A') });
+    await h.repos.v2Matches.finish(practice.id, { winner: 'A', reason: 'goal', debriefs: { A: debrief(mine!.id, 4) } });
+    const voided = await h.repos.v2Matches.create({ mapId: 'copper-hollow', ranked: false, teamA: fay.accountId, teamB: gus.accountId, crews: crews('A') });
+    await h.repos.v2Matches.finish(voided.id, { winner: null, reason: 'declined' });
+
+    const res = await fay.get(`/agents/${mine!.id}/record`);
+    expect(res.status).toBe(200);
+    const counted = { matches: 2, wins: 1, losses: 0, draws: 1, delivered: 4, bluffsTold: 2, bluffsLanded: 1, seenThrough: 1 };
+    expect(res.body.allTime).toEqual(counted);
+    expect(res.body.season).toMatchObject({ number: expect.any(Number), endsAt: expect.any(String), ...counted });
+    // The rival's agent lost the ranked match.
+    expect((await gus.get(`/agents/${theirs!.id}/record`)).body.allTime).toMatchObject({ matches: 2, wins: 0, losses: 1, draws: 1 });
+
+    // Once the season is over and no new one is open, only the all-time record remains.
+    h.clock.now += 60 * 86_400_000;
+    const late = await h.repos.v2Matches.create({ mapId: 'copper-hollow', ranked: false, teamA: fay.accountId, teamB: gus.accountId, crews: crews('A') });
+    await h.repos.v2Matches.finish(late.id, { winner: 'B', reason: 'goal', debriefs: { A: debrief(mine!.id, 0) } });
+    const after = (await fay.get(`/agents/${mine!.id}/record`)).body;
+    expect(after.season).toBeNull();
+    expect(after.allTime).toMatchObject({ matches: 3, losses: 1 });
+  });
+
+  it("refuses another player's agent and needs a session", async () => {
+    const hal = await h.as('hal');
+    const ivy = await h.as('ivy');
+    const [ivys] = (await ivy.get('/agents')).body as { id: string }[];
+    expect((await hal.get(`/agents/${ivys!.id}/record`)).status).toBe(404);
+    expect((await h.http().get(`/agents/${ivys!.id}/record`)).status).toBe(401);
+  });
+});

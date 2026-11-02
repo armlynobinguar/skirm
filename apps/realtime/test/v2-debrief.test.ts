@@ -30,8 +30,8 @@ describe('v2 debrief', () => {
     moss.picks = 1;
     s.agents.find((a) => a.id === 'wick')!.used = 2;
     expect(agentsOf(s, 'A')).toEqual([
-      { agentId: 'wick', name: 'wick', delivered: 0, used: 2, picks: 0 },
-      { agentId: 'moss', name: 'moss', delivered: 1, used: 0, picks: 1 },
+      { agentId: 'wick', name: 'wick', delivered: 0, used: 2, picks: 0, bluffs: { told: 0, landed: 0, seenThrough: 0 } },
+      { agentId: 'moss', name: 'moss', delivered: 1, used: 0, picks: 1, bluffs: { told: 0, landed: 0, seenThrough: 0 } },
     ]);
   });
 

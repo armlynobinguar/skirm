@@ -26,6 +26,8 @@ export interface V2DebriefAgent {
   used: number;
   /** Items picked up. */
   picks: number;
+  /** Bluffs this agent told, how many the rival believed, and rival bluffs it heard and doubted. Absent before bluffs were judged. */
+  bluffs?: { told: number; landed: number; seenThrough: number };
 }
 
 /** What one crew is told at the end (its own numbers only). */

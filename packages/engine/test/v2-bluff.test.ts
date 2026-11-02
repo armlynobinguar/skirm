@@ -81,6 +81,8 @@ describe('v2 bluffs', () => {
     const { s, tile, target } = setup(noFogMap, { vision: 1, liarId: liarIdFor(true, p), match: { lieCap: { A: 0, B: 1 } } });
     expect(bluffs(stepMatch(s, { actions: {} }))[0]).toMatchObject({ believed: true });
     expect(s.tally.B).toMatchObject({ lies: 1, believed: 1 });
+    expect(s.agents[1]!.bluffs).toEqual({ told: 1, landed: 1, seenThrough: 0 });
+    expect(target.bluffs).toEqual({ told: 0, landed: 0, seenThrough: 0 });
     expect(target.avoid).toEqual({ tile, until: 1 + BLUFF_AVOID_TICKS });
     const { x, y } = at(s, tile);
     expect(observe(s, target.id).rows[y]![x]).toBe('.');
@@ -102,6 +104,7 @@ describe('v2 bluffs', () => {
     expect(bluffs(stepMatch(s, { actions: {} }))[0]).toMatchObject({ believed: false });
     expect(target.avoid).toBeNull();
     expect(s.tally.B).toMatchObject({ lies: 1, believed: 0 });
+    expect(target.bluffs).toEqual({ told: 0, landed: 0, seenThrough: 1 });
   });
 
   it('keeps to the cap: BLUFF_CAP by default, the match’s own when set, and one a tick', () => {

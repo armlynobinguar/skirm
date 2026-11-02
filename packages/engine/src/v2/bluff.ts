@@ -112,11 +112,13 @@ export function judgeBluffs(s: MatchState, planned: readonly PlannedBluff[], spo
     if (!said || said.kind !== 'said' || !said.heardBy.includes(b.victim.id)) continue;
     const T = s.tally[b.liar.team];
     T.lies++;
+    b.liar.bluffs.told++;
     const believed = bluffRoll(s.tick, b.liar.id, b.victim.id) < believeChance(s, b.victim, b.tile);
     if (believed) {
       T.believed++;
+      b.liar.bluffs.landed++;
       b.victim.avoid = { tile: b.tile, until: s.tick + BLUFF_AVOID_TICKS };
-    }
+    } else b.victim.bluffs.seenThrough++;
     const { w } = s.map;
     ev.push({ kind: 'bluff', agent: b.liar.id, victim: b.victim.id, at: [b.tile % w, (b.tile / w) | 0], believed });
   }
