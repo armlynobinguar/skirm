@@ -37,7 +37,14 @@ export interface V2CommsLine {
   overheardBy?: string[];
   /** verb lines: the verb's name, e.g. "Dig rubble". */
   verb?: string;
+  /** A bluff and its target's answer: whether the target believed it (engine `bluff` event). */
+  bluff?: 'landed' | 'doubted';
+  /** The target's answer to a bluff (the line after it). */
+  bluffReply?: true;
 }
+
+/** What a bluff's target answers (the prototype's lines). */
+export const BLUFF_REPLY = { landed: 'Copy. Falling back.', doubted: 'Not buying it. Going to look.' } as const;
 
 export interface V2MatchView {
   matchId: string;
@@ -190,6 +197,13 @@ export function linesOf(frame: V2Frame, prev: V2Frame | null): V2CommsLine[] {
       out.push({ tick, from: a.id, fromName: a.name, team: a.team, channel: 'verb', text: name, verb: name, overheard: false });
     } else if (e.kind === 'supply_drop') {
       out.push({ tick, from: 'arena', fromName: 'Arena', team: 'A', channel: 'arena', text: `Supply drop is down. One ${(def?.item ?? 'item').toLowerCase()} in the middle.`, overheard: false });
+    } else if (e.kind === 'bluff') {
+      // Tag the lie itself, then the target's answer right after it.
+      const bluff = e.believed ? 'landed' : 'doubted';
+      const lie = out.findIndex((l) => l.from === e.agent && l.channel === 'say' && !l.bluff);
+      if (lie >= 0) out[lie] = { ...out[lie]!, bluff };
+      const v = agent(e.victim);
+      if (v) out.splice(lie >= 0 ? lie + 1 : out.length, 0, { tick, from: v.id, fromName: v.name, team: v.team, channel: 'say', text: BLUFF_REPLY[bluff], overheard: false, bluff, bluffReply: true });
     }
   }
   if (frame.view !== 'watch')

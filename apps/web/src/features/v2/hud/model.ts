@@ -119,6 +119,14 @@ export function calloutOf(frame: V2Frame, team: Team): Callout | null {
       if (!a) continue;
       if (e.stolen) out = { text: `${a.name} stole a dropped ${item}`, side: side(a.team) };
       else if (e.at[0] === mid) out = { text: `${a.name} took a middle ${item}`, side: side(a.team) };
+    } else if (e.kind === 'bluff') {
+      // Either agent may be out of sight: the crew still heard the lie or told it.
+      const liar = agent(e.agent);
+      const victim = agent(e.victim);
+      const liarTeam: Team = liar?.team ?? (victim ? (victim.team === 'A' ? 'B' : 'A') : team);
+      const liarName = liar?.name ?? 'A rival';
+      if (e.believed) out = { text: `${liarName}'s bluff landed`, side: side(liarTeam) };
+      else if (victim) out = { text: `${victim.name} saw through ${liarName}'s bluff`, side: side(victim.team) };
     }
   }
   return out;

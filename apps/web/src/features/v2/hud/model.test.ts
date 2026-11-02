@@ -1,7 +1,7 @@
 import type { FrameAgent } from '@skirm/engine/v2';
 import { describe, expect, it } from 'vitest';
 import { v2DebriefFixture, v2FrameFixture, v2MatchRecordFixture } from '@/test/fixtures';
-import type { V2CommsLine } from '../v2Store';
+import { BLUFF_REPLY, linesOf, type V2CommsLine } from '../v2Store';
 import { debriefOf, mvpOf } from './debrief';
 import { calloutOf, clockLine, feedTag, goalTag, heardBy, inFilter, invChange, plural, slotsOf, subtitlesFor } from './model';
 
@@ -59,6 +59,28 @@ describe('callouts and inventory', () => {
     });
     expect(calloutOf({ ...f, events: [{ kind: 'picked', agent: 'wick', at: [3, 4], stolen: true, origin: 'stolen' }] }, 'A')?.text).toBe('Wick stole a dropped lamp oil');
     expect(calloutOf({ ...f, events: [{ kind: 'picked', agent: 'wick', at: [3, 4], stolen: false, origin: 'own' }] }, 'A')).toBeNull();
+  });
+
+  it('calls out a bluff that landed for the liar, and one seen through for the target', () => {
+    const f = v2FrameFixture();
+    const wren = agent({ id: 'wren', name: 'Wren', team: 'B', role: 'Scout' });
+    const withWren = { ...f, agents: [...f.agents, wren] };
+    expect(calloutOf({ ...withWren, events: [{ kind: 'bluff', agent: 'wren', victim: 'wick', at: [20, 4], believed: true }] }, 'A')).toEqual({ text: "Wren's bluff landed", side: 'rival' });
+    expect(calloutOf({ ...withWren, events: [{ kind: 'bluff', agent: 'wren', victim: 'wick', at: [20, 4], believed: false }] }, 'A')).toEqual({ text: "Wick saw through Wren's bluff", side: 'you' });
+    // The liar out of sight in fog: still a rival's bluff.
+    expect(calloutOf({ ...f, events: [{ kind: 'bluff', agent: 'wren', victim: 'wick', at: [20, 4], believed: true }] }, 'A')).toEqual({ text: "A rival's bluff landed", side: 'rival' });
+  });
+
+  it('tags the lie in the feed and adds the target’s answer after it', () => {
+    const f = v2FrameFixture();
+    const wren = agent({ id: 'wren', name: 'Wren', team: 'B', role: 'Scout' });
+    const lie = { tick: f.tick, from: 'wren', fromName: 'Wren', team: 'B' as const, channel: 'say' as const, text: 'The middle lamp oil is gone. I already have it.', overheard: false };
+    const frame = { ...f, agents: [...f.agents, wren], comms: [lie], events: [{ kind: 'bluff' as const, agent: 'wren', victim: 'wick', at: [20, 4] as [number, number], believed: true }] };
+    const lines = linesOf(frame, null).filter((l) => l.channel === 'say');
+    expect(lines.map((l) => [l.fromName, l.text, l.bluff, l.bluffReply])).toEqual([
+      ['Wren', lie.text, 'landed', undefined],
+      ['Wick', BLUFF_REPLY.landed, 'landed', true],
+    ]);
   });
 
   it('tells a pickup from a delivery from a drop', () => {

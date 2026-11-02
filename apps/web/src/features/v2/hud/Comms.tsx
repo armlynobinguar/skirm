@@ -75,6 +75,11 @@ export function Comms({ lines, team, filter, onFilter, tickMs }: { lines: V2Comm
                 </span>
               </span>
               <span className={c.tx}>{l.text}</span>
+              {l.bluff ? (
+                <span className={c.note} data-testid="v2-bluff-note">
+                  {l.bluffReply ? (l.bluff === 'landed' ? 'Believed it' : 'Saw through it') : l.bluff === 'landed' ? 'Bluff · landed' : 'Bluff · doubted'}
+                </span>
+              ) : null}
               {heardBy ? (
                 <span className={c.note} title={`Overheard by ${heardBy}`}>
                   <Ear />
