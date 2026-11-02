@@ -109,11 +109,15 @@ export function judgeBluffs(s: MatchState, planned: readonly PlannedBluff[], spo
   const ev: MatchEvent[] = [];
   for (const b of planned) {
     const said = spoken.find((e) => e.kind === 'said' && e.agent === b.liar.id && e.text === b.say.text);
-    if (!said || said.kind !== 'said' || !said.heardBy.includes(b.victim.id)) continue;
+    if (!said || said.kind !== 'said') continue;
+    // The engine spoke it for the agent (not the agent's own message): marked for stats that count a brain's speech.
+    said.bluff = true;
+    if (!said.heardBy.includes(b.victim.id)) continue;
     const T = s.tally[b.liar.team];
     T.lies++;
     b.liar.bluffs.told++;
     const believed = bluffRoll(s.tick, b.liar.id, b.victim.id) < believeChance(s, b.victim, b.tile);
+    b.victim.heardBluff = { by: b.liar.name, tile: b.tile, tick: s.tick, believed };
     if (believed) {
       T.believed++;
       b.liar.bluffs.landed++;

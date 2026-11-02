@@ -3,7 +3,7 @@
 // models) only choose; the engine decides what happens.
 //
 // Each tick, in order (design doc "Match format"):
-//   1. timers: switch floods run out, cooldowns tick down, supply drops land
+//   1. timers: switch floods run out, cooldowns tick down, supply drops land (known to both crews)
 //   2. every agent's action resolves together: verbs first, then moves (two agents stepping onto one
 //      tile both stay put), digging takes three hits by hand
 //   3. pickups and deliveries
@@ -110,6 +110,8 @@ export interface AgentState {
   inbox: HeardMessage[];
   /** A bluff this agent believed: it treats `tile` as empty until tick `until` (bluff.ts). */
   avoid: { tile: number; until: number } | null;
+  /** The last bluff told to this agent: who, about which tile, on which tick, and whether it believed it. */
+  heardBluff: { by: string; tile: number; tick: number; believed: boolean } | null;
   /** Bluffs it told and the rival believed, and rival bluffs it heard and doubted (the agent record). */
   bluffs: { told: number; landed: number; seenThrough: number };
 }
@@ -127,7 +129,7 @@ export type MatchEvent =
   | { kind: 'switch'; agent: string; name: string; floods: Team; until: number }
   | { kind: 'supply_drop'; at: [number, number] }
   | { kind: 'hazard'; hazard: HazardKind; wave: number; receding: boolean }
-  | { kind: 'said'; agent: string; channel: 'say' | 'team'; text: string; heardBy: string[]; overheardBy: string[] }
+  | { kind: 'said'; agent: string; channel: 'say' | 'team'; text: string; heardBy: string[]; overheardBy: string[]; bluff?: true }
   | { kind: 'bluff'; agent: string; victim: string; at: [number, number]; believed: boolean }
   | { kind: 'refused'; agent: string; reason: string };
 
@@ -245,6 +247,7 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
         lastSpoke: -Infinity,
         inbox: [],
         avoid: null,
+        heardBluff: null,
         bluffs: { told: 0, landed: 0, seenThrough: 0 },
       });
     });
@@ -277,6 +280,13 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
     visible: { A: new Array(size).fill(false), B: new Array(size).fill(false) },
     result: null,
   };
+  // Both crews know where every item starts (the prototype's known items): fog hides what happens
+  // to them later, not where they were laid out.
+  s.grid.forEach((t, i) => {
+    if (t !== 'item') return;
+    s.seen.A[i] = 'item';
+    s.seen.B[i] = 'item';
+  });
   updateSight(s);
   return s;
 }
@@ -308,7 +318,12 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
   for (const d of def.drops)
     if (d.tick === s.tick) {
       const j = idx(s, d.at);
-      if (s.grid[j] === null) s.grid[j] = 'item';
+      if (s.grid[j] === null) {
+        s.grid[j] = 'item';
+        // Announced to both crews, fog or not (the prototype marks a drop as known to both).
+        s.seen.A[j] = 'item';
+        s.seen.B[j] = 'item';
+      }
       ev.push({ kind: 'supply_drop', at: d.at });
     }
 

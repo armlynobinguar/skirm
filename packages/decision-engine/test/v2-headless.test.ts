@@ -80,7 +80,8 @@ describe('playHeadless', () => {
     expect(replans).toEqual(Array.from({ length: Math.floor((r.ticks - 1) / V2_REPLAN_EVERY) }, (_, i) => (i + 1) * V2_REPLAN_EVERY + 1));
     // The match runs past the first replan, so the later turns carry the new plan.
     expect(r.ticks).toBeGreaterThan(V2_REPLAN_EVERY + 1);
-    const late = A.heard.filter((h) => h.tick > V2_REPLAN_EVERY + 1 && h.tick <= 2 * V2_REPLAN_EVERY + 1);
+    // Turns after the first replan and before the second (tick 2 × V2_REPLAN_EVERY + 1 has the next plan).
+    const late = A.heard.filter((h) => h.tick > V2_REPLAN_EVERY + 1 && h.tick < 2 * V2_REPLAN_EVERY + 1);
     expect(late.length).toBeGreaterThan(0);
     expect(late.every((h) => h.ctx.plan === `plan at ${V2_REPLAN_EVERY + 1}`)).toBe(true);
     expect(r.stats.A.calls).toBe(A.heard.length + A.plans.length);
@@ -114,7 +115,8 @@ describe('playHeadless', () => {
     expect(r.stats.A.refused.leak).toBe(1);
     // a-2 has no secrets, so its copy goes out; at tick 6 both may speak again.
     expect(r.stats.A.says).toBe(3);
-    const said = r.log.ticks.flatMap((t) => t.says);
+    // Crew A's lines (crew B's greedy agents call out their deliveries).
+    const said = r.log.ticks.flatMap((t) => t.says).filter((x) => x.agent.startsWith('a-'));
     expect(said.map((x) => x.text)).toEqual(['I will dam the left tunnel before the pump starts', 'Going middle.', 'Going middle.']);
     expect(said[0]!.agent).toBe('a-2');
   });

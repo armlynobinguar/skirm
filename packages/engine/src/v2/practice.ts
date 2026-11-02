@@ -58,6 +58,7 @@ export function practiceRival(difficulty: Difficulty, playerSize: 1 | 2 | 3, cre
  * nobody is eliminated and somebody scores. Atlas order.
  */
 export const PRACTICE_MAPS: readonly string[] = [
+  'saltmarsh-weir',
   'ashfall-orchard',
   'frostline-depot',
   'glasshouse-ruins',
@@ -65,6 +66,7 @@ export const PRACTICE_MAPS: readonly string[] = [
   'dust-bowl-silos',
   'monsoon-terraces',
   'sunken-metro',
+  'basalt-stair',
   'blackout-harbor',
 ];
 

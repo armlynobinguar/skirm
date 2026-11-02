@@ -12,7 +12,8 @@ You pick items up by stepping on them (* on the map) and deliver them by standin
 Map key: # wall, . floor, , grass, T tree, d rubble (walk into it to dig: 3 hits, 1 for a Digger), ~ water, ^ fire, L lava (removes you for the match), * item, E delivery point, c crate, B block, V switch, ? not seen yet.
 Hazards spread in waves, then recede. If one reaches you, you are knocked down for 4 ticks, drop what you carry and go back to your start.
 A switch floods the rival crew's lane for 8 ticks. Rival crews can pick up items you drop.
-Talk: "team" reaches your crew anywhere, but rivals near you overhear it. "say" reaches everyone near you. Rivals may lie. Never reveal your skills.`;
+Talk: "team" reaches your crew anywhere, but rivals near you overhear it. "say" reaches everyone near you. Rivals may lie. Never reveal your skills.
+Bluffs: a rival near you may tell you a middle item is gone, the delivery point is flooding, or your own items are unguarded. What you can see is never a lie; a claim about a tile your crew cannot see may fool you, and then you treat that item as gone for a few ticks. Your crew bluffs rivals the same way when they close on a middle item.`;
 
 /** Longest owner's instructions an agent carries (agents.system_prompt, PATCH /agents/:id). */
 export const OWNER_INSTRUCTIONS_MAX = 600;
@@ -44,6 +45,15 @@ export function viewText(o: Observation): string {
     'Map (x across, y down, row 0 first):',
     ...o.rows,
   ];
+  if (o.bluff) {
+    const [x, y] = o.bluff.at;
+    const item = o.map.item.toLowerCase();
+    lines.push(
+      o.bluff.believed
+        ? `You believe ${o.bluff.by}: the ${item} at ${x},${y} is gone. You cannot see it, so you treat it as gone for ${o.bluff.ticksLeft} more ticks.`
+        : `${o.bluff.by} told you the ${item} at ${x},${y} is gone, but your crew can see it or you doubt it: you did not believe it.`,
+    );
+  }
   if (o.heard.length)
     lines.push('Heard last tick:', ...o.heard.map((m) => `- ${m.fromName} (${m.team === o.me.team ? 'crew' : 'rival'}, ${m.overheard ? 'overheard' : m.channel}): ${m.text}`));
   return lines.join('\n');

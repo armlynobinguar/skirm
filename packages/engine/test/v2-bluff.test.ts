@@ -10,6 +10,7 @@ import {
   checkGoal,
   createMatch,
   evaluateGoals,
+  frameFor,
   mapV2,
   observe,
   stepMatch,
@@ -143,6 +144,18 @@ describe('v2 bluffs', () => {
       return out;
     };
     expect(play()).toEqual(play());
+  });
+
+  it('shows the bluff in both crews’ frames, even with the liar out of the target crew’s sight', () => {
+    const { s, liar, target } = setup('copper-hollow', { vision: 1 });
+    const ev = stepMatch(s, { actions: {} });
+    // Hide the liar from crew A, as fog would.
+    s.visible.A[liar.y * s.map.w + liar.x] = false;
+    for (const view of ['A', 'B', 'watch'] as const) {
+      const f = frameFor(s, view, ev);
+      expect(f.events.filter((e) => e.kind === 'bluff'), view).toHaveLength(1);
+    }
+    expect(frameFor(s, 'A', ev).agents.map((a) => a.id)).toEqual([target.id]);
   });
 
   it('fills the result screen’s bluff stars', () => {
