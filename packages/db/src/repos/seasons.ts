@@ -92,6 +92,18 @@ export class SeasonsRepo {
     private readonly clock: Clock = () => Date.now(),
   ) {}
 
+  /** The season `now` falls in, if one is open; unlike ensureCurrent it never opens one (for reads). */
+  async current(now: number = this.clock()): Promise<SeasonRow | undefined> {
+    const at = new Date(now);
+    const [row] = await this.db
+      .select()
+      .from(seasons)
+      .where(and(lte(seasons.startsAt, at), gt(seasons.endsAt, at)))
+      .orderBy(desc(seasons.number))
+      .limit(1);
+    return row;
+  }
+
   /**
    * The season `now` falls in, opening it when there is none: number max+1, from
    * max(previous end, now) for 14 days, so an idle gap never creates seasons that already ended.

@@ -30,7 +30,7 @@ export function agentsOf(s: MatchState, team: Team): V2DebriefAgent[] {
   return s.agents
     .filter((a) => a.team === team)
     .sort((a, b) => a.slot - b.slot)
-    .map((a) => ({ agentId: a.id, name: a.name, delivered: a.delivered, used: a.used, picks: a.picks }));
+    .map((a) => ({ agentId: a.id, name: a.name, delivered: a.delivered, used: a.used, picks: a.picks, bluffs: { ...a.bluffs } }));
 }
 
 /** The crew's best agent: delivered × 3 + used + picks, the earlier slot on a tie; null for no agents. */

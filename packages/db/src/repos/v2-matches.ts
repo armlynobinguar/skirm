@@ -2,7 +2,7 @@
 // 16, floor 100). Elo moves only for ranked matches that end with a result, in the same transaction
 // that closes the match; that transaction also adds the season standings and the skill versions'
 // ranked records.
-import { and, desc, eq, or } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, or, sql } from 'drizzle-orm';
 import { updateMatch, type EloResult } from '@skirm/shared';
 import type { Executor } from '../client';
 import { newId } from '../ids';
@@ -13,6 +13,21 @@ import { SeasonsRepo } from './seasons';
 import { tx, type Clock } from './util';
 
 export type V2MatchRow = typeof v2Matches.$inferSelect;
+
+/** One agent's results over a set of ended v2 matches (practice against the bot left out). */
+export interface V2AgentRecord {
+  matches: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  /** Items the agent delivered. */
+  delivered: number;
+  /** Bluffs it told, and how many the rival believed. */
+  bluffsTold: number;
+  bluffsLanded: number;
+  /** Rival bluffs it heard and did not believe. */
+  seenThrough: number;
+}
 
 export interface CreateV2MatchInput {
   id?: string;
@@ -122,6 +137,43 @@ export class V2MatchesRepo {
   }
 
   /**
+   * An agent's record from the matches it played: ended (not void), against players (practice
+   * against the bot does not count), ended at or after `since` and before `until` when given. The
+   * delivered and bluff counts come from the stored debriefs; a match stored before bluffs were
+   * judged counts no bluffs.
+   */
+  async agentRecord(agentId: string, window: { since?: Date; until?: Date } = {}): Promise<V2AgentRecord> {
+    const member = JSON.stringify([{ id: agentId }]);
+    const rows = await this.db
+      .select({ crews: v2Matches.crews, winner: v2Matches.winner, debriefs: v2Matches.debriefs })
+      .from(v2Matches)
+      .where(
+        and(
+          eq(v2Matches.status, 'ended'),
+          eq(v2Matches.practice, false),
+          or(sql`${v2Matches.crews} -> 'A' @> ${member}::jsonb`, sql`${v2Matches.crews} -> 'B' @> ${member}::jsonb`),
+          window.since ? gte(v2Matches.endedAt, window.since) : undefined,
+          window.until ? lt(v2Matches.endedAt, window.until) : undefined,
+        ),
+      );
+    const out: V2AgentRecord = { matches: 0, wins: 0, losses: 0, draws: 0, delivered: 0, bluffsTold: 0, bluffsLanded: 0, seenThrough: 0 };
+    for (const r of rows) {
+      const team = (['A', 'B'] as const).find((T) => r.crews?.[T]?.some((a) => a.id === agentId));
+      if (!team) continue;
+      out.matches++;
+      if (r.winner === 'draw') out.draws++;
+      else if (r.winner === team) out.wins++;
+      else out.losses++;
+      const line = r.debriefs?.[team]?.agents.find((a) => a.agentId === agentId);
+      out.delivered += line?.delivered ?? 0;
+      out.bluffsTold += line?.bluffs?.told ?? 0;
+      out.bluffsLanded += line?.bluffs?.landed ?? 0;
+      out.seenThrough += line?.bluffs?.seenThrough ?? 0;
+    }
+    return out;
+  }
+
+  /**
    * Closes a match; ranked results move both players' Elo, count towards the current season and
    * the skill versions' ranked records, and the delivered lines are stored.
    * Idempotent: a closed match is returned as is (nothing is written twice).
@@ -193,7 +245,8 @@ export class V2MatchesRepo {
           logHash: input.logHash ?? null,
           debriefs,
           registryStatus,
-          endedAt: new Date(),
+          // The repo clock, as for the season this result counts towards.
+          endedAt: new Date(this.clock()),
         })
         .where(and(eq(v2Matches.id, id), eq(v2Matches.status, 'live')))
         .returning();

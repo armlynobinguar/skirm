@@ -24,6 +24,8 @@ export const qk = {
   /** Under `me`, so a match end (qk.me invalidated) refreshes it too. */
   myMatches: ['me', 'matches'] as const,
   agents: ['agents'] as const,
+  /** Under `me`, so a match end (qk.me invalidated) refreshes it too. */
+  agentRecord: (agentId: string) => ['me', 'agent-record', agentId] as const,
   skills: {
     all: ['skills'] as const,
     list: (tab: 'written' | 'owned') => ['skills', 'list', tab] as const,

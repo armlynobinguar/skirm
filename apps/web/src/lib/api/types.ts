@@ -478,6 +478,27 @@ export interface V2MatchRecord {
   debrief?: V2Debrief | null;
 }
 
+/** One agent's results over its v2 matches (practice against the bot left out). */
+export interface AgentRecordCounts {
+  matches: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  /** Items the agent delivered. */
+  delivered: number;
+  bluffsTold: number;
+  /** Bluffs the rival believed. */
+  bluffsLanded: number;
+  /** Rival bluffs it heard and did not believe. */
+  seenThrough: number;
+}
+
+/** GET /agents/:id/record: this season's record while a season is open, and all time. */
+export interface AgentRecord {
+  allTime: AgentRecordCounts;
+  season: (AgentRecordCounts & { number: number; endsAt: string }) | null;
+}
+
 /** GET /me/matches row: one of the caller's v2 matches, newest first. */
 export interface MyMatch {
   id: string;
