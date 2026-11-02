@@ -5,7 +5,7 @@
   "name": "Ashfall Orchard",
   "region": "Burnt hills",
   "difficulty": 2,
-  "label": "Easy",
+  "label": "Starter",
   "blurb": "An apple orchard in the dry season. A spark in the north corner walks through the grass tree by tree, and the farmhouse root cellar is the only way out.",
   "item": "Seed pack",
   "deliverTo": "Root cellar",

@@ -214,10 +214,22 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
               <b>{fmt(d.talk.overheard)}</b>
             </Row>
             <Row label="Bluffs told · believed by the rival">
-              <Soon what="Bluff stats" />
+              {d.bluffs ? (
+                <b>
+                  {fmt(d.bluffs.told)} · {fmt(d.bluffs.believed)}
+                </b>
+              ) : (
+                <Soon what="Bluff stats" />
+              )}
             </Row>
             <Row label="Rival bluffs · your agents saw through">
-              <Soon what="Bluff stats" />
+              {d.bluffs ? (
+                <b>
+                  {fmt(d.bluffs.heard)} · {fmt(d.bluffs.seenThrough)}
+                </b>
+              ) : (
+                <Soon what="Bluff stats" />
+              )}
             </Row>
             <Row label="Themed verbs used">
               <b>{fmt(verbs)}</b>

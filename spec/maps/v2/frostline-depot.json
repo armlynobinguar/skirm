@@ -5,7 +5,7 @@
   "name": "Frostline Depot",
   "region": "North rail line",
   "difficulty": 2,
-  "label": "Easy",
+  "label": "Starter",
   "blurb": "A rail depot buried in snow. Freight crates block the aisles and drifts seal the doors. Nothing spreads here, but the cold leaves very few steps to spare.",
   "item": "Heat pack",
   "deliverTo": "Warm room",

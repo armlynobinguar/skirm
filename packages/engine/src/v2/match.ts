@@ -9,12 +9,14 @@
 //   3. pickups and deliveries
 //   4. the environment: hazards spread for `cap` waves, then recede, then grow again; anyone a
 //      hazard reaches is knocked down (lava removes them)
-//   5. talk: messages sent this tick are delivered to whoever hears them
-//   6. what each crew can see (fog), then the goal check
+//   5. what each crew can see (fog)
+//   6. talk: messages sent this tick are delivered to whoever hears them, bluffs among them (bluff.ts,
+//      judged on what the crews see now), then the goal check
 //
 // A difficulty level (difficulty.ts) rewrites the map's rules before the first tick. Each crew keeps
 // a running tally (middle items, verbs, switches, steals, knock-downs, talk) for goals and the debrief.
 import { talkHold } from '@skirm/shared';
+import { avoidedTile, BLUFF_CAP, judgeBluffs, planBluffs } from './bluff';
 import type { Difficulty } from './difficulty';
 import { DIFF_MODS, RANKED_DIFFICULTY, withDifficulty } from './difficulty';
 import type { ItemOrigin } from './frame';
@@ -67,6 +69,10 @@ export interface MatchOptions {
   ticks?: number;
   /** Casual difficulty (DIFF_MODS, see withDifficulty); Normal when unset. Ignored in ranked. */
   difficulty?: Difficulty;
+  /** Extra ticks a crew holds at the start, on top of the head start (the practice bot on Easy). */
+  hold?: Partial<Record<Team, number>>;
+  /** Bluffs each crew may tell this match (BLUFF_CAP when unset; the practice bot's from the difficulty). */
+  lieCap?: Partial<Record<Team, number>>;
 }
 
 export type Action = { type: 'wait' } | { type: 'move'; dir: Dir } | { type: 'verb'; verb: string; dir?: Dir } | { type: 'switch' };
@@ -102,6 +108,8 @@ export interface AgentState {
   lastSpoke: number;
   /** Messages heard last tick, read when choosing this tick. */
   inbox: HeardMessage[];
+  /** A bluff this agent believed: it treats `tile` as empty until tick `until` (bluff.ts). */
+  avoid: { tile: number; until: number } | null;
 }
 
 export type MatchEvent =
@@ -118,6 +126,7 @@ export type MatchEvent =
   | { kind: 'supply_drop'; at: [number, number] }
   | { kind: 'hazard'; hazard: HazardKind; wave: number; receding: boolean }
   | { kind: 'said'; agent: string; channel: 'say' | 'team'; text: string; heardBy: string[]; overheardBy: string[] }
+  | { kind: 'bluff'; agent: string; victim: string; at: [number, number]; believed: boolean }
   | { kind: 'refused'; agent: string; reason: string };
 
 export interface MatchResult {
@@ -152,6 +161,10 @@ export interface CrewTally {
   sent: number;
   /** Rival team messages at least one of this crew's agents overheard. */
   overheard: number;
+  /** Bluffs told to the rival (each reached its target). */
+  lies: number;
+  /** Of those, the ones the rival believed. */
+  believed: number;
 }
 
 export interface MatchState {
@@ -168,7 +181,9 @@ export interface MatchState {
   score: Record<Team, number>;
   /** Tick each crew reached its current score (tiebreak). */
   scoredAt: Record<Team, number>;
-  /** Ticks each crew waits at the start: the larger crew waits 5 per agent of difference. */
+  /** Bluffs each crew may tell this match. */
+  lieCap: Record<Team, number>;
+  /** Ticks each crew waits at the start: the larger crew waits 5 per agent of difference, plus any `hold`. */
   holdTicks: Record<Team, number>;
   blocks: Record<Team, number>;
   /** Dig hits so far per dirt tile. */
@@ -227,11 +242,12 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
         cooldown: {},
         lastSpoke: -Infinity,
         inbox: [],
+        avoid: null,
       });
     });
   const diff = crews.A.length - crews.B.length;
   const size = map.w * map.h;
-  const tally = (): CrewTally => ({ middle: [], verbs: 0, switches: 0, steals: 0, swept: 0, sent: 0, overheard: 0 });
+  const tally = (): CrewTally => ({ middle: [], verbs: 0, switches: 0, steals: 0, swept: 0, sent: 0, overheard: 0, lies: 0, believed: 0 });
   const s: MatchState = {
     map,
     difficulty,
@@ -243,7 +259,11 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
     agents,
     score: { A: 0, B: 0 },
     scoredAt: { A: 0, B: 0 },
-    holdTicks: { A: diff > 0 ? diff * HEAD_START_TICKS_PER_AGENT : 0, B: diff < 0 ? -diff * HEAD_START_TICKS_PER_AGENT : 0 },
+    holdTicks: {
+      A: (diff > 0 ? diff * HEAD_START_TICKS_PER_AGENT : 0) + Math.max(0, opts.hold?.A ?? 0),
+      B: (diff < 0 ? -diff * HEAD_START_TICKS_PER_AGENT : 0) + Math.max(0, opts.hold?.B ?? 0),
+    },
+    lieCap: { A: Math.max(0, opts.lieCap?.A ?? BLUFF_CAP), B: Math.max(0, opts.lieCap?.B ?? BLUFF_CAP) },
     blocks: { A: def.blockSupply, B: def.blockSupply },
     dig: {},
     dropped: {},
@@ -346,7 +366,8 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
   for (const a of s.agents) {
     if (a.out || a.down) continue;
     const j = a.y * w + a.x;
-    if (s.grid[j] === 'item' && a.carrying.length < carryOf(a.role)) {
+    // A fooled agent walks over the item it was told is gone.
+    if (s.grid[j] === 'item' && a.carrying.length < carryOf(a.role) && avoidedTile(s, a) !== j) {
       s.grid[j] = null;
       const by = s.dropped[j];
       delete s.dropped[j];
@@ -373,17 +394,22 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
   // 4. environment
   for (const hz of def.hazards) if (s.tick % hz.every === 0) spreadHazard(s, hz.kind, hz.cap, ev);
 
-  // 5. talk
-  for (const m of deliverTalk(s, input.says ?? [])) {
+  // 5. sight, before talk: a bluff is judged on what the target's crew sees after this tick's moves
+  updateSight(s);
+
+  // 6. talk, with any bluff spoken as an ordinary say and judged once it lands
+  const says = input.says ?? [];
+  const bluffs = planBluffs(s, says);
+  const spoken = deliverTalk(s, [...says, ...bluffs.map((b) => b.say)]);
+  for (const m of spoken) {
     ev.push(m);
     if (m.kind !== 'said') continue;
     const team = s.agents.find((a) => a.id === m.agent)!.team;
     s.tally[team].sent++;
     if (m.overheardBy.length) s.tally[team === 'A' ? 'B' : 'A'].overheard++;
   }
+  ev.push(...judgeBluffs(s, bluffs, spoken));
 
-  // 6. sight and result
-  updateSight(s);
   s.result = checkResult(s);
   return ev;
 }

@@ -99,7 +99,8 @@ describe('v2 practice against the greedy bot', () => {
     expect(row).toMatchObject({ status: 'ended', teamAAccountId: judge.acc.id, teamBAccountId: SYSTEM_ACCOUNT_ID, practice: true, ranked: false, difficulty: DEFAULT_PRACTICE.difficulty, logHash: end.logHash, eloDeltas: [], registryStatus: 'none' });
     expect(row.stats!.A.charged).toBe(0);
     expect(row.stats!.B.charged).toBe(0);
-    expect(row.crews!.B.map((a) => a.tier)).toEqual(['standard']);
+    // Easy: the bot talks Quiet and waits 12 s (practiceRival).
+    expect(row.crews!.B.map((a) => a.tier)).toEqual(['quiet']);
     const acc = (await deps.repos.accounts.get(judge.acc.id))!;
     expect(acc).toMatchObject({ elo: judge.acc.elo, rankedMatches: 0, wins: 0, losses: 0, draws: 0 });
     expect(deps.registryJobs).toEqual([]);
@@ -107,6 +108,18 @@ describe('v2 practice against the greedy bot', () => {
     await delay(20);
     expect(hub.v2.isBusy(SYSTEM_ACCOUNT_ID)).toBe(false);
     expect(hub.v2.isBusy(judge.acc.id)).toBe(false);
+  });
+
+  it('fields a full Open-talk bot crew against a lone agent on Mega Agentic', async () => {
+    const deps = await practiceDeps(createGreedyBrain());
+    hub = new RealtimeHub(deps);
+    const cam = await player(hub, deps, 'cam');
+    const { found, lockin, end } = await playPractice(cam, 0, { mapId: 'copper-hollow', difficulty: 'mega' });
+    expect(found).toMatchObject({ practice: true, difficulty: 'mega' });
+    expect(lockin).toMatchObject({ rival: { agents: 3 } });
+    expect(end.result).not.toBeNull();
+    const row = (await deps.repos.v2Matches.get(found.matchId))!;
+    expect(row.crews!.B.map((a) => a.tier)).toEqual(['open', 'open', 'open']);
   });
 
   it('plays two players’ practice matches at once, each against its own bot', async () => {

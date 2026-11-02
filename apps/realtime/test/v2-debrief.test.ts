@@ -50,6 +50,16 @@ describe('v2 debrief', () => {
     expect(buildDebrief({ ...base, void: true }).credits).toEqual({ held: 81, used: 0, returned: 81 });
     expect(buildDebrief({ ...base, state: null, void: true })).toMatchObject({ agents: [], mvp: null, goals: [], difficulty: 'hard' });
   });
+
+  it('reports each crew’s bluffs from the engine’s tallies, and none before the match went live', () => {
+    const s = createMatch(map, crews);
+    Object.assign(s.tally.A, { lies: 3, believed: 1 });
+    Object.assign(s.tally.B, { lies: 2, believed: 0 });
+    const base = { state: s, difficulty: 'normal' as const, tally: new DebriefTally(team), held: 0, charged: 0, void: false, eloDelta: null, registry: null };
+    expect(buildDebrief({ ...base, team: 'A' }).bluffs).toEqual({ told: 3, believed: 1, heard: 2, seenThrough: 2 });
+    expect(buildDebrief({ ...base, team: 'B' }).bluffs).toEqual({ told: 2, believed: 0, heard: 3, seenThrough: 2 });
+    expect(buildDebrief({ ...base, team: 'A', state: null }).bluffs).toBeUndefined();
+  });
 });
 
 describe('v2 replay frames', () => {

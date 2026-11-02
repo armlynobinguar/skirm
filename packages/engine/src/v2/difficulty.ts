@@ -30,7 +30,7 @@ export interface DiffMods {
   rivalWaitTicks: number;
   /** Talk tier the prototype's rival crew plays at. */
   rivalTier: TalkTier;
-  /** The prototype's bluff cap for the rival crew (bluffs are model talk; the engine does not count them yet). */
+  /** Bluffs the practice bot may tell (practiceRival; every other crew has BLUFF_CAP). */
   rivalLies: number;
   /** Fog over the whole map, whatever the map's own setting. */
   fog: boolean;
@@ -134,9 +134,9 @@ export function isDifficulty(v: unknown): v is Difficulty {
  * least 1) for `cap + capDelta` waves (at least 3), the goal moves by `goalDelta` (at least 2), and
  * the level's fog and night are added to the map's own. Normal is the map as designed.
  *
- * The rival-only rules (rivalWaitTicks, rivalTier, rivalLies, fullRival) shape the prototype's bot
- * crew. Both crews in a v2 match are players who picked the same level, so the engine applies none
- * of them.
+ * The rival-only rules (rivalWaitTicks, rivalTier, rivalLies, fullRival) shape the practice bot
+ * (practiceRival). Both crews in a PvP match are players who picked the same level, so they apply
+ * only there.
  */
 export function withDifficulty(def: MapDefV2, difficulty: Difficulty): MapDefV2 {
   if (difficulty === 'normal') return def;

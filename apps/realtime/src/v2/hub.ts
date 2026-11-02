@@ -18,6 +18,7 @@ import {
   MAPS_V2,
   RANKED_DIFFICULTY,
   botCrew,
+  practiceRival,
   type AgentSpec,
   type Difficulty,
   type FrameView,
@@ -148,8 +149,8 @@ export class V2Hub {
 
   /**
    * Practice against the greedy bot: casual, no matchmaking, it starts at once on the picked map that
-   * fits the crew (default DEFAULT_PRACTICE). The bot is a Standard crew the player's size on the
-   * greedy brain that accepts and locks in by itself and never holds credits; the player plays free
+   * fits the crew (default DEFAULT_PRACTICE). The bot is a greedy-brain crew shaped by the difficulty
+   * (practiceRival: size, talk tier, late start) that accepts and locks in by itself and never holds credits; the player plays free
    * on the greedy brain, at the normal rates with a model brain. No Elo, no registry job.
    */
   async practice(user: { accountId: string; handle: string }, crew: V2CrewEntry[], opts: V2QueueOptions = {}): Promise<void> {
@@ -426,15 +427,19 @@ export class V2Hub {
   private async startPractice(user: { accountId: string; handle: string }, entries: V2CrewEntry[], map: MapDefV2, difficulty: Difficulty): Promise<void> {
     const matchId = newId('mat');
     await this.launch(matchId, [user.accountId], async () => {
-      const bot: V2Side = { accountId: SYSTEM_ACCOUNT_ID, handle: BOT_HANDLE, crew: botCrew(entries.length as 1 | 2 | 3, `bot_${matchId}`), skills: entries.map(() => []) };
+      // The difficulty shapes the bot: crew size, talk tier, a late start and its bluff cap (practiceRival).
+      const rival = practiceRival(difficulty, entries.length as 1 | 2 | 3, crewLimitOf(map));
+      const botAgents = botCrew(rival.size, `bot_${matchId}`, rival.tier);
+      const bot: V2Side = { accountId: SYSTEM_ACCOUNT_ID, handle: BOT_HANDLE, crew: botAgents, skills: botAgents.map(() => []) };
       const sides = { A: await this.side({ ...user, crew: entries }), B: bot };
       // The greedy brain makes no model calls, so a player on it plays free; the bot always does.
       const free: V2Setup['free'] = this.deps.brain.kind === 'greedy' ? { A: true, B: true } : { B: true };
       await this.deps.repos.v2Matches.create({ id: matchId, mapId: map.id, ranked: false, practice: true, teamA: user.accountId, teamB: SYSTEM_ACCOUNT_ID, crews: { A: crewRecords(sides.A), B: crewRecords(bot) }, difficulty });
-      const match = this.newMatch({ matchId, map, ranked: false, difficulty, sides, practice: true, free }, { A: this.deps.brain, B: createGreedyBrain() }, (t, msg) => {
+      const hold = rival.hold ? { B: rival.hold } : undefined;
+      const match = this.newMatch({ matchId, map, ranked: false, difficulty, sides, practice: true, free, lieCap: { B: rival.lieCap }, ...(hold ? { hold } : {}) }, { A: this.deps.brain, B: createGreedyBrain() }, (t, msg) => {
         if (t === 'A') return this.deps.send(user.accountId, msg);
         if (msg.type === 'v2_found') queueMicrotask(() => match.accept('B'));
-        else if (msg.type === 'v2_lockin') queueMicrotask(() => match.lockIn('B', bot.crew.map(() => 'standard')));
+        else if (msg.type === 'v2_lockin') queueMicrotask(() => match.lockIn('B', bot.crew.map(() => rival.tier)));
       });
       return match;
     });

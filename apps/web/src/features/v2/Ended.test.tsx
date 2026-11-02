@@ -12,6 +12,21 @@ afterEach(() => arenaStore().setLive(null));
 const soonCount = () => document.querySelectorAll('[data-soon]').length;
 
 describe('v2 result screen', () => {
+  it('shows the bluffs told and landed, and the rival bluffs seen through', async () => {
+    renderWithProviders(<V2ResultScreen matchId="mat_v2" />, {
+      handle: 'ada',
+      path: '/matches/mat_v2/result',
+      search: '',
+      api: { v2Match: async () => v2MatchRecordFixture({ debrief: v2DebriefFixture({ bluffs: { told: 3, believed: 1, heard: 2, seenThrough: 2 } }) }) },
+    });
+    await screen.findByTestId('v2-verdict');
+    const tally = screen.getByTestId('v2-tally');
+    expect(tally).toHaveTextContent('Bluffs told · believed by the rival3 · 1');
+    expect(tally).toHaveTextContent('Rival bluffs · your agents saw through2 · 2');
+    // Only season points are still "Soon".
+    expect(within(tally).getAllByText('Soon')).toHaveLength(1);
+  });
+
   it('lays out the debrief from the stored record: verdict, stars, Elo, MVP, report, registry and hash', async () => {
     const { api } = renderWithProviders(<V2ResultScreen matchId="mat_v2" />, {
       handle: 'ada',
@@ -34,7 +49,7 @@ describe('v2 result screen', () => {
     expect(tally).toHaveTextContent('Rival team chat your agents overheard3');
     expect(tally).toHaveTextContent('Themed verbs used6');
     expect(screen.getByTestId('v2-credits')).toHaveTextContent('36 of 60 held · 24 back');
-    // Bluffs (×2) and season points are not live: "Soon", never a number.
+    // A debrief stored before bluffs were judged has no bluff counts: "Soon" (×2), as are season points.
     expect(soonCount()).toBe(3);
     expect(within(tally).getAllByText('Soon')).toHaveLength(3);
     expect(screen.getByTestId('v2-registry')).toHaveTextContent('Writing result · Elo · replay hash to registry.playskirm.testnet');

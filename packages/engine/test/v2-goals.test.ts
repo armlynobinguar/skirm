@@ -213,7 +213,18 @@ describe('v2 goals', () => {
     end(s, 'A');
     expect(checkGoal(s, 'A', verb).met).toBe(true);
     expect(checkGoal(s, 'A', goalFor('copper-hollow', 'agentic'))).toEqual({ met: false, available: true, progress: '0/1 switches' });
-    expect(checkGoal(s, 'A', goalFor('copper-hollow', 'hard'))).toEqual({ met: false, available: false, progress: null });
+    // Bluff goals read the engine's own bluff tallies (bluff.ts).
+    const landed = goalFor('copper-hollow', 'hard');
+    expect(landed.check).toBe('bluff');
+    expect(checkGoal(s, 'A', landed)).toEqual({ met: false, available: true, progress: '0/1 bluffs landed' });
+    s.tally.A.lies = 2;
+    s.tally.A.believed = 1;
+    expect(checkGoal(s, 'A', landed)).toEqual({ met: true, available: true, progress: '1/1 bluffs landed' });
+    const seen = goalFor('copper-hollow', 'mega');
+    expect(seen.check).toBe('see');
+    s.tally.B.lies = 3;
+    s.tally.B.believed = 1;
+    expect(checkGoal(s, 'A', seen)).toEqual({ met: true, available: true, progress: '2/2 seen through' });
     expect(checkGoal(s, 'A', { title: 'Steal', text: '', check: 'steal', n: 1 }).progress).toBe('0/1 stolen');
   });
 
@@ -243,7 +254,7 @@ describe('v2 goals', () => {
     expect(checkGoal(f, 'A', goalFor('frostline-depot', 'hard'))).toEqual({ met: false, available: true, progress: '15/14 messages' });
   });
 
-  it('reports the difficulty goal first, then the stars, bluffs unavailable', () => {
+  it('reports the difficulty goal first, then the stars, bluffs included', () => {
     const s = createMatch(map('copper-hollow'), crews(), { difficulty: 'easy' });
     s.score.A = 3;
     s.tally.A.middle = [82];
@@ -252,8 +263,8 @@ describe('v2 goals', () => {
       { title: 'Light the way', check: 'win', met: true, available: true, progress: '3/3 delivered' },
       { title: 'Won the match', check: 'win', met: true, available: true, progress: '3/3 delivered' },
       { title: 'Took a middle lamp oil', check: 'mid', met: true, available: true, progress: '1 middle' },
-      { title: 'Landed a bluff', check: 'bluff', met: false, available: false, progress: null },
-      { title: 'Saw through a bluff', check: 'see', met: false, available: false, progress: null },
+      { title: 'Landed a bluff', check: 'bluff', met: false, available: true, progress: '0 landed' },
+      { title: 'Saw through a bluff', check: 'see', met: false, available: true, progress: '0 seen through' },
       { title: 'Nobody swept', check: 'clean', met: true, available: true, progress: 'nobody swept' },
     ]);
     const lost = evaluateGoals(s, 'B', 'easy');

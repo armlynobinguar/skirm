@@ -5,7 +5,7 @@
   "name": "Sunken Metro",
   "region": "Central line",
   "difficulty": 4,
-  "label": "Hard",
+  "label": "Veteran",
   "blurb": "A metro platform under a flooded city. Water pushes in from both tunnel mouths and rubble from the ceiling blocks the way to the stairs.",
   "item": "Med kit",
   "deliverTo": "Exit stairs",
