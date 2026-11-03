@@ -30,7 +30,9 @@ export function greedyAct(o: Observation): Action {
   const nx = o.me.x + STEP[dir!][0];
   const ny = o.me.y + STEP[dir!][1];
   const crowded = [...o.teammates, ...o.rivals].some((x) => !x.down && Math.abs(x.x - nx) + Math.abs(x.y - ny) === 1);
-  return crowded && hash(`${o.me.id}:${o.tick}`) % 2 === 1 ? { type: 'wait' } : move;
+  // A high bit of the hash: its lowest bit only follows the parity of the characters, so two ids
+  // like "a-2" and "b-1" would always yield together and never get past each other.
+  return crowded && ((hash(`${o.me.id}:${o.tick}`) >>> 16) & 1) === 1 ? { type: 'wait' } : move;
 }
 
 function hash(s: string): number {

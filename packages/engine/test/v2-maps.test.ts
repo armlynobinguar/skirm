@@ -1,6 +1,7 @@
 // The ten maps as played: every item and the delivery point reachable from every start, contested
-// items as far from one crew as from the other (so each is a race), and no hazard next to a start
-// in its first wave (a crew is never boxed in at spawn).
+// items as far from one crew as from the other (so each is a race), flow like hand-built Copper
+// Hollow (few dead ends, no single-file way out), and no hazard next to a start in its first wave
+// (a crew is never boxed in at spawn).
 import { describe, expect, it } from 'vitest';
 import { MAPS_V2, middleTiles, parseMapV2, type ParsedMap, type Tile } from '../src/v2';
 
@@ -55,6 +56,32 @@ describe('v2 maps', () => {
       const middle = middleTiles(p);
       expect(middle.length).toBeGreaterThan(0);
       for (const m of middle) expect(dA[m], `${m % p.w},${(m / p.w) | 0}`).toBe(dB[m]);
+    });
+
+    it(`${def.code} ${def.name}: flows like hand-built Copper Hollow (few dead ends, no single-file way out)`, () => {
+      const { w, h, grid } = p;
+      const walk = (i: number) => {
+        const t = grid[i];
+        return t === null || t === 'grass' || t === 'item' || t === 'exit' || t === 'dirt';
+      };
+      const nb = (i: number) =>
+        STEPS.map(([dx, dy]) => [(i % w) + dx, ((i / w) | 0) + dy] as const)
+          .filter(([x, y]) => x >= 0 && y >= 0 && x < w && y < h)
+          .map(([x, y]) => y * w + x);
+      const cells = grid.flatMap((_, i) => (walk(i) ? [i] : []));
+      const deadEnds = cells.filter((i) => nb(i).filter(walk).length === 1).length;
+      expect((deadEnds / cells.length) * 100, 'dead ends per 100 open tiles').toBeLessThanOrEqual(2);
+      // Tiles every route from the start to the delivery point must cross. The tutorial has one
+      // route by design (difficulty 1); every other map has none.
+      const start = def.starts.A[0]![1] * w + def.starts.A[0]![0];
+      const reach = (blocked: number) => {
+        const seen = new Set([start]);
+        const q = [start];
+        while (q.length) for (const k of nb(q.pop()!)) if (walk(k) && k !== blocked && !seen.has(k)) (seen.add(k), q.push(k));
+        return seen;
+      };
+      const chokes = [...reach(-1)].filter((i) => i !== start && i !== exit && !reach(i).has(exit));
+      if (def.difficulty > 1) expect(chokes, 'chokepoints').toEqual([]);
     });
 
     it(`${def.code} ${def.name}: no hazard reaches next to a start in its first wave`, () => {

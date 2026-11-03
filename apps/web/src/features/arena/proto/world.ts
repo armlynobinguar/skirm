@@ -101,6 +101,45 @@ function genArena(m) {
   routeRows.forEach((y, k) => { for (let x = Math.max(1, homeW - 6); x < hw; x++) L[y][x] = (k < sp.valves && x >= homeW - 4 && x <= homeW) ? String(k + 1) : '.'; });
   // the middle band: open cavern with a few pillars
   for (let y = 1; y < H - 1; y++) for (let x = sepX + 1; x < hw; x++) if (!routeRows.includes(y)) L[y][x] = R() < .1 ? '#' : R() < .07 ? obs : '.';
+  // flow pass over the home zone (the hand-tuning the prototype asks for, measured against hand-built
+  // Copper Hollow): a dead-end stub opens into a loop where a wall beside it also touches other open
+  // floor. Never on the border or the wall line that sets the route count into the middle.
+  const walkable = c => c === '.' || c === ',' || c === '*' || c === 'S' || c === 'd' || /[0-9]/.test(c);
+  const around = (x, y) => [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]].filter(([a, b]) => a >= 1 && b >= 1 && a < sepX && b < H - 1);
+  for (let pass = 0; pass < 6; pass++) {
+    let changed = false;
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < sepX; x++) {
+      if (!walkable(L[y][x]) || around(x, y).filter(([a, b]) => walkable(L[b][a])).length !== 1) continue;
+      const door = around(x, y).find(([a, b]) => L[b][a] === '#' && around(a, b).some(([c, d]) => (c !== x || d !== y) && walkable(L[d][c])));
+      if (door) { L[door[1]][door[0]] = '.'; changed = true; }
+    }
+    if (!changed) break;
+  }
+  // a second way out where the start's only way to the middle runs single file (Copper Hollow's spawn
+  // has several): for each tile every route from the start must cross, open a home-zone wall with
+  // floor on both sides of it. The route count into the middle stays as designed.
+  const S0 = (() => { for (let y = 0; y < H; y++) { const x = L[y].indexOf('S'); if (x >= 0) return [x, y]; } return null; })();
+  const fromStart = blocked => {
+    const seen = new Set([S0.join()]); const q = [S0];
+    while (q.length) { const [x, y] = q.pop(); for (const [a, b] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      const k = `${a},${b}`; if (a < 1 || b < 1 || a > sepX || b >= H - 1 || k === blocked || seen.has(k) || !walkable(L[b][a])) continue; seen.add(k); q.push([a, b]); } }
+    return seen;
+  };
+  const gates = () => { const g = []; for (let y = 1; y < H - 1; y++) if (walkable(L[y][sepX])) g.push(`${sepX},${y}`); return g; };
+  const skip = new Set();
+  for (let pass = 0; S0 && pass < 12; pass++) {
+    const all = fromStart(null), out = gates();
+    const choke = [...all].find(k => k !== S0.join() && !out.includes(k) && !skip.has(k) && !out.some(g => fromStart(k).has(g)));
+    if (!choke) break;
+    const near = fromStart(choke), far = new Set([...all].filter(k => !near.has(k) && k !== choke));
+    let door = null;
+    for (let y = 1; y < H - 1 && !door; y++) for (let x = 1; x < sepX && !door; x++) {
+      if (L[y][x] !== '#') continue;
+      const n = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]].map(([a, b]) => `${a},${b}`);
+      if (n.some(k => near.has(k)) && n.some(k => far.has(k))) door = [x, y];
+    }
+    if (door) L[door[1]][door[0]] = '.'; else skip.add(choke);
+  }
   // center column: lift, switches, drops and the contested items
   const C = Array.from({length:H}, (_, y) => (y === 0 || y === H - 1) ? '#' : '.');
   const ey = Math.floor(H / 2); C[ey] = 'E';

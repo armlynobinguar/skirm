@@ -70,7 +70,7 @@ export const PRACTICE_MAPS: readonly string[] = [
   'blackout-harbor',
 ];
 
-/** Copper Hollow on Easy ends 3-0 inside 60 ticks with greedy on both sides. */
+/** Copper Hollow on Easy ends inside 90 ticks with greedy on both sides. */
 export const DEFAULT_PRACTICE: { readonly mapId: string; readonly difficulty: Difficulty } = { mapId: 'copper-hollow', difficulty: 'easy' };
 
 export function isPracticeMap(id: string): boolean {

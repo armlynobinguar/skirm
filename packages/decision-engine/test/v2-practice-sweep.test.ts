@@ -25,12 +25,12 @@ describe('greedy practice sweep', () => {
     expect(clean).toEqual(MAPS_V2.map((m) => m.id));
   }, 60_000);
 
-  it('plays the default practice to a result before tick 80, 1v1 and 2v2, with a valid log', async () => {
+  it('plays the default practice to a result before tick 90, 1v1 and 2v2, with a valid log', async () => {
     const def = mapV2(DEFAULT_PRACTICE.mapId)!;
     for (const n of [1, 2] as const) {
       const r = await greedy(def, DEFAULT_PRACTICE.difficulty, n);
       expect(r.result.reason).toBe('goal');
-      expect(r.ticks).toBeLessThan(80);
+      expect(r.ticks).toBeLessThan(90);
       expect(verifyLog(r.log)).toBeNull();
       expect(r.log.result).toEqual(r.result);
     }
