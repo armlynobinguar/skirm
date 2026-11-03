@@ -78,6 +78,12 @@ export const envSchema = z
     DATABASE_URL: url(ENV_DEFAULTS.DATABASE_URL, ['postgres:', 'postgresql:']),
     REDIS_URL: url(ENV_DEFAULTS.REDIS_URL, ['redis:', 'rediss:']),
     AUTH_MODE: enumWithDefault(['dev', 'privy'] as const, 'dev'),
+    /**
+     * `true` lets NODE_ENV=production run dev settings (AUTH_MODE=dev, the built-in dev SKILL_KEK):
+     * the local docker stack only. Unset, a production server refuses them: dev auth trusts the
+     * x-dev-user header (anyone signs in as anyone) and accepts `dev:` payment hashes.
+     */
+    ALLOW_DEV_IN_PRODUCTION: z.enum(['true', 'false']).optional(),
     PRIVY_APP_ID: optional(),
     PRIVY_VERIFICATION_KEY: optional(),
     OPENROUTER_API_KEY: optional(),
@@ -210,6 +216,15 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const kekMode = !skillKek && c.SKILL_KEK_KMS ? 'kms' : 'local';
   const devKek = kekMode === 'local' && (!skillKek || skillKek === DEV_SKILL_KEK);
   const warnings: string[] = [];
+  const devAllowed = c.ALLOW_DEV_IN_PRODUCTION === 'true';
+  if (c.NODE_ENV === 'production' && !devAllowed) {
+    const issues: { path: string; message: string }[] = [];
+    if (c.AUTH_MODE === 'dev')
+      issues.push({ path: 'AUTH_MODE', message: 'dev in production trusts x-dev-user and dev: payment hashes; use privy (or ALLOW_DEV_IN_PRODUCTION=true for a local stack)' });
+    if (devKek)
+      issues.push({ path: 'SKILL_KEK', message: 'the public built-in dev key in production leaves skill prompts unprotected; set SKILL_KEK_KMS (or ALLOW_DEV_IN_PRODUCTION=true for a local stack)' });
+    if (issues.length) throw new ConfigError(issues);
+  }
   if (devKek && c.NODE_ENV === 'production')
     warnings.push(
       'SKILL_KEK is the public built-in dev key and SKILL_KEK_KMS is unset: skill prompts are NOT ' +
