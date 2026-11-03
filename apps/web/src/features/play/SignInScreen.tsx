@@ -249,6 +249,10 @@ export function SignInScreen() {
             </p>
           </article>
         </section>
+        <p className="sk-muted s01-legal" data-testid="s01-legal">
+          Testnet. By playing you accept the <Link href={routes.terms()}>terms</Link>; how your data is used is in the{' '}
+          <Link href={routes.privacy()}>privacy policy</Link>.
+        </p>
       </main>
     </div>
   );
