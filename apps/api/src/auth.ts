@@ -52,7 +52,7 @@ export class SessionGuard implements CanActivate {
     const account = user.privyDid
       ? await accounts.byPrivyDid(user.privyDid)
       : await accounts.byHandle(user.handle);
-    if (!account || account.system)
+    if (!account || account.system || account.deletedAt)
       throw new ApiError(401, 'no_session', 'sign in first (POST /auth/session)');
     return account;
   }

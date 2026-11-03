@@ -16,6 +16,8 @@ const METHODS: (keyof ApiClient)[] = [
   'createSession',
   'me',
   'unlinkNear',
+  'exportMe',
+  'deleteMe',
   'earnBack',
   'myMatches',
   'agents',

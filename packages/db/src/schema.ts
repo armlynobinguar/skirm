@@ -89,6 +89,8 @@ export const accounts = pgTable(
     losses: integer('losses').notNull().default(0),
     draws: integer('draws').notNull().default(0),
     createdAt: createdAt(),
+    /** Set when the player deleted the account: it never signs in again (AccountsRepo.deleteAccount). */
+    deletedAt: ts('deleted_at'),
   },
   (t) => [
     index('accounts_elo_idx').on(t.elo),

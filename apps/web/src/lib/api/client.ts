@@ -48,6 +48,10 @@ export interface ApiClient {
   /** POST /auth/session: signs in with the current credentials, creating the account (S01). */
   createSession(body?: SessionRequest): Promise<SessionResponse>;
   me(): Promise<Me>;
+  /** GET /me/export: everything skirm holds about the caller, own skill prompts included. */
+  exportMe(): Promise<Record<string, unknown>>;
+  /** DELETE /me: deletes the account; `confirm` is the current handle. */
+  deleteMe(confirm: string): Promise<{ deleted: true }>;
   /** DELETE /me/near: unlinks the NEAR account (409 `listing_active` while a listing is open). */
   unlinkNear(): Promise<UnlinkNearResponse>;
   /** GET /me/earn-back: royalties, net skill sales, season prizes, agent rentals and match spend. */
@@ -178,6 +182,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     createSession: (body = {}) => json('POST', '/auth/session', { body }),
     me: () => get('/me'),
     unlinkNear: () => json('DELETE', '/me/near'),
+    exportMe: () => get('/me/export'),
+    deleteMe: (confirm) => json('DELETE', '/me', { body: { confirm } }),
     earnBack: () => get('/me/earn-back'),
     myMatches: () => get('/me/matches'),
 

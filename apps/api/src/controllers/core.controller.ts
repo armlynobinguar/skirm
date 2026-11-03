@@ -208,6 +208,48 @@ export class CoreController {
   }
 
   /**
+   * Everything skirm holds about the caller as one JSON download (the privacy policy's export):
+   * every table that references the account, with the caller's own skill prompts decrypted. Match
+   * debriefs keep only the caller's side.
+   */
+  @Get('me/export')
+  async exportData(@CurrentAccount() acc?: AccountRow) {
+    const account = mustAccount(acc);
+    const { repos, vault } = this.deps;
+    const data = await repos.accounts.exportFor(account.id);
+    const written = await repos.skills.listWritten(account.id);
+    const skillPrompts = [];
+    for (const v of written) {
+      const sealed = await repos.skills.loadSealed(v.id, v.version);
+      if (!sealed) continue;
+      const text = await vault.decryptSkill(sealed);
+      skillPrompts.push({ skillId: v.id, version: v.version, name: v.name, prompt: text.prompt, reflexes: text.reflexes ?? null });
+    }
+    return { exportedAt: new Date().toISOString(), accountId: account.id, ...data, skillPrompts };
+  }
+
+  /**
+   * Deletes the caller's account (the privacy policy's delete). `{ confirm }` must be the current
+   * handle. Refused while an agent plays a live match (409 `agent_busy`) or a market listing is open
+   * (409 `listing_active`). The sign-in, NEAR link, system prompts and rental offers go; credits are
+   * forfeited; agents, match history and sales stay for other players' records and paid passes.
+   */
+  @Delete('me')
+  async deleteMe(@Body() body: unknown, @CurrentAccount() acc?: AccountRow) {
+    const account = mustAccount(acc);
+    const { confirm } = parse(z.object({ confirm: z.string().min(1).max(64) }), body);
+    if (confirm !== account.handle) throw new ApiError(422, 'confirm_mismatch', 'type your handle to confirm');
+    const { repos } = this.deps;
+    const own = await repos.agents.listByOwner(account.id);
+    if ((await repos.agents.busyAgents(own.map((a) => a.id))).length)
+      throw new ApiError(409, 'agent_busy', 'an agent is in a match that has not ended');
+    if (await repos.market.hasActiveListing(account.id))
+      throw new ApiError(409, 'listing_active', 'cancel your market listings before deleting your account');
+    await repos.accounts.deleteAccount(account.id);
+    return { deleted: true };
+  }
+
+  /**
    * Unlinks the NEAR account. Refused (409 `listing_active`) while the player has an active market
    * listing: its approval and payout belong to the linked wallet.
    */

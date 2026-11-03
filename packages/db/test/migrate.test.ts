@@ -54,8 +54,8 @@ describe('migrations', () => {
       sql`select count(*)::int as n from drizzle.__drizzle_migrations`,
     );
     expect(rowsOf<{ n: number }>(applied)[0]!.n).toBe(embeddedMigrations().length);
-    // 0000_init, then 0001_agent_rentals.
-    expect(embeddedMigrations()).toHaveLength(2);
+    // 0000_init, 0001_agent_rentals, 0002_account_deletion.
+    expect(embeddedMigrations()).toHaveLength(3);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {

@@ -126,5 +126,14 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE INDEX \"rentals_renter_idx\" ON \"rentals\" USING btree (\"renter_id\",\"agent_id\");",
       "\nCREATE INDEX \"rentals_owner_idx\" ON \"rentals\" USING btree (\"owner_id\");"
     ]
+  },
+  {
+    "tag": "0002_account_deletion",
+    "folderMillis": 1793668430088,
+    "bps": true,
+    "hash": "2ba3521a89cfdc28a4966559c03e3cb04f8f04895f0b6f62a4d05eb92adcfbf8",
+    "sql": [
+      "ALTER TABLE \"accounts\" ADD COLUMN \"deleted_at\" timestamp with time zone;"
+    ]
   }
 ];
