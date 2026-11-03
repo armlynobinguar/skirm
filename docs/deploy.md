@@ -181,6 +181,24 @@ gcloud iam service-accounts add-iam-policy-binding $SA --role=roles/iam.workload
 
 Repository variables (Settings → Secrets and variables → Actions → Variables; none are secret): `GCP_PROJECT`, `GCP_WIF_PROVIDER` (`projects/<number>/locations/global/workloadIdentityPools/github/providers/skirm`), `GCP_DEPLOY_SA` and `PRIVY_APP_ID`. For the custom domain, also `PUBLIC_API_URL` (`https://api.playskirm.xyz`), `PUBLIC_WS_URL` (`wss://rt.playskirm.xyz/ws`) and `CORS_ORIGINS` (`https://playskirm.xyz,<web run.app URL>`); without them the deploy points web at the run.app URLs and the api refuses the custom domain's origin. Run `scripts/deploy-gcp.sh` by hand with the same three variables.
 
+## Rate limits
+
+The api counts every request per client (the first `X-Forwarded-For` hop, which Cloud Run's front
+end sets) in one-minute windows, with Redis counters shared by every instance:
+
+| Bucket | Default | Routes |
+| --- | --- | --- |
+| strict | 20 / min (`RATE_LIMIT_STRICT`) | `POST /auth/session`, `/credits/deposits`, `/rentals/:offerId`, `/market/:id/purchase`, `/listing`, `/trial`, `/skills/:id/mint`, `/cosmetics/:id/buy`: NEAR RPC, paid work, sign-in |
+| general | 300 / min (`RATE_LIMIT_GENERAL`) | everything else; `GET /health` is never limited |
+
+Over the limit: 429 `rate_limited` with `Retry-After`. If Redis is down the limiter lets requests
+through rather than taking the api with it. The realtime server caps each connection at 30 messages
+per 10 s (one `rate_limited` error, then the rest are dropped).
+
+These limits stop one client flooding NEAR RPC or the queues. Volumetric attacks belong at the edge:
+put the Cloud Run services behind an external HTTPS load balancer with a Cloud Armor policy (a
+per-IP `rate-based-ban` rule, for example 600 requests per minute, and the preconfigured WAF rules).
+
 ## Cost alert
 
 Milestones (Observability) asks for a cost alert, and System Architecture routes alerts through Cloud Logging/Monitoring and Billing budgets. The app can't reach those, so it writes a log line:
