@@ -99,7 +99,9 @@ gcloud services vpc-peerings connect --service=servicenetworking.googleapis.com 
 
 # Per environment (create Cloud SQL only after the peering exists, or it fails)
 gcloud sql instances create skirm-pg-$ENV --database-version=POSTGRES_16 --edition=enterprise \
-  --tier=db-f1-micro --storage-type=SSD --storage-size=10 --region=$R --network=default --no-assign-ip
+  --tier=db-f1-micro --storage-type=SSD --storage-size=10 --region=$R --network=default --no-assign-ip \
+  --backup-start-time=03:00 --retained-backups-count=14 \
+  --enable-point-in-time-recovery --retained-transaction-log-days=7
 gcloud sql databases create skirm --instance=skirm-pg-$ENV
 gcloud redis instances create skirm-redis-$ENV --size=1 --tier=basic --region=$R \
   --redis-version=redis_7_2 --network=default
@@ -180,6 +182,43 @@ gcloud iam service-accounts add-iam-policy-binding $SA --role=roles/iam.workload
 ```
 
 Repository variables (Settings → Secrets and variables → Actions → Variables; none are secret): `GCP_PROJECT`, `GCP_WIF_PROVIDER` (`projects/<number>/locations/global/workloadIdentityPools/github/providers/skirm`), `GCP_DEPLOY_SA` and `PRIVY_APP_ID`. For the custom domain, also `PUBLIC_API_URL` (`https://api.playskirm.xyz`), `PUBLIC_WS_URL` (`wss://rt.playskirm.xyz/ws`) and `CORS_ORIGINS` (`https://playskirm.xyz,<web run.app URL>`); without them the deploy points web at the run.app URLs and the api refuses the custom domain's origin. Run `scripts/deploy-gcp.sh` by hand with the same three variables.
+
+## Backups and restore
+
+Postgres holds everything that matters: accounts, the credits ledger, purchases, rental passes and
+match history. The instance keeps a daily automated backup (03:00 UTC, 14 kept) and point-in-time
+recovery (7 days of transaction logs), so it can be brought back to any second of the last week.
+
+An instance created before these flags existed gets them with:
+
+```bash
+gcloud sql instances patch skirm-pg-$ENV --backup-start-time=03:00 --retained-backups-count=14 \
+  --enable-point-in-time-recovery --retained-transaction-log-days=7
+```
+
+`ENV=staging PROJECT=$PROJECT scripts/check-backups.sh` checks it (read only): backups and
+point-in-time recovery on, at least 7 kept, and a successful backup in the last 36 hours. It exits
+non-zero when anything is off.
+
+**Restore** never overwrites the live instance. Clone it to the moment before the damage, check the
+clone, then point the services at it:
+
+```bash
+# 1. A new instance as it was at that moment (UTC); takes minutes.
+gcloud sql instances clone skirm-pg-$ENV skirm-pg-$ENV-restore --point-in-time=2026-11-03T14:04:00Z
+# 2. Check it: connect through the Cloud SQL proxy and look at the rows that went wrong.
+# 3. Point DATABASE_URL at it: add a new version of the `$ENV-database-url` secret with the
+#    clone's private IP, then redeploy api, realtime and worker ("Each deploy" above).
+# 4. Once traffic runs on the clone and it looks right, delete the old instance or keep it for review.
+```
+
+To restore a whole daily backup instead: `gcloud sql backups list --instance=skirm-pg-$ENV`, then
+`gcloud sql backups restore <BACKUP_ID> --restore-instance=skirm-pg-$ENV-restore --backup-instance=skirm-pg-$ENV`
+(create the target instance first; restoring onto the live one replaces its data).
+
+**Restore drill**, once a month and before mainnet: clone to a point in time, run
+`SELECT count(*) FROM accounts; SELECT count(*) FROM ledger_rows;` on the clone, compare with the
+live instance, then delete the clone. A backup that has never been restored is not a backup yet.
 
 ## Error reporting
 
