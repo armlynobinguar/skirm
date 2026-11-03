@@ -3,6 +3,11 @@
 // else. Each turn sends the agent's own fog-aware view, what it heard and its legal actions numbered;
 // the reply names one number and, when the agent may speak, at most one 120-character message.
 import { actionText, MAX_MESSAGE_CHARS, type Action, type Channel, type Observation } from '@skirm/engine/v2';
+
+/** Longest inner-voice line kept from an actor reply (the mind panel and third-person subtitles). */
+export const MAX_THOUGHT_CHARS = 80;
+/** Longest planner reason kept (the mind panel's planner trace). */
+export const MAX_WHY_CHARS = 200;
 import { distancesFrom, routeHint } from './route';
 
 export const RULES = `You control one agent in skirm, a match between two crews on one shared map.
@@ -73,8 +78,8 @@ export function turnPrompt(o: Observation, plan: string | null, canSpeak: boolea
     `From where you stand: ${where}. Each move lists the steps from the tile it leads to; lower is closer. Unless your plan or skills say otherwise, take the move with the lowest item number, or the lowest deliver number when you carry all you can or enough to win; with no item known, the lowest unseen number to explore. Do not undo your last move or wait on the delivery point.`,
     `Legal actions:\n${legal}`,
     canSpeak
-      ? `Answer at once, no explanation. First line "ACTION: <number>"; then, if you want to talk, one line "SAY: team <message>" or "SAY: say <message>" (at most ${MAX_MESSAGE_CHARS} characters).`
-      : 'Answer at once, no explanation: one line "ACTION: <number>".',
+      ? `Answer at once, no explanation. First line "ACTION: <number>"; then, if you want to talk, one line "SAY: team <message>" or "SAY: say <message>" (at most ${MAX_MESSAGE_CHARS} characters); then one line "THINK: <your inner voice, first person, at most ${MAX_THOUGHT_CHARS} characters>" (private to your crew).`
+      : `Answer at once, no explanation: one line "ACTION: <number>", then one line "THINK: <your inner voice, first person, at most ${MAX_THOUGHT_CHARS} characters>" (private to your crew).`,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -83,6 +88,14 @@ export function turnPrompt(o: Observation, plan: string | null, canSpeak: boolea
 export interface ParsedReply {
   action: Action | null;
   say: { channel: Channel; text: string } | null;
+  /** The agent's inner voice this tick (the THINK line), or null. */
+  thought: string | null;
+}
+
+/** One line, quotes trimmed, cut to `max` characters; null when empty. */
+function oneLine(text: string | undefined, max: number): string | null {
+  const t = (text ?? '').replace(/\s+/g, ' ').trim().replace(/^"|"$/g, '').trim();
+  return t ? [...t].slice(0, max).join('') : null;
 }
 
 export function parseReply(text: string, legal: Action[], canSpeak: boolean): ParsedReply {
@@ -94,9 +107,17 @@ export function parseReply(text: string, legal: Action[], canSpeak: boolean): Pa
     const s = /SAY:\s*(team|say)\s+(.+)/i.exec(text);
     if (s) say = { channel: s[1]!.toLowerCase() as Channel, text: s[2]!.trim().replace(/^"|"$/g, '').slice(0, MAX_MESSAGE_CHARS) };
   }
-  return { action, say };
+  const thought = oneLine(/THINK:\s*(.+)/i.exec(text)?.[1], MAX_THOUGHT_CHARS);
+  return { action, say, thought };
 }
 
 export function planPrompt(o: Observation): string {
-  return `${viewText(o)}\n\nWrite your crew's plan for the next minute in at most 4 short lines: who goes where, which items, when to deliver, how to handle the rival.`;
+  return `${viewText(o)}\n\nWrite your crew's plan for the next minute in at most 4 short lines: who goes where, which items, when to deliver, how to handle the rival. Then one last line "WHY: <one sentence on why this plan>".`;
+}
+
+/** The plan without its WHY line, and the WHY line (the planner trace) on its own. */
+export function parsePlan(text: string): { plan: string | null; why: string | null } {
+  const m = /^\s*WHY:\s*(.+)$/im.exec(text);
+  const plan = (m ? text.slice(0, m.index) + text.slice(m.index + m[0].length) : text).trim();
+  return { plan: plan ? plan.slice(0, 800) : null, why: oneLine(m?.[1], MAX_WHY_CHARS) };
 }

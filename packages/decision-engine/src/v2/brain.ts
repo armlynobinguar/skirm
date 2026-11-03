@@ -11,12 +11,14 @@ import { runWithPolicy } from '../policy';
 import { nowMs } from '../usage';
 import { filterSpeech } from './filter';
 import { greedyAct, greedySay } from './greedy';
-import { parseReply, planPrompt, systemPrompt, turnPrompt } from './prompt';
+import { parsePlan, parseReply, planPrompt, systemPrompt, turnPrompt } from './prompt';
 
 /** 2 s ticks: the action must be back with half a second to spare. */
 export const V2_ACTION_DEADLINE_MS = 1500;
-export const V2_ACTOR_MAX_TOKENS = 80;
-export const V2_PLANNER_MAX_TOKENS = 200;
+/** Room for the action, a message and the inner-voice line. */
+export const V2_ACTOR_MAX_TOKENS = 110;
+/** Room for the plan and its WHY line. */
+export const V2_PLANNER_MAX_TOKENS = 240;
 export const V2_PLANNER_DEADLINE_MS = 6000;
 
 export interface V2Call {
@@ -39,6 +41,15 @@ export interface V2Decision {
   say: { channel: Channel; text: string } | null;
   /** Speech the filter refused (never shown to anyone). */
   refusedSay?: 'leak' | 'abuse' | 'empty';
+  /** The agent's inner voice this tick: first person, private to its crew (withheld like the plan). */
+  thought?: string;
+  call?: V2Call;
+}
+
+/** A crew plan and the planner's reason for it (the mind panel's planner trace). */
+export interface V2Plan {
+  text: string | null;
+  why?: string | null;
   call?: V2Call;
 }
 
@@ -60,7 +71,7 @@ export interface V2Brain {
   readonly model: string;
   act(o: Observation, ctx: V2AgentContext): Promise<V2Decision>;
   /** A short crew plan (null when the brain does not plan). */
-  plan(o: Observation, ctx: Pick<V2AgentContext, 'skills' | 'instructions'>): Promise<{ text: string | null; call?: V2Call }>;
+  plan(o: Observation, ctx: Pick<V2AgentContext, 'skills' | 'instructions'>): Promise<V2Plan>;
 }
 
 /** Whether an agent may speak on `tick` given its tier and the tick it last spoke. */
@@ -150,12 +161,15 @@ export function createHaikuBrain(opts: HaikuBrainOptions): V2Brain {
         reason: parsed.action ? 'chosen' : 'illegal',
         say,
         ...(refusedSay ? { refusedSay } : {}),
+        ...(parsed.thought ? { thought: parsed.thought } : {}),
         call: r.call,
       };
     },
     async plan(o, ctx) {
       const r = await call('planner', systemPrompt(ctx.skills, ctx.instructions), planPrompt(o), V2_PLANNER_MAX_TOKENS, V2_PLANNER_DEADLINE_MS);
-      return { text: r.text ? r.text.trim().slice(0, 800) : null, call: r.call };
+      if (!r.text) return { text: null, why: null, call: r.call };
+      const { plan, why } = parsePlan(r.text);
+      return { text: plan, why, call: r.call };
     },
   };
 }

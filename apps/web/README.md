@@ -223,7 +223,8 @@ More api and realtime shapes:
 - Realtime: `v2_queue { mapId, difficulty }` (casual), `v2_queue { opponent: 'bot' }` (practice),
   `v2_lock_in { crew }`, `v2_lockin { crewLimit, headStartTicks }`, `v2_found { difficulty, practice,
   free, rivalHandle }`, `v2_end { debrief }`, `v2_replay` → `v2_frames`; frames carry
-  `agents[].items` (`{ kind, origin }`) and own-crew `plan` / `planHidden`. The v2 store keeps them.
+  `agents[].items` (`{ kind, origin }`) and own-crew `plan` / `planHidden`, `planWhy` (the planner
+  trace) and `thought` (the agent's inner voice this tick). The v2 store keeps them.
 - Difficulty: `Difficulty`, `DIFFICULTIES`, `DIFF_MODS`, goals `MATCH_GOALS` / `goalFor` in
   `@skirm/engine/v2`; the prototype's `DIFFS`, `GOALS`, `goalOf` typed in `features/arena/world.ts`.
   Practice data: `BOT_HANDLE`, `PRACTICE_MAPS`, `DEFAULT_PRACTICE` from `@skirm/engine/v2`.

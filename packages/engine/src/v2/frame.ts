@@ -35,6 +35,10 @@ export interface FrameAgent {
   tier: TalkTier;
   /** The agent's current plan: own crew only, never a rival's. */
   plan?: string;
+  /** Why the planner chose that plan (the mind panel's planner trace): own crew only, withheld with the plan. */
+  planWhy?: string;
+  /** The agent's latest inner voice, first person: own crew only, withheld when it runs a bought skill. */
+  thought?: string;
   /** The plan is withheld because the agent runs a bought (encrypted) skill. */
   planHidden?: boolean;
 }

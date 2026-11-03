@@ -1,6 +1,6 @@
 import { MAPS_V2, createMatch, observe, stepMatch, type AgentSpec, type Observation } from '@skirm/engine/v2';
 import { describe, expect, it, vi } from 'vitest';
-import { createGreedyBrain, createHaikuBrain, createV2Brain, filterSpeech, maySpeak, parseReply, systemPrompt, turnPrompt } from '../src/v2';
+import { MAX_THOUGHT_CHARS, createGreedyBrain, createHaikuBrain, createV2Brain, filterSpeech, maySpeak, parsePlan, parseReply, planPrompt, systemPrompt, turnPrompt } from '../src/v2';
 
 const map = MAPS_V2.find((m) => m.id === 'copper-hollow')!;
 const spec = (id: string, role: AgentSpec['role']): AgentSpec => ({ id, name: id, role, vision: 3, comms: 3, tier: 'standard' });
@@ -43,7 +43,7 @@ describe('v2 prompts', () => {
 
   it('parses the action number and an optional message, and drops speech when the agent may not speak', () => {
     const legal = observe(match(), 'wick').legal;
-    expect(parseReply('ACTION: 2\nSAY: team Taking the left tunnel.', legal, true)).toEqual({ action: legal[1], say: { channel: 'team', text: 'Taking the left tunnel.' } });
+    expect(parseReply('ACTION: 2\nSAY: team Taking the left tunnel.', legal, true)).toEqual({ action: legal[1], say: { channel: 'team', text: 'Taking the left tunnel.' }, thought: null });
     expect(parseReply('ACTION: 2\nSAY: team hi', legal, false).say).toBeNull();
     expect(parseReply('ACTION: 99', legal, true).action).toBeNull();
     expect(parseReply('3', legal, false).action).toBe(legal[2]);
@@ -64,6 +64,24 @@ describe('v2 prompts', () => {
     // A doubted bluff is news for one turn only; a believed one lasts as long as the belief.
     s.tick++;
     expect(observe(s, 'wick').bluff).toBeUndefined();
+  });
+
+  it('asks for an inner voice and a plan reason, and reads them apart from the action and plan', () => {
+    const o = observe(match(), 'wick');
+    expect(turnPrompt(o, null, false)).toContain('THINK:');
+    expect(turnPrompt(o, null, true)).toContain('THINK:');
+    const r = parseReply('ACTION: 2\nSAY: team Left tunnel.\nTHINK: "Kes is slow, I can beat him to the lamp."', o.legal, true);
+    expect(r).toMatchObject({ action: o.legal[1], say: { text: 'Left tunnel.' }, thought: 'Kes is slow, I can beat him to the lamp.' });
+    expect(parseReply('ACTION: 1', o.legal, false).thought).toBeNull();
+    expect(parseReply(`ACTION: 1\nTHINK: ${'x'.repeat(200)}`, o.legal, false).thought).toHaveLength(MAX_THOUGHT_CHARS);
+
+    expect(planPrompt(o)).toContain('WHY:');
+    expect(parsePlan('Wick shores the left.\nMoss digs.\nWHY: the pump floods the right first.')).toEqual({
+      plan: 'Wick shores the left.\nMoss digs.',
+      why: 'the pump floods the right first.',
+    });
+    expect(parsePlan('Just go.')).toEqual({ plan: 'Just go.', why: null });
+    expect(parsePlan('WHY: only a reason')).toEqual({ plan: null, why: 'only a reason' });
   });
 
   it('knows when a tier may speak', () => {
@@ -110,6 +128,14 @@ describe('Haiku brain (OpenRouter)', () => {
     expect(d).toMatchObject({ say: null, refusedSay: 'leak' });
     const body = JSON.parse(String(fetch.mock.calls[0]![1].body));
     expect(JSON.stringify(body.messages)).toContain('Always hug the north wall when fire spreads.');
+  });
+
+  it('returns the inner voice with the action, and the planner reason with the plan', async () => {
+    const actor = createHaikuBrain({ apiKey: 'k', fetch: fakeFetch('ACTION: 1\nTHINK: Nobody near the lift. Go now.') });
+    const d = await actor.act(observe(match(), 'wick'), { skills: [], plan: null, canSpeak: false });
+    expect(d).toMatchObject({ reason: 'chosen', thought: 'Nobody near the lift. Go now.' });
+    const planner = createHaikuBrain({ apiKey: 'k', fetch: fakeFetch('Wick shores, Moss digs.\nWHY: the pump floods our side first.') });
+    expect(await planner.plan(observe(match(), 'wick'), { skills: [] })).toMatchObject({ text: 'Wick shores, Moss digs.', why: 'the pump floods our side first.' });
   });
 
   it('waits when the provider fails or misses the deadline', async () => {
