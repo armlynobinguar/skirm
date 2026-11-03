@@ -101,3 +101,36 @@ describe('opsTokenMatches', () => {
     expect(opsTokenMatches(undefined, TOKEN)).toBe(false);
   });
 });
+
+describe('GET /ops/talk-rates', () => {
+  let h: Harness;
+  beforeAll(async () => {
+    h = await setup({ config: { OPS_TOKEN: TOKEN } });
+  });
+  afterAll(() => h.close());
+
+  const crew = (tiers: string[]) => tiers.map((tier, i) => ({ id: `agt_${i}`, name: `A${i}`, role: 'Runner', vision: 3, comms: 3, tier }));
+  const stats = (costUsd: number) => ({ timeouts: 0, errors: 0, illegal: 0, refusedSays: 0, costUsd, charged: 0 });
+
+  it('measures model spend per agent-tick for single-tier crews and suggests rates', async () => {
+    expect((await h.http().get('/ops/talk-rates')).status).toBe(401);
+    const ana = await h.as('ana');
+    const ben = await h.as('ben');
+    const play = async (ranked: boolean, A: string[], B: string[], cost: { A: number; B: number }) => {
+      const m = await h.repos.v2Matches.create({ mapId: 'copper-hollow', ranked, teamA: ana.accountId, teamB: ben.accountId, crews: { A: crew(A), B: crew(B) } });
+      await h.repos.v2Matches.finish(m.id, { winner: 'A', reason: 'time', ticks: 100, stats: { A: stats(cost.A), B: stats(cost.B) } });
+    };
+    // Standard (ranked counts as Standard whatever the record says) and Open crews; a mixed crew and a
+    // greedy crew (no spend) are left out.
+    await play(true, ['open', 'open'], ['standard'], { A: 0.032, B: 0.016 });
+    await play(false, ['open'], ['open', 'standard'], { A: 0.06, B: 0.5 });
+    await play(false, ['quiet'], ['standard'], { A: 0, B: 0 });
+    const res = await h.http().get('/ops/talk-rates').set('authorization', `Bearer ${TOKEN}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ days: 30, margin: 1.25, creditUsd: 0.001 });
+    // Standard: 300 agent-ticks, 0.048 USD → 0.00016 a tick → 20 per 100.
+    expect(res.body.tiers.standard).toMatchObject({ crews: 2, agentTicks: 300, suggestedRatePer100: 20, currentRatePer100: 20, enough: false });
+    expect(res.body.tiers.open).toMatchObject({ crews: 1, agentTicks: 100, suggestedRatePer100: 75 });
+    expect(res.body.tiers.quiet).toMatchObject({ crews: 0, suggestedRatePer100: null });
+  });
+});

@@ -36,3 +36,55 @@ export function modeledCostPerAgentTickUsd(cfg: SkirmConfig = DEFAULTS, planEver
 export function v2CostPerFreeCredit(cfg: SkirmConfig = DEFAULTS): number {
   return modeledCostPerAgentTickUsd(cfg) / (talkRatePer100('standard', cfg) / 100);
 }
+
+/** One crew's real model spend in one ended match, its agents all on one tier. */
+export interface TalkUsageSample {
+  tier: TalkTierName;
+  agents: number;
+  ticks: number;
+  costUsd: number;
+}
+
+export interface TalkRateMeasure {
+  /** Crews measured. */
+  crews: number;
+  agentTicks: number;
+  /** Measured model USD per agent-tick (null with no samples). */
+  costPerAgentTickUsd: number | null;
+  /** ratePer100 that covers the measured cost with the margin (null with no samples). */
+  suggestedRatePer100: number | null;
+  currentRatePer100: number;
+  /** Enough samples to act on (at least `minAgentTicks`). */
+  enough: boolean;
+}
+
+/**
+ * Talk-tier rates from measured usage (the prototype: "rates are placeholders until token counts are
+ * measured"). For each tier, the model cost per agent-tick over the samples, and the rate in credits
+ * per 100 agent-ticks that covers it: ceil(cost / priceUsd × 100 × margin). Quiet makes the same model
+ * calls as Standard, so their measures are usually close; the suggestion never undercuts the cost.
+ */
+export function measureTalkRates(
+  samples: readonly TalkUsageSample[],
+  opts: { margin?: number; minAgentTicks?: number; cfg?: SkirmConfig } = {},
+): Record<TalkTierName, TalkRateMeasure> {
+  const cfg = opts.cfg ?? DEFAULTS;
+  const margin = opts.margin ?? 1.25;
+  const min = opts.minAgentTicks ?? 3000;
+  const out = {} as Record<TalkTierName, TalkRateMeasure>;
+  for (const tier of ['quiet', 'standard', 'open'] as const) {
+    const mine = samples.filter((s) => s.tier === tier && s.agents > 0 && s.ticks > 0 && s.costUsd >= 0);
+    const agentTicks = mine.reduce((n, s) => n + s.agents * s.ticks, 0);
+    const cost = mine.reduce((n, s) => n + s.costUsd, 0);
+    const per = agentTicks ? cost / agentTicks : null;
+    out[tier] = {
+      crews: mine.length,
+      agentTicks,
+      costPerAgentTickUsd: per,
+      suggestedRatePer100: per === null ? null : Math.max(1, Math.ceil(((per / cfg.credits.priceUsd) * 100 * margin) - 1e-9)),
+      currentRatePer100: talkRatePer100(tier, cfg),
+      enough: agentTicks >= min,
+    };
+  }
+  return out;
+}

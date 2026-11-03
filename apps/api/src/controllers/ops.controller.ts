@@ -2,7 +2,8 @@
 // OPS_TOKEN bearer token instead, and answers 404 like an unknown route while OPS_TOKEN is unset.
 // Totals only, never a player's handle, balance or ledger row.
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { Controller, Get, Headers, Inject } from '@nestjs/common';
+import { Controller, Get, Headers, Inject, Query } from '@nestjs/common';
+import { DEFAULTS, measureTalkRates } from '@skirm/shared';
 import { Public } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
 import { ApiError } from '../errors';
@@ -65,5 +66,22 @@ export class OpsController {
       credits: { ...stats.credits, creditsPerNear: this.deps.config.CREDITS_PER_NEAR },
       matches: stats.matches,
     };
+  }
+
+  /**
+   * Talk-tier rates from measured model spend (the prototype: "rates are placeholders until token
+   * counts are measured"): per tier, the model USD per agent-tick over the last `days` (default 30)
+   * of ended matches, the rate that covers it with a 25% margin, the current rate, and whether there
+   * are enough samples. Apply a suggestion by changing DEFAULTS.talk.ratePer100 (every client prices
+   * crews from it).
+   */
+  @Get('talk-rates')
+  async talkRates(@Headers('authorization') authorization?: string, @Query('days') daysQ?: string) {
+    const token = this.deps.config.OPS_TOKEN;
+    if (!token) throw new ApiError(404, 'not_found', 'route not found');
+    if (!opsTokenMatches(authorization, token)) throw new ApiError(401, 'unauthenticated', 'ops token required');
+    const days = Math.min(365, Math.max(1, Number.parseInt(daysQ ?? '30', 10) || 30));
+    const samples = await this.deps.repos.ops.talkUsage(new Date(Date.now() - days * DAY_MS));
+    return { days, margin: 1.25, creditUsd: DEFAULTS.credits.priceUsd, tiers: measureTalkRates(samples, { margin: 1.25 }) };
   }
 }

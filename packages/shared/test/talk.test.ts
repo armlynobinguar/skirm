@@ -3,6 +3,7 @@ import {
   COST_RATES,
   DEFAULTS,
   chargeDue,
+  measureTalkRates,
   modeledCostPerAgentTickUsd,
   talkHold,
   talkRatePer100,
@@ -126,5 +127,31 @@ describe('v2 free-play budget', () => {
     expect(v2GlobalFreeBudget(300, 0.001)).toBe(8000);
     expect(v2GlobalFreeBudget(300, 0.001, 0.5, 10)).toBe(15000);
     expect(v2GlobalFreeBudget(-1)).toBe(0);
+  });
+});
+
+describe('talk rates from measured usage', () => {
+  it('turns measured model cost per agent-tick into a rate that covers it with the margin', () => {
+    // Standard: 2 crews, 400 agent-ticks, 0.064 USD → 0.00016 USD a tick = 0.16 credits at $0.001;
+    // with the 25% margin, 0.2 credits a tick: 20 per 100 (today's rate).
+    const m = measureTalkRates(
+      [
+        { tier: 'standard', agents: 2, ticks: 150, costUsd: 0.048 },
+        { tier: 'standard', agents: 1, ticks: 100, costUsd: 0.016 },
+        { tier: 'open', agents: 1, ticks: 100, costUsd: 0.06 },
+      ],
+      { minAgentTicks: 300 },
+    );
+    expect(m.standard).toMatchObject({ crews: 2, agentTicks: 400, currentRatePer100: 20, suggestedRatePer100: 20, enough: true });
+    expect(m.standard.costPerAgentTickUsd).toBeCloseTo(0.00016, 12);
+    // Open: 0.0006 USD a tick → 0.6 credits, 0.75 with the margin: 75 per 100 (today 40); too few samples to act on.
+    expect(m.open).toMatchObject({ crews: 1, agentTicks: 100, currentRatePer100: 40, suggestedRatePer100: 75, enough: false });
+    // No samples: nothing to suggest.
+    expect(m.quiet).toMatchObject({ crews: 0, agentTicks: 0, costPerAgentTickUsd: null, suggestedRatePer100: null, enough: false });
+  });
+
+  it('never suggests 0, and ignores empty samples', () => {
+    const m = measureTalkRates([{ tier: 'quiet', agents: 3, ticks: 150, costUsd: 0 }, { tier: 'quiet', agents: 0, ticks: 150, costUsd: 9 }]);
+    expect(m.quiet).toMatchObject({ crews: 1, suggestedRatePer100: 1 });
   });
 });
