@@ -1,8 +1,9 @@
 'use client';
 // Third person on one agent (the prototype's enterTPV / renderTpv / buildMind / subtitles): who it
 // is with its inventory on the left, its mind on the right, and subtitles of what it does, says and
-// hears. The mind shows your own agent's plan as the server sent it, "Plan hidden" for an agent on a
-// bought skill (so a skill never leaks through plan text), and nothing for a rival. Story pace keeps
+// hears. The mind shows your own agent's plan as the server sent it, the planner's reason for it
+// (planner trace) and the agent's inner voice this tick; "Plan hidden" for an agent on a bought skill
+// (so a skill never leaks through plan text), and nothing for a rival. Story pace keeps
 // every subtitle up for its full time; without it only the last three wait their turn.
 import { carryOf, mapV2, type FrameAgent, type Team } from '@skirm/engine/v2';
 import { Button } from '@skirm/ui';
@@ -108,6 +109,22 @@ function Mind({ agent, team, ranked, lines }: { agent: FrameAgent; team: Team; r
               {agent.plan ? plan : 'No plan reported yet.'}
             </div>
           )}
+          {!agent.planHidden && agent.planWhy ? (
+            <>
+              <h3>
+                Why <em>planner trace</em>
+              </h3>
+              <div className={c.thk} data-testid="v2-plan-why">
+                {agent.planWhy}
+              </div>
+            </>
+          ) : null}
+          <h3>
+            Inner voice <em>this tick</em>
+          </h3>
+          <div className={c.thk} data-testid="v2-thought">
+            {agent.thought ? `“${agent.thought}”` : agent.planHidden ? 'Kept to itself: bought skill.' : 'Nothing said to itself yet.'}
+          </div>
         </section>
       )}
       <section>

@@ -162,6 +162,10 @@ export class V2Match {
   private stopReason: string | null = null;
   private poke: (() => void) | null = null;
   private plans: Record<Team, string | null> = { A: null, B: null };
+  /** The planner's reason for each crew's plan (the planner trace). */
+  private planWhys: Record<Team, string | null> = { A: null, B: null };
+  /** Each agent's latest inner voice (its THINK line), by agent id. */
+  private thoughts = new Map<string, string>();
   /** Holds still open (released on a void). */
   private held = new Map<Team, number>();
   /** What each crew had held, kept for the debrief. */
@@ -411,6 +415,8 @@ export class V2Match {
         r.push(`${actionText(d.action)} from ${a.x},${a.y}`);
         this.recent.set(a.id, r.slice(-4));
         if (d.say) says.push({ agent: a.id, channel: d.say.channel, text: d.say.text });
+        // The inner voice is never part of the match (not in the log, never heard); only its own crew's frames show it.
+        if (d.thought) this.thoughts.set(a.id, d.thought);
         this.count(a.team, d);
       });
       const ev = stepMatch(s, { actions, says });
@@ -495,14 +501,17 @@ export class V2Match {
     this.deps.scheduler.clearTimeout(timer);
     if (r) {
       this.stats[team].costUsd += r.call?.costUsd ?? 0;
-      if (r.text) this.plans[team] = r.text;
+      if (r.text) {
+        this.plans[team] = r.text;
+        this.planWhys[team] = r.why ?? null;
+      }
     }
   }
 
   private publish(ev: MatchEvent[]) {
     const s = this.state!;
     for (const t of TEAMS) {
-      const frame = withOwnCrew(frameFor(s, t, ev), s, t, ev, this.plans[t], this.setup.sides[t].bought ?? []);
+      const frame = withOwnCrew(frameFor(s, t, ev), s, t, ev, this.plans[t], this.setup.sides[t].bought ?? [], { why: this.planWhys[t], thoughts: this.thoughts });
       const msg: V2ServerMessage = { type: 'v2_frame', matchId: this.matchId, frame };
       this.frames[t].push(frame);
       this.lastFrames[t] = msg;
@@ -526,17 +535,30 @@ export class V2Match {
 }
 
 /**
- * A crew's frame with what only that crew may see: the crew plan on each of its agents, and the
- * rival agents that overheard each of its team messages. The plan is one crew plan written with every
- * equipped skill in its prompt, so when any agent of the crew runs a bought skill the plan is withheld
- * from the whole crew (`planHidden`): a bought skill never leaks through plan text.
+ * A crew's frame with what only that crew may see: the crew plan and the planner's reason on each of
+ * its agents, each agent's inner voice, and the rival agents that overheard each of its team
+ * messages. The plan is one crew plan written with every equipped skill in its prompt, so when any
+ * agent of the crew runs a bought skill the plan and its reason are withheld from the whole crew
+ * (`planHidden`): a bought skill never leaks through plan text. An agent's inner voice comes from its
+ * own prompt, so it is withheld when that agent runs a bought (or rented) skill.
  */
-export function withOwnCrew(frame: V2Frame, s: MatchState, team: Team, ev: readonly MatchEvent[], plan: string | null, bought: readonly boolean[]): V2Frame {
+export function withOwnCrew(
+  frame: V2Frame,
+  s: MatchState,
+  team: Team,
+  ev: readonly MatchEvent[],
+  plan: string | null,
+  bought: readonly boolean[],
+  mind: { why?: string | null; thoughts?: ReadonlyMap<string, string> } = {},
+): V2Frame {
   const hidden = bought.some(Boolean);
+  const slotOf = (id: string) => s.agents.find((x) => x.id === id)?.slot ?? -1;
   const agents = frame.agents.map((a) => {
     if (a.team !== team) return a;
-    if (hidden) return { ...a, planHidden: true };
-    return plan ? { ...a, plan } : a;
+    const thought = bought[slotOf(a.id)] ? undefined : mind.thoughts?.get(a.id);
+    const own = thought ? { ...a, thought } : a;
+    if (hidden) return { ...own, planHidden: true };
+    return plan ? { ...own, plan, ...(mind.why ? { planWhy: mind.why } : {}) } : own;
   });
   const nameOf = (id: string) => s.agents.find((a) => a.id === id)?.name ?? id;
   const comms = frame.comms.map((m) => {

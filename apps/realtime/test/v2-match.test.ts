@@ -389,6 +389,28 @@ describe('v2 match: difficulty, lock-in crew changes, plans, debrief and frames'
     const quiet: MatchEvent = { ...said, overheardBy: [] };
     expect(withOwnCrew(frameFor(s, 'A', [quiet]), s, 'A', [quiet], null, []).comms[0]!.overheardBy).toBeUndefined();
   });
+
+  it('gives a crew its plan, the planner trace and each agent’s inner voice, never the rival’s, and withholds them for bought skills', () => {
+    const s = createMatch(map, { A: setup().sides.A.crew, B: setup().sides.B.crew });
+    const thoughts = new Map([
+      ['wick', 'Lift is mine.'],
+      ['moss', 'Dig, dig.'],
+      ['wren', 'Rival secret.'],
+    ]);
+    const mind = { why: 'The pump floods our side first.', thoughts };
+    const f = withOwnCrew(frameFor(s, 'A', []), s, 'A', [], 'Wick shores, Moss digs.', [false, false], mind);
+    const wick = f.agents.find((a) => a.id === 'wick')!;
+    expect(wick).toMatchObject({ plan: 'Wick shores, Moss digs.', planWhy: 'The pump floods our side first.', thought: 'Lift is mine.' });
+    expect(f.agents.find((a) => a.id === 'moss')!.thought).toBe('Dig, dig.');
+    // Rivals in sight never carry a plan or a thought.
+    for (const a of f.agents.filter((x) => x.team === 'B')) expect(a.thought ?? a.plan ?? a.planWhy).toBeUndefined();
+    // Moss runs a bought skill: the crew plan and its reason go for everyone, and Moss's own thought too.
+    const b = withOwnCrew(frameFor(s, 'A', []), s, 'A', [], 'Wick shores, Moss digs.', [false, true], mind);
+    const bw = b.agents.find((a) => a.id === 'wick')!;
+    expect(bw).toMatchObject({ planHidden: true, thought: 'Lift is mine.' });
+    expect(bw.plan ?? bw.planWhy).toBeUndefined();
+    expect(b.agents.find((a) => a.id === 'moss')!.thought).toBeUndefined();
+  });
 });
 
 describe('v2 credits on the ledger', () => {

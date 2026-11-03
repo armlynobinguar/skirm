@@ -185,7 +185,11 @@ describe('v2 match screen', () => {
     const [wick, moss] = base.agents as [FrameAgent, FrameAgent];
     const f: V2Frame = {
       ...base,
-      agents: [{ ...wick, plan: 'Shore the tunnel, then the lamp.' }, { ...moss, planHidden: true }, wren],
+      agents: [
+        { ...wick, plan: 'Shore the tunnel, then the lamp.', planWhy: 'The pump floods our side first.', thought: 'Nobody at the lift. Go.' },
+        { ...moss, planHidden: true },
+        wren,
+      ],
       comms: [{ tick: 3, from: 'moss', fromName: 'Moss', team: 'A', channel: 'team', text: 'Rubble ahead.', overheard: false }],
     };
     act(() => rt.emit({ type: 'v2_frame', matchId: 'mat_tpv', frame: f }));
@@ -197,6 +201,8 @@ describe('v2 match screen', () => {
     expect(arenaStore().get().view).toEqual({ mode: 'tpv', focus: 'wick' });
     later(500);
     expect(screen.getByTestId('v2-plan')).toHaveTextContent('Shore the tunnel, then the lamp.');
+    expect(screen.getByTestId('v2-plan-why')).toHaveTextContent('The pump floods our side first.');
+    expect(screen.getByTestId('v2-thought')).toHaveTextContent('“Nobody at the lift. Go.”');
     expect(screen.getByTestId('v2-mind')).toHaveTextContent('Rubble ahead.');
     expect(screen.getByTestId('v2-subs')).toHaveTextContent('Wick · thinking');
     expect(await screen.findByTestId('chase-cam')).toBeInTheDocument();
@@ -205,6 +211,8 @@ describe('v2 match screen', () => {
     expect(screen.getByTestId('v2-tpv')).toHaveTextContent('Moss');
     expect(screen.getByTestId('v2-plan-hidden')).toHaveTextContent('Plan hidden — bought skill');
     expect(screen.queryByTestId('v2-plan')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('v2-plan-why')).not.toBeInTheDocument();
+    expect(screen.getByTestId('v2-thought')).toHaveTextContent('Kept to itself: bought skill.');
 
     key('ArrowRight');
     expect(screen.getByTestId('v2-tpv')).toHaveTextContent('rival crew');

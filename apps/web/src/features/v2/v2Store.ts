@@ -41,6 +41,8 @@ export interface V2CommsLine {
   bluff?: 'landed' | 'doubted';
   /** The target's answer to a bluff (the line after it). */
   bluffReply?: true;
+  /** mind lines: the agent's inner voice (its THINK line), not a plan change. */
+  thought?: true;
 }
 
 /** What a bluff's target answers (the prototype's lines). */
@@ -211,6 +213,13 @@ export function linesOf(frame: V2Frame, prev: V2Frame | null): V2CommsLine[] {
       if (a.team !== frame.view || !a.plan) continue;
       if (prev?.agents.find((p) => p.id === a.id)?.plan === a.plan) continue;
       out.push({ tick, from: a.id, fromName: a.name, team: a.team, channel: 'mind', text: a.plan, overheard: false });
+    }
+  // A new inner-voice line from one of your agents: the Mind feed and its third-person subtitles.
+  if (frame.view !== 'watch')
+    for (const a of frame.agents) {
+      if (a.team !== frame.view || !a.thought) continue;
+      if (prev?.agents.find((p) => p.id === a.id)?.thought === a.thought) continue;
+      out.push({ tick, from: a.id, fromName: a.name, team: a.team, channel: 'mind', text: a.thought, overheard: false, thought: true });
     }
   return out;
 }

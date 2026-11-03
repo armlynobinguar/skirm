@@ -71,6 +71,16 @@ describe('callouts and inventory', () => {
     expect(calloutOf({ ...f, events: [{ kind: 'bluff', agent: 'wren', victim: 'wick', at: [20, 4], believed: true }] }, 'A')).toEqual({ text: "A rival's bluff landed", side: 'rival' });
   });
 
+  it('adds a new inner-voice line from your own agent to the Mind feed, once', () => {
+    const f = v2FrameFixture();
+    const [wick] = f.agents as [FrameAgent];
+    const next = { ...f, comms: [], events: [], agents: f.agents.map((a) => (a.id === wick.id ? { ...a, thought: 'Lift is clear.' } : a)) };
+    const lines = linesOf(next, f).filter((l) => l.channel === 'mind' && l.thought);
+    expect(lines.map((l) => [l.fromName, l.text])).toEqual([[wick.name, 'Lift is clear.']]);
+    // The same thought on the next frame is not repeated.
+    expect(linesOf(next, next).some((l) => l.thought)).toBe(false);
+  });
+
   it('tags the lie in the feed and adds the target’s answer after it', () => {
     const f = v2FrameFixture();
     const wren = agent({ id: 'wren', name: 'Wren', team: 'B', role: 'Scout' });
