@@ -10,7 +10,7 @@ import { defaultFetch, dig, num, postJson, type FetchLike } from '../http';
 import { runWithPolicy } from '../policy';
 import { nowMs } from '../usage';
 import { filterSpeech } from './filter';
-import { greedyAct, greedySay } from './greedy';
+import { greedyAct, greedyPlan, greedySay, greedyThought } from './greedy';
 import { parsePlan, parseReply, planPrompt, systemPrompt, turnPrompt } from './prompt';
 
 /** 2 s ticks: the action must be back with half a second to spare. */
@@ -181,10 +181,10 @@ export function createGreedyBrain(): V2Brain {
     async act(o, ctx) {
       const action = greedyAct(o);
       const text = ctx.canSpeak ? greedySay(o, action) : null;
-      return { action, reason: 'chosen', say: text ? { channel: 'team', text } : null };
+      return { action, reason: 'chosen', say: text ? { channel: 'team', text } : null, thought: greedyThought(o, action) };
     },
-    async plan() {
-      return { text: null };
+    async plan(o) {
+      return greedyPlan(o);
     },
   };
 }

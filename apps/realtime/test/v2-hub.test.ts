@@ -75,6 +75,9 @@ describe('v2 matches over the hub', () => {
     const delta = row.eloDeltas!.find((d) => d.team === 'A')?.delta ?? null;
     expect(end.debrief).toMatchObject({ eloDelta: delta, registry: 'pending', difficulty: 'normal', credits: { held: 30, used, returned: 30 - used } });
     expect(end.debrief!.agents.map((a) => a.agentId)).toEqual([ana.agents[0]!.id]);
+    // Against a player, a rival's mind never reaches the frames (only practice shows it).
+    const rivals = ana.inbox.ofType('v2_frame').flatMap((f) => f.frame.agents.filter((a) => a.team !== 'A'));
+    expect(rivals.some((a) => a.plan || a.planWhy || a.thought)).toBe(false);
     // The season points the stored result gave Ana arrive with v2_end too.
     const outcome = end.result!.winner === 'draw' ? 'draw' : end.result!.winner === 'A' ? 'win' : 'loss';
     expect(end.debrief!.season).toEqual({ number: 1, points: seasonPoints(outcome) });

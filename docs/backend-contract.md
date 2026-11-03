@@ -33,7 +33,7 @@ The single reference for `apps/api`, `apps/worker`, `apps/realtime` and `apps/we
 | `PUBLIC_API_URL` / `PUBLIC_WS_URL` | `http://localhost:4000` / `ws://localhost:4001/ws` | web (inlined at build time) |
 | `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | api: browser origins it accepts |
 | `COST_ALERT_DAILY_USD` | `10` | worker, realtime: daily model spend (USD, summed across instances in Redis `cost:usd:<UTC day>`) that logs `cost_alert` at 50 % / 80 % (warn) and 100 % (error); `0` = off |
-| `OPS_TOKEN` | unset | api: bearer token (≥ 32 characters) for `GET /ops/stats`; unset turns the route off (404) |
+| `OPS_TOKEN` | unset | api: bearer token (≥ 32 characters) for `GET /ops/stats` and `GET /ops/talk-rates`; unset turns the route off (404) |
 | `SEED_OFFICIAL_SKILLS` | on | worker: `0` skips the official skills seed at boot |
 
 ## New account defaults
@@ -58,7 +58,7 @@ Talk tiers are priced in whole credits per 100 agent-ticks (`DEFAULTS.talk.rateP
 
 ## REST (`apps/api`, JSON, no prefix)
 
-Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/players`, `GET /v2/matches/*`, `GET /seasons*` and `GET /ops/stats` (its own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
+Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/players`, `GET /v2/matches/*`, `GET /seasons*` and `GET /ops/stats` / `GET /ops/talk-rates` (their own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
 
 ### Account
 
@@ -126,6 +126,7 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | Method | Path | Body / query | Returns |
 | --- | --- | --- | --- |
 | GET | `/ops/stats` | header `Authorization: Bearer <OPS_TOKEN>` | totals for the skirm-ops dashboard, no per-player data: `{ at, engine: 'haiku'\|'greedy', ai: {dailyBudgetUsd, spend: {day, usd}[3] \| null, matchCostUsd30d}, players: {total, new1d, new7d, withNear}, credits: {balance, held, fundedAccounts, freeBudgetUsedToday, creditsPerNear, flow30d[]}, matches: {live, last1d, last7d, last30d, void30d, costUsd30d, charged30d, daily[] (14 UTC days)} }`. `404` while `OPS_TOKEN` is unset, `401 unauthenticated` for a wrong token |
+| GET | `/ops/talk-rates` | ops token | `{ days, margin, creditUsd, tiers: { quiet, standard, open } }`, each `{ crews, agentTicks, costPerAgentTickUsd, suggestedRatePer100, currentRatePer100, enough }`: talk-tier rates from measured model spend over `?days=` (default 30) of ended matches, single-tier crews with model spend only. Apply a suggestion in `DEFAULTS.talk.ratePer100` |
 
 ### Error codes
 

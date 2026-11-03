@@ -1,7 +1,8 @@
 // Operator stats for GET /ops/stats: players, credits in circulation and their flow, v2 match
 // volume and the model cost each match recorded. Read-only aggregates over whole tables; every
 // window is passed in so tests control the clock.
-import { sql } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
+import { v2Matches } from '../schema';
 import type { Executor } from '../client';
 import { rowsOf } from './util';
 
@@ -126,5 +127,33 @@ export class OpsRepo {
         })),
       },
     };
+  }
+
+  /**
+   * Real model spend per crew from ended matches since `since`: one sample per crew whose agents are
+   * all on one talk tier (mixed crews cannot be split by tier), with model spend recorded (the greedy
+   * brain spends nothing). For measureTalkRates in @skirm/shared.
+   */
+  async talkUsage(since: Date): Promise<{ tier: 'quiet' | 'standard' | 'open'; agents: number; ticks: number; costUsd: number }[]> {
+    const rows = await this.db
+      .select({ crews: v2Matches.crews, stats: v2Matches.stats, ticks: v2Matches.ticks, ranked: v2Matches.ranked })
+      .from(v2Matches)
+      .where(and(eq(v2Matches.status, 'ended'), gte(v2Matches.endedAt, since)));
+    const out: { tier: 'quiet' | 'standard' | 'open'; agents: number; ticks: number; costUsd: number }[] = [];
+    for (const r of rows) {
+      if (!r.crews || !r.stats || !r.ticks) continue;
+      for (const team of ['A', 'B'] as const) {
+        const crew = r.crews[team];
+        const cost = r.stats[team]?.costUsd ?? 0;
+        if (!crew?.length || !(cost > 0)) continue;
+        // Ranked plays every agent at Standard, whatever the crew record says.
+        const tiers = new Set(r.ranked ? ['standard'] : crew.map((a) => a.tier));
+        if (tiers.size !== 1) continue;
+        const tier = [...tiers][0] as string;
+        if (tier !== 'quiet' && tier !== 'standard' && tier !== 'open') continue;
+        out.push({ tier, agents: crew.length, ticks: r.ticks, costUsd: cost });
+      }
+    }
+    return out;
   }
 }

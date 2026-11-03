@@ -511,7 +511,12 @@ export class V2Match {
   private publish(ev: MatchEvent[]) {
     const s = this.state!;
     for (const t of TEAMS) {
-      const frame = withOwnCrew(frameFor(s, t, ev), s, t, ev, this.plans[t], this.setup.sides[t].bought ?? [], { why: this.planWhys[t], thoughts: this.thoughts });
+      let frame = withOwnCrew(frameFor(s, t, ev), s, t, ev, this.plans[t], this.setup.sides[t].bought ?? [], { why: this.planWhys[t], thoughts: this.thoughts });
+      // Practice shows all minds (the prototype): the player also sees the bot's plan, reason and inner voice.
+      if (this.setup.practice) {
+        const r: Team = t === 'A' ? 'B' : 'A';
+        frame = withRivalMind(frame, t, this.plans[r], this.planWhys[r], this.thoughts, this.setup.sides[r].bought ?? []);
+      }
       const msg: V2ServerMessage = { type: 'v2_frame', matchId: this.matchId, frame };
       this.frames[t].push(frame);
       this.lastFrames[t] = msg;
@@ -569,6 +574,28 @@ export function withOwnCrew(
     return by.length ? { ...m, overheardBy: by } : m;
   });
   return { ...frame, agents, comms };
+}
+
+/**
+ * Practice only: the rival agents in a crew's frame with their own crew's plan, its reason and each
+ * agent's inner voice. Never in ranked or casual play against people, whose strategy stays theirs;
+ * withheld like an own crew's for any rival on a bought skill.
+ */
+export function withRivalMind(
+  frame: V2Frame,
+  team: Team,
+  plan: string | null,
+  why: string | null,
+  thoughts: ReadonlyMap<string, string>,
+  rivalBought: readonly boolean[],
+): V2Frame {
+  if (rivalBought.some(Boolean)) return frame;
+  const agents = frame.agents.map((a) => {
+    if (a.team === team) return a;
+    const thought = thoughts.get(a.id);
+    return { ...a, ...(plan ? { plan } : {}), ...(plan && why ? { planWhy: why } : {}), ...(thought ? { thought } : {}) };
+  });
+  return { ...frame, agents };
 }
 
 const header = (a: { id: string; name: string; role: string; vision: number; comms: number; tier: string }) => ({ id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier });

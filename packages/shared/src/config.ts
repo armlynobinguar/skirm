@@ -74,7 +74,8 @@ const defaults = {
   },
   /**
    * v2 talk tiers, integer credits per 100 agent-ticks. Quiet makes the same per-tick model calls
-   * as Standard, so it costs the same; its value is stealth, not price.
+   * as Standard, so it costs the same; its value is stealth, not price. Placeholders until measured:
+   * GET /ops/talk-rates turns the model spend of ended matches into suggested rates (measureTalkRates).
    */
   talk: {
     ratePer100: { quiet: 20, standard: 20, open: 40 },

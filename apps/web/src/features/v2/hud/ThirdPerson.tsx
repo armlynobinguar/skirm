@@ -3,7 +3,8 @@
 // is with its inventory on the left, its mind on the right, and subtitles of what it does, says and
 // hears. The mind shows your own agent's plan as the server sent it, the planner's reason for it
 // (planner trace) and the agent's inner voice this tick; "Plan hidden" for an agent on a bought skill
-// (so a skill never leaks through plan text), and nothing for a rival. Story pace keeps
+// (so a skill never leaks through plan text), and nothing for a rival except in practice, where the
+// server sends the bot's mind too. Story pace keeps
 // every subtitle up for its full time; without it only the last three wait their turn.
 import { carryOf, mapV2, type FrameAgent, type Team } from '@skirm/engine/v2';
 import { Button } from '@skirm/ui';
@@ -81,8 +82,10 @@ export function ThirdPerson({ agent, team, ranked, mapId, inSight, tick, limit, 
 
 function Mind({ agent, team, ranked, lines }: { agent: FrameAgent; team: Team; ranked: boolean; lines: V2CommsLine[] }) {
   const rival = agent.team !== team;
+  // The server sends a rival's mind only in practice (the prototype: practice shows all minds).
+  const open = !rival || !!(agent.plan || agent.planWhy || agent.thought);
   const heard = heardBy(lines, agent, team);
-  const plan = useTyped(!rival && !agent.planHidden ? (agent.plan ?? '') : '');
+  const plan = useTyped(open && !agent.planHidden ? (agent.plan ?? '') : '');
   return (
     <aside className={`sk-panel ${c.mind}`} aria-label="Agent mind" data-testid="v2-mind">
       <div className={c.mh}>
@@ -91,12 +94,17 @@ function Mind({ agent, team, ranked, lines }: { agent: FrameAgent; team: Team; r
         </span>
         {rival ? <span className="sk-kick">{ranked ? 'Ranked' : 'Casual'}</span> : <span className="sk-kick">{TIER_NAME[agent.tier]} talk</span>}
       </div>
-      {rival ? (
+      {rival && !open ? (
         <div className={c.hid} data-testid="v2-mind-private">
           {ranked ? 'Private in ranked.' : 'A rival’s plan stays private.'} You see what {agent.name} says aloud and what your crew overhears.
         </div>
       ) : (
         <section>
+          {rival ? (
+            <p className={c.hid} data-testid="v2-mind-practice">
+              Practice: you see the bot’s mind. In ranked and against players, a rival’s mind stays private.
+            </p>
+          ) : null}
           <h3>
             Plan <em>its last turn</em>
           </h3>

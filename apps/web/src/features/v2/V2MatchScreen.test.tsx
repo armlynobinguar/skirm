@@ -178,6 +178,26 @@ describe('v2 match screen', () => {
     expect(screen.queryByTestId('v2-speed')).not.toBeInTheDocument();
   });
 
+  it('shows the bot’s mind on a rival in practice, where the server sends it', async () => {
+    const { rt } = setup('mat_prac');
+    startMatch(rt, 'mat_prac', false);
+    const base = v2FrameFixture({ tick: 3 });
+    const f: V2Frame = {
+      ...base,
+      agents: [...base.agents, { ...wren, plan: 'Take the nearest lamp oil.', planWhy: 'The nearest is 4 steps out.', thought: '4 steps to the nearest lamp oil. Going.' }],
+    };
+    act(() => rt.emit({ type: 'v2_frame', matchId: 'mat_prac', frame: f }));
+    key('Enter');
+    fireEvent.click(screen.getByTestId('v2-card-wren'));
+    key('v');
+    later(500);
+    expect(screen.getByTestId('v2-mind-practice')).toHaveTextContent('Practice: you see the bot’s mind.');
+    expect(screen.queryByTestId('v2-mind-private')).not.toBeInTheDocument();
+    expect(screen.getByTestId('v2-plan')).toHaveTextContent('Take the nearest lamp oil.');
+    expect(screen.getByTestId('v2-plan-why')).toHaveTextContent('The nearest is 4 steps out.');
+    expect(screen.getByTestId('v2-thought')).toHaveTextContent('4 steps to the nearest lamp oil. Going.');
+  });
+
   it('opens third person with your plan, hides a bought skill and a rival mind, and leaves on Esc', async () => {
     const { rt } = setup('mat_tpv');
     startMatch(rt, 'mat_tpv', true);

@@ -122,6 +122,18 @@ describe('v2 practice against the greedy bot', () => {
     expect(row.crews!.B.map((a) => a.tier)).toEqual(['open', 'open', 'open']);
   });
 
+  it("shows the bot's plan, reason and inner voice to the player (practice shows all minds)", async () => {
+    const deps = await practiceDeps(createGreedyBrain());
+    hub = new RealtimeHub(deps);
+    const dee = await player(hub, deps, 'dee');
+    // Saltmarsh Weir has no fog, so the bot is always in sight.
+    const { found, end } = await playPractice(dee, 0, { mapId: 'saltmarsh-weir', difficulty: 'normal' });
+    expect(end.result).not.toBeNull();
+    const bots = dee.inbox.ofType('v2_frame').filter((f) => f.matchId === found.matchId).flatMap((f) => f.frame.agents.filter((a) => a.team === 'B'));
+    expect(bots.length).toBeGreaterThan(0);
+    expect(bots.some((a) => a.plan && a.planWhy && a.thought)).toBe(true);
+  });
+
   it('plays two players’ practice matches at once, each against its own bot', async () => {
     const deps = await practiceDeps(createGreedyBrain());
     hub = new RealtimeHub(deps);
