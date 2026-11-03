@@ -1,6 +1,6 @@
 import { MAPS_V2, createMatch, observe, stepMatch, type AgentSpec, type Observation } from '@skirm/engine/v2';
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_THOUGHT_CHARS, createGreedyBrain, createHaikuBrain, createV2Brain, filterSpeech, maySpeak, parsePlan, parseReply, planPrompt, systemPrompt, turnPrompt } from '../src/v2';
+import { MAX_THOUGHT_CHARS, createGreedyBrain, greedyThought, createHaikuBrain, createV2Brain, filterSpeech, maySpeak, parsePlan, parseReply, planPrompt, systemPrompt, turnPrompt } from '../src/v2';
 
 const map = MAPS_V2.find((m) => m.id === 'copper-hollow')!;
 const spec = (id: string, role: AgentSpec['role']): AgentSpec => ({ id, name: id, role, vision: 3, comms: 3, tier: 'standard' });
@@ -162,6 +162,20 @@ describe('greedy brain', () => {
       stepMatch(s, { actions });
     }
     expect(s.score.A + s.score.B).toBeGreaterThan(0);
+  });
+
+  it('reads a plan, its reason and an inner voice off what greedy does, the same every time', async () => {
+    const s = match();
+    const o = observe(s, 'wick');
+    const brain = createGreedyBrain();
+    const p = await brain.plan(o, { skills: [] });
+    expect(p.text).toMatch(/to go\.$/);
+    expect(p.why).toMatch(/rival has 0 of 4/);
+    const d = await brain.act(o, { skills: [], plan: null, canSpeak: false });
+    expect(d.thought).toBeTruthy();
+    expect([...d.thought!].length).toBeLessThanOrEqual(80);
+    expect(await brain.act(o, { skills: [], plan: null, canSpeak: false })).toEqual(d);
+    expect(greedyThought(o, { type: 'switch' })).toBe('Switch is ready. Flooding their lane.');
   });
 
   /** A hand-made view: `rows` with `@` where the agent stands, legal moves onto open tiles. */
