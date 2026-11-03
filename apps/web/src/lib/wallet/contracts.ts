@@ -3,6 +3,7 @@
 //
 //   top up   deposits.deposit()                        attached: the amount       30 Tgas
 //   buy      market.buy({token_id})                    attached: the price        150 Tgas (≥ 120 needed)
+//   rent     market.rent({rental_id, owner_id, price}) attached: the price         60 Tgas
 //   list     skills.nft_approve({token_id,             attached: 0.01 NEAR        100 Tgas
 //              account_id: market, msg: {"price"}})      (approval storage; the excess is refunded)
 //   link     signMessage("skirm:link-near:<skirm account id>:<near account id>")  NEP-413
@@ -17,6 +18,7 @@ export const GAS = {
   deposit: (30n * TGAS).toString(),
   buy: (150n * TGAS).toString(),
   approve: (100n * TGAS).toString(),
+  rent: (60n * TGAS).toString(),
 } as const;
 
 /** Attached to nft_approve for the approval's storage; the skills contract refunds the excess. */
@@ -53,6 +55,17 @@ export function buyTx(c: Contracts, tokenId: string, priceYocto: string): NearTr
   return {
     receiverId: c.market,
     actions: [call('buy', { token_id: tokenId }, GAS.buy, yocto(priceYocto))],
+  };
+}
+
+/**
+ * Pays for one match with another player's agent. `rental_id` is the offer id and a nonce, which the
+ * api matches to the offer; the market takes the platform fee and pays `ownerId` the rest.
+ */
+export function rentTx(c: Contracts, offerId: string, nonce: string, ownerId: string, priceYocto: string): NearTransaction {
+  return {
+    receiverId: c.market,
+    actions: [call('rent', { rental_id: `${offerId}:${nonce}`, owner_id: ownerId, price: yocto(priceYocto) }, GAS.rent, yocto(priceYocto))],
   };
 }
 

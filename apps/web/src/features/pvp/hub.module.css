@@ -19,7 +19,7 @@
 .seasonKick { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
 .title { font-size: 40px; }
 
-/* Earn-back (the prototype's #myEarn): real sales, royalties, season prizes and spend; rentals not offered. */
+/* Earn-back (the prototype's #myEarn): real sales, royalties, season prizes, agent rentals and spend. */
 .earn { display: grid; gap: 2px; width: 100%; text-align: left; }
 .earnH { margin: 0; font-weight: 500; }
 .earn .split { margin-top: 4px; }

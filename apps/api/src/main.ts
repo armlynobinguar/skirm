@@ -39,6 +39,7 @@ async function main(): Promise<void> {
     near: {
       minter: near.minter,
       deposits: near.deposits,
+      rentals: near.rentals,
       ownership: near.ownership,
       keys: new RpcNearKeyChecker(near.rpc),
     },

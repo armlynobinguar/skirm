@@ -8,6 +8,7 @@ import { MarketRepo } from './market';
 import { MatchMessagesRepo } from './match-messages';
 import { OpsRepo } from './ops';
 import { ProofRepo } from './proof';
+import { RentalsRepo } from './rentals';
 import { SeasonsRepo } from './seasons';
 import { SkillsRepo } from './skills';
 import { tx, type Clock } from './util';
@@ -32,6 +33,8 @@ export interface Repos {
   proof: ProofRepo;
   /** Premium cosmetics (paid credits only). */
   cosmetics: CosmeticsRepo;
+  /** Agent rental offers and one-match passes. */
+  rentals: RentalsRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -57,6 +60,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     seasons: new SeasonsRepo(db, opts.clock),
     proof: new ProofRepo(db),
     cosmetics: new CosmeticsRepo(db, opts.ledger),
+    rentals: new RentalsRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -70,6 +74,7 @@ export * from './market';
 export * from './match-messages';
 export * from './ops';
 export * from './proof';
+export * from './rentals';
 export * from './seasons';
 export * from './skills';
 export * from './v2-matches';

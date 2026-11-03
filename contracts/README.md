@@ -223,6 +223,7 @@ going to the creator. On the creator's own (primary) sale the royalty is 0.
 | `delist(token_id)` | seller | 1 yocto | |
 | `update_price(token_id, price)` | seller | 1 yocto | |
 | `buy(token_id)` → `bool` | anyone but the seller | ≥ price | Needs ≥ 120 Tgas (the web sends 150). Excess deposit refunded |
+| `rent(rental_id, owner_id, price)` | anyone but `owner_id` | ≥ price | Agent rentals (agents are offchain, nothing is transferred). The platform fee comes out of `price` with the same season/treasury split as a sale, `owner_id` gets the rest, the excess is refunded. `rental_id` is 1–96 bytes (the api's offer id and a nonce). Keeps no state. The web sends 60 Tgas |
 | `resolve_purchase(...)`, `on_season_funded(amount)` | private callbacks | | |
 | `get_listing`, `get_listings(from_index?, limit?)`, `get_listings_by_seller`, `listing_count`, `is_purchase_pending`, `fee_for(price)`, `get_config` | view | | `get_config` → `{owner_id, governance_id, nft_contract_id, treasury_id, season_pool_id, season_share_bps, fee_bps, max_fee_bps, pending_fee: {bps, effective_at_ms}?, fee_delay_ms}` |
 | `propose_fee(bps)` → `{bps, effective_at_ms}` | owner or governance | 1 yocto | `bps` ≤ 1000. Replaces a pending proposal and restarts its delay |
@@ -330,7 +331,7 @@ no event.
 | Standard | Events and data |
 | --- | --- |
 | `nep171` | `nft_mint`, `nft_transfer` (emitted by skills) |
-| `skirm_market` | `list` (listing), `delist`, `update_price`, `sale` `{token_id, seller, buyer, price, fee, fee_bps, season_share, treasury_share, royalties{account: amount}, seller_proceeds, refund, payout_fallback}`, `purchase_failed` `{token_id, seller, buyer, refund}`, `season_share_forwarded` `{amount, treasury_id, season_pool_id}`, `fee_proposed` `{old_bps, new_bps, effective_at_ms, by}`, `fee_updated` `{old_bps, new_bps, by}`, `treasury_updated` / `owner_updated` / `governance_updated` / `season_pool_updated` `{old, new, by}` |
+| `skirm_market` | `list` (listing), `delist`, `update_price`, `sale` `{token_id, seller, buyer, price, fee, fee_bps, season_share, treasury_share, royalties{account: amount}, seller_proceeds, refund, payout_fallback}`, `purchase_failed` `{token_id, seller, buyer, refund}`, `rental` `{rental_id, owner, renter, price, fee, fee_bps, season_share, treasury_share, owner_proceeds, refund}`, `season_share_forwarded` `{amount, treasury_id, season_pool_id}`, `fee_proposed` `{old_bps, new_bps, effective_at_ms, by}`, `fee_updated` `{old_bps, new_bps, by}`, `treasury_updated` / `owner_updated` / `governance_updated` / `season_pool_updated` `{old, new, by}` |
 | `skirm_registry` | `match_recorded` (MatchRecordV2) |
 | `skirm_seasons` | `season_opened`, `season_funded`, `season_locked`, `standings_posted`, `prize_claimed`, `season_closed`, `carry_rolled`, `ops_updated`, `owner_updated` |
 | `skirm_deposits` | `deposit` `{receipt, player, amount, block_height, timestamp_ms}`, `withdraw` `{treasury, amount}` |

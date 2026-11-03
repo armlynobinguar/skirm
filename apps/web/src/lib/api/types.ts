@@ -151,7 +151,7 @@ export interface EarnBack {
   creditsPerNear: number;
   /** Season prizes won over all seasons (local until the seasons contract pays), yoctoNEAR string. */
   prizesYocto: string | null;
-  /** Agent rentals: null while rentals are not offered. */
+  /** Agent rentals earned after the platform fee (null from an older api). */
   rentalsYocto: string | null;
 }
 
@@ -476,6 +476,42 @@ export interface V2MatchRecord {
   you?: Side;
   /** The caller's debrief, when stored. */
   debrief?: V2Debrief | null;
+}
+
+/** GET /rentals row: another player's agent offered for one match at a time. */
+export interface RentalOffer {
+  offerId: string;
+  agentId: string;
+  name: string;
+  role: string;
+  vision: number;
+  comms: number;
+  tier: string;
+  ownerId: string;
+  ownerHandle: string;
+  /** Where `market.rent` pays the owner; null while the owner has no NEAR account linked. */
+  ownerNearAccountId: string | null;
+  priceYocto: string;
+}
+
+/** The caller's own offer for one agent (PUT /agents/:id/rental, GET /rentals/mine). */
+export interface MyRentalOffer {
+  offerId: string;
+  agentId: string;
+  priceYocto: string;
+  active: boolean;
+}
+
+/** A one-match pass for another player's agent; `matchId` is set once used. */
+export interface RentalPass {
+  rentalId: string;
+  offerId: string;
+  agentId: string;
+  /** The rented agent, for the crew picker. */
+  agent: { name: string; role: string; vision: number; comms: number; tier: string; ownerHandle: string } | null;
+  priceYocto: string;
+  matchId: string | null;
+  createdAt: string;
 }
 
 /** One agent's results over its v2 matches (practice against the bot left out). */

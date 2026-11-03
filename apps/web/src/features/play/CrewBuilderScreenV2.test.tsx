@@ -28,6 +28,47 @@ function setup(search = '', api: RenderOptions['api'] = {}) {
 afterEach(() => arenaStore().setMap(0));
 
 describe('S04 v2 crew screen', () => {
+  const PASS = {
+    rentalId: 'rnt_1',
+    offerId: 'rof_1',
+    agentId: 'agt_hired',
+    agent: { name: 'Juno', role: 'Scout', vision: 4, comms: 5, tier: 'open', ownerHandle: 'kai' },
+    priceYocto: '1000',
+    matchId: null,
+    createdAt: '2026-11-03T00:00:00.000Z',
+  };
+
+  it('fields a rented agent from its pass in the queued crew, with no edit link', async () => {
+    const { realtime, user } = setup('', { myRentals: async () => ({ offers: [], passes: [PASS, { ...PASS, rentalId: 'rnt_2' }] }), rentalOffers: async () => [] });
+    const hired = await screen.findByTestId('s04-rented-agt_hired');
+    // Two passes for one agent: one pick, "2 left".
+    expect(hired).toHaveTextContent('Juno');
+    expect(hired).toHaveTextContent('2 left');
+    await user.click(hired);
+    expect(screen.getByTestId('s04-card-agt_hired')).toBeInTheDocument();
+    expect(within(screen.getByTestId('s04-card-agt_hired')).queryByRole('link', { name: /edit/i })).toBeNull();
+    await user.click(screen.getByTestId('s04-queue'));
+    expect(realtime.sentOf('v2_queue')[0]!.crew.map((c: { agentId: string }) => c.agentId)).toContain('agt_hired');
+  });
+
+  it('rents an offered agent in dev mode and refreshes the passes', async () => {
+    const offer = { offerId: 'rof_9', agentId: 'agt_x', name: 'Rook II', role: 'Builder', vision: 3, comms: 3, tier: 'standard', ownerId: 'acc_k', ownerHandle: 'kai', ownerNearAccountId: 'kai.testnet', priceYocto: '500000000000000000000000' };
+    let passes: (typeof PASS)[] = [];
+    const { api, user } = setup('', {
+      myRentals: async () => ({ offers: [], passes }),
+      rentalOffers: async () => [offer],
+      rent: async (offerId: string) => {
+        passes = [{ ...PASS, offerId, agentId: 'agt_x', agent: { ...PASS.agent, name: 'Rook II' } }];
+        return { pass: passes[0]! };
+      },
+    });
+    const btn = await screen.findByTestId('s04-rent-rof_9');
+    expect(btn).toHaveTextContent('Rent · 0.5 NEAR');
+    await user.click(btn);
+    expect(api.rent).toHaveBeenCalledWith('rof_9', expect.stringMatching(/^dev:500000000000000000000000:/));
+    expect(await screen.findByTestId('s04-rented-agt_x')).toHaveTextContent('Rook II');
+  });
+
   it('builds a casual crew at the difficulty from the URL and queues it on this map', async () => {
     const { user, realtime, router } = setup('?d=hard');
     const card = await screen.findByTestId(`s04-card-${WICK.id}`);

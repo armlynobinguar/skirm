@@ -14,6 +14,11 @@
 //!   forwards the share to the treasury. Without a season pool the whole fee goes to the treasury.
 //! * Fee governance: the owner or `governance_id` proposes a fee, which applies after
 //!   `FEE_DELAY_MS` (24 h). Every setter emits a NEP-297 event.
+//! * Rent: agent rentals (agents live offchain, so nothing is transferred). The renter attaches at
+//!   least `price` to `rent(rental_id, owner_id, price)`; the same platform fee comes out of it
+//!   with the same season/treasury split as a sale, the owner gets the rest, any excess is
+//!   refunded, and a `rental` event records it. The backend checks the event against its own
+//!   offer (owner, price) before it grants the match. No state is kept.
 
 use std::collections::HashMap;
 
@@ -50,6 +55,8 @@ pub const GAS_FOR_RESOLVE_PURCHASE: Gas = Gas::from_tgas(70);
 pub const GAS_FOR_BUY: Gas = Gas::from_tgas(120);
 /// Largest payout JSON read back from the NFT contract.
 const MAX_PAYOUT_RESULT_LEN: usize = 4096;
+/// Longest `rental_id` accepted (the backend's offer id and a nonce).
+pub const MAX_RENTAL_ID_LEN: usize = 96;
 
 /// `floor(amount · bps / 10^4)` without overflowing u128.
 pub fn bps_of(amount: u128, bps: u16) -> u128 {
@@ -211,6 +218,15 @@ fn emit_event(event: &str, data: serde_json::Value) {
     let ev =
         json!({ "standard": EVENT_STANDARD, "version": "1.0.0", "event": event, "data": [data] });
     env::log_str(&format!("EVENT_JSON:{ev}"));
+}
+
+/// Sends `amount` yoctoNEAR to `to` (nothing when it is 0).
+fn pay(to: &AccountId, amount: u128) {
+    if amount > 0 {
+        Promise::new(to.clone())
+            .transfer(NearToken::from_yoctonear(amount))
+            .detach();
+    }
 }
 
 /// `<what>_updated {old, new, by}` for a setter.
@@ -404,30 +420,7 @@ impl Contract {
             &listing.seller,
         );
 
-        let pay = |to: &AccountId, amount: u128| {
-            if amount > 0 {
-                Promise::new(to.clone())
-                    .transfer(NearToken::from_yoctonear(amount))
-                    .detach();
-            }
-        };
-        let (season_share, treasury_share) = match &self.season_pool_id {
-            Some(_) => split_fee(s.fee, self.season_share_bps),
-            None => (0, s.fee),
-        };
-        if let (Some(pool), true) = (&self.season_pool_id, season_share > 0) {
-            ext_seasons::ext(pool.clone())
-                .with_attached_deposit(NearToken::from_yoctonear(season_share))
-                .with_static_gas(GAS_FOR_SEASON_FUND)
-                .fund(None)
-                .then(
-                    Self::ext(env::current_account_id())
-                        .with_static_gas(GAS_FOR_ON_SEASON_FUNDED)
-                        .on_season_funded(U128(season_share)),
-                )
-                .detach();
-        }
-        pay(&self.treasury_id, treasury_share);
+        let (season_share, treasury_share) = self.pay_fee(s.fee);
         for (account, amount) in &s.royalties {
             pay(account, *amount);
         }
@@ -458,6 +451,47 @@ impl Contract {
             }),
         );
         true
+    }
+
+    /// Rent an offchain agent for one match: attach at least `price`. The platform fee is taken
+    /// and split as for a sale, `owner_id` gets the rest and any excess comes back. `rental_id`
+    /// is the backend's offer id plus a nonce; the backend matches the `rental` event to its offer.
+    #[payable]
+    pub fn rent(&mut self, rental_id: String, owner_id: AccountId, price: U128) {
+        let renter = env::predecessor_account_id();
+        let deposit = env::attached_deposit().as_yoctonear();
+        require!(
+            !rental_id.is_empty() && rental_id.len() <= MAX_RENTAL_ID_LEN,
+            "rental_id must be 1 to 96 bytes"
+        );
+        require!(price.0 > 0, "Price must be greater than 0");
+        require!(renter != owner_id, "The owner cannot rent their own agent");
+        require!(
+            deposit >= price.0,
+            format!("Attach at least the price: {} yoctoNEAR", price.0)
+        );
+
+        let fee = bps_of(price.0, self.fee_bps);
+        let owner_proceeds = price.0 - fee;
+        let (season_share, treasury_share) = self.pay_fee(fee);
+        pay(&owner_id, owner_proceeds);
+        let refund = deposit - price.0;
+        pay(&renter, refund);
+        emit_event(
+            "rental",
+            json!({
+                "rental_id": rental_id,
+                "owner": owner_id,
+                "renter": renter,
+                "price": price,
+                "fee": U128(fee),
+                "fee_bps": self.fee_bps,
+                "season_share": U128(season_share),
+                "treasury_share": U128(treasury_share),
+                "owner_proceeds": U128(owner_proceeds),
+                "refund": U128(refund),
+            }),
+        );
     }
 
     /// Callback of the season share's `fund`. Returns true when the seasons contract took the
@@ -641,6 +675,29 @@ impl Contract {
 }
 
 impl Contract {
+    /// Pays out a platform fee: the season pool's share through `fund` (forwarded to the treasury
+    /// if that fails), the rest to the treasury. Returns `(season_share, treasury_share)`.
+    fn pay_fee(&self, fee: u128) -> (u128, u128) {
+        let (season_share, treasury_share) = match &self.season_pool_id {
+            Some(_) => split_fee(fee, self.season_share_bps),
+            None => (0, fee),
+        };
+        if let (Some(pool), true) = (&self.season_pool_id, season_share > 0) {
+            ext_seasons::ext(pool.clone())
+                .with_attached_deposit(NearToken::from_yoctonear(season_share))
+                .with_static_gas(GAS_FOR_SEASON_FUND)
+                .fund(None)
+                .then(
+                    Self::ext(env::current_account_id())
+                        .with_static_gas(GAS_FOR_ON_SEASON_FUNDED)
+                        .on_season_funded(U128(season_share)),
+                )
+                .detach();
+        }
+        pay(&self.treasury_id, treasury_share);
+        (season_share, treasury_share)
+    }
+
     fn assert_owner(&self) {
         require!(
             env::predecessor_account_id() == self.owner_id,

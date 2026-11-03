@@ -5,6 +5,7 @@ import type { NearKeyChecker } from './near-link';
 import type {
   BenchmarkJobData,
   DepositVerifier,
+  RentalVerifier,
   Minter,
   OwnershipReader,
   ServerConfig,
@@ -46,6 +47,8 @@ export interface ApiDeps {
   near: {
     minter: Minter;
     deposits: DepositVerifier;
+    /** Agent rental payments (`market.rent`); dev mode also takes `dev:` hashes. */
+    rentals: RentalVerifier;
     ownership: OwnershipReader;
     /** Checks NEAR link proofs outside dev mode (absent: linking is refused with 503). */
     keys?: NearKeyChecker;

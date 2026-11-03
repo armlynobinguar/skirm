@@ -176,10 +176,10 @@ describe('ladder, rank title and v2 match record', () => {
 });
 
 describe('GET /me/earn-back', () => {
-  it('sums royalties, sales net as seller, prizes and paid v2 spend; rentals are null', async () => {
+  it('sums royalties, sales net as seller, prizes, rentals earned and paid v2 spend', async () => {
     const empty = await cat.get('/me/earn-back');
     expect(empty.status).toBe(200);
-    expect(empty.body).toEqual({ royaltiesYocto: '0', salesNetYocto: '0', spentCredits: 0, creditsPerNear: 1000, prizesYocto: '0', rentalsYocto: null });
+    expect(empty.body).toEqual({ royaltiesYocto: '0', salesNetYocto: '0', spentCredits: 0, creditsPerNear: 1000, prizesYocto: '0', rentalsYocto: '0' });
     expect((await h.http().get('/me/earn-back')).status).toBe(401);
 
     // Ana writes and sells a skill; Ben resells it to Cat.
@@ -211,7 +211,7 @@ describe('GET /me/earn-back', () => {
     expect(BigInt(a.salesNetYocto)).toBeGreaterThan(0n);
     expect(BigInt(a.salesNetYocto)).toBeLessThan(BigInt(price));
     expect(a.spentCredits).toBe(paid);
-    expect(a).toMatchObject({ prizesYocto: '0', rentalsYocto: null });
+    expect(a).toMatchObject({ prizesYocto: '0', rentalsYocto: '0' });
     const b = (await ben.get('/me/earn-back')).body;
     expect(b.royaltiesYocto).toBe('0');
     // Ben's resale pays the creator royalty on top of the fee, so it nets less than Ana's primary sale.

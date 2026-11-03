@@ -37,6 +37,7 @@ import { useRealtimeMessage, useRealtimeStatus } from '@/lib/realtime/hooks';
 import { routes } from '@/lib/routes';
 import { useApi, useRealtime } from '@/lib/services';
 import styles from './play.module.css';
+import { RentShelf, passesByAgent, rentedAgent } from './RentShelf';
 
 /** Agents a crew may field. */
 export const CREW_CAP = 3;
@@ -99,7 +100,10 @@ function V2Crew({ me, mapId, initialDifficulty, initialBot }: { me: Me; mapId: s
   const toast = useToast();
   const map = mapById(mapId)!;
   const written = useQuery({ queryKey: qk.skills.list('written'), queryFn: () => api.skills('written') });
-  const byId = useMemo(() => new Map(me.agents.map((a) => [a.id, a])), [me.agents]);
+  // Agents rented for one match join the player's own (RentShelf); unused passes only.
+  const rentals = useQuery({ queryKey: qk.myRentals, queryFn: () => api.myRentals(), retry: false });
+  const passes = useMemo(() => rentals.data?.passes ?? [], [rentals.data]);
+  const byId = useMemo(() => new Map([...me.agents, ...passesByAgent(passes).map(rentedAgent)].map((a) => [a.id, a])), [me.agents, passes]);
 
   // The arena behind the screen is this map.
   useEffect(() => {
@@ -265,7 +269,7 @@ function V2Crew({ me, mapId, initialDifficulty, initialBot }: { me: Me; mapId: s
                 skillMine={mine(a.skills[0]?.id)}
                 onTier={(t) => setTiers((p) => ({ ...p, [id]: t }))}
                 onRemove={() => remove(id)}
-                editHref={busy ? undefined : agentEditorHref(id, from)}
+                editHref={busy || !me.agents.some((x) => x.id === id) ? undefined : agentEditorHref(id, from)}
                 index={i}
                 data-testid={`s04-card-${id}`}
               />
@@ -273,6 +277,7 @@ function V2Crew({ me, mapId, initialDifficulty, initialBot }: { me: Me; mapId: s
           })}
         </div>
         <RosterStrip agents={me.agents} picked={crew} onToggle={toggle} disabled={busy} testPrefix="s04" />
+        <RentShelf passes={passes} picked={crew} onToggle={toggle} disabled={busy} nearId={me.account.nearAccountId} />
       </div>
 
       <aside className={c.side}>
