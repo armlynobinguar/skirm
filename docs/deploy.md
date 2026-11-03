@@ -181,6 +181,19 @@ gcloud iam service-accounts add-iam-policy-binding $SA --role=roles/iam.workload
 
 Repository variables (Settings → Secrets and variables → Actions → Variables; none are secret): `GCP_PROJECT`, `GCP_WIF_PROVIDER` (`projects/<number>/locations/global/workloadIdentityPools/github/providers/skirm`), `GCP_DEPLOY_SA` and `PRIVY_APP_ID`. For the custom domain, also `PUBLIC_API_URL` (`https://api.playskirm.xyz`), `PUBLIC_WS_URL` (`wss://rt.playskirm.xyz/ws`) and `CORS_ORIGINS` (`https://playskirm.xyz,<web run.app URL>`); without them the deploy points web at the run.app URLs and the api refuses the custom domain's origin. Run `scripts/deploy-gcp.sh` by hand with the same three variables.
 
+## Error reporting
+
+Every service writes unexpected errors as structured log lines that Cloud Error Reporting groups on
+its own (no SDK or key): api 5xx responses, realtime errors while handling a client message, and
+unhandled rejections and uncaught exceptions in api, realtime and worker (an uncaught exception
+exits the process, and Cloud Run starts a fresh instance). An event carries the error's name, code
+and stack frames, the service and revision, and for the api the method and path. It never carries
+the error message or a query string, which can quote secrets or user text.
+
+To be told about new errors, turn on notifications once per project: Error Reporting in the console
+→ "Configure notifications" → pick a notification channel (email or Slack). New error groups and
+spikes then alert.
+
 ## Rate limits
 
 The api counts every request per client (the first `X-Forwarded-For` hop, which Cloud Run's front

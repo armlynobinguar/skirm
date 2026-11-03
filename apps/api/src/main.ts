@@ -9,6 +9,7 @@ import {
   createQueue,
   createRedis,
   createVault,
+  installCrashReporting,
   loadConfig,
 } from '@skirm/server';
 import { createApp } from './app.module';
@@ -18,6 +19,7 @@ import { RpcNearKeyChecker } from './near-link';
 import { RedisRateLimitStore } from './rate-limit';
 
 async function main(): Promise<void> {
+  installCrashReporting('api');
   const config = loadConfig();
   for (const w of config.warnings) console.warn(`[api] WARNING: ${w}`);
 

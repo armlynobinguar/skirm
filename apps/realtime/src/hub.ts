@@ -149,6 +149,7 @@ export class RealtimeHub {
         else if (err instanceof V2HubError) this.send(c, errorMessage(err.code, err.message));
         else {
           this.log.error(`client ${c.id}: ${(err as Error).stack ?? String(err)}`);
+          this.deps.report?.(err, `client message ${parsed.msg.type}`);
           this.send(c, errorMessage('internal', 'something went wrong'));
         }
       }
