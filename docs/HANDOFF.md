@@ -64,7 +64,7 @@ The judge invariant: `apps/realtime/test/v2-practice.test.ts` plays a fresh acco
 
 ## Known limitations (deferred on purpose)
 
-- **Rentals** are not built; earn-back `rentalsYocto` stays `null`. Cosmetics are premium outfit and hair colours only (no 3D items).
+- **Agent rentals** are built (owner offers an agent per match, renter pays `market.rent`, 5% fee). The market contract needs a redeploy with `rent` before rentals work on testnet (dev mode works without it). Cosmetics are premium outfit and hair colours only (no 3D items).
 - **Reconnecting through another realtime instance** works for spectators only; a player must reach the instance running their match.
 - **Realtime has its own tick loop**, mirrored by `playHeadless`; they share `V2_REPLAN_EVERY` but are separate code.
 - **Greedy** has no hazard lookahead (observe has no wave schedule); `PRACTICE_MAPS` avoids the maps where it plays badly.

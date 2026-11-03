@@ -11,6 +11,7 @@
 //   skill          slots for the skills you own (click one to equip), the equipped skill's prompt
 //                  when you wrote it, encrypted when bought
 //   talk tier      the agent's default for unranked play (ranked is always Standard)
+//   rent out       offer the agent to other players at a price per match (./RentOut.tsx)
 //   record         this season's record (all time when no season is open) from GET /agents/:id/record:
 //                  win rate, matches, deliveries per match, bluffs landed of told and rival bluffs seen
 //                  through; the agent's own counters with "Soon" until it loads or if it fails
@@ -24,6 +25,7 @@ import { AgentPortrait } from '@/features/arena/AgentPortrait';
 import { useArena } from '@/features/arena/store';
 import { MAPS, mapById, type V2Map } from '@/features/arena/world';
 import { SkillArt } from '@/features/skills/parts';
+import { RentOut } from './RentOut';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
 import { EmptyState } from '@/components/states/EmptyState';
@@ -93,6 +95,7 @@ function AgentEditorData({ agentId, mapId, difficulty }: AgentEditorScreenProps)
       key={agent.id}
       agent={agent}
       agents={agents}
+      linked={!!me.data.account.nearAccountId}
       map={fromMap ?? MAPS[mapIdx]}
       from={fromMap ? { mapId: fromMap.id, difficulty: d } : undefined}
     />
@@ -107,11 +110,14 @@ function typing(t: EventTarget | null): boolean {
 function AgentEditor({
   agent,
   agents,
+  linked,
   map,
   from,
 }: {
   agent: Agent;
   agents: Agent[];
+  /** A NEAR account is linked (renting the agent out needs one). */
+  linked: boolean;
   map: V2Map | undefined;
   from?: { mapId: string; difficulty?: Difficulty };
 }) {
@@ -518,6 +524,8 @@ function AgentEditor({
           </div>
           <span className={e.sub}>{TIER_INFO[tier].line} Ranked locks everyone to Standard.</span>
         </section>
+
+        <RentOut agentId={agent.id} agentName={agent.name} linked={linked} />
 
         <ButtonLink href={backHref} variant="primary" className={e.back} data-testid="agent-back">
           {from ? 'Back to crew ▸' : 'Back to Command ▸'}

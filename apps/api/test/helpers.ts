@@ -5,8 +5,13 @@ import { createRepos, type Db, type Repos } from '@skirm/db';
 import { createTestDb } from '@skirm/db/testing';
 import {
   CompositeDepositVerifier,
+  CompositeRentalVerifier,
   DepositError,
   DevDepositVerifier,
+  DevRentalVerifier,
+  RentalError,
+  type RentalPayment,
+  type RentalVerifier,
   LocalKeyWrapper,
   NoopMinter,
   NoopOwnershipReader,
@@ -47,6 +52,17 @@ export class FakeRpcDeposits implements DepositVerifier {
   }
 }
 
+/** RPC rental verifier stand-in: knows a fixed set of tx hashes and their `rental` events. */
+export class FakeRpcRentals implements RentalVerifier {
+  txs = new Map<string, Omit<RentalPayment, 'receipt' | 'dev'>>();
+  async verify(txHash: string, opts: { renterId?: string | null }) {
+    const t = this.txs.get(txHash);
+    if (!t) throw new RentalError('not_found', 'transaction not found');
+    if (t.renter !== opts.renterId) throw new RentalError('wrong_sender', 'signed by another account');
+    return { ...t, receipt: txHash, dev: false };
+  }
+}
+
 export interface Harness {
   app: INestApplication;
   db: Db;
@@ -56,6 +72,7 @@ export interface Harness {
   minter: NoopMinter;
   ownership: FakeOwnership | NoopOwnershipReader;
   rpcDeposits: FakeRpcDeposits;
+  rpcRentals: FakeRpcRentals;
   clock: { now: number };
   costs: MemoryDailyCosts;
   http: () => ReturnType<typeof request>;
@@ -91,6 +108,7 @@ export async function setup(
   const minter = new NoopMinter();
   const ownership = opts.nearOwnership ? new FakeOwnership() : new NoopOwnershipReader();
   const rpcDeposits = new FakeRpcDeposits();
+  const rpcRentals = new FakeRpcRentals();
   const costs = new MemoryDailyCosts();
   const config: ApiConfig = {
     AUTH_MODE: 'dev',
@@ -109,6 +127,7 @@ export async function setup(
         rpcDeposits,
         config.AUTH_MODE === 'dev' ? new DevDepositVerifier(config.CREDITS_PER_NEAR) : undefined,
       ),
+      rentals: new CompositeRentalVerifier(rpcRentals, config.AUTH_MODE === 'dev' ? new DevRentalVerifier() : undefined),
       ownership,
       ...(opts.nearKeys ? { keys: opts.nearKeys } : {}),
     },
@@ -142,6 +161,7 @@ export async function setup(
     minter,
     ownership,
     rpcDeposits,
+    rpcRentals,
     clock,
     costs,
     http,

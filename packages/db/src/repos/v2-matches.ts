@@ -2,13 +2,14 @@
 // 16, floor 100). Elo moves only for ranked matches that end with a result, in the same transaction
 // that closes the match; that transaction also adds the season standings and the skill versions'
 // ranked records.
-import { and, desc, eq, gte, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
 import { seasonPoints, updateMatch, type EloResult } from '@skirm/shared';
 import type { Executor } from '../client';
 import { newId } from '../ids';
-import { accounts, matchMessages, v2Matches, type V2CrewRecord, type V2CrewStatsRecord, type V2DebriefRecord, type V2EloDeltaRecord } from '../schema';
+import { accounts, agents, matchMessages, v2Matches, type V2CrewRecord, type V2CrewStatsRecord, type V2DebriefRecord, type V2EloDeltaRecord } from '../schema';
 import { RepoError, type RegistryState } from '../types';
 import { ProofRepo } from './proof';
+import { RentalsRepo } from './rentals';
 import { SeasonsRepo } from './seasons';
 import { tx, type Clock } from './util';
 
@@ -265,6 +266,41 @@ export class V2MatchesRepo {
             overheardBy: l.overheardBy,
           })),
         );
+      // Each agent's own counters (the lobby and the agent record's fallback): ended matches
+      // against players, so practice against the bot and void matches do not count.
+      const played = input.crews ?? m.crews;
+      if (status === 'ended' && !m.practice && played)
+        for (const team of ['A', 'B'] as const) {
+          const ids = played[team].map((a) => a.id);
+          if (!ids.length) continue;
+          const won = input.winner === team;
+          const draw = input.winner === 'draw';
+          await t
+            .update(agents)
+            .set({
+              matchesPlayed: sql`${agents.matchesPlayed} + 1`,
+              wins: sql`${agents.wins} + ${won ? 1 : 0}`,
+              losses: sql`${agents.losses} + ${!won && !draw ? 1 : 0}`,
+              draws: sql`${agents.draws} + ${draw ? 1 : 0}`,
+            })
+            .where(inArray(agents.id, ids));
+        }
+      // A rented agent in a crew uses up one of that player's passes when the match ends (a void
+      // match uses none). A pass can only be missing if one was spent elsewhere meanwhile, which the
+      // busy check prevents; then the match still stands.
+      if (status === 'ended' && played) {
+        const crewIds = [...played.A, ...played.B].map((a) => a.id);
+        const owners = crewIds.length ? await t.select({ id: agents.id, ownerId: agents.ownerId }).from(agents).where(inArray(agents.id, crewIds)) : [];
+        const rentals = new RentalsRepo(t);
+        for (const team of ['A', 'B'] as const) {
+          const account = team === 'A' ? m.teamAAccountId : m.teamBAccountId;
+          const rented = played[team].map((a) => a.id).filter((id) => owners.some((o) => o.id === id && o.ownerId !== account));
+          for (const agentId of rented)
+            await rentals.consume(account, [agentId], id, new Date(this.clock())).catch((err: unknown) => {
+              if (!(err instanceof RepoError && err.code === 'no_rental')) throw err;
+            });
+        }
+      }
       const season = await new SeasonsRepo(t, this.clock).recordRanked(t, row!);
       await new ProofRepo(t).recordMatchStats(t, row!);
       if (!season) return row!;

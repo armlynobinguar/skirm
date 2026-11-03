@@ -9,6 +9,7 @@ import { CoreController } from './controllers/core.controller';
 import { CosmeticsController } from './controllers/cosmetics.controller';
 import { CreditsController } from './controllers/credits.controller';
 import { MarketController } from './controllers/market.controller';
+import { RentalsController } from './controllers/rentals.controller';
 import { OpsController } from './controllers/ops.controller';
 import { PublicController } from './controllers/public.controller';
 import { SeasonsController } from './controllers/seasons.controller';
@@ -27,6 +28,7 @@ export class AppModule {
         CreditsController,
         SkillsController,
         MarketController,
+        RentalsController,
         SeasonsController,
         CosmeticsController,
         OpsController,

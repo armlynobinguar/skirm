@@ -8,7 +8,7 @@
 // within the window (then the v2 match screen takes over: lock-in, live) or Decline. The cost is the
 // hold: every tick at the crew's talk rates (Standard in ranked), the unused part returned.
 // The season (GET /seasons/current) gives the pool, its split, the countdown and the top 10; the pool
-// says "local" while it is kept offchain. Earn-back shows season prizes won; rentals are not offered.
+// says "local" while it is kept offchain. Earn-back shows season prizes won and agent rentals earned.
 // Ranked plays Normal; casual picks of map and difficulty start from the atlas.
 import { DIFF_MODS, RANKED_DIFFICULTY, holdFor, type TalkTier } from '@skirm/engine/v2';
 import { fmtRate, ratePerTick } from '@/features/agents/agentView';
@@ -552,7 +552,7 @@ function QueueRing({ spinning }: { spinning: boolean }) {
 
 /**
  * What the player got back: skill sales and royalties, season prizes won (all real), and credits
- * spent on matches (at the server's credits per NEAR). Agent rentals are not offered yet.
+ * spent on matches (at the server's credits per NEAR), and what agent rentals earned after the fee.
  */
 function EarnBackPanel() {
   const api = useApi();

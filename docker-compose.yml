@@ -21,6 +21,9 @@ x-node-env: &node-env
   DATABASE_URL: postgres://skirm:skirm@postgres:5432/skirm
   REDIS_URL: redis://redis:6379
   AUTH_MODE: ${AUTH_MODE:-dev}
+  # This stack runs NODE_ENV=production with dev auth and the dev SKILL_KEK on purpose (local only);
+  # without this, a production server refuses both (packages/server config).
+  ALLOW_DEV_IN_PRODUCTION: "true"
   # v2 brain: greedy plays offline (no model calls, no spend). Set V2_BRAIN=haiku and
   # OPENROUTER_API_KEY in .env to play Haiku through OpenRouter.
   V2_BRAIN: ${V2_BRAIN:-greedy}

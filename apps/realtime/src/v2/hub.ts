@@ -165,12 +165,20 @@ export class V2Hub {
     this.track(this.startPractice(user, crew, map, opts.difficulty ?? DEFAULT_PRACTICE.difficulty));
   }
 
-  /** Every agent is the player's and none plays another live match (`matchId`: the one locking in). */
+  /**
+   * Every agent is the player's, or one they hold an unused rental pass for, and none plays another
+   * live match (`matchId`: the one locking in). The pass is used up when the match ends.
+   */
   private async ownCrew(accountId: string, crew: V2CrewEntry[], matchId?: string): Promise<void> {
     const { repos } = this.deps;
     if (new Set(crew.map((c) => c.agentId)).size !== crew.length) throw new V2HubError('invalid_crew', 'an agent is listed twice');
     const rows = await Promise.all(crew.map((c) => repos.agents.get(c.agentId)));
-    if (rows.some((r) => !r || r.ownerId !== accountId)) throw new V2HubError('invalid_crew', 'every agent must be yours');
+    if (rows.some((r) => !r)) throw new V2HubError('invalid_crew', 'every agent must be yours');
+    const others = rows.filter((r) => r!.ownerId !== accountId).map((r) => r!.id);
+    if (others.length) {
+      const rented = await repos.rentals.rentable(accountId, others);
+      if (others.some((id) => !rented.includes(id))) throw new V2HubError('invalid_crew', 'every agent must be yours or rented');
+    }
     const busy = await repos.agents.busyAgents(crew.map((c) => c.agentId), matchId !== undefined ? { exceptMatch: matchId } : {});
     if (busy.length) throw new V2HubError('agent_busy', 'an agent is in a match that has not ended');
   }
@@ -340,7 +348,9 @@ export class V2Hub {
 
   /**
    * The crew's agents as they stand now, their decrypted skills, and which run a bought skill. Only
-   * skills the player owns are decrypted: one still equipped after it was sold is skipped.
+   * skills the agent's player owns are decrypted: one still equipped after it was sold is skipped. A
+   * rented agent plays with its owner's skills, and counts as bought: its plans are withheld from
+   * the renter, who never reads another player's strategy.
    */
   private async roster(accountId: string, entries: V2CrewEntry[]): Promise<V2Roster> {
     const { repos, vault, log } = this.deps;
@@ -355,8 +365,12 @@ export class V2Hub {
       crew.push({ id: v.id, name: v.name, role: v.role, vision: v.vision, comms: v.comms, tier: c.tier });
       const prompts: string[] = [];
       const keys: { id: string; version: number }[] = [];
+      // A rented agent (ownCrew checked the pass) plays with the skills its owner holds.
+      const ownerId = (await repos.agents.get(c.agentId))?.ownerId ?? accountId;
+      const rented = ownerId !== accountId;
+      const holder = ownerId;
       for (const k of v.skills) {
-        if (!(await repos.skills.owns(accountId, k.id, k.version))) {
+        if (!(await repos.skills.owns(holder, k.id, k.version))) {
           log.warn(`v2: agent ${v.id} plays without skill ${k.id} v${k.version}: its player does not own it`);
           continue;
         }
@@ -368,7 +382,7 @@ export class V2Hub {
       skills.push(prompts);
       skillKeys.push(keys);
       const meta = keys.length ? await repos.skills.getMany(keys) : [];
-      bought.push(meta.some((m) => m.creatorId !== accountId));
+      bought.push(rented || meta.some((m) => m.creatorId !== accountId));
       instructions.push(v.systemPrompt ?? null);
     }
     return { crew, skills, skillKeys, bought, instructions };

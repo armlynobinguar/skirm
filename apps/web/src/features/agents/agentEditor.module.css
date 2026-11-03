@@ -65,6 +65,8 @@
 .statrow span { display: grid; gap: 1px; padding: 4px 8px; box-shadow: inset 0 0 0 1px var(--line); }
 .statrow small { font: 500 9.5px/13px var(--font-mono); letter-spacing: .14em; color: var(--faint); text-transform: uppercase; }
 .statrow b { font: 800 18px/1.1 var(--font-display); color: var(--bone); }
+.rentInput { flex: 1; min-width: 0; min-height: 36px; padding: 0 10px; border: 0; font: 500 14px/1 var(--font-mono); color: var(--bone); background: rgba(5, 8, 13, .6); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.rentInput:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .recSub { font: 500 10px/14px var(--font-mono); letter-spacing: .06em; color: var(--faint); }
 
 .plate { display: grid; gap: 10px; margin-top: auto; }

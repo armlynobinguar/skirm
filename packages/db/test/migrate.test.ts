@@ -33,6 +33,8 @@ describe('migrations', () => {
         'skill_ownership',
         'listings',
         'sales',
+        'rental_offers',
+        'rentals',
         'ledger_accounts',
         'ledger_rows',
         'run_holds',
@@ -52,7 +54,8 @@ describe('migrations', () => {
       sql`select count(*)::int as n from drizzle.__drizzle_migrations`,
     );
     expect(rowsOf<{ n: number }>(applied)[0]!.n).toBe(embeddedMigrations().length);
-    expect(embeddedMigrations()).toHaveLength(1);
+    // 0000_init, then 0001_agent_rentals.
+    expect(embeddedMigrations()).toHaveLength(2);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {

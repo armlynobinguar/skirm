@@ -202,6 +202,40 @@ describe('v2 practice against the greedy bot', () => {
     expect(ticks.every((t) => t >= 1 && t <= end.result!.ticks)).toBe(true);
   });
 
+  it("fields a rented agent with its owner's skill, withholds its plans and uses the pass up", async () => {
+    const deps = await practiceDeps(createGreedyBrain());
+    hub = new RealtimeHub(deps);
+    const owner = await player(hub, deps, 'ozzy');
+    const renter = await player(hub, deps, 'remi');
+    const rented = owner.agents[0]!;
+    const queue = () => renter.send({ type: 'v2_queue', crew: [{ agentId: rented.id, tier: 'standard' }], ranked: false, opponent: 'bot' });
+
+    // No pass yet: refused.
+    await queue();
+    expect((await renter.inbox.next('error')).code).toBe('invalid_crew');
+
+    const offer = (await deps.repos.rentals.setOffer(owner.acc.id, rented.id, '1000'))!;
+    await deps.repos.rentals.record({ offerId: offer.id, renterId: renter.acc.id, priceYocto: '1000', feeYocto: '50', ownerProceedsYocto: '950', txHash: 'dev:1000:r1' });
+    await queue();
+    const found = await renter.inbox.next('v2_found');
+    await renter.send({ type: 'v2_accept', matchId: found.matchId });
+    await renter.inbox.next('v2_lockin', (m) => m.matchId === found.matchId);
+    await renter.send({ type: 'v2_lock_in', matchId: found.matchId, tiers: ['standard'] });
+    const end = await renter.inbox.next('v2_end', (m) => m.matchId === found.matchId, 30_000);
+    expect(end.result).not.toBeNull();
+
+    const row = (await deps.repos.v2Matches.get(found.matchId))!;
+    expect(row.crews!.A[0]).toMatchObject({ id: rented.id, skills: [{ id: STARTER_SKILL.id, version: STARTER_SKILL.version }] });
+    const own = renter.inbox.ofType('v2_frame').filter((f) => f.matchId === found.matchId).flatMap((f) => f.frame.agents.filter((a) => a.team === 'A'));
+    expect(own.length).toBeGreaterThan(0);
+    expect(own.every((a) => a.planHidden === true)).toBe(true);
+    // The pass is spent on this match; another match needs another rental.
+    expect((await deps.repos.rentals.byTx('dev:1000:r1'))!.matchId).toBe(found.matchId);
+    await delay(20);
+    await queue();
+    expect((await renter.inbox.next('error')).code).toBe('invalid_crew');
+  });
+
   it('records the skill versions played and never decrypts a skill the player no longer owns', async () => {
     const warns: string[] = [];
     const deps = await practiceDeps(createGreedyBrain(), { info() {}, warn: (m) => warns.push(m), error() {} });

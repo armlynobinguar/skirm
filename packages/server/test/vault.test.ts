@@ -269,8 +269,11 @@ describe('CachingKeyWrapper', () => {
 describe('createVault wrapper selection', () => {
   const env = (e: Record<string, string>) => loadConfig(e);
 
+  // These cases are about the vault, not auth: a production env opts into dev auth like the local stack.
+  const local = { NODE_ENV: 'production', ALLOW_DEV_IN_PRODUCTION: 'true' };
+
   it('uses KMS when SKILL_KEK is unset and SKILL_KEK_KMS is set', async () => {
-    const c = env({ SKILL_KEK_KMS: KMS_KEY, NODE_ENV: 'production' });
+    const c = env({ SKILL_KEK_KMS: KMS_KEY, ...local });
     expect(c.kekMode).toBe('kms');
     expect(c.devKek).toBe(false);
     expect(c.warnings).toEqual([]);
@@ -299,17 +302,31 @@ describe('createVault wrapper selection', () => {
     expect(await v.decryptSkill(kmsRow)).toEqual({ prompt: 'kms sealed' });
   });
 
-  it('warns (does not refuse) on the dev KEK in production without KMS', () => {
-    const prod = env({ NODE_ENV: 'production' });
+  it('warns on the dev KEK in a production local stack (ALLOW_DEV_IN_PRODUCTION) without KMS', () => {
+    const prod = env(local);
     expect(prod.devKek).toBe(true);
     expect(prod.warnings).toHaveLength(1);
     expect(prod.warnings[0]).toMatch(/dev key/);
     expect(prod.warnings[0]).not.toContain(DEV_SKILL_KEK);
-    expect(env({ NODE_ENV: 'production', SKILL_KEK: DEV_SKILL_KEK }).warnings).toHaveLength(1);
+    expect(env({ ...local, SKILL_KEK: DEV_SKILL_KEK }).warnings).toHaveLength(1);
     expect(env({}).warnings).toEqual([]);
     expect(
-      env({ NODE_ENV: 'production', SKILL_KEK: Buffer.from(kek(3)).toString('base64') }).warnings,
+      env({ ...local, SKILL_KEK: Buffer.from(kek(3)).toString('base64') }).warnings,
     ).toEqual([]);
     expect(() => env({ SKILL_KEK_KMS: 'skill-prompt-kek' })).toThrow(/SKILL_KEK_KMS/);
+  });
+
+  it('refuses dev auth and the dev KEK in production unless the stack opts in', () => {
+    const privy = { AUTH_MODE: 'privy', PRIVY_APP_ID: 'app', PRIVY_VERIFICATION_KEY: 'key' };
+    // Dev auth: anyone could sign in as anyone and pay with dev: hashes.
+    expect(() => env({ NODE_ENV: 'production', SKILL_KEK_KMS: KMS_KEY })).toThrow(/AUTH_MODE/);
+    // The public dev key: skill prompts unprotected.
+    expect(() => env({ NODE_ENV: 'production', ...privy })).toThrow(/SKILL_KEK/);
+    expect(() => env({ NODE_ENV: 'production', ...privy, SKILL_KEK: DEV_SKILL_KEK })).toThrow(/SKILL_KEK/);
+    // A real production config starts; so does the local stack that opts in; development is unaffected.
+    expect(env({ NODE_ENV: 'production', ...privy, SKILL_KEK_KMS: KMS_KEY }).AUTH_MODE).toBe('privy');
+    expect(env({ ...local, ALLOW_DEV_IN_PRODUCTION: 'true' }).AUTH_MODE).toBe('dev');
+    expect(env({}).AUTH_MODE).toBe('dev');
+    expect(() => env({ NODE_ENV: 'production', ALLOW_DEV_IN_PRODUCTION: 'false' })).toThrow(/AUTH_MODE/);
   });
 });

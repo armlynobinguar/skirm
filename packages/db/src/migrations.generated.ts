@@ -105,5 +105,26 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE INDEX \"v2_matches_team_a_idx\" ON \"v2_matches\" USING btree (\"team_a_account_id\",\"created_at\");",
       "\nCREATE INDEX \"v2_matches_team_b_idx\" ON \"v2_matches\" USING btree (\"team_b_account_id\",\"created_at\");"
     ]
+  },
+  {
+    "tag": "0001_agent_rentals",
+    "folderMillis": 1793662728566,
+    "bps": true,
+    "hash": "6eff9f30987dea4274bcb3c129ec0b901cb935fb6d488584023a4b9fcaf97169",
+    "sql": [
+      "CREATE TABLE \"rental_offers\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"agent_id\" text NOT NULL,\n\t\"owner_id\" text NOT NULL,\n\t\"price_yocto\" numeric(40, 0) NOT NULL,\n\t\"active\" boolean DEFAULT true NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"rental_offers_price_ck\" CHECK (\"rental_offers\".\"price_yocto\" > 0)\n);\n",
+      "\nCREATE TABLE \"rentals\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"offer_id\" text NOT NULL,\n\t\"agent_id\" text NOT NULL,\n\t\"owner_id\" text NOT NULL,\n\t\"renter_id\" text NOT NULL,\n\t\"price_yocto\" numeric(40, 0) NOT NULL,\n\t\"fee_yocto\" numeric(40, 0) NOT NULL,\n\t\"owner_proceeds_yocto\" numeric(40, 0) NOT NULL,\n\t\"tx_hash\" text NOT NULL,\n\t\"match_id\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"used_at\" timestamp with time zone,\n\tCONSTRAINT \"rentals_owner_renter_ck\" CHECK (\"rentals\".\"owner_id\" <> \"rentals\".\"renter_id\")\n);\n",
+      "\nALTER TABLE \"rental_offers\" ADD CONSTRAINT \"rental_offers_agent_id_agents_id_fk\" FOREIGN KEY (\"agent_id\") REFERENCES \"public\".\"agents\"(\"id\") ON DELETE cascade ON UPDATE no action;",
+      "\nALTER TABLE \"rental_offers\" ADD CONSTRAINT \"rental_offers_owner_id_accounts_id_fk\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"rentals\" ADD CONSTRAINT \"rentals_offer_id_rental_offers_id_fk\" FOREIGN KEY (\"offer_id\") REFERENCES \"public\".\"rental_offers\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"rentals\" ADD CONSTRAINT \"rentals_agent_id_agents_id_fk\" FOREIGN KEY (\"agent_id\") REFERENCES \"public\".\"agents\"(\"id\") ON DELETE cascade ON UPDATE no action;",
+      "\nALTER TABLE \"rentals\" ADD CONSTRAINT \"rentals_owner_id_accounts_id_fk\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"rentals\" ADD CONSTRAINT \"rentals_renter_id_accounts_id_fk\" FOREIGN KEY (\"renter_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE UNIQUE INDEX \"rental_offers_agent_active_uq\" ON \"rental_offers\" USING btree (\"agent_id\") WHERE \"rental_offers\".\"active\";",
+      "\nCREATE INDEX \"rental_offers_owner_idx\" ON \"rental_offers\" USING btree (\"owner_id\");",
+      "\nCREATE UNIQUE INDEX \"rentals_tx_uq\" ON \"rentals\" USING btree (\"tx_hash\");",
+      "\nCREATE INDEX \"rentals_renter_idx\" ON \"rentals\" USING btree (\"renter_id\",\"agent_id\");",
+      "\nCREATE INDEX \"rentals_owner_idx\" ON \"rentals\" USING btree (\"owner_id\");"
+    ]
   }
 ];

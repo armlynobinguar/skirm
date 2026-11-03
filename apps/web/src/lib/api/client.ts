@@ -21,6 +21,9 @@ import type {
   Me,
   AgentRecord,
   MyMatch,
+  MyRentalOffer,
+  RentalOffer,
+  RentalPass,
   MintResponse,
   PlayerLadder,
   PurchaseResponse,
@@ -47,12 +50,20 @@ export interface ApiClient {
   me(): Promise<Me>;
   /** DELETE /me/near: unlinks the NEAR account (409 `listing_active` while a listing is open). */
   unlinkNear(): Promise<UnlinkNearResponse>;
-  /** GET /me/earn-back: royalties, net skill sales, season prizes and match spend; rentals are null. */
+  /** GET /me/earn-back: royalties, net skill sales, season prizes, agent rentals and match spend. */
   earnBack(): Promise<EarnBack>;
   /** GET /me/matches: the caller's latest v2 matches, newest first. */
   myMatches(): Promise<MyMatch[]>;
 
   agents(): Promise<Agent[]>;
+  /** GET /rentals: other players' agents offered for rent, cheapest first. */
+  rentalOffers(): Promise<RentalOffer[]>;
+  /** GET /rentals/mine: the caller's offers and unused passes. */
+  myRentals(): Promise<{ offers: MyRentalOffer[]; passes: RentalPass[] }>;
+  /** PUT /agents/:id/rental: offer an agent at a price per match, or stop (null). */
+  setRentalOffer(agentId: string, priceYocto: string | null): Promise<{ offer: MyRentalOffer | null }>;
+  /** POST /rentals/:offerId: records a paid rental (`market.rent` tx, or `dev:<yocto>[:<nonce>]`). */
+  rent(offerId: string, txHash: string): Promise<{ pass: RentalPass }>;
   /** GET /agents/:id/record: the agent's season and all-time record, bluffs included. */
   agentRecord(agentId: string): Promise<AgentRecord>;
   /** PATCH /agents/:id: name, look, skills, unlocks, v2 role/vision/comms/tier and `systemPrompt` (≤ 600). */
@@ -172,6 +183,10 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
 
     agents: () => get('/agents'),
     agentRecord: (id) => get(`/agents/${enc(id)}/record`),
+    rentalOffers: () => get('/rentals'),
+    myRentals: () => get('/rentals/mine'),
+    setRentalOffer: (id, priceYocto) => json('PUT', `/agents/${enc(id)}/rental`, { body: { priceYocto } }),
+    rent: (offerId, txHash) => json('POST', `/rentals/${enc(offerId)}`, { body: { txHash } }),
     patchAgent: (id, patch) => json('PATCH', `/agents/${enc(id)}`, { body: patch }),
 
     skills: (tab = 'written') => get('/skills', { tab }),

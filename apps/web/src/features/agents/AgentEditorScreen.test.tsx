@@ -46,6 +46,38 @@ function setup(
 }
 
 describe('agent editor', () => {
+  it('offers the agent for rent at a price per match, shows the share after the fee, and stops', async () => {
+    let offers: { offerId: string; agentId: string; priceYocto: string; active: boolean }[] = [];
+    const { api, user } = renderWithProviders(<AgentEditorScreen agentId={WICK.id} />, {
+      handle: 'ada',
+      path: `/agents/${WICK.id}`,
+      api: {
+        me: async () => meFixture({ account: { id: 'acc_me', handle: 'ada', nearAccountId: 'ada.testnet' }, agents: [WICK, MOSS, PIKE] }),
+        skills: async () => [],
+        myRentals: async () => ({ offers, passes: [] }),
+        setRentalOffer: async (agentId: string, priceYocto: string | null) => {
+          offers = priceYocto ? [{ offerId: 'rof_1', agentId, priceYocto, active: true }] : [];
+          return { offer: offers[0] ?? null };
+        },
+      },
+    });
+    expect(await screen.findByTestId('agent-rent-state')).toHaveTextContent('Not offered');
+    await user.type(screen.getByTestId('agent-rent-price'), '0.5');
+    expect(screen.getByTestId('agent-rent-note')).toHaveTextContent('You get 0.475 NEAR a match after the 5% platform fee.');
+    await user.click(screen.getByTestId('agent-rent-offer'));
+    expect(api.setRentalOffer).toHaveBeenCalledWith(WICK.id, '500000000000000000000000');
+    expect(await screen.findByText('0.5 NEAR')).toBeInTheDocument();
+    await user.click(screen.getByTestId('agent-rent-stop'));
+    expect(api.setRentalOffer).toHaveBeenLastCalledWith(WICK.id, null);
+    expect(await screen.findByText('Not offered')).toBeInTheDocument();
+  });
+
+  it('asks for a NEAR account before renting an agent out', async () => {
+    setup();
+    expect(await screen.findByTestId('agent-rent-note')).toHaveTextContent('Link a NEAR account');
+    expect(screen.queryByTestId('agent-rent-price')).toBeNull();
+  });
+
   it('shows the season record from the record endpoint, bluffs included', async () => {
     setup(WICK.id, { record: { allTime: { ...COUNTS, matches: 8 }, season: { number: 2, endsAt: '2026-11-10T00:00:00.000Z', ...COUNTS } } });
     expect(await screen.findByTestId('agent-record-span')).toHaveTextContent('Season 2');

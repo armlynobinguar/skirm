@@ -286,6 +286,73 @@ export const sales = pgTable(
   (t) => [uniqueIndex('sales_tx_uq').on(t.txHash), index('sales_skill_idx').on(t.skillId)],
 );
 
+// ---------- Agent rentals ----------
+
+/**
+ * An owner's offer to rent out one agent, a match at a time, at `price_yocto` paid through
+ * `market.rent` (the platform fee comes out of it). One offer per agent; removing it ends the offer
+ * but keeps passes already bought.
+ */
+export const rentalOffers = pgTable(
+  'rental_offers',
+  {
+    /** `rof_` + ULID. */
+    id: text('id').primaryKey(),
+    agentId: text('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => accounts.id),
+    priceYocto: numeric('price_yocto', { precision: 40, scale: 0 }).notNull(),
+    active: boolean('active').notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('rental_offers_agent_active_uq').on(t.agentId).where(sql`${t.active}`),
+    index('rental_offers_owner_idx').on(t.ownerId),
+    check('rental_offers_price_ck', sql`${t.priceYocto} > 0`),
+  ],
+);
+
+/**
+ * A paid rental: the renter may field the agent in one match. `match_id` is set when that match
+ * starts (the pass is then used up). The amounts are the `rental` event's, from the chain.
+ */
+export const rentals = pgTable(
+  'rentals',
+  {
+    /** `rnt_` + ULID. */
+    id: text('id').primaryKey(),
+    offerId: text('offer_id')
+      .notNull()
+      .references(() => rentalOffers.id),
+    agentId: text('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => accounts.id),
+    renterId: text('renter_id')
+      .notNull()
+      .references(() => accounts.id),
+    priceYocto: numeric('price_yocto', { precision: 40, scale: 0 }).notNull(),
+    feeYocto: numeric('fee_yocto', { precision: 40, scale: 0 }).notNull(),
+    ownerProceedsYocto: numeric('owner_proceeds_yocto', { precision: 40, scale: 0 }).notNull(),
+    txHash: text('tx_hash').notNull(),
+    matchId: text('match_id'),
+    createdAt: createdAt(),
+    usedAt: ts('used_at'),
+  },
+  (t) => [
+    uniqueIndex('rentals_tx_uq').on(t.txHash),
+    index('rentals_renter_idx').on(t.renterId, t.agentId),
+    index('rentals_owner_idx').on(t.ownerId),
+    check('rentals_owner_renter_ck', sql`${t.ownerId} <> ${t.renterId}`),
+  ],
+);
+
 // ---------- Credits ledger ----------
 
 export const ledgerAccounts = pgTable('ledger_accounts', {

@@ -183,18 +183,19 @@ export class CoreController {
 
   /**
    * What the player got back over all time: creator royalties, skill sales as the seller (after fee
-   * and royalty), season prizes won and paid credits spent on v2 matches. Rentals do not exist yet,
-   * so they are null (the hub shows them as Soon).
+   * and royalty), season prizes won, agent rentals earned (after the platform fee) and paid credits
+   * spent on v2 matches.
    */
   @Get('me/earn-back')
   async earnBack(@CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
     const { repos } = this.deps;
-    const [royalties, salesNet, spentCredits, prizes] = await Promise.all([
+    const [royalties, salesNet, spentCredits, prizes, rentals] = await Promise.all([
       repos.market.royaltiesByCreator(account.id),
       repos.market.salesNetBySeller(account.id),
       repos.ledger.v2MatchSpend(account.id),
       repos.seasons.prizesFor(account.id),
+      repos.rentals.proceedsFor(account.id),
     ]);
     return {
       royaltiesYocto: sumYocto(royalties.values()).toString(),
@@ -202,7 +203,7 @@ export class CoreController {
       spentCredits,
       creditsPerNear: this.deps.config.CREDITS_PER_NEAR,
       prizesYocto: prizes.toString(),
-      rentalsYocto: null,
+      rentalsYocto: rentals.toString(),
     };
   }
 

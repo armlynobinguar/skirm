@@ -1279,3 +1279,111 @@ fn on_season_funded_is_private() {
     set(buyer(), 0);
     c.on_season_funded(U128(1));
 }
+
+// ---------- agent rentals ----------
+
+fn renter() -> AccountId {
+    acc("kai.testnet")
+}
+
+#[test]
+fn rent_pays_the_owner_the_price_less_the_fee_and_refunds_the_excess() {
+    let mut c = setup();
+    set(renter(), milli(1_200));
+    c.rent("rnt_1:n1".to_string(), creator(), U128(near(1)));
+    let t = transfers();
+    // 5% of 1 NEAR to the treasury (no season pool), 0.95 to the owner, 0.2 back.
+    assert_eq!(t.get(&treasury()), Some(&milli(50)));
+    assert_eq!(t.get(&creator()), Some(&milli(950)));
+    assert_eq!(t.get(&renter()), Some(&milli(200)));
+    let e = event("rental");
+    assert_eq!(e["rental_id"], "rnt_1:n1");
+    assert_eq!(e["owner"], "tyron.testnet");
+    assert_eq!(e["renter"], "kai.testnet");
+    assert_eq!(e["price"], near(1).to_string());
+    assert_eq!(e["fee"], milli(50).to_string());
+    assert_eq!(e["fee_bps"], 500);
+    assert_eq!(e["owner_proceeds"], milli(950).to_string());
+    assert_eq!(e["refund"], milli(200).to_string());
+    assert_eq!(e["season_share"], "0");
+    assert_eq!(e["treasury_share"], milli(50).to_string());
+}
+
+#[test]
+fn rent_parts_sum_to_the_deposit_for_awkward_prices() {
+    for price in [1u128, 19, 10_001, 123_456_789_012_345_678_901] {
+        let mut c = setup();
+        set(renter(), price + 7);
+        c.rent("rnt_x".to_string(), creator(), U128(price));
+        let total: u128 = transfers().values().sum();
+        assert_eq!(total, price + 7, "price {price}");
+    }
+}
+
+#[test]
+fn rent_sends_the_season_share_of_the_fee_to_the_pool() {
+    let mut c = setup_governed(None);
+    set(renter(), near(2));
+    c.rent("rnt_2".to_string(), creator(), U128(near(2)));
+    // Fee 0.1 NEAR: 30% (0.03) to the seasons contract's fund(None), 0.07 to the treasury.
+    let (to, amount, args) = fund_call().expect("fund call");
+    assert_eq!(to, seasons());
+    assert_eq!(amount, milli(30));
+    assert_eq!(args["season_id"], serde_json::Value::Null);
+    let t = transfers();
+    assert_eq!(t.get(&treasury()), Some(&milli(70)));
+    assert_eq!(t.get(&creator()), Some(&milli(1_900)));
+    let e = event("rental");
+    assert_eq!(e["season_share"], milli(30).to_string());
+    assert_eq!(e["treasury_share"], milli(70).to_string());
+}
+
+#[test]
+#[should_panic(expected = "Attach at least the price")]
+fn rent_below_price_rejected() {
+    let mut c = setup();
+    set(renter(), near(1) - 1);
+    c.rent("rnt_3".to_string(), creator(), U128(near(1)));
+}
+
+#[test]
+#[should_panic(expected = "The owner cannot rent their own agent")]
+fn rent_own_agent_rejected() {
+    let mut c = setup();
+    set(creator(), near(1));
+    c.rent("rnt_4".to_string(), creator(), U128(near(1)));
+}
+
+#[test]
+#[should_panic(expected = "Price must be greater than 0")]
+fn rent_zero_price_rejected() {
+    let mut c = setup();
+    set(renter(), 1);
+    c.rent("rnt_5".to_string(), creator(), U128(0));
+}
+
+#[test]
+#[should_panic(expected = "rental_id must be 1 to 96 bytes")]
+fn rent_empty_id_rejected() {
+    let mut c = setup();
+    set(renter(), near(1));
+    c.rent(String::new(), creator(), U128(near(1)));
+}
+
+#[test]
+#[should_panic(expected = "rental_id must be 1 to 96 bytes")]
+fn rent_overlong_id_rejected() {
+    let mut c = setup();
+    set(renter(), near(1));
+    c.rent("x".repeat(MAX_RENTAL_ID_LEN + 1), creator(), U128(near(1)));
+}
+
+#[test]
+fn rent_keeps_no_state_and_leaves_listings_alone() {
+    let mut c = setup();
+    list(&mut c, TOKEN, creator(), 1, near(5));
+    set(renter(), near(1));
+    c.rent("rnt_6".to_string(), creator(), U128(near(1)));
+    assert_eq!(c.get_listings(None, None).len(), 1);
+    assert_eq!(c.get_listing(TOKEN.to_string()).unwrap().price, U128(near(5)));
+}

@@ -212,7 +212,9 @@ Shapes worth knowing (all in `src/lib/api/types.ts`):
 
 More api and realtime shapes:
 - `api.playerLadder(limit?)` (`GET /leaderboards/players` → `{ rows, you? }`, `qk.leaderboards.players`),
-  `api.earnBack()` (`GET /me/earn-back`, `qk.earnBack`; rentals are `null` until they ship),
+  `api.earnBack()` (`GET /me/earn-back`, `qk.earnBack`; `rentalsYocto` is what agent rentals earned),
+  agent rentals (`api.rentalOffers()` / `myRentals()` / `setRentalOffer()` / `rent()`; the agent
+  editor's Rent out tile and the crew screen's RentShelf),
   `api.v2Match(id)` (`GET /v2/matches/:id`, `qk.matches.v2(id)`), `api.v2LiveMatches()`,
   `api.currentSeason()`, `api.seasonStandings(id)`, `api.startTrial(id, body)` / `api.trials(id)`,
   `api.cosmetics()` / `api.buyCosmetic(id)`, `api.patchAgent(id, { systemPrompt })`
