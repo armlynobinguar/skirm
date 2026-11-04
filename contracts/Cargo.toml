@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["skills", "market", "registry", "deposits", "seasons", "integration-tests"]
+members = ["skills", "market", "registry", "deposits", "seasons", "badges", "integration-tests"]
 # `cargo test` at the root runs the contract unit tests only; the sandbox tests are opt-in.
-default-members = ["skills", "market", "registry", "deposits", "seasons"]
+default-members = ["skills", "market", "registry", "deposits", "seasons", "badges"]
 
 [workspace.package]
 version = "0.1.0"
