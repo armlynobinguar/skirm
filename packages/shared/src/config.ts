@@ -84,6 +84,17 @@ const defaults = {
    * v2 seasons: 14 days, standings from ranked v2 matches only, top 10 paid 30/20/15 then 5 × 7
    * (bps, the seasons contract's SPLIT_BPS). The pool is funded NEAR plus this share of market fees.
    */
+  /**
+   * Live commands: directives a player sends one agent or the whole crew during a match (presets
+   * plus optional free text). `perMatch` per crew; at most one every `cooldownTicks`; each holds in
+   * the agents' prompts for `activeTicks`; free text up to `maxChars` (it passes the speech filter).
+   */
+  commands: {
+    perMatch: 3,
+    cooldownTicks: 5,
+    activeTicks: 10,
+    maxChars: 80,
+  },
   season: {
     days: 14,
     splitBps: [3000, 2000, 1500, 500, 500, 500, 500, 500, 500, 500],

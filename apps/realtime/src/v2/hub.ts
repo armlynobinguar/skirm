@@ -34,7 +34,7 @@ import type { WsServerMessage } from '../protocol';
 import type { PubSub, Unsubscribe } from '../pubsub';
 import type { QueueTiming, Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
-import { TEAMS, V2Match, crewLimitOf, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Roster, type V2Setup, type V2Side, type V2Timing } from './match';
+import { TEAMS, V2Match, crewLimitOf, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Roster, type V2Setup, type V2Side, type V2Timing } from './match';
 import type { V2FrameStore } from './replay';
 
 export interface V2Search {
@@ -88,7 +88,16 @@ export interface V2HubDeps {
 
 export class V2HubError extends Error {
   constructor(
-    readonly code: 'invalid_crew' | 'agent_busy' | 'already_queued' | 'in_match' | 'not_queued' | 'not_found' | 'unavailable' | 'not_in_lockin',
+    readonly code:
+      | 'invalid_crew'
+      | 'agent_busy'
+      | 'already_queued'
+      | 'in_match'
+      | 'not_queued'
+      | 'not_found'
+      | 'unavailable'
+      | 'not_in_lockin'
+      | V2CommandError,
     message: string,
   ) {
     super(message);
@@ -229,6 +238,18 @@ export class V2Hub {
     const roster = await this.roster(accountId, crew);
     if (!match.lockIn(team, tiers, roster)) throw missed();
     this.deps.log.info(`v2 match ${matchId} ${team}: crew changed at lock-in (${roster.crew.length} agents)`);
+  }
+
+  /**
+   * A live command to the player's own crew in a match on this instance (V2Match.command): applied
+   * on the next tick, seen by that crew only. Throws the reason it was refused.
+   */
+  command(accountId: string, matchId: string, input: V2CommandInput): { tick: number; left: number } {
+    const { match, team } = this.mine(accountId, matchId);
+    const r = match.command(team, input);
+    if (!r.ok) throw new V2HubError(r.code, r.message);
+    this.deps.log.info(`v2 match ${matchId} ${team}: command ${input.preset ?? 'text'}${input.agentId ? ` to ${input.agentId}` : ' to the crew'} (${r.left} left)`);
+    return { tick: r.tick, left: r.left };
   }
 
   /**

@@ -166,7 +166,7 @@ export function slotsOf(agent: FrameAgent | null, slots: number, known: boolean,
 export type FeedFilter = 'all' | 'team' | 'say' | 'heard' | 'mind';
 
 /** The tag a feed line wears. */
-export type FeedTag = 'team' | 'rteam' | 'say' | 'heard' | 'verb' | 'arena' | 'mind';
+export type FeedTag = 'team' | 'rteam' | 'say' | 'heard' | 'verb' | 'arena' | 'mind' | 'order';
 
 export function feedTag(line: V2CommsLine, team: Team): FeedTag {
   if (line.channel === 'team') return line.overheard ? 'heard' : line.team === team ? 'team' : 'rteam';
@@ -179,7 +179,7 @@ export function inFilter(line: V2CommsLine, team: Team, filter: FeedFilter): boo
     case 'all':
       return tag !== 'mind';
     case 'team':
-      return tag === 'team' || tag === 'rteam';
+      return tag === 'team' || tag === 'rteam' || tag === 'order';
     case 'say':
       return tag === 'say' || tag === 'verb' || tag === 'arena';
     case 'heard':
@@ -212,6 +212,7 @@ export function subtitlesFor(lines: V2CommsLine[], agent: FrameAgent, team: Team
   const dur = (text: string) => Math.min(6.5, Math.max(2.4, 1.5 + text.length * 0.05));
   const push = (s: Omit<Sub, 'dur'>) => out.push({ ...s, dur: dur(s.text) });
   for (const l of lines) {
+    if (l.channel === 'order') continue; // your own commands stay in the feed, not the subtitles
     if (l.channel === 'arena') push({ kind: 'arena', who: 'Arena', team: null, text: l.text });
     else if (l.channel === 'mind') {
       if (l.from === agent.id && !rival) push({ kind: 'think', who: l.fromName, team: l.team, text: l.text });

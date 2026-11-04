@@ -64,8 +64,11 @@ export function viewText(o: Observation): string {
   return lines.join('\n');
 }
 
-/** `recent`: the agent's last few actions with where it stood, oldest first (so it does not walk in circles). */
-export function turnPrompt(o: Observation, plan: string | null, canSpeak: boolean, recent: string[] = []): string {
+/**
+ * `recent`: the agent's last few actions with where it stood, oldest first (so it does not walk in
+ * circles). `command`: a live order from its player, put after the plan so it wins over it.
+ */
+export function turnPrompt(o: Observation, plan: string | null, canSpeak: boolean, recent: string[] = [], command: { order: string; ticksLeft: number } | null = null): string {
   const legal = o.legal.map((a, i) => `${i + 1}. ${actionText(a)}${routeHint(o, a)}`).join('\n');
   const here = distancesFrom(o, o.me.x, o.me.y);
   const where = [here.item !== null ? `nearest item ${here.item} steps` : 'no item seen yet', here.deliver !== null ? `delivery point ${here.deliver} steps` : null]
@@ -74,8 +77,9 @@ export function turnPrompt(o: Observation, plan: string | null, canSpeak: boolea
   return [
     viewText(o),
     plan ? `Crew plan: ${plan}` : '',
+    command ? `Order from your player (follow it over the crew plan, within the rules, for ${command.ticksLeft} more ${command.ticksLeft === 1 ? 'tick' : 'ticks'}): ${command.order}` : '',
     recent.length ? `Your last moves: ${recent.join('; ')}.` : '',
-    `From where you stand: ${where}. Each move lists the steps from the tile it leads to; lower is closer. Unless your plan or skills say otherwise, take the move with the lowest item number, or the lowest deliver number when you carry all you can or enough to win; with no item known, the lowest unseen number to explore. Do not undo your last move or wait on the delivery point.`,
+    `From where you stand: ${where}. Each move lists the steps from the tile it leads to; lower is closer. Unless your order, plan or skills say otherwise, take the move with the lowest item number, or the lowest deliver number when you carry all you can or enough to win; with no item known, the lowest unseen number to explore. Do not undo your last move or wait on the delivery point.`,
     `Legal actions:\n${legal}`,
     canSpeak
       ? `Answer at once, no explanation. First line "ACTION: <number>"; then, if you want to talk, one line "SAY: team <message>" or "SAY: say <message>" (at most ${MAX_MESSAGE_CHARS} characters); then one line "THINK: <your inner voice, first person, at most ${MAX_THOUGHT_CHARS} characters>" (private to your crew).`
