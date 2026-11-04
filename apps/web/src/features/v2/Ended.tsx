@@ -1,8 +1,8 @@
 'use client';
 // v2 match, ended: the debrief (the prototype's s-result). Left: map line, verdict, score, the goal
 // and star checks, Queue again. Right: the match report: Elo change and MVP, the difficulty goal,
-// talk, verbs, credits held / used / returned, the registry write and the match log hash. Bluff
-// stats and season points are designed but not live, so they show "Soon", never a number. Under
+// talk, verbs, credits held / used / returned, draft bans (draft mode), the registry write and the
+// match log hash. Bluff stats and season points are designed but not live, so they show "Soon", never a number. Under
 // both, the Comms transcript: every line said that this tab saw delivered. A spectator gets the
 // result by crew ("ada wins"), no stars and no report of their own; practice carries its badge and
 // queues practice again.
@@ -23,6 +23,7 @@ import { config } from '@/lib/config';
 import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
 import { PracticeBadge, other } from './common';
+import { BanList } from './Draft';
 import { debriefOf, mvpOf, type DebriefData } from './hud/debrief';
 import { clock, feedTag } from './hud/model';
 import v from './v2.module.css';
@@ -132,7 +133,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
       <div className={v.verdict}>
         <span className="sk-kick">
           <b>{def?.code ?? data.mapId}</b> · {def?.name ?? look?.name ?? data.mapId} · <span style={{ color: D.colour }}>{D.name}</span> ·{' '}
-          {data.ranked ? 'ranked' : data.practice ? 'practice' : 'casual'} · {clock((r.ticks * TICK_MS) / 1000)} played
+          {data.ranked ? 'ranked' : data.practice ? 'practice' : d?.draft ? 'draft' : 'casual'} · {clock((r.ticks * TICK_MS) / 1000)} played
           {watch ? ' · watched' : ''}
         </span>
         {data.practice ? <PracticeBadge free={data.free} /> : null}
@@ -272,6 +273,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
                       : 'Not written to the registry'}
           </span>
         </div>
+        {d?.draft ? <BanList bans={d.draft.bans} team={me} watch={watch} /> : null}
         {data.logHash ? (
           <div className={v.verify}>
             <span>

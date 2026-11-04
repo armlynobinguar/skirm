@@ -204,6 +204,7 @@ export class RealtimeHub {
         const opts = {
           ...(msg.mapId !== undefined ? { mapId: msg.mapId } : {}),
           ...(msg.difficulty !== undefined ? { difficulty: msg.difficulty } : {}),
+          ...(msg.draft ? { draft: true } : {}),
         };
         // The parser already refused a ranked practice (practice_unranked).
         if (msg.opponent === 'bot') return this.v2.practice(this.requireUser(c), msg.crew, opts);
@@ -215,6 +216,8 @@ export class RealtimeHub {
         return this.v2.accept(this.requireUser(c).accountId, msg.matchId);
       case 'v2_decline':
         return this.v2.decline(this.requireUser(c).accountId, msg.matchId);
+      case 'v2_ban':
+        return this.v2.ban(this.requireUser(c).accountId, msg.matchId, msg.skillId);
       case 'v2_lock_in':
         return this.v2.lockIn(this.requireUser(c).accountId, msg.matchId, msg.tiers, msg.crew);
       case 'v2_command': {

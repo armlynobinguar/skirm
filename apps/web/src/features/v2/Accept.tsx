@@ -16,7 +16,7 @@ export function Accept({ view }: { view: V2MatchView }) {
     <div className={v.vs} role="dialog" aria-modal="true" aria-labelledby="v2-found" data-testid="v2-found">
       <p className={v.found}>
         <span id="v2-found" className="sk-kick">
-          Match found · {view.ranked ? 'Ranked' : view.practice ? 'Practice' : 'Casual'} · {map?.name ?? view.mapId}
+          Match found · {view.ranked ? 'Ranked' : view.practice ? 'Practice' : view.draft ? 'Draft' : 'Casual'} · {map?.name ?? view.mapId}
         </span>
         {view.practice ? (
           <>
