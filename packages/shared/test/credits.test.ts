@@ -34,6 +34,7 @@ describe('config', () => {
       'credits',
       'crew',
       'elo',
+      'external',
       'free',
       'market',
       'model',
