@@ -126,6 +126,18 @@ const defaults = {
     bansPerSide: 1,
     stepMs: 15_000,
   },
+  /**
+   * Crew playbooks: one crew-level strategy per player (who does what, when to regroup, goal or deny),
+   * picked at lock-in. Text up to `maxChars` (sealed in the vault like skill prompts), names up to
+   * `nameMaxChars`, at most `maxSaved` per player. The planner reads it whole; each actor gets one line
+   * of at most `actorLineChars`.
+   */
+  playbooks: {
+    maxChars: 800,
+    nameMaxChars: 32,
+    maxSaved: 5,
+    actorLineChars: 160,
+  },
   season: {
     days: 14,
     splitBps: [3000, 2000, 1500, 500, 500, 500, 500, 500, 500, 500],

@@ -207,7 +207,7 @@ export function parseClientMessage(raw: unknown): ParseResult {
       return { ok: true, msg: { type: 'v2_ban', matchId: v.matchId, skillId: v.skillId } };
     }
     case 'v2_lock_in': {
-      if (extraKeys(v, ['type', 'matchId', 'tiers', 'crew'])) return bad('v2_lock_in takes {matchId, tiers, crew?}');
+      if (extraKeys(v, ['type', 'matchId', 'tiers', 'crew', 'playbookId'])) return bad('v2_lock_in takes {matchId, tiers, crew?, playbookId?}');
       if (typeof v.matchId !== 'string' || !ID_RE.test(v.matchId)) return bad('v2_lock_in.matchId must be an id');
       if (!Array.isArray(v.tiers) || v.tiers.length > 3 || !v.tiers.every((t) => TIERS.includes(t as never)))
         return bad('v2_lock_in.tiers must list at most 3 talk tiers');
@@ -216,6 +216,10 @@ export function parseClientMessage(raw: unknown): ParseResult {
         const crew = parseV2Crew(v.crew);
         if (typeof crew === 'string') return bad(`v2_lock_in.${crew}`);
         msg.crew = crew;
+      }
+      if (v.playbookId !== undefined) {
+        if (v.playbookId !== null && (typeof v.playbookId !== 'string' || !ID_RE.test(v.playbookId))) return bad('v2_lock_in.playbookId must be a playbook id, or null for none');
+        msg.playbookId = v.playbookId;
       }
       return { ok: true, msg };
     }

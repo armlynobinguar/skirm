@@ -10,6 +10,7 @@ import { MatchMessagesRepo } from './match-messages';
 import { MatchTimelinesRepo } from './match-timelines';
 import { OnboardingRepo } from './onboarding';
 import { OpsRepo } from './ops';
+import { PlaybooksRepo } from './playbooks';
 import { ProofRepo } from './proof';
 import { RankedRepo } from './ranked';
 import { RentalsRepo } from './rentals';
@@ -53,6 +54,8 @@ export interface Repos {
   replays: ReplaysRepo;
   /** Tutorial progress and the home checklist. */
   onboarding: OnboardingRepo;
+  /** Crew playbooks (sealed; owner-only). */
+  playbooks: PlaybooksRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -85,6 +88,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     tournaments: new TournamentsRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
     replays: new ReplaysRepo(db),
     onboarding: new OnboardingRepo(db),
+    playbooks: new PlaybooksRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -100,6 +104,7 @@ export * from './match-messages';
 export * from './match-timelines';
 export * from './onboarding';
 export * from './ops';
+export * from './playbooks';
 export * from './proof';
 export * from './ranked';
 export * from './rentals';

@@ -44,7 +44,7 @@ import type { WsServerMessage } from '../protocol';
 import type { PubSub, Unsubscribe } from '../pubsub';
 import type { QueueTiming, Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
-import { TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
+import { TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Playbook, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
 import type { V2FrameStore } from './replay';
 
 export interface V2Search {
@@ -93,7 +93,8 @@ export function v2PoolsMatch(a: string | undefined, b: string | undefined): bool
 
 export interface V2HubDeps {
   repos: Repos;
-  vault: Pick<Vault, 'decryptSkill'>;
+  /** decryptPlaybook opens crew playbooks (without it, crews play with none). */
+  vault: Pick<Vault, 'decryptSkill'> & Partial<Pick<Vault, 'decryptPlaybook'>>;
   /** The players' brain (practice: the bot always plays greedy). */
   brain: V2Brain;
   scheduler: Scheduler;
@@ -344,10 +345,13 @@ export class V2Hub {
    * Locks a crew in. `crew` swaps, removes or adds agents (up to the map's crew limit) and its tiers
    * win over `tiers`; the new roster is loaded (skills decrypted) before the lock lands.
    */
-  async lockIn(accountId: string, matchId: string, tiers: V2CrewEntry['tier'][], crew?: V2CrewEntry[]): Promise<void> {
+  async lockIn(accountId: string, matchId: string, tiers: V2CrewEntry['tier'][], crew?: V2CrewEntry[], playbookId?: string | null): Promise<void> {
     const { match, team } = this.mine(accountId, matchId);
+    // The crew playbook for this match: absent keeps the one selected when the match was made, null plays none.
+    const playbook = playbookId === undefined ? undefined : playbookId === null ? null : await this.playbook(accountId, playbookId);
+    if (playbook === undefined && playbookId) throw new V2HubError('not_found', 'playbook not found');
     if (!crew) {
-      match.lockIn(team, tiers);
+      match.lockIn(team, tiers, undefined, playbook);
       return;
     }
     // A crew change that misses the lock says so: the client must not show a crew that won't play.
@@ -356,7 +360,7 @@ export class V2Hub {
     if (crew.length < 1 || crew.length > match.crewLimit) throw new V2HubError('invalid_crew', `this map takes 1 to ${match.crewLimit} agents`);
     await this.ownCrew(accountId, crew, matchId);
     const roster = await this.roster(accountId, crew);
-    if (!match.lockIn(team, tiers, roster)) throw missed();
+    if (!match.lockIn(team, tiers, roster, playbook)) throw missed();
     this.deps.log.info(`v2 match ${matchId} ${team}: crew changed at lock-in (${roster.crew.length} agents)`);
   }
 
@@ -488,7 +492,27 @@ export class V2Hub {
   }
 
   private async side(s: Pick<V2Search, 'accountId' | 'handle' | 'crew' | 'rank'>): Promise<V2Side> {
-    return { accountId: s.accountId, handle: s.handle, ...(s.rank ? { rank: s.rank } : {}), ...(await this.roster(s.accountId, s.crew)) };
+    const selected = await this.deps.repos.playbooks.selected(s.accountId);
+    // A playbook that cannot be opened never holds up a match: the crew plays without one.
+    const playbook = selected
+      ? await this.playbook(s.accountId, selected.id).catch((err: unknown) => {
+          this.deps.log.warn(`v2: ${s.accountId} plays without playbook ${selected.id}: ${(err as Error).message}`);
+          return undefined;
+        })
+      : undefined;
+    return { accountId: s.accountId, handle: s.handle, ...(s.rank ? { rank: s.rank } : {}), ...(await this.roster(s.accountId, s.crew)), ...(playbook ? { playbook } : {}) };
+  }
+
+  /**
+   * One of the player's own crew playbooks, decrypted for the planner (undefined when it is not theirs,
+   * or this hub cannot open playbooks). Only the match runner reads the text; frames carry the name alone.
+   */
+  private async playbook(accountId: string, id: string): Promise<V2Playbook | undefined> {
+    const { repos, vault } = this.deps;
+    if (!vault.decryptPlaybook) return undefined;
+    const [view, sealed] = await Promise.all([repos.playbooks.get(accountId, id), repos.playbooks.loadSealed(accountId, id)]);
+    if (!view || !sealed) return undefined;
+    return { id: view.id, name: view.name, text: await vault.decryptPlaybook(sealed) };
   }
 
   /**

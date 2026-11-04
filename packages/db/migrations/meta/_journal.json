@@ -64,6 +64,13 @@
       "when": 1793782742570,
       "tag": "0008_lobbies_tournaments",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793786248683,
+      "tag": "0009_crew_playbooks",
+      "breakpoints": true
     }
   ]
 }
