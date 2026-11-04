@@ -51,6 +51,8 @@ describe('migrations', () => {
         'cosmetics_owned',
         'onboarding_progress',
         'elo_decays',
+        'campaign_progress',
+        'campaign_rewards',
       ]),
     );
     const applied = await db.execute(
@@ -60,8 +62,9 @@ describe('migrations', () => {
     // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_onboarding, 0004_ranked_tiers,
     // 0005_match_timelines, 0006_skill_triggers, 0007_replay_shares, 0008_lobbies_tournaments,
     // 0009_external_agents, 0010_skill_roles,
-    // 0011_crew_playbooks, 0012_skill_bench, 0013_quests_achievements, 0014_daily_challenge.
-    expect(embeddedMigrations()).toHaveLength(15);
+    // 0011_crew_playbooks, 0012_skill_bench, 0013_quests_achievements,
+    // 0014_campaign, 0015_daily_challenge.
+    expect(embeddedMigrations()).toHaveLength(16);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {

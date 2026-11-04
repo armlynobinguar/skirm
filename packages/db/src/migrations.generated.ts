@@ -281,8 +281,20 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     ]
   },
   {
-    "tag": "0014_daily_challenge",
-    "folderMillis": 1793809921369,
+    "tag": "0014_campaign",
+    "folderMillis": 1793810479717,
+    "bps": true,
+    "hash": "5ff960c6e8fdc2f62c0d5c2858183bca788cc76dc70e8a85ef5af80e3a93d462",
+    "sql": [
+      "CREATE TABLE \"campaign_progress\" (\n\t\"account_id\" text NOT NULL,\n\t\"mission_id\" text NOT NULL,\n\t\"attempts\" integer DEFAULT 0 NOT NULL,\n\t\"cleared_at\" timestamp with time zone,\n\t\"best_ticks\" integer,\n\t\"last_match_id\" text,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"campaign_progress_account_id_mission_id_pk\" PRIMARY KEY(\"account_id\",\"mission_id\")\n);\n",
+      "\nCREATE TABLE \"campaign_rewards\" (\n\t\"account_id\" text NOT NULL,\n\t\"chapter_id\" text NOT NULL,\n\t\"skill_id\" text NOT NULL,\n\t\"cosmetic_id\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"campaign_rewards_account_id_chapter_id_pk\" PRIMARY KEY(\"account_id\",\"chapter_id\")\n);\n",
+      "\nALTER TABLE \"campaign_progress\" ADD CONSTRAINT \"campaign_progress_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"campaign_rewards\" ADD CONSTRAINT \"campaign_rewards_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;"
+    ]
+  },
+  {
+    "tag": "0015_daily_challenge",
+    "folderMillis": 1793811501948,
     "bps": true,
     "hash": "f201b96b0ee14f39984cc8f4fc46cf66be2b9970e07a450293993b552d805454",
     "sql": [

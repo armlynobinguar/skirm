@@ -88,7 +88,8 @@ export type V2ClientMessage =
    * them. `opponent: 'bot'` is practice against the greedy bot: casual only, no matchmaking, it
    * starts at once (the server picks DEFAULT_PRACTICE when no board is given).
    */
-  | { type: 'v2_queue'; crew: V2CrewEntry[]; ranked: boolean; mapId?: string; difficulty?: Difficulty; opponent?: V2Opponent; draft?: boolean }
+  /** `mission`: a campaign mission (with `opponent: 'bot'`); its map and difficulty win. */
+  | { type: 'v2_queue'; crew: V2CrewEntry[]; ranked: boolean; mapId?: string; difficulty?: Difficulty; opponent?: V2Opponent; draft?: boolean; mission?: string }
   | { type: 'v2_cancel_queue' }
   | { type: 'v2_watch'; matchId: string }
   | { type: 'v2_unwatch'; matchId: string }
