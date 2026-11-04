@@ -85,8 +85,8 @@ describe('ladder, rank title and v2 match record', () => {
     const res = await ana.get('/leaderboards/players');
     expect(res.status).toBe(200);
     expect(res.body.rows).toEqual([
-      { rank: 1, account: { id: ana.accountId, handle: 'v2ana' }, elo: 1216, title: 'Breach Runner II', rankedMatches: 1, wins: 1, losses: 0, draws: 0 },
-      { rank: 2, account: { id: ben.accountId, handle: 'v2ben' }, elo: 1184, title: 'Breach Runner I', rankedMatches: 1, wins: 0, losses: 1, draws: 0 },
+      { rank: 1, account: { id: ana.accountId, handle: 'v2ana' }, elo: 1224, title: 'Breach Runner II', rankedMatches: 1, wins: 1, losses: 0, draws: 0, tier: { tier: null, placementsPlayed: 1, placementMatches: 5, nextAt: null } },
+      { rank: 2, account: { id: ben.accountId, handle: 'v2ben' }, elo: 1176, title: 'Breach Runner I', rankedMatches: 1, wins: 0, losses: 1, draws: 0, tier: { tier: null, placementsPlayed: 1, placementMatches: 5, nextAt: null } },
     ]);
     expect(res.body.you).toMatchObject({ rank: 1, title: 'Breach Runner II' });
     // Public; an unranked caller has no `you`.
@@ -99,8 +99,8 @@ describe('ladder, rank title and v2 match record', () => {
   });
 
   it('GET /me has the rank title and ladder position', async () => {
-    expect((await ana.get('/me')).body.rank).toMatchObject({ elo: 1216, wins: 1, title: 'Breach Runner II', position: 1 });
-    expect((await ben.get('/me')).body.rank).toMatchObject({ elo: 1184, title: 'Breach Runner I', position: 2 });
+    expect((await ana.get('/me')).body.rank).toMatchObject({ elo: 1224, wins: 1, title: 'Breach Runner II', position: 1 });
+    expect((await ben.get('/me')).body.rank).toMatchObject({ elo: 1176, title: 'Breach Runner I', position: 2 });
     expect((await cat.get('/me')).body.rank).toMatchObject({ elo: 1200, title: 'Breach Runner II', position: null });
   });
 
@@ -123,8 +123,8 @@ describe('ladder, rank title and v2 match record', () => {
       score: { A: 4, B: 2 },
       ticks: 96,
       elo: [
-        { accountId: ana.accountId, team: 'A', before: 1200, delta: 16, after: 1216 },
-        { accountId: ben.accountId, team: 'B', before: 1200, delta: -16, after: 1184 },
+        { accountId: ana.accountId, team: 'A', before: 1200, delta: 24, after: 1224 },
+        { accountId: ben.accountId, team: 'B', before: 1200, delta: -24, after: 1176 },
       ],
       stats: { A: { illegal: 1, charged: 120 }, B: { timeouts: 1 } },
       logHash: 'ab'.repeat(32),
@@ -138,12 +138,12 @@ describe('ladder, rank title and v2 match record', () => {
 
     const mine = await ben.get(`/v2/matches/${matchId}`);
     expect(mine.body.you).toBe('B');
-    expect(mine.body.debrief).toMatchObject({ mvp: 'agt_2', eloDelta: -16, registry: 'pending', talk: { sent: 4, overheard: 2 } });
+    expect(mine.body.debrief).toMatchObject({ mvp: 'agt_2', eloDelta: -24, registry: 'pending', talk: { sent: 4, overheard: 2 } });
 
     await h.repos.v2Matches.setRegistry(matchId, 'recorded', 'tx9');
     const written = await ana.get(`/v2/matches/${matchId}`);
     expect(written.body.registry).toEqual({ status: 'recorded', txHash: 'tx9' });
-    expect(written.body.debrief).toMatchObject({ mvp: 'agt_1', eloDelta: 16, registry: 'written' });
+    expect(written.body.debrief).toMatchObject({ mvp: 'agt_1', eloDelta: 24, registry: 'written' });
 
     expect((await h.http().get('/v2/matches/mat_01JB7Z3K9QX4M2T8V6N5R1C0DF')).status).toBe(404);
     expect((await h.http().get('/v2/matches/nope')).status).toBe(404);

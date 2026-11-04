@@ -1,7 +1,7 @@
-// v2 matches and per-player Elo (Formulas §7: start 1200, K 32 for the first 20 ranked matches then
-// 16, floor 100). Elo moves only for ranked matches that end with a result, in the same transaction
-// that closes the match; that transaction also adds the season standings and the skill versions'
-// ranked records.
+// v2 matches and per-player Elo (Formulas §7: start 1200, K 48 for the 5 placement matches, 32 up
+// to the 20th ranked match, then 16, floor 100). Elo moves only for ranked matches that end with a
+// result, in the same transaction that closes the match; that transaction also adds the season
+// standings and the skill versions' ranked records, and stamps each player's last ranked result.
 import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
 import { seasonPoints, updateMatch, type EloResult } from '@skirm/shared';
 import type { Executor } from '../client';
@@ -212,6 +212,7 @@ export class V2MatchesRepo {
               wins: r.wins + (won ? 1 : 0),
               losses: r.losses + (!won && !draw ? 1 : 0),
               draws: r.draws + (draw ? 1 : 0),
+              lastRankedAt: new Date(this.clock()),
             })
             .where(eq(accounts.id, r.id));
         }

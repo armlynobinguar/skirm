@@ -1,0 +1,13 @@
+/* Live commands panel (Commands.tsx): centred just above the bottom bar (.mbot, its containing block). */
+.bar { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); width: min(520px, 100%); display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.hd { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.left { display: inline-flex; align-items: center; gap: 4px; }
+.left i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--line-strong); }
+.left i[data-on] { background: var(--you); border-color: var(--you); }
+.status { margin-left: 6px; font-size: 12px; opacity: .8; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.row :global(.sk-btn) { min-height: 32px; }
+.target, .text { min-height: 32px; padding: 0 8px; font: inherit; color: inherit; background: transparent; border: 1px solid var(--line-strong); border-radius: 4px; }
+.text { flex: 1; min-width: 0; }
+.target:disabled, .text:disabled { opacity: .5; }
+

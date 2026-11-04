@@ -26,8 +26,50 @@
     {
       "idx": 3,
       "version": "7",
-      "when": 1793764237267,
-      "tag": "0003_quests_achievements",
+      "when": 1793764247015,
+      "tag": "0003_onboarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793771758405,
+      "tag": "0004_ranked_tiers",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793773723595,
+      "tag": "0005_match_timelines",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793776907145,
+      "tag": "0006_skill_triggers",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793782667055,
+      "tag": "0007_replay_shares",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793782742570,
+      "tag": "0008_lobbies_tournaments",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793786199138,
+      "tag": "0009_quests_achievements",
       "breakpoints": true
     }
   ]

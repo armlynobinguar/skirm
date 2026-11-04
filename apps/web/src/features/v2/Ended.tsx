@@ -1,11 +1,11 @@
 'use client';
 // v2 match, ended: the debrief (the prototype's s-result). Left: map line, verdict, score, the goal
 // and star checks, Queue again. Right: the match report: Elo change and MVP, the difficulty goal,
-// talk, verbs, credits held / used / returned, the registry write and the match log hash. Bluff
-// stats and season points are designed but not live, so they show "Soon", never a number. Under
+// talk, verbs, credits held / used / returned, draft bans (draft mode), the registry write and the
+// match log hash. Bluff stats and season points are designed but not live, so they show "Soon", never a number. Under
 // both, the Comms transcript: every line said that this tab saw delivered. A spectator gets the
 // result by crew ("ada wins"), no stars and no report of their own; practice carries its badge and
-// queues practice again.
+// queues practice again. Last, a player's decision timeline (Decisions: "why did it do that?").
 //   Ended          → on the match screen (a void match, or after the banner when the route did not move).
 //   V2ResultScreen → /matches/[id]/result: this tab's v2 store, else GET /v2/matches/:id.
 import { DIFF_MODS, TICK_MS, mapV2 } from '@skirm/engine/v2';
@@ -22,7 +22,10 @@ import { qk } from '@/lib/api/queries';
 import { config } from '@/lib/config';
 import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
+import { ReplayPanel } from '../replays/ReplayPanel';
 import { PracticeBadge, other } from './common';
+import { BanList } from './Draft';
+import { Decisions } from './Decisions';
 import { debriefOf, mvpOf, type DebriefData } from './hud/debrief';
 import { clock, feedTag } from './hud/model';
 import v from './v2.module.css';
@@ -132,7 +135,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
       <div className={v.verdict}>
         <span className="sk-kick">
           <b>{def?.code ?? data.mapId}</b> · {def?.name ?? look?.name ?? data.mapId} · <span style={{ color: D.colour }}>{D.name}</span> ·{' '}
-          {data.ranked ? 'ranked' : data.practice ? 'practice' : 'casual'} · {clock((r.ticks * TICK_MS) / 1000)} played
+          {data.ranked ? 'ranked' : data.practice ? 'practice' : d?.draft ? 'draft' : 'casual'} · {clock((r.ticks * TICK_MS) / 1000)} played
           {watch ? ' · watched' : ''}
         </span>
         {data.practice ? <PracticeBadge free={data.free} /> : null}
@@ -272,6 +275,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
                       : 'Not written to the registry'}
           </span>
         </div>
+        {d?.draft ? <BanList bans={d.draft.bans} team={me} watch={watch} /> : null}
         {data.logHash ? (
           <div className={v.verify}>
             <span>
@@ -280,12 +284,14 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
           </div>
         ) : null}
       </section>
+      {data.status === 'ended' ? <ReplayPanel matchId={data.matchId} ticks={r.ticks} canShare={!watch} /> : null}
       {data.comms ? <Transcript lines={data.comms} team={me} watch={watch} /> : null}
+      {!watch && data.status === 'ended' ? <Decisions matchId={data.matchId} /> : null}
     </div>
   );
 }
 
-const CHANNEL: Record<string, string> = { team: 'Team', rteam: 'Team', say: 'Say', heard: 'Overheard' };
+const CHANNEL: Record<string, string> = { team: 'Team', rteam: 'Team', say: 'Say', heard: 'Overheard', order: 'Order' };
 
 /** Every line said in the match as this tab saw it delivered, oldest first. */
 function Transcript({ lines, team, watch }: { lines: V2CommsLine[]; team: DebriefData['team']; watch: boolean }) {
@@ -303,7 +309,7 @@ function Transcript({ lines, team, watch }: { lines: V2CommsLine[]; team: Debrie
                 <span className={v.tk}>{clock((l.tick * TICK_MS) / 1000)}</span>
                 <b>{l.fromName}</b>
                 <span className={v.ch}>{CHANNEL[tag] ?? tag}</span>
-                <span className={v.tx}>{l.text}</span>
+                <span className={v.tx}>{l.orderTo ? `${l.text} → ${l.orderTo}` : l.text}</span>
                 {l.overheardBy?.length ? <span className={v.heard}>overheard by {l.overheardBy.join(', ')}</span> : null}
               </li>
             );

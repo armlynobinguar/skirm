@@ -8,11 +8,16 @@ import { SessionGuard } from './auth';
 import { CoreController } from './controllers/core.controller';
 import { CosmeticsController } from './controllers/cosmetics.controller';
 import { CreditsController } from './controllers/credits.controller';
+import { DecisionsController } from './controllers/decisions.controller';
 import { MarketController } from './controllers/market.controller';
+import { LobbiesController } from './controllers/lobbies.controller';
+import { OnboardingController } from './controllers/onboarding.controller';
 import { RentalsController } from './controllers/rentals.controller';
 import { OpsController } from './controllers/ops.controller';
 import { PublicController } from './controllers/public.controller';
 import { QuestsController } from './controllers/quests.controller';
+import { ReplaysController } from './controllers/replays.controller';
+import { RankedController } from './controllers/ranked.controller';
 import { SeasonsController } from './controllers/seasons.controller';
 import { SkillsController } from './controllers/skills.controller';
 import { DEPS, type ApiDeps } from './deps';
@@ -27,14 +32,19 @@ export class AppModule {
       controllers: [
         CoreController,
         PublicController,
+        RankedController,
         CreditsController,
         SkillsController,
         MarketController,
         RentalsController,
+        LobbiesController,
         SeasonsController,
         CosmeticsController,
         QuestsController,
         OpsController,
+        ReplaysController,
+        DecisionsController,
+        OnboardingController,
       ],
       providers: [
         { provide: DEPS, useValue: deps },

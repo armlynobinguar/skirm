@@ -14,13 +14,13 @@ import {
 } from '@nestjs/common';
 import type { AccountRow } from '@skirm/db';
 import { verifyCredentials } from '@skirm/server';
-import { premiumItemsIn, rankTitle } from '@skirm/shared';
+import { DEFAULTS, playerTier, premiumItemsIn, rankTitle } from '@skirm/shared';
 import { z } from 'zod';
 import { CurrentAccount, Public, mustAccount } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
 import { ApiError } from '../errors';
 import { agentId, agentPatch, intQuery, parse, sessionBody } from '../validation';
-import { linkMessage, verifyNearSignature } from '../near-link';
+import { linkMessage, linkSignInMessage, verifyNearSignature } from '../near-link';
 import { accountView, myMatchView } from '../views';
 import { idOr404 } from './util';
 
@@ -107,14 +107,12 @@ export class CoreController {
             ...(proof.callbackUrl !== undefined ? { callbackUrl: proof.callbackUrl } : {}),
           }
         : undefined;
-    if (
-      !verifyNearSignature(
-        proof.publicKey,
-        linkMessage(accountId, nearAccountId),
-        proof.signature,
-        nep413,
-      )
-    )
+    // Either message: with the NEAR account id (sign after connect) or without it (signed during
+    // sign-in, one approval). The full-access-key check below binds both to nearAccountId.
+    const signedOne = [linkMessage(accountId, nearAccountId), linkSignInMessage(accountId)].some((m) =>
+      verifyNearSignature(proof.publicKey, m, proof.signature, nep413),
+    );
+    if (!signedOne)
       throw new ApiError(
         422,
         'near_proof_invalid',
@@ -140,17 +138,23 @@ export class CoreController {
   async me(@CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
     const { repos } = this.deps;
-    const [credits, agents, unlocks, royalties, ladderRow, cosmetics] = await Promise.all([
+    const decay = this.deps.config.rankedDecay ?? DEFAULTS.ranked.decay;
+    const [credits, agents, unlocks, royalties, ladderRow, cosmetics, decayAt] = await Promise.all([
       repos.ledger.balance(account.id),
       repos.agents.listByOwner(account.id),
       repos.agents.unlocksOf(account.id),
       repos.market.royaltiesByCreator(account.id),
       repos.leaderboards.playerRowFor(account.id),
       repos.cosmetics.owned(account.id),
+      decay.days > 0 && decay.amount > 0 ? repos.ranked.nextDecayAt(account, decay.days) : Promise.resolve(null),
     ]);
     return {
       account: accountView(account),
-      /** v2: the player's own Elo, ranked record, rank title and place on the player ladder. */
+      /**
+       * v2: the player's own Elo, ranked record, rank title, place on the player ladder, ranked tier
+       * (null until the placement matches are played) and when inactivity next costs Elo (null when
+       * decay does not apply to them).
+       */
       rank: {
         elo: account.elo,
         rankedMatches: account.rankedMatches,
@@ -159,6 +163,8 @@ export class CoreController {
         draws: account.draws,
         title: rankTitle(account.elo).title,
         position: ladderRow?.rank ?? null,
+        tier: playerTier(account.elo, account.rankedMatches),
+        decayAt: decayAt?.toISOString() ?? null,
       },
       credits,
       agents,

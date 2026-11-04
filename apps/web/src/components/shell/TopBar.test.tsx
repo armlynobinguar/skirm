@@ -69,8 +69,10 @@ describe('TopBar', () => {
     const body = JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
     expect(body.params).toMatchObject({ request_type: 'view_account', account_id: 'ada.testnet' });
     const elo = screen.getByTestId('topbar-elo');
-    expect(elo).toHaveTextContent('Ranked Elo1240Breach Runner II');
-    expect(elo).toHaveAttribute('title', 'Breach Runner II · Ranked Elo 1240');
+    expect(elo).toHaveTextContent('Ranked Elo1240Placement 4/5 · Breach Runner II');
+    expect(elo).toHaveAttribute('title', 'Placement 4/5 · Breach Runner II · Ranked Elo 1240');
+    // The account badge carries the tier (placement until five ranked matches).
+    expect(screen.getByTestId('topbar-tier')).toHaveTextContent('Placement 4/5');
     expect(elo).toHaveAttribute('href', '/pvp');
   });
 

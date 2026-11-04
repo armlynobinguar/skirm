@@ -5,11 +5,11 @@
 //
 // Game types (SkillPublic, Tag, …) come from @skirm/shared (type-only imports,
 // browser-safe).
-import type { ActionKind, AgentAppearance, CosmeticItem, SkillPublic, Tag, Unlock } from '@skirm/shared';
+import type { ActionKind, AgentAppearance, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, SkillTrigger, Tag, Unlock } from '@skirm/shared';
 
-import type { Difficulty, V2Debrief } from '../realtime/protocol';
+import type { Difficulty, V2Debrief, V2Frame } from '../realtime/protocol';
 
-export type { AgentAppearance, CosmeticItem, SkillPublic, Tag, Unlock };
+export type { AgentAppearance, CosmeticItem, SkillPublic, SkillTrigger, Tag, Unlock };
 
 /** Skill version reference used everywhere a crew or agent names a skill. */
 export interface SkillRef {
@@ -106,6 +106,11 @@ export interface Me {
     title: string;
     /** Place on the player ladder (1 = top); null before the first ranked match. */
     position: number | null;
+    // The api always sends the two below; optional so test fixtures can leave them out.
+    /** Ranked tier (`playerTier` in @skirm/shared); `tier.tier` is null during placement. */
+    tier?: PlayerTier;
+    /** When inactivity next costs Elo (Diamond and up), ISO 8601; null when decay does not apply. */
+    decayAt?: string | null;
   };
   credits: Credits;
   agents: Agent[];
@@ -168,7 +173,7 @@ export interface LedgerRow {
   type: LedgerRowType;
   amount: number;
   source: 'paid' | 'free';
-  note: 'entry_fee' | 'reversal' | 'expired' | 'cosmetic' | null;
+  note: 'entry_fee' | 'reversal' | 'expired' | 'cosmetic' | 'prize_pool' | 'prize' | null;
   /** The v2 match a hold, charge or refund belongs to; null for top-ups, free grants and spends. */
   matchId: string | null;
   txHash: string | null;
@@ -225,6 +230,8 @@ export interface SkillBody {
   handles_tags: Tag[];
   /** 0–1,000 (default 500). */
   royalty_bps?: number;
+  /** When the skill joins its agent's prompt; null or absent: always. Public, unlike the prompt. */
+  trigger?: SkillTrigger | null;
 }
 
 export interface MintResponse {
@@ -413,12 +420,64 @@ export interface PlayerLadderRow {
   wins: number;
   losses: number;
   draws: number;
+  /** Ranked tier (`playerTier` in @skirm/shared); optional so fixtures can leave it out. */
+  tier?: PlayerTier;
 }
 
 export interface PlayerLadder {
   rows: PlayerLadderRow[];
   /** The caller's row when signed in and ranked (it may be outside `rows`). */
   you?: PlayerLadderRow;
+}
+
+/** GET /leaderboards/maps/:mapId row: a player's ranked record on one map. */
+export interface MapLadderRow {
+  rank: number;
+  account: { id: string; handle: string };
+  /** Overall Elo and ranked matches (the tier comes from these). */
+  elo: number;
+  rankedMatches: number;
+  matches: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  /** wins / matches on this map, 0–1. */
+  winRate: number;
+  tier: PlayerTier;
+}
+
+export interface MapLadder {
+  mapId: string;
+  rows: MapLadderRow[];
+}
+
+/** GET /leaderboards/skills row: a skill's ranked record over all its versions. */
+export interface SkillLadderRow {
+  rank: number;
+  skill: { id: string; name: string };
+  creator: { id: string; handle: string };
+  matches: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  /** wins / matches, 0–1. */
+  winRate: number;
+}
+
+export interface SkillLadder {
+  /** Ranked matches a skill needs to be listed (DEFAULTS.ranked.skillMinMatches). */
+  minMatches: number;
+  mapId?: string;
+  rows: SkillLadderRow[];
+}
+
+/** GET /leaderboards/tiers. */
+export interface RankedTiers {
+  tiers: { name: RankedTierName; min: number; nextAt: number | null }[];
+  placementMatches: number;
+  kPlacement: number;
+  decay: { fromTier: RankedTierName; days: number; amount: number };
+  skillMinMatches: number;
 }
 
 /** packages/db V2CrewRecord: an agent as it played. */
@@ -616,6 +675,96 @@ export interface SeasonStandings {
 export interface Cosmetics {
   items: CosmeticItem[];
   owned: string[];
+}
+
+// ---------- Replays ----------
+
+/** A highlight moment of an ended match (engine detectHighlights) with its caster line. */
+export interface ReplayHighlight {
+  id: string;
+  kind: 'goal' | 'switch_flood' | 'drop_fight' | 'lead_change';
+  tick: number;
+  /** The suggested clip around it. */
+  start: number;
+  end: number;
+  team: Side | null;
+  title: string;
+  facts: string;
+  weight: number;
+  score: Record<Side, number>;
+  /** The caster's line: the model's when a key is set, else the template's. */
+  line: string;
+}
+
+/** GET /v2/matches/:id/highlights. */
+export interface V2Highlights {
+  matchId: string;
+  highlights: ReplayHighlight[];
+  caster: 'model' | 'template' | null;
+  /** Whether the frames are still stored, so the replay can be played. */
+  framesKept: boolean;
+}
+
+/** A public replay link (POST/GET /v2/matches/:id/shares). */
+export interface ReplayShare {
+  id: string;
+  matchId: string;
+  clip: { start: number; end: number } | null;
+  createdAt: string;
+  /** Site path of the link, e.g. /replays/rps_… */
+  path: string;
+}
+
+/** GET /replays/:shareId: what anyone with the link sees (the whole board, never a crew's minds). */
+export interface SharedReplay {
+  share: ReplayShare & { by: string | null };
+  match: V2MatchRecord;
+  highlights: ReplayHighlight[];
+  caster: 'model' | 'template' | null;
+  framesKept: boolean;
+  /** The clip's whole-board frames; null once they are no longer kept; absent with ?frames=0. */
+  frames?: V2Frame[] | null;
+}
+
+// ---------- Onboarding ----------
+
+export type TutorialStatus = 'new' | 'in_progress' | 'done' | 'skipped';
+
+/** GET /onboarding: the guided match's progress and the home checklist. */
+export interface Onboarding {
+  tutorial: {
+    status: TutorialStatus;
+    /** Tips seen so far (only grows). */
+    step: number;
+    /** TUTORIAL_STEPS.length. */
+    steps: number;
+    match: { mapId: string; difficulty: Difficulty; crewSize: number };
+    completedAt: string | null;
+    skippedAt: string | null;
+  };
+  checklist: { items: { id: FirstStepId; done: boolean }[]; done: boolean; dismissed: boolean };
+  showChecklist: boolean;
+}
+
+export type FirstStepId = 'tutorial' | 'practice' | 'skill' | 'equip' | 'pvp';
+
+/** PUT /onboarding/tutorial. */
+export interface TutorialUpdate {
+  step?: number;
+  status?: 'done' | 'skipped' | 'restart';
+}
+
+/** GET /onboarding/templates: a starter strategy, full text shown (they are examples). */
+export interface SkillTemplateView {
+  id: string;
+  name: string;
+  summary: string;
+  bestFor: string;
+  lesson: string;
+  prompt: string;
+  reflexes: string;
+  requires_actions: ('place_block' | 'dig' | 'extinguish')[];
+  handles_tags: Tag[];
 }
 
 // ---------- Quests and achievements ----------

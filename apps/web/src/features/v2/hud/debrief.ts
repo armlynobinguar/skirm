@@ -3,8 +3,9 @@
 // the registry write and the Elo once settled). The record wins where both say something, since
 // the worker updates it after the match. A spectator (a watch view, or a record without `you`)
 // gets the result by crew, not a verdict of their own. The comms transcript is the talk this tab saw
-// delivered (the store's say and team lines); a record alone has none.
-import { DIFF_MODS, mapV2, type Difficulty, type MatchResult, type Team } from '@skirm/engine/v2';
+// delivered (the store's say and team lines, with your own live commands); a record alone has only
+// the commands its debrief lists.
+import { DIFF_MODS, commandLabel, mapV2, type Difficulty, type MatchResult, type Team } from '@skirm/engine/v2';
 import type { V2MatchRecord } from '@/lib/api/types';
 import type { V2Debrief } from '@/lib/realtime/protocol';
 import type { V2CommsLine, V2MatchView } from '../v2Store';
@@ -90,8 +91,23 @@ export function debriefOf(view: V2MatchView | undefined, record: V2MatchRecord |
     handles,
     practice: view?.practice ?? false,
     free: view?.free ?? false,
-    comms: view ? view.said : null,
+    comms: view ? view.said : debrief?.commands?.length ? debriefOrders(debrief, team) : null,
   };
+}
+
+/** The debrief's live commands as transcript lines (a record seen without the live match). */
+export function debriefOrders(d: V2Debrief, team: Team): V2CommsLine[] {
+  const crew = d.agents.length;
+  return (d.commands ?? []).map((c) => ({
+    tick: c.tick,
+    from: 'you',
+    fromName: 'You',
+    team,
+    channel: 'order',
+    text: commandLabel(c),
+    overheard: false,
+    orderTo: c.agents.length === 1 && crew !== 1 ? c.agents[0]!.name : 'Crew',
+  }));
 }
 
 function registryOf(ranked: boolean, record: V2MatchRecord | undefined, debrief: V2Debrief | null): RegistryLine {

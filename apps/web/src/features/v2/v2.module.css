@@ -100,3 +100,19 @@
   .vsWord { font-size: 64px; }
 }
 @media (prefers-reduced-motion: reduce) { .va, .vb, .vsWord { animation: none; } }
+
+/* Draft mode: the ban phase between accept and lock-in. */
+.draft { display: grid; gap: 18px; max-width: 760px; margin: 8vh auto 0; padding: 24px 16px; }
+.draftHead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px; }
+.draftHead :global(.sk-disp) { margin: 0; font-size: clamp(40px, 6vw, 72px); color: var(--bone); }
+.pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.banPick { display: grid; gap: 4px; width: 100%; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, .03); color: var(--bone); text-align: left; cursor: pointer; }
+.banPick:hover:not(:disabled), .banPick:focus-visible { border-color: var(--rival); box-shadow: inset 0 0 0 1px var(--rival); }
+.banPick:disabled { cursor: default; opacity: .6; }
+.banPick b { font: 600 16px/20px var(--font-display); overflow-wrap: anywhere; }
+.banPick small { color: var(--muted); }
+.bans { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.bans li { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; color: var(--muted); }
+.bans li b { color: var(--bone); }
+.bans li[data-you] b { color: var(--you); }
+.bans li[data-rival] b { color: var(--rival); }

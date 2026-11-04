@@ -9,7 +9,9 @@
 // hold: every tick at the crew's talk rates (Standard in ranked), the unused part returned.
 // The season (GET /seasons/current) gives the pool, its split, the countdown and the top 10; the pool
 // says "local" while it is kept offchain. Earn-back shows season prizes won and agent rentals earned.
-// Ranked plays Normal; casual picks of map and difficulty start from the atlas.
+// Ranked plays Normal; casual picks of map and difficulty start from the atlas. Draft is a casual
+// queue (`v2_queue {draft: true}`) that pairs only with other draft searches: after accept each crew
+// bans one of the rival's equipped skills (the match screen's ban phase), then lock-in.
 import { DIFF_MODS, RANKED_DIFFICULTY, holdFor, type TalkTier } from '@skirm/engine/v2';
 import { fmtRate, ratePerTick } from '@/features/agents/agentView';
 import { DEFAULTS, OUTFIT_COLORS, SKIN_TONES, rankTitle } from '@skirm/shared';
@@ -23,6 +25,7 @@ import { DIFFS, MAPS, diffIndex, mapById } from '@/features/arena/world';
 import { other } from '@/features/v2/common';
 import { useV2Match, v2StoreFor, type V2MatchView } from '@/features/v2/v2Store';
 import { ButtonLink } from '@/components/ButtonLink';
+import { TierBadge } from '@/components/TierBadge';
 import { useEscapeLayer } from '@/components/shell/GlobalKeys';
 import { RequireSession } from '@/components/shell/RequireSession';
 import { EmptyState } from '@/components/states/EmptyState';
@@ -39,7 +42,7 @@ import s from './pvp.module.css';
 import h from './hub.module.css';
 import { boardSizeRange, creditsAsNear, fmtCountdown, fmtMinSec, nearFixed, nearText, splitRows, splitShare, sumYocto, useNow } from './pvpUtil';
 
-type Mode = 'ranked' | 'casual';
+type Mode = 'ranked' | 'casual' | 'draft';
 type Phase = 'idle' | 'requesting' | 'searching' | 'found';
 
 /** Agents a crew may field. */
@@ -55,7 +58,10 @@ const NOT_QUEUE_ERRORS = new Set(['not_found', 'too_many_subscriptions']);
 const MODE_TABS = [
   { id: 'ranked', label: 'Ranked' },
   { id: 'casual', label: 'Casual' },
+  { id: 'draft', label: 'Draft' },
 ];
+
+const MODE_LABEL: Record<Mode, string> = { ranked: 'Ranked', casual: 'Casual', draft: 'Draft' };
 
 /** Paid season places the Ladder panel lists before the season loads. */
 const LADDER_SIZE = 10;
@@ -213,7 +219,7 @@ function Lobby() {
       setVoided(VOID_COPY[found.end?.reason ?? 'error'] ?? VOID_OTHER);
       setFoundId(null);
       setPhase('idle');
-    } else if ((foundMine || foundPhase === 'lockin' || foundPhase === 'live') && opened.current !== found.matchId) {
+    } else if ((foundMine || foundPhase === 'draft' || foundPhase === 'lockin' || foundPhase === 'live') && opened.current !== found.matchId) {
       opened.current = found.matchId;
       router.push(routes.match(found.matchId));
     }
@@ -269,7 +275,7 @@ function Lobby() {
     if (!pickedAgents.length || pickedAgents.length > cap) return;
     setVoided(null);
     const crew = pickedAgents.map((a) => ({ agentId: a.id, tier: tierOf(a, mode) }));
-    const msg: Extract<OutgoingMessage, { type: 'v2_queue' }> = { type: 'v2_queue', ranked: mode === 'ranked', crew };
+    const msg: Extract<OutgoingMessage, { type: 'v2_queue' }> = { type: 'v2_queue', ranked: mode === 'ranked', crew, ...(mode === 'draft' ? { draft: true } : {}) };
     queued.current = msg;
     // The match screen's lock-in starts from these names and tiers.
     v2StoreFor(rt).queued = pickedAgents.map((a) => ({ agentId: a.id, name: a.name, tier: tierOf(a, mode) }));
@@ -401,7 +407,7 @@ function Lobby() {
 
       <section className={h.queue} aria-labelledby="s11-queue" aria-live="polite" data-testid="s11-queue">
         <span className="sk-kick" data-testid="s11-rotation">
-          {mode === 'ranked' ? 'Ranked' : 'Casual'} rotation · <b>{ROTATION}</b>
+          {MODE_LABEL[mode]} rotation · <b>{ROTATION}</b>
         </span>
         <h2 id="s11-queue" className="sk-sr-only">
           {phase === 'found' ? 'Match found' : searching ? 'Finding a match' : 'Skirmish'}
@@ -454,7 +460,7 @@ function Lobby() {
               Find
               <br />
               match
-              <small>{mode === 'ranked' ? 'RANKED · 2 CREWS' : 'CASUAL · 2 CREWS'}</small>
+              <small>{MODE_LABEL[mode].toUpperCase()} · 2 CREWS</small>
             </span>
           </button>
         )}
@@ -490,10 +496,23 @@ function Lobby() {
               'Ranked always plays Normal.'
             ) : (
               <>
-                Casual plays Normal here; pick a map and difficulty in the <Link href={routes.atlas()}>atlas</Link>.
+                Casual plays Normal here; pick a map and difficulty in the <Link href={routes.atlas()}>atlas</Link>, challenge a friend in a{' '}
+                <Link href={routes.lobbies()} data-testid="s11-lobbies">
+                  private lobby
+                </Link>{' '}
+                or enter a <Link href={routes.tournaments()}>tournament</Link>.
               </>
             )}
           </dd>
+          {mode === 'draft' ? (
+            <>
+              <dt>DRAFT</dt>
+              <dd data-testid="s11-draft-rules">
+                After accept each crew bans {DEFAULTS.draft.bansPerSide === 1 ? 'one' : DEFAULTS.draft.bansPerSide} of the rival&apos;s equipped skills, in turn ({Math.round(DEFAULTS.draft.stepMs / 1000)} s a
+                ban, or it passes). A banned skill is unequipped from the rival crew for that match. Casual: no Elo.
+              </dd>
+            </>
+          ) : null}
           <dt>TALK</dt>
           <dd>
             {mode === 'ranked' ? 'Standard tier for both crews.' : 'Each agent at its own talk tier.'} Say reaches agents in range; team reaches teammates
@@ -730,6 +749,7 @@ function VsTakeover({
           <b>You</b> · Elo {fmt(elo)}
         </span>
         <span className="sk-disp">{handle}</span>
+        {view.tiers ? <TierBadge tier={view.tiers.you} testId="s11-vs-tier-you" /> : null}
         <div className={h.faces} data-testid="s11-vs-faces-you">
           {crew.map(({ c, a }) => (
             <AgentPortrait
@@ -762,6 +782,7 @@ function VsTakeover({
           <span className="is-rival">Rival</span> · {view.accepted.includes(other(view.team)) ? 'accepted' : 'deciding'}
         </span>
         <span className="sk-disp">Rival</span>
+        {view.tiers ? <TierBadge tier={view.tiers.rival} testId="s11-vs-tier-rival" /> : null}
         <div className={h.faces} role="img" aria-label="Rival crew hidden" data-testid="s11-vs-faces-rival">
           <span className="sk-kick">? · ? · ?</span>
         </div>

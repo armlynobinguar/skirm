@@ -1,5 +1,5 @@
 'use client';
-// S07 My skills (/skills, ?tab=owned). Owner: skills builder. Design: .design-src/screens/S07-My-skills.dc.html
+// S07 My skills (/skills, ?tab=owned). Owner: skills builder.
 // Tabs "Written by me" (GET /skills?tab=written: latest version of each skill I wrote) and "Owned"
 // (?tab=owned: versions I hold). Rows carry public fields + status only.
 import { Icon, Tabs, TagChip, UnlockChip } from '@skirm/ui';
@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
+import { SkillTemplates } from '@/features/onboarding/SkillTemplates';
 import { EmptyState } from '@/components/states/EmptyState';
 import { QueryView } from '@/components/states/QueryView';
 import { Skeleton } from '@/components/states/Skeleton';
@@ -92,6 +93,8 @@ function MySkills() {
           {(rows) => <SkillTable rows={rows} tab={tab} />}
         </QueryView>
       </div>
+
+      {tab === 'written' ? <SkillTemplates /> : null}
 
       <p className={s.note}>
         Royalties are paid to your NEAR wallet on each resale.

@@ -3,6 +3,7 @@
 // logged actions through the engine reproduces the match exactly.
 import { canonicalJson, sha256Hex } from '../canonical';
 import type { Difficulty } from './difficulty';
+import type { CrewCommand } from './commands';
 import type { Action, MatchResult } from './match';
 import type { SayInput } from './talk';
 
@@ -20,6 +21,8 @@ export interface LogTick {
   tick: number;
   actions: Record<string, Action>;
   says: SayInput[];
+  /** Live commands applied this tick (absent when none, so older logs hash the same). */
+  commands?: CrewCommand[];
 }
 
 export interface MatchLog {

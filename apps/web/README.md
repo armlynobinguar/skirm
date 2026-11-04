@@ -4,9 +4,6 @@ The skirm web app: Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tan
 REST data, one shared WebSocket for v2 matches (queue, accept, lock-in, live, spectate), and
 `@skirm/ui` for every component.
 
-Design sources: `.design-src/docs/uiux.md` (screens S01–S16, M01–M03, states, keyboard, copy),
-`.design-src/screens/*.dc.html` (artboards; `TopBar.dc.html` is the header),
-`.design-src/design-system/`. The docs say "Promptlings"; the product is **skirm** everywhere.
 Backend shapes: `src/lib/api/types.ts` (mirrors `apps/api/src/views.ts` and the controllers).
 
 ## Run it
@@ -98,6 +95,7 @@ Route groups `(play)`, `(skills)`, … only split ownership; they add no layout 
 | S01 | Sign in (pitch, practice line) | `/` | `features/play/SignInScreen.tsx` | Play |
 | S02 | Home (Command deck) | `/play` | `features/play/HomeScreen.tsx` | Play |
 | — | Map atlas | `/maps` | `features/play/AtlasScreen.tsx` | Play |
+| — | Tutorial (guided first match: briefing, then tips over the match) | `/tutorial` | `features/onboarding/TutorialScreen.tsx`, `TutorialCoach.tsx` | Play |
 | S04 | Crew (casual, ranked, Vs Greedy bot) | `/maps/[mapId]/crew` (`?d=`, `?opponent=bot`) | `features/play/CrewBuilderScreenV2.tsx` (`V2CrewScreen`) | Play |
 | — | Agent editor | `/agents/[agentId]` | `features/agents/AgentEditorScreen.tsx` | Play |
 | S07 | My skills | `/skills` (`?tab=owned`) | `features/skills/MySkillsScreen.tsx` | Skills + Market |

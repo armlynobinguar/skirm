@@ -4,7 +4,7 @@
 //   the action and, when the agent may speak, its message, which then goes through the filter.
 // - greedy: deterministic and offline, for dev, tests and benchmarks without keys.
 // A brain that misses the deadline or answers with nothing legal waits that tick.
-import { TALK_TIERS, type Action, type Channel, type Observation } from '@skirm/engine/v2';
+import { TALK_TIERS, skillTriggerHolds, type Action, type Channel, type CommandPreset, type Observation, type SkillTrigger } from '@skirm/engine/v2';
 import { HAIKU_OPENROUTER_MODEL, OPENROUTER_BASE_URL, PRICES } from '../config';
 import { defaultFetch, dig, num, postJson, type FetchLike } from '../http';
 import { runWithPolicy } from '../policy';
@@ -43,6 +43,8 @@ export interface V2Decision {
   refusedSay?: 'leak' | 'abuse' | 'empty';
   /** The agent's inner voice this tick: first person, private to its crew (withheld like the plan). */
   thought?: string;
+  /** Index into the context's `skills` of the skill the model said drove this move (the debrief timeline). */
+  skill?: number;
   call?: V2Call;
 }
 
@@ -56,6 +58,12 @@ export interface V2Plan {
 export interface V2AgentContext {
   /** The agent's equipped skill prompts: secret, sent to the model only. */
   skills: string[];
+  /**
+   * Each skill's trigger, in skill order (absent or null: always). A skill whose trigger does not
+   * hold on this tick's observation is left out of the prompt (activeSkills); the speech filter
+   * still guards every skill.
+   */
+  skillTriggers?: (SkillTrigger | null)[];
   /** The owner's instructions (agents.system_prompt), put ahead of the skills; private like them. */
   instructions?: string | null;
   /** The crew's current plan, if any. */
@@ -64,6 +72,19 @@ export interface V2AgentContext {
   canSpeak: boolean;
   /** Its last few actions with where it stood, oldest first. */
   recent?: string[];
+  /** A live command from its player still in force (DEFAULTS.commands.activeTicks), or none. */
+  command?: V2AgentCommand | null;
+}
+
+/** A player's live command as an agent receives it. */
+export interface V2AgentCommand {
+  preset: CommandPreset | null;
+  /** The whole order for the model: the preset's directive, then the player's words (commandOrder). */
+  order: string;
+  /** Ticks the order has left. */
+  ticksLeft: number;
+  /** go_drop: the tiles it points at (landed supply drops, else middle items); empty when none. */
+  targets?: [number, number][];
 }
 
 export interface V2Brain {
@@ -71,7 +92,12 @@ export interface V2Brain {
   readonly model: string;
   act(o: Observation, ctx: V2AgentContext): Promise<V2Decision>;
   /** A short crew plan (null when the brain does not plan). */
-  plan(o: Observation, ctx: Pick<V2AgentContext, 'skills' | 'instructions'>): Promise<V2Plan>;
+  plan(o: Observation, ctx: Pick<V2AgentContext, 'skills' | 'skillTriggers' | 'instructions'>): Promise<V2Plan>;
+}
+
+/** The skills whose triggers hold on this observation, in order (skills without a trigger always do). */
+export function activeSkills(o: Observation, ctx: Pick<V2AgentContext, 'skills' | 'skillTriggers'>): string[] {
+  return ctx.skills.filter((_, i) => skillTriggerHolds(ctx.skillTriggers?.[i], o));
 }
 
 /** Whether an agent may speak on `tick` given its tier and the tick it last spoke. */
@@ -146,9 +172,13 @@ export function createHaikuBrain(opts: HaikuBrainOptions): V2Brain {
     model,
     async act(o, ctx) {
       const wait: Action = { type: 'wait' };
-      const r = await call('actor', systemPrompt(ctx.skills, ctx.instructions), turnPrompt(o, ctx.plan, ctx.canSpeak, ctx.recent ?? []), V2_ACTOR_MAX_TOKENS, opts.deadlineMs ?? V2_ACTION_DEADLINE_MS);
+      // The system prompt numbers the non-blank skills whose trigger holds this tick; a SKILL line maps
+      // back to ctx.skills.
+      const numbered = ctx.skills.flatMap((t, i) => (t.trim() && skillTriggerHolds(ctx.skillTriggers?.[i], o) ? [i] : []));
+      const r = await call('actor', systemPrompt(numbered.map((i) => ctx.skills[i]!), ctx.instructions), turnPrompt(o, ctx.plan, ctx.canSpeak, ctx.recent ?? [], ctx.command ?? null, numbered.length), V2_ACTOR_MAX_TOKENS, opts.deadlineMs ?? V2_ACTION_DEADLINE_MS);
       if (r.text === null) return { action: wait, reason: r.reason === 'timeout' ? 'timeout' : 'error', say: null, call: r.call };
-      const parsed = parseReply(r.text, o.legal, ctx.canSpeak);
+      const parsed = parseReply(r.text, o.legal, ctx.canSpeak, numbered.length);
+      const skill = parsed.action && parsed.skill ? numbered[parsed.skill - 1] : undefined;
       let say: V2Decision['say'] = null;
       let refusedSay: V2Decision['refusedSay'];
       if (parsed.say) {
@@ -162,11 +192,12 @@ export function createHaikuBrain(opts: HaikuBrainOptions): V2Brain {
         say,
         ...(refusedSay ? { refusedSay } : {}),
         ...(parsed.thought ? { thought: parsed.thought } : {}),
+        ...(skill !== undefined ? { skill } : {}),
         call: r.call,
       };
     },
     async plan(o, ctx) {
-      const r = await call('planner', systemPrompt(ctx.skills, ctx.instructions), planPrompt(o), V2_PLANNER_MAX_TOKENS, V2_PLANNER_DEADLINE_MS);
+      const r = await call('planner', systemPrompt(activeSkills(o, ctx), ctx.instructions), planPrompt(o), V2_PLANNER_MAX_TOKENS, V2_PLANNER_DEADLINE_MS);
       if (!r.text) return { text: null, why: null, call: r.call };
       const { plan, why } = parsePlan(r.text);
       return { text: plan, why, call: r.call };
@@ -179,7 +210,7 @@ export function createGreedyBrain(): V2Brain {
     kind: 'greedy',
     model: 'greedy',
     async act(o, ctx) {
-      const action = greedyAct(o);
+      const action = greedyAct(o, ctx.command ?? null);
       const text = ctx.canSpeak ? greedySay(o, action) : null;
       return { action, reason: 'chosen', say: text ? { channel: 'team', text } : null, thought: greedyThought(o, action) };
     },

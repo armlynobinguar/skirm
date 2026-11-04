@@ -1,10 +1,10 @@
 // WebSocket messages of apps/realtime (path /ws). Mirrors WsClientMessage / WsServerMessage in
 // packages/server/src/queues.ts and the parser in apps/realtime/src/protocol.ts; copied here because
 // @skirm/server is Node-only (bullmq, ioredis). Keep in sync.
-import type { Difficulty, FrameAgent, FrameItem, ItemOrigin, MatchResult, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
-import type { Side } from '@skirm/shared';
+import type { CommandPreset, Difficulty, FrameAgent, FrameCommand, FrameItem, ItemOrigin, MatchResult, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
+import type { PlayerTier, Side } from '@skirm/shared';
 
-export type { Side, V2Frame, FrameAgent, FrameItem, ItemOrigin, TalkTier, Team, MatchResult, Difficulty };
+export type { Side, V2Frame, FrameAgent, FrameCommand, FrameItem, ItemOrigin, TalkTier, Team, MatchResult, Difficulty, CommandPreset };
 
 /** v2 (packages/server/src/v2.ts): found → accept (10 s) → lock-in (30 s) → live (2 s ticks) → end. */
 /** Who a v2_queue plays: absent for a matchmade rival, 'bot' for practice against the greedy bot. */
@@ -51,6 +51,35 @@ export interface V2Debrief {
   difficulty?: Difficulty;
   /** Ranked: the season this result counted towards and the standings points it gave; absent otherwise. */
   season?: { number: number; points: number };
+  /** The live commands this crew's player sent, as applied (tick order); absent when none. */
+  commands?: V2DebriefCommand[];
+  /** Draft mode: every ban step, both crews'. */
+  draft?: { bans: V2DraftBan[] };
+}
+
+/** Draft mode: a rival skill you may ban (its id and public name, never its text). */
+export interface V2DraftSkill {
+  skillId: string;
+  name: string;
+  /** How many rival agents run it. */
+  agents: number;
+}
+
+/** One ban step: who banned what (null: passed), and whether the step ran out. */
+export interface V2DraftBan {
+  team: Team;
+  step: number;
+  skillId: string | null;
+  name: string | null;
+  timedOut?: true;
+}
+
+/** One live command in the debrief transcript. */
+export interface V2DebriefCommand {
+  tick: number;
+  agents: { id: string; name: string }[];
+  preset: CommandPreset | null;
+  text: string | null;
 }
 
 export type V2ClientMessage =
@@ -59,7 +88,7 @@ export type V2ClientMessage =
    * them. `opponent: 'bot'` is practice against the greedy bot: casual only, no matchmaking, it
    * starts at once (the server picks DEFAULT_PRACTICE when no board is given).
    */
-  | { type: 'v2_queue'; crew: V2CrewEntry[]; ranked: boolean; mapId?: string; difficulty?: Difficulty; opponent?: V2Opponent }
+  | { type: 'v2_queue'; crew: V2CrewEntry[]; ranked: boolean; mapId?: string; difficulty?: Difficulty; opponent?: V2Opponent; draft?: boolean }
   | { type: 'v2_cancel_queue' }
   | { type: 'v2_watch'; matchId: string }
   | { type: 'v2_unwatch'; matchId: string }
@@ -68,7 +97,13 @@ export type V2ClientMessage =
   /** `tiers` is per queued agent; `crew`, when sent, replaces the queued crew (up to `crewLimit`) and its tiers win. */
   | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[] }
   /** Every stored frame of an ended match (answered with v2_frames), for replay at another speed. */
-  | { type: 'v2_replay'; matchId: string };
+  | { type: 'v2_replay'; matchId: string }
+  /** Readies a crew in a private lobby; the match starts once both players have. v2_cancel_queue steps back. */
+  | { type: 'v2_lobby_ready'; lobbyId: string; crew: V2CrewEntry[] }
+  /** A live command to your own crew: one agent or all of it, a preset and/or free text. Answered with v2_command_ok. */
+  | { type: 'v2_command'; matchId: string; agentId?: string; preset?: CommandPreset; text?: string }
+  /** Draft mode, on your turn: ban one of the rival's skills from the v2_draft pool, or pass (null). */
+  | { type: 'v2_ban'; matchId: string; skillId: string | null };
 
 /** What practice adds to v2_found and v2_lockin. */
 export interface V2PracticeFlags {
@@ -80,9 +115,16 @@ export interface V2PracticeFlags {
   rivalHandle?: string;
 }
 
+/** What ranked adds to v2_found: both players' ranked tiers as they queued (the rival stays unnamed). */
+export interface V2FoundTiers {
+  tiers?: { you: PlayerTier; rival: PlayerTier };
+}
+
 export type V2ServerMessage =
-  | ({ type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty } & V2PracticeFlags)
+  | ({ type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty; draft?: true } & V2PracticeFlags & V2FoundTiers)
   | { type: 'v2_accepted'; matchId: string; team: Team }
+  /** Draft mode: each ban step (`turn` bans within `stepMs`, else it passes), then once more with `turn` null. */
+  | { type: 'v2_draft'; matchId: string; turn: Team | null; step: number; steps: number; stepMs: number; pool: V2DraftSkill[]; bans: V2DraftBan[] }
   /** `crewLimit`: most agents this map takes; `headStartTicks`: each crew's hold with the crews as they stand. */
   | ({ type: 'v2_lockin'; matchId: string; lockMs: number; rival: { agents: number }; crewLimit?: number; headStartTicks?: Record<Team, number> } & V2PracticeFlags)
   | { type: 'v2_locked'; matchId: string; team: Team }
@@ -90,7 +132,11 @@ export type V2ServerMessage =
   | { type: 'v2_frame'; matchId: string; frame: V2Frame }
   | { type: 'v2_end'; matchId: string; result: MatchResult | null; reason: V2EndReason; logHash: string | null; debrief?: V2Debrief }
   /** Answer to v2_replay: a player's own crew view (the whole board for anyone else), ascending tick. */
-  | { type: 'v2_frames'; matchId: string; frames: V2Frame[] };
+  | { type: 'v2_frames'; matchId: string; frames: V2Frame[] }
+  /** A private lobby's players readied or stepped back. */
+  | { type: 'v2_lobby'; lobbyId: string; ready: { host: boolean; guest: boolean } }
+  /** The command is applied on `tick`; `left` remain this match. */
+  | { type: 'v2_command_ok'; matchId: string; tick: number; left: number };
 
 export type WsClientMessage = { type: 'auth'; token?: string; devUser?: string } | V2ClientMessage;
 
@@ -113,10 +159,19 @@ export type WsErrorCode =
   | 'in_match'
   | 'invalid_crew'
   | 'not_in_lockin'
+  | 'draft_casual'
+  | 'not_your_turn'
+  | 'invalid_ban'
   | 'agent_busy'
   | 'insufficient_credits'
   | 'match_void'
   | 'not_found'
+  | 'lobby_closed'
+  | 'not_live'
+  | 'no_commands'
+  | 'rate_limited'
+  | 'invalid_command'
+  | 'command_refused'
   | 'too_many_subscriptions'
   | 'unavailable'
   | 'internal'

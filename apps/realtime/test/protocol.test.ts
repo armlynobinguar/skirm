@@ -1,3 +1,4 @@
+import { DEFAULTS } from '@skirm/shared';
 import { describe, expect, it } from 'vitest';
 import { parseClientMessage } from '../src/protocol';
 
@@ -117,10 +118,37 @@ describe('parseClientMessage', () => {
     expect(err({ type: 'v2_replay', matchId: 'mat_1', speed: 2 })).toBe('bad_message');
   });
 
+  it('accepts a lobby ready with a crew, and nothing else', () => {
+    const crew = [{ agentId: 'agt_1', tier: 'quiet' }];
+    expect(ok({ type: 'v2_lobby_ready', lobbyId: 'lby_1', crew })).toEqual({ type: 'v2_lobby_ready', lobbyId: 'lby_1', crew });
+    expect(err({ type: 'v2_lobby_ready', lobbyId: 'lby 1', crew })).toBe('bad_message');
+    expect(err({ type: 'v2_lobby_ready', lobbyId: 'lby_1', crew: [] })).toBe('bad_message');
+    expect(err({ type: 'v2_lobby_ready', lobbyId: 'lby_1', crew, ranked: true })).toBe('bad_message');
+  });
+
   it('accepts Buffer frames as ws delivers them', () => {
     expect(parseClientMessage(Buffer.from('{"type":"v2_cancel_queue"}'))).toEqual({
       ok: true,
       msg: { type: 'v2_cancel_queue' },
     });
+  });
+
+  it('checks v2_command: a preset and/or text, an optional agent, nothing else', () => {
+    expect(ok({ type: 'v2_command', matchId: 'mat_1', preset: 'regroup' })).toEqual({ type: 'v2_command', matchId: 'mat_1', preset: 'regroup' });
+    expect(ok({ type: 'v2_command', matchId: 'mat_1', agentId: 'agt_1', preset: 'go_drop', text: 'now' })).toEqual({
+      type: 'v2_command',
+      matchId: 'mat_1',
+      agentId: 'agt_1',
+      preset: 'go_drop',
+      text: 'now',
+    });
+    expect(ok({ type: 'v2_command', matchId: 'mat_1', text: 'hug the wall', agentId: null })).toEqual({ type: 'v2_command', matchId: 'mat_1', text: 'hug the wall' });
+    expect(err({ type: 'v2_command', matchId: 'mat_1' })).toBe('bad_message');
+    expect(err({ type: 'v2_command', matchId: 'mat_1', text: '   ' })).toBe('bad_message');
+    expect(err({ type: 'v2_command', matchId: 'mat_1', preset: 'charge' })).toBe('bad_message');
+    expect(err({ type: 'v2_command', matchId: 'mat_1', preset: 'regroup', agentId: 'bad id!' })).toBe('bad_message');
+    expect(err({ type: 'v2_command', matchId: 'mat_1', text: 'x'.repeat(DEFAULTS.commands.maxChars + 1) })).toBe('bad_message');
+    expect(err({ type: 'v2_command', matchId: 'mat_1', preset: 'regroup', tick: 4 })).toBe('bad_message');
+    expect(err({ type: 'v2_command', preset: 'regroup' })).toBe('bad_message');
   });
 });

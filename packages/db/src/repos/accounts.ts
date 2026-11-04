@@ -10,10 +10,12 @@ import {
   agentSkills,
   agents,
   cosmeticsOwned,
+  eloDecays,
   ledgerAccounts,
   ledgerRows,
   listings,
   matchMessages,
+  onboardingProgress,
   prizePayouts,
   questClaims,
   rentalOffers,
@@ -114,7 +116,7 @@ export class AccountsRepo {
     const agentIds = myAgents.map((a) => a.id);
     const [
       agentSkillRows, unlockRows, skillRows, ownership, listingRows, saleRows, offers, rentalRows,
-      ledger, ledgerRowsOut, matches, standings, payouts, trials, cosmetics,
+      ledger, ledgerRowsOut, matches, standings, payouts, trials, cosmetics, onboarding, decays,
     ] = await Promise.all([
       this.db.select().from(agentSkills).where(agentIds.length ? inArray(agentSkills.agentId, agentIds) : sql`false`),
       this.db.select().from(unlockItems).where(eq(unlockItems.ownerId, accountId)),
@@ -134,6 +136,8 @@ export class AccountsRepo {
       this.db.select().from(prizePayouts).where(eq(prizePayouts.accountId, accountId)),
       this.db.select().from(skillTrials).where(eq(skillTrials.accountId, accountId)),
       this.db.select().from(cosmeticsOwned).where(eq(cosmeticsOwned.accountId, accountId)),
+      this.db.select().from(onboardingProgress).where(eq(onboardingProgress.accountId, accountId)),
+      this.db.select().from(eloDecays).where(eq(eloDecays.accountId, accountId)),
     ]);
     // A match's debriefs hold both crews' private numbers: keep only the player's own side.
     const ownMatches = matches.map((m) => {
@@ -164,6 +168,8 @@ export class AccountsRepo {
       cosmetics,
       questClaims: quests,
       achievements,
+      onboarding,
+      eloDecays: decays,
     };
   }
 

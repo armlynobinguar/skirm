@@ -13,15 +13,15 @@ describe('v2 matches', () => {
     const row = await ctx.repos.v2Matches.finish(m.id, { winner: 'A', reason: 'goal', decidedBy: 'goal', score: { A: 4, B: 1 }, ticks: 88, log: { ticks: [] }, logHash: 'ab'.repeat(32) });
     expect(row).toMatchObject({ status: 'ended', winner: 'A', scoreA: 4, scoreB: 1, registryStatus: 'pending' });
     expect(row.eloDeltas).toEqual([
-      { accountId: ana.id, team: 'A', before: 1200, delta: 16, after: 1216 },
-      { accountId: ben.id, team: 'B', before: 1200, delta: -16, after: 1184 },
+      { accountId: ana.id, team: 'A', before: 1200, delta: 24, after: 1224 },
+      { accountId: ben.id, team: 'B', before: 1200, delta: -24, after: 1176 },
     ]);
     const a = await ctx.repos.accounts.get(ana.id);
-    expect(a).toMatchObject({ elo: 1216, rankedMatches: 1, wins: 1, losses: 0 });
-    expect(await ctx.repos.accounts.get(ben.id)).toMatchObject({ elo: 1184, losses: 1 });
+    expect(a).toMatchObject({ elo: 1224, rankedMatches: 1, wins: 1, losses: 0 });
+    expect(await ctx.repos.accounts.get(ben.id)).toMatchObject({ elo: 1176, losses: 1 });
 
     await ctx.repos.v2Matches.finish(m.id, { winner: 'B', reason: 'goal' });
-    expect((await ctx.repos.accounts.get(ana.id))!.elo).toBe(1216);
+    expect((await ctx.repos.accounts.get(ana.id))!.elo).toBe(1224);
     expect((await ctx.repos.v2Matches.listForAccount(ben.id)).map((r) => r.id)).toEqual([m.id]);
   });
 

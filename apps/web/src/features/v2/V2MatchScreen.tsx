@@ -1,6 +1,7 @@
 'use client';
 // v2 match (/matches/[id]): one screen through every phase the server drives.
 //   found  → the VS card: Accept / Decline within 10 s (the rival stays hidden).
+//   draft  → draft mode only: each crew bans one of the rival's skills in turn (./Draft).
 //   lockin → each agent's talk tier (Quiet / Standard / Open, credits per tick); ranked is Standard.
 //   live   → the intro, then the HUD over this crew's fogged frames (cards, comms, third person).
 //   ended  → the VICTORY / DEFEAT banner over the last frame, then the debrief at
@@ -21,6 +22,7 @@ import { useRealtimeMessage } from '@/lib/realtime/hooks';
 import { routes } from '@/lib/routes';
 import { useRealtime } from '@/lib/services';
 import { Accept } from './Accept';
+import { Draft } from './Draft';
 import { Ended } from './Ended';
 import { Replay } from './hud/Replay';
 import { Live, RESULT_AT_MS } from './Live';
@@ -103,6 +105,8 @@ export function V2MatchScreen({ matchId }: { matchId: string }) {
   switch (view.phase) {
     case 'found':
       return <Accept view={view} />;
+    case 'draft':
+      return <Draft view={view} />;
     case 'lockin':
       return <LockIn view={view} />;
     case 'live':

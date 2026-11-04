@@ -1,6 +1,5 @@
 'use client';
 // S08 Skill editor (/skills/[skillId]/edit, and /skills/new with skillId null). Owner: skills builder.
-// Design: .design-src/screens/S08-Skill-editor.dc.html
 //
 // - POST /skills creates v1 (draft); PUT /skills/:id always writes the next version as a draft
 //   (versions are immutable, a minted one included), so Save says which version it writes.
@@ -17,7 +16,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import type { Tag, Unlock } from '@skirm/shared';
+import { skillTriggerOf, type Tag, type Unlock } from '@skirm/shared';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
 import { EmptyState } from '@/components/states/EmptyState';
@@ -49,6 +48,7 @@ import {
   type SkillForm,
 } from './lib';
 import { StatusBadge } from './parts';
+import { TriggerField } from './TriggerField';
 import s from './skills.module.css';
 
 const UNLOCK_LABEL: Record<Unlock, string> = { builder: 'Builder', digger: 'Digger', firefighter: 'Firefighter' };
@@ -92,6 +92,7 @@ function formOf(sk: SkillWithText): SkillForm {
     requires: sk.requires_actions.map((a) => ACTION_UNLOCK[a as keyof typeof ACTION_UNLOCK]).filter(Boolean),
     tags: [...sk.handles_tags],
     royalty: bpsPct(sk.royalty_bps).replace('%', ''),
+    trigger: skillTriggerOf(sk.trigger),
   };
 }
 
@@ -408,6 +409,7 @@ function Editor({ skill, owner }: { skill: SkillWithText | null; owner: string |
                 <span className="app-small sk-muted">Tags drive the market filters; agents never see them.</span>
               )}
             </fieldset>
+            <TriggerField value={form.trigger} onChange={(t) => set('trigger', t)} error={shown.trigger} />
           </section>
 
           <MintPanel skill={skill} dirty={dirty} form={form} setRoyalty={(v) => set('royalty', v)} royaltyError={shown.royalty} />
@@ -548,7 +550,7 @@ function MintPanel({
           <Icon name="warning" size={16} />
         </span>
         <span>
-          Minting locks this version: prompt, reflexes, unlocks, tags and royalty. Later edits save as a new version. Needs
+          Minting locks this version: prompt, reflexes, unlocks, tags, trigger and royalty. Later edits save as a new version. Needs
           a NEAR wallet. The platform then benchmarks it on hidden seeds.
         </span>
       </div>

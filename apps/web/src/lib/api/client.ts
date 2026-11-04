@@ -4,7 +4,9 @@
 // client. In components use `useApi()` (src/lib/providers.tsx), never construct one.
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
+import type { MatchDecisions } from './decisions';
 import { ApiError, errorFromBody } from './errors';
+import type { CreateTournament, Lobby, LobbySettings, TournamentDetail, TournamentStatus, TournamentSummary } from './lobbyTypes';
 import type {
   AchievementBadge,
   Achievements,
@@ -24,10 +26,15 @@ import type {
   AgentRecord,
   MyMatch,
   MyRentalOffer,
+  Onboarding,
+  SkillTemplateView,
+  TutorialUpdate,
   RentalOffer,
   RentalPass,
   MintResponse,
+  MapLadder,
   PlayerLadder,
+  SkillLadder,
   PurchaseResponse,
   QuestBoard,
   QuestClaimResponse,
@@ -45,6 +52,9 @@ import type {
   UnlinkNearResponse,
   V2LiveMatch,
   V2MatchRecord,
+  ReplayShare,
+  SharedReplay,
+  V2Highlights,
 } from './types';
 
 export interface ApiClient {
@@ -120,10 +130,58 @@ export interface ApiClient {
 
   /** GET /leaderboards/players: per-player Elo, rank and title (v2 ladder). */
   playerLadder(limit?: number): Promise<PlayerLadder>;
+  /** GET /leaderboards/maps/:mapId: players by ranked results on one map. */
+  mapLadder(mapId: string, limit?: number): Promise<MapLadder>;
+  /** GET /leaderboards/skills: skills by ranked win rate (minimum matches applied). */
+  skillLadder(opts?: { mapId?: string; limit?: number }): Promise<SkillLadder>;
   /** GET /v2/matches/:id: a v2 match with Elo changes and crew stats (the result screen). */
   v2Match(matchId: string): Promise<V2MatchRecord>;
   /** GET /v2/matches/live: v2 matches being played now, crews hidden. */
   v2LiveMatches(): Promise<V2LiveMatch[]>;
+  /** GET /v2/matches/:id/highlights: highlight moments with caster lines (public, once ended). */
+  v2Highlights(matchId: string): Promise<V2Highlights>;
+  /** POST /v2/matches/:id/shares: a player's public link to the replay, optionally a clip. */
+  createReplayShare(matchId: string, clip?: { start: number; end: number } | null): Promise<{ share: ReplayShare }>;
+  /** GET /v2/matches/:id/shares: the caller's live links to that match. */
+  replayShares(matchId: string): Promise<{ shares: ReplayShare[] }>;
+  /** GET /replays/:shareId: a shared replay (public); `frames: false` leaves the frames out. */
+  sharedReplay(shareId: string, opts?: { frames?: boolean }): Promise<SharedReplay>;
+  /** DELETE /replays/:shareId: its creator ends the link. */
+  revokeReplayShare(shareId: string): Promise<{ revoked: true }>;
+  /** GET /v2/matches/:id/decisions: the caller's crew's decision timeline (players only, once ended). */
+  v2MatchDecisions(matchId: string): Promise<MatchDecisions>;
+
+  /** POST /lobbies: a private friend lobby with the caller as host. */
+  createLobby(settings: Partial<LobbySettings> & { mapId: string }): Promise<Lobby>;
+  /** GET /lobbies: the caller's lobbies still to play (friend and bracket ones). */
+  myLobbies(): Promise<Lobby[]>;
+  lobby(lobbyId: string): Promise<Lobby>;
+  /** GET /lobbies/code/:code: an invite's lobby before joining it. */
+  lobbyByCode(code: string): Promise<Lobby>;
+  /** POST /lobbies/join: takes the guest seat (409 `lobby_full`, `own_lobby`, `lobby_closed`). */
+  joinLobby(code: string): Promise<Lobby>;
+  /** PATCH /lobbies/:id: the host changes the settings (409 `lobby_ready` while a crew is readied). */
+  updateLobby(lobbyId: string, patch: Partial<LobbySettings>): Promise<Lobby>;
+  /** DELETE /lobbies/:id: a guest leaves; the host closes the lobby. */
+  leaveLobby(lobbyId: string): Promise<Lobby>;
+  tournaments(status?: TournamentStatus): Promise<TournamentSummary[]>;
+  tournament(id: string): Promise<TournamentDetail>;
+  /** POST /tournaments: a prize pool is spent from paid credits (402 `insufficient_credits`). */
+  createTournament(body: CreateTournament): Promise<TournamentDetail>;
+  joinTournament(id: string): Promise<TournamentDetail>;
+  leaveTournament(id: string): Promise<TournamentDetail>;
+  /** POST /tournaments/:id/cancel: the creator, before it starts; the pool comes back. */
+  cancelTournament(id: string): Promise<TournamentDetail>;
+  /** GET /onboarding: tutorial progress and the home checklist. */
+  onboarding(): Promise<Onboarding>;
+  /** PUT /onboarding/tutorial: tips seen (only grows), or `done` / `skipped` / `restart`. */
+  updateTutorial(body: TutorialUpdate): Promise<Onboarding>;
+  /** POST /onboarding/checklist/dismiss: hides the home checklist for good. */
+  dismissChecklist(): Promise<Onboarding>;
+  /** GET /onboarding/templates: the starter skill templates, full text. */
+  skillTemplates(): Promise<SkillTemplateView[]>;
+  /** POST /onboarding/templates/:id/copy: a new draft skill of the caller's from the template. */
+  copyTemplate(templateId: string): Promise<SkillView>;
 }
 
 export interface ApiClientOptions {
@@ -238,7 +296,34 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     deposit: (txHash) => json('POST', '/credits/deposits', { body: { txHash } }),
 
     playerLadder: (limit) => get('/leaderboards/players', { limit }),
+    mapLadder: (mapId, limit) => get(`/leaderboards/maps/${enc(mapId)}`, { limit }),
+    skillLadder: (opts = {}) => get('/leaderboards/skills', { mapId: opts.mapId, limit: opts.limit }),
     v2Match: (id) => get(`/v2/matches/${enc(id)}`),
     v2LiveMatches: () => get('/v2/matches/live'),
+    v2Highlights: (id) => get(`/v2/matches/${enc(id)}/highlights`),
+    createReplayShare: (id, clip) => json('POST', `/v2/matches/${enc(id)}/shares`, { body: clip ? { clip } : {} }),
+    replayShares: (id) => get(`/v2/matches/${enc(id)}/shares`),
+    sharedReplay: (id, opts = {}) => get(`/replays/${enc(id)}`, opts.frames === false ? { frames: 0 } : undefined),
+    revokeReplayShare: (id) => json('DELETE', `/replays/${enc(id)}`),
+    v2MatchDecisions: (id) => get(`/v2/matches/${enc(id)}/decisions`),
+
+    createLobby: (settings) => json('POST', '/lobbies', { body: settings }),
+    myLobbies: () => get('/lobbies'),
+    lobby: (id) => get(`/lobbies/${enc(id)}`),
+    lobbyByCode: (code) => get(`/lobbies/code/${enc(code)}`),
+    joinLobby: (code) => json('POST', '/lobbies/join', { body: { code } }),
+    updateLobby: (id, patch) => json('PATCH', `/lobbies/${enc(id)}`, { body: patch }),
+    leaveLobby: (id) => json('DELETE', `/lobbies/${enc(id)}`),
+    tournaments: (status) => get('/tournaments', { status }),
+    tournament: (id) => get(`/tournaments/${enc(id)}`),
+    createTournament: (body) => json('POST', '/tournaments', { body }),
+    joinTournament: (id) => json('POST', `/tournaments/${enc(id)}/join`),
+    leaveTournament: (id) => json('POST', `/tournaments/${enc(id)}/leave`),
+    cancelTournament: (id) => json('POST', `/tournaments/${enc(id)}/cancel`),
+    onboarding: () => get('/onboarding'),
+    updateTutorial: (body) => json('PUT', '/onboarding/tutorial', { body }),
+    dismissChecklist: () => json('POST', '/onboarding/checklist/dismiss'),
+    skillTemplates: () => get('/onboarding/templates'),
+    copyTemplate: (id) => json('POST', `/onboarding/templates/${enc(id)}/copy`),
   };
 }

@@ -41,6 +41,7 @@ describe('migrations', () => {
         'free_budget_days',
         'v2_matches',
         'match_messages',
+        'match_timelines',
         'seasons',
         'season_standings',
         'prize_payouts',
@@ -50,14 +51,18 @@ describe('migrations', () => {
         'cosmetics_owned',
         'quest_claims',
         'achievements_unlocked',
+        'onboarding_progress',
+        'elo_decays',
       ]),
     );
     const applied = await db.execute(
       sql`select count(*)::int as n from drizzle.__drizzle_migrations`,
     );
     expect(rowsOf<{ n: number }>(applied)[0]!.n).toBe(embeddedMigrations().length);
-    // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_quests_achievements.
-    expect(embeddedMigrations()).toHaveLength(4);
+    // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_onboarding, 0004_ranked_tiers,
+    // 0005_match_timelines, 0006_skill_triggers, 0007_replay_shares, 0008_lobbies_tournaments,
+    // 0009_quests_achievements.
+    expect(embeddedMigrations()).toHaveLength(10);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {

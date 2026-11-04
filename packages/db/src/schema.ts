@@ -21,6 +21,7 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
+import type { SkillTrigger } from '@skirm/shared';
 
 /** bytea column mapped to Uint8Array. */
 export const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | Buffer | string }>({
@@ -57,7 +58,14 @@ export const ledgerRowType = pgEnum('ledger_row_type', [
   'spend',
 ]);
 export const creditSource = pgEnum('credit_source', ['paid', 'free']);
-export const ledgerNote = pgEnum('ledger_note', ['entry_fee', 'reversal', 'expired', 'cosmetic']);
+export const ledgerNote = pgEnum('ledger_note', [
+  'entry_fee',
+  'reversal',
+  'expired',
+  'cosmetic',
+  'prize_pool',
+  'prize',
+]);
 export const holdStatus = pgEnum('hold_status', ['held', 'settled', 'aborted']);
 /** `local`: recorded by the NoopRegistry only (NEAR is off in local mode); never onchain. */
 export const registryStatus = pgEnum('registry_status', [
@@ -88,6 +96,8 @@ export const accounts = pgTable(
     wins: integer('wins').notNull().default(0),
     losses: integer('losses').notNull().default(0),
     draws: integer('draws').notNull().default(0),
+    /** When the player's last ranked v2 result was written (the Elo decay's inactivity clock). */
+    lastRankedAt: ts('last_ranked_at'),
     createdAt: createdAt(),
     /** Set when the player deleted the account: it never signs in again (AccountsRepo.deleteAccount). */
     deletedAt: ts('deleted_at'),
@@ -185,6 +195,8 @@ export const skillVersions = pgTable(
     summary: text('summary'),
     requiresActions: jsonb('requires_actions').$type<string[]>().notNull(),
     handlesTags: jsonb('handles_tags').$type<string[]>().notNull(),
+    /** When the skill joins its agent's prompt (public, @skirm/shared SkillTrigger); null is always. */
+    trigger: jsonb('trigger').$type<SkillTrigger>(),
     royaltyBps: integer('royalty_bps').notNull().default(500),
     promptSha256: text('prompt_sha256').notNull(),
     ciphertext: bytea('ciphertext').notNull(),
@@ -489,6 +501,10 @@ export interface V2DebriefRecord {
   difficulty?: string;
   /** Ranked: the season this result counted towards and the standings points it gave (set by finish). */
   season?: { number: number; points: number };
+  /** The crew's own live commands (V2Debrief.commands); absent when none were sent. */
+  commands?: { tick: number; agents: { id: string; name: string }[]; preset: string | null; text: string | null }[];
+  /** Draft mode: every ban step, both crews' (V2Debrief.draft); absent outside draft mode. */
+  draft?: { bans: { team: 'A' | 'B'; step: number; skillId: string | null; name: string | null; timedOut?: true }[] };
 }
 
 /**
@@ -540,6 +556,8 @@ export const v2Matches = pgTable(
     index('v2_matches_status_idx').on(t.status, t.createdAt),
     index('v2_matches_team_a_idx').on(t.teamAAccountId, t.createdAt),
     index('v2_matches_team_b_idx').on(t.teamBAccountId, t.createdAt),
+    /** The per-map ranked leaderboard. */
+    index('v2_matches_map_idx').on(t.mapId, t.endedAt),
   ],
 );
 
@@ -569,6 +587,69 @@ export const matchMessages = pgTable(
     check('match_messages_team_ck', sql`${t.team} in ('A', 'B')`),
     check('match_messages_channel_ck', sql`${t.channel} in ('say', 'team')`),
   ],
+);
+
+/** One agent's turn in a crew's decision timeline (the debrief's "why did it do that?"). */
+export interface V2DecisionRecord {
+  /** The tick the action played on. */
+  tick: number;
+  agentId: string;
+  /** What the agent saw, summarised from its own fogged observation. */
+  observed: string;
+  /** The action as the engine names it ("move E", "verb dam E", "wait"). */
+  action: string;
+  /** Why it is a wait when it is: the brain missed the deadline, failed or answered nothing legal. */
+  reason: 'chosen' | 'timeout' | 'error' | 'illegal';
+  /** What the engine made of it: short tags (picked, delivered, blocked, dug, knocked_down, ...). */
+  outcome?: string[];
+  /** The effect class of a verb that resolved, or `remove_solid` for a dig (skill inference). */
+  effect?: string;
+  /** The line it said, as delivered (refused lines never appear). */
+  said?: string;
+  /** Its inner voice; never stored for an agent on a bought or rented skill. */
+  thought?: string;
+  /** The equipped skill the model said drove the move (id only; skill text never leaves the vault). */
+  skill?: { id: string; version: number };
+}
+
+/** A crew plan as it stood from `tick` on; `hidden` instead of text when a bought skill shaped it. */
+export interface V2PlanRecord {
+  tick: number;
+  text: string | null;
+  why: string | null;
+  hidden?: true;
+}
+
+/** A key moment on the timeline's scrubber. */
+export interface V2MomentRecord {
+  tick: number;
+  kind: 'hazard_breach' | 'switch' | 'supply_drop' | 'goal';
+  /** The crew it happened to (or that caused it). */
+  team: 'A' | 'B';
+  agentId: string | null;
+  text: string;
+}
+
+/**
+ * Each crew's decision timeline of a v2 match, written by realtime when the match ends: per agent
+ * per tick what it saw, the crew plan, the action and the skill that drove it, plus key moments.
+ * Read by GET /v2/matches/:id/decisions (players only, their own crew; practice adds the bot's).
+ */
+export const matchTimelines = pgTable(
+  'match_timelines',
+  {
+    matchId: text('match_id')
+      .notNull()
+      .references(() => v2Matches.id, { onDelete: 'cascade' }),
+    team: text('team').$type<'A' | 'B'>().notNull(),
+    /** The brain that played this crew ('haiku' or 'greedy'); greedy plays without skills. */
+    brain: text('brain').notNull(),
+    plans: jsonb('plans').$type<V2PlanRecord[]>().notNull().default([]),
+    decisions: jsonb('decisions').$type<V2DecisionRecord[]>().notNull().default([]),
+    moments: jsonb('moments').$type<V2MomentRecord[]>().notNull().default([]),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.matchId, t.team] }), check('match_timelines_team_ck', sql`${t.team} in ('A', 'B')`)],
 );
 
 // ---------- Seasons ----------
@@ -759,6 +840,230 @@ export const cosmeticsOwned = pgTable(
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.accountId, t.itemId] })],
+);
+
+// ---------- Private lobbies and tournaments ----------
+
+/**
+ * A single-elimination bracket of 4, 8 or 16 players, made of private lobbies. `prize_pool` paid
+ * credits were spent by the creator when it was made; they go to the top finishers when it ends, or
+ * back to the creator when it is cancelled before it starts.
+ */
+export const tournaments = pgTable(
+  'tournaments',
+  {
+    /** `trn_` + ULID. */
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    creatorId: text('creator_id')
+      .notNull()
+      .references(() => accounts.id),
+    size: integer('size').notNull(),
+    mapId: text('map_id').notNull(),
+    difficulty: text('difficulty').notNull(),
+    talk: text('talk').notNull().default('any'),
+    crewSize: integer('crew_size').notNull().default(3),
+    prizePool: integer('prize_pool').notNull().default(0),
+    /** open (taking players) | running | done | cancelled. */
+    status: text('status').notNull().default('open'),
+    championId: text('champion_id').references(() => accounts.id),
+    createdAt: createdAt(),
+    startedAt: ts('started_at'),
+    endedAt: ts('ended_at'),
+  },
+  (t) => [
+    index('tournaments_status_idx').on(t.status, t.createdAt),
+    check('tournaments_status_ck', sql`${t.status} in ('open', 'running', 'done', 'cancelled')`),
+    check('tournaments_size_ck', sql`${t.size} in (4, 8, 16)`),
+    check('tournaments_talk_ck', sql`${t.talk} in ('any', 'quiet', 'standard', 'open')`),
+    check('tournaments_crew_ck', sql`${t.crewSize} between 1 and 3`),
+    check('tournaments_pool_ck', sql`${t.prizePool} >= 0`),
+  ],
+);
+
+/** A player in a tournament: seed (by Elo at the start), where they finished and what they won. */
+export const tournamentEntries = pgTable(
+  'tournament_entries',
+  {
+    tournamentId: text('tournament_id')
+      .notNull()
+      .references(() => tournaments.id, { onDelete: 'cascade' }),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    /** 1 = best Elo; set when the bracket starts. */
+    seed: integer('seed'),
+    /** Elo when seeded. */
+    elo: integer('elo'),
+    /** 1 champion, 2 runner-up, 3 semi-final losers, 5 quarter-final losers, …; null while in. */
+    place: integer('place'),
+    prize: integer('prize').notNull().default(0),
+    joinedAt: ts('joined_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tournamentId, t.accountId] }),
+    index('tournament_entries_account_idx').on(t.accountId),
+  ],
+);
+
+/**
+ * A private casual match between two players: the host shares `code`, a guest joins, both ready
+ * a crew on realtime and play through the usual accept and lock-in. Unranked: no Elo, season or
+ * registry; credits are held and charged as in any casual match. A friend lobby goes back to `open`
+ * after each match (a rematch is one ready away); a tournament lobby is one bracket match
+ * (`tournament_id`, `round`, `slot`) and is `done` once it has a winner.
+ */
+export const lobbies = pgTable(
+  'lobbies',
+  {
+    /** `lby_` + ULID. */
+    id: text('id').primaryKey(),
+    /** Share code (LOBBY_CODE_ALPHABET). */
+    code: text('code').notNull(),
+    hostId: text('host_id')
+      .notNull()
+      .references(() => accounts.id),
+    guestId: text('guest_id').references(() => accounts.id),
+    mapId: text('map_id').notNull(),
+    difficulty: text('difficulty').notNull(),
+    /** LobbyTalkRule: any, or every agent on quiet, standard or open. */
+    talk: text('talk').notNull().default('any'),
+    /** Most agents a crew may field (also capped by the map). */
+    crewSize: integer('crew_size').notNull().default(3),
+    /** open | playing | done | cancelled. */
+    status: text('status').notNull().default('open'),
+    /** The match being played, or the last one. */
+    matchId: text('match_id'),
+    /** The last match's winner (null for a draw or a void). */
+    winnerId: text('winner_id').references(() => accounts.id),
+    tournamentId: text('tournament_id').references(() => tournaments.id),
+    round: integer('round'),
+    slot: integer('slot'),
+    /** When each player last readied a crew on realtime (cleared when they step back). */
+    hostReadyAt: ts('host_ready_at'),
+    guestReadyAt: ts('guest_ready_at'),
+    /** When the lobby last opened for a match (made, or back after a match that has to be replayed). */
+    openedAt: ts('opened_at').notNull().defaultNow(),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('lobbies_code_uq').on(t.code),
+    uniqueIndex('lobbies_bracket_uq').on(t.tournamentId, t.round, t.slot),
+    index('lobbies_host_idx').on(t.hostId, t.createdAt),
+    index('lobbies_guest_idx').on(t.guestId, t.createdAt),
+    index('lobbies_match_idx').on(t.matchId),
+    index('lobbies_status_idx').on(t.status, t.updatedAt),
+    check('lobbies_status_ck', sql`${t.status} in ('open', 'playing', 'done', 'cancelled')`),
+    check('lobbies_talk_ck', sql`${t.talk} in ('any', 'quiet', 'standard', 'open')`),
+    check('lobbies_crew_ck', sql`${t.crewSize} between 1 and 3`),
+    check('lobbies_players_ck', sql`${t.guestId} is null or ${t.guestId} <> ${t.hostId}`),
+  ],
+);
+// ---------- Replay shares ----------
+
+/**
+ * A public link to an ended match's replay, made by one of its players (opt-in). The link plays the
+ * whole-board (watch) frames only, so no crew plan, inner voice or live command is ever shown; an
+ * optional clip (`start_tick`..`end_tick`) narrows it to a moment. Revoking ends the link.
+ */
+export const replayShares = pgTable(
+  'replay_shares',
+  {
+    /** The public token: `rps_` + 16 random base64url characters (unguessable, never a ULID). */
+    id: text('id').primaryKey(),
+    matchId: text('match_id')
+      .notNull()
+      .references(() => v2Matches.id, { onDelete: 'cascade' }),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    startTick: integer('start_tick'),
+    endTick: integer('end_tick'),
+    createdAt: createdAt(),
+    revokedAt: ts('revoked_at'),
+  },
+  (t) => [
+    index('replay_shares_match_idx').on(t.matchId, t.accountId),
+    check(
+      'replay_shares_clip_ck',
+      sql`(${t.startTick} is null and ${t.endTick} is null) or (${t.startTick} >= 0 and ${t.endTick} > ${t.startTick})`,
+    ),
+  ],
+);
+
+/** A highlight as cached (engine ReplayHighlight plus its caster line). */
+export interface ReplayHighlightRecord {
+  id: string;
+  kind: 'goal' | 'switch_flood' | 'drop_fight' | 'lead_change';
+  tick: number;
+  start: number;
+  end: number;
+  team: 'A' | 'B' | null;
+  title: string;
+  facts: string;
+  weight: number;
+  score: Record<'A' | 'B', number>;
+  line: string;
+}
+
+/**
+ * The highlights of an ended match with their caster lines, worked out once from its stored frames
+ * and kept here, so the caster is called at most once per match and the highlights outlive the
+ * frames. `cost_usd` is platform model spend; no player is charged for it.
+ */
+export const replayCasts = pgTable('replay_casts', {
+  matchId: text('match_id')
+    .primaryKey()
+    .references(() => v2Matches.id, { onDelete: 'cascade' }),
+  highlights: jsonb('highlights').$type<ReplayHighlightRecord[]>().notNull(),
+  /** model | template */
+  caster: text('caster').$type<'model' | 'template'>().notNull(),
+  model: text('model'),
+  costUsd: real('cost_usd').notNull().default(0),
+  createdAt: createdAt(),
+});
+
+// ---------- Onboarding ----------
+
+/**
+ * How far a player got with onboarding (@skirm/shared TUTORIAL_STEPS, FIRST_STEPS). No row: a new
+ * player who has seen nothing. `tutorial_step` is the number of tips seen and only grows; the rest
+ * of the checklist is read from the player's own matches, skills and agents.
+ */
+export const onboardingProgress = pgTable('onboarding_progress', {
+  accountId: text('account_id')
+    .primaryKey()
+    .references(() => accounts.id),
+  tutorialStep: integer('tutorial_step').notNull().default(0),
+  tutorialCompletedAt: ts('tutorial_completed_at'),
+  tutorialSkippedAt: ts('tutorial_skipped_at'),
+  checklistDismissedAt: ts('checklist_dismissed_at'),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+// ---------- Ranked ----------
+
+/**
+ * Elo lost to inactivity (the worker's `ranked` decay job, @skirm/shared decayedElo): one row per
+ * step, so the next step waits `DEFAULTS.ranked.decay.days` from the later of this and the player's
+ * last ranked result.
+ */
+export const eloDecays = pgTable(
+  'elo_decays',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    eloBefore: integer('elo_before').notNull(),
+    eloAfter: integer('elo_after').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('elo_decays_account_idx').on(t.accountId, t.createdAt),
+    check('elo_decays_lower_ck', sql`${t.eloAfter} < ${t.eloBefore}`),
+  ],
 );
 
 // ---------- Quests and achievements ----------

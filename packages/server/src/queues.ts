@@ -17,10 +17,16 @@ export const QUEUE_REGISTRY = 'registry' as const;
 export const QUEUE_BENCHMARKS = 'benchmarks' as const;
 /** Season upkeep: lock ended seasons, write payouts, open the next one. */
 export const QUEUE_SEASONS = 'seasons' as const;
+/** Tournament upkeep: settle lobbies whose match ended unsettled, decide bracket no-shows. */
+export const QUEUE_TOURNAMENTS = 'tournaments' as const;
+/** Ranked upkeep: the Elo decay of inactive high-tier players. */
+export const QUEUE_RANKED = 'ranked' as const;
 export const QUEUE_NAMES = {
   registry: QUEUE_REGISTRY,
   benchmarks: QUEUE_BENCHMARKS,
   seasons: QUEUE_SEASONS,
+  tournaments: QUEUE_TOURNAMENTS,
+  ranked: QUEUE_RANKED,
 } as const;
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
@@ -43,10 +49,22 @@ export interface SeasonJobData {
   kind: 'tick';
 }
 
+/** `tournaments` queue: one repeatable tick. */
+export interface TournamentJobData {
+  kind: 'tick';
+}
+
+/** `ranked` queue: one repeatable decay pass. */
+export interface RankedJobData {
+  kind: 'decay';
+}
+
 export interface JobDataByQueue {
   registry: RegistryJobData;
   benchmarks: BenchmarkJobData;
   seasons: SeasonJobData;
+  tournaments: TournamentJobData;
+  ranked: RankedJobData;
 }
 
 /** Every queue retries: registry writes, benchmarks and the season tick. */
@@ -69,6 +87,17 @@ export const DEFAULT_JOB_OPTIONS: Record<QueueName, JobsOptions> = {
     removeOnComplete: 100,
     removeOnFail: 1000,
   },
+  tournaments: {
+    attempts: 1,
+    removeOnComplete: 100,
+    removeOnFail: 1000,
+  },
+  ranked: {
+    attempts: 3,
+    backoff: { type: 'fixed', delay: 60_000 },
+    removeOnComplete: 100,
+    removeOnFail: 1000,
+  },
 };
 
 /** Stable job ids: one job per registry record / per benchmark or trial. */
@@ -78,6 +107,12 @@ export const benchmarkJobId = (d: BenchmarkJobData) =>
 /** The season tick's job scheduler id: one schedule however many workers start it. */
 export const SEASON_TICK_JOB_ID = 'season-tick';
 export const SEASON_TICK_EVERY_MS = 10 * 60_000;
+/** The tournament tick's job scheduler id, and how often it runs. */
+export const TOURNAMENT_TICK_JOB_ID = 'tournament-tick';
+export const TOURNAMENT_TICK_EVERY_MS = 60_000;
+/** The Elo decay pass's job scheduler id, and how often it runs (a step is due once per decay period). */
+export const RANKED_DECAY_JOB_ID = 'ranked-decay';
+export const RANKED_DECAY_EVERY_MS = 60 * 60_000;
 
 // ---------- WebSocket (apps/realtime, path /ws) ----------
 
@@ -119,7 +154,7 @@ export function createWorker<Q extends QueueName, R = unknown>(
   opts: Omit<WorkerOptions, 'connection'> = {},
 ): Worker<JobDataByQueue[Q], R> {
   return new Worker<JobDataByQueue[Q], R>(name, processor, {
-    concurrency: name === 'seasons' ? 1 : 4,
+    concurrency: name === 'seasons' || name === 'ranked' || name === 'tournaments' ? 1 : 4,
     ...opts,
     connection,
   });
@@ -150,5 +185,29 @@ export async function scheduleSeasonTick(
     SEASON_TICK_JOB_ID,
     { every: everyMs },
     { name: 'tick', data: { kind: 'tick' } },
+  );
+}
+
+/** Schedules the tournament tick every TOURNAMENT_TICK_EVERY_MS (an upsert: one schedule per queue). */
+export async function scheduleTournamentTick(
+  queue: Queue<TournamentJobData>,
+  everyMs: number = TOURNAMENT_TICK_EVERY_MS,
+): Promise<void> {
+  await queue.upsertJobScheduler(
+    TOURNAMENT_TICK_JOB_ID,
+    { every: everyMs },
+    { name: 'tick', data: { kind: 'tick' } },
+  );
+}
+
+/** Schedules the Elo decay pass every RANKED_DECAY_EVERY_MS (an upsert: one schedule per queue). */
+export async function scheduleRankedDecay(
+  queue: Queue<RankedJobData>,
+  everyMs: number = RANKED_DECAY_EVERY_MS,
+): Promise<void> {
+  await queue.upsertJobScheduler(
+    RANKED_DECAY_JOB_ID,
+    { every: everyMs },
+    { name: 'decay', data: { kind: 'decay' } },
   );
 }

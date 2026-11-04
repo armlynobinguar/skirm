@@ -2,9 +2,9 @@ name: ci
 
 # On main (merges and direct pushes) and on pull requests into main; start a run by hand from the
 # Actions tab ("Run workflow"). Typecheck and unit tests also run on each machine before a push
-# (.githooks/pre-push); the app job repeats them on pull requests so a PR shows its checks before it
-# is merged. e2e and the full stack smoke run by hand (README, Testing), and the staging deploy
-# (deploy.yml) builds the images.
+# (.githooks/pre-push); CI repeats them so a merge that skipped the hook is still checked. e2e and
+# the full stack smoke run by hand (README, Testing), and the staging deploy (deploy.yml) builds the
+# images.
 on:
   push:
     branches: [main]
@@ -22,8 +22,6 @@ permissions:
 jobs:
   app:
     name: app (typecheck, unit tests)
-    # Main already ran these locally before the push (pre-push hook); pull requests get them here.
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

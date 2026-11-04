@@ -2,6 +2,7 @@
 // v2 match, found: the VS card. Accept or decline within 10 s; the rival stays hidden (practice
 // names the greedy bot at once, since there is nobody to hide).
 import { Button } from '@skirm/ui';
+import { TierBadge } from '@/components/TierBadge';
 import { mapById } from '@/features/arena/world';
 import { useRealtime } from '@/lib/services';
 import { Countdown, PracticeBadge, other } from './common';
@@ -16,7 +17,7 @@ export function Accept({ view }: { view: V2MatchView }) {
     <div className={v.vs} role="dialog" aria-modal="true" aria-labelledby="v2-found" data-testid="v2-found">
       <p className={v.found}>
         <span id="v2-found" className="sk-kick">
-          Match found · {view.ranked ? 'Ranked' : view.practice ? 'Practice' : 'Casual'} · {map?.name ?? view.mapId}
+          Match found · {view.ranked ? 'Ranked' : view.practice ? 'Practice' : view.draft ? 'Draft' : 'Casual'} · {map?.name ?? view.mapId}
         </span>
         {view.practice ? (
           <>
@@ -28,6 +29,7 @@ export function Accept({ view }: { view: V2MatchView }) {
       <div className={`${v.vside} ${v.va}`}>
         <span className="sk-kick">Your crew · {view.team}</span>
         <span className="sk-disp">You</span>
+        {view.tiers ? <TierBadge tier={view.tiers.you} testId="v2-found-tier-you" /> : null}
         <span className={v.crewMeta}>{mine ? 'Accepted' : 'Waiting for you'}</span>
       </div>
       <div className={v.vmid}>
@@ -49,6 +51,7 @@ export function Accept({ view }: { view: V2MatchView }) {
       <div className={`${v.vside} ${v.vb}`}>
         <span className="sk-kick">Rival crew · {other(view.team)}</span>
         <span className="sk-disp">{view.rivalHandle ?? '???'}</span>
+        {view.tiers ? <TierBadge tier={view.tiers.rival} testId="v2-found-tier-rival" /> : null}
         <span className={v.crewMeta}>{view.accepted.includes(other(view.team)) ? 'Accepted' : 'Deciding'}</span>
       </div>
     </div>
