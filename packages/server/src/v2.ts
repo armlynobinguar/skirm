@@ -1,7 +1,8 @@
 // v2 match messages on /ws. A match goes found → accept (10 s,
 // both crews) → lock-in (30 s: talk tiers and crew changes, the rival hidden) → live (2 s ticks) →
 // end. Each crew gets its own frame through its own fog; watchers get the whole board.
-import type { Difficulty, MatchResult, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
+import type { CommandPreset, Difficulty, MatchResult, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
+import type { PlayerTier } from '@skirm/shared';
 
 export interface V2CrewEntry {
   agentId: string;
@@ -50,6 +51,16 @@ export interface V2Debrief {
   difficulty?: Difficulty;
   /** Ranked: the season this result counted towards and the standings points it gave; absent otherwise. */
   season?: { number: number; points: number };
+  /** The live commands this crew's player sent, as applied (tick order); absent when none. Never the rival's. */
+  commands?: V2DebriefCommand[];
+}
+
+/** One live command in the debrief transcript. */
+export interface V2DebriefCommand {
+  tick: number;
+  agents: { id: string; name: string }[];
+  preset: CommandPreset | null;
+  text: string | null;
 }
 
 export type V2ClientMessage =
@@ -70,14 +81,20 @@ export type V2ClientMessage =
    */
   | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[] }
   /** Every stored frame of an ended match (answered with v2_frames), for replay at another speed. */
-  | { type: 'v2_replay'; matchId: string };
+  | { type: 'v2_replay'; matchId: string }
+  /**
+   * A live command to the player's own crew: one agent (`agentId`) or all of it, a preset and/or free
+   * text (at most DEFAULTS.commands.maxChars, through the speech filter). Answered with v2_command_ok.
+   */
+  | { type: 'v2_command'; matchId: string; agentId?: string; preset?: CommandPreset; text?: string };
 
 export type V2ServerMessage =
   /**
    * `practice`: against the greedy bot, whose handle (`rivalHandle`) is known at once. `free`: this
-   * crew holds and pays nothing (the bot, or a player on the offline greedy brain).
+   * crew holds and pays nothing (the bot, or a player on the offline greedy brain). `tiers`: ranked
+   * only, both players' ranked tiers as they queued (the rival stays unnamed).
    */
-  | { type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty; practice?: true; free?: true; rivalHandle?: string }
+  | { type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty; practice?: true; free?: true; rivalHandle?: string; tiers?: { you: PlayerTier; rival: PlayerTier } }
   | { type: 'v2_accepted'; matchId: string; team: Team }
   /** `crewLimit`: most agents this map takes; `headStartTicks`: the hold each crew gets with the crews as they stand. */
   /** `free`: as on v2_found, this crew is not held for the match. */
@@ -87,4 +104,6 @@ export type V2ServerMessage =
   | { type: 'v2_frame'; matchId: string; frame: V2Frame }
   | { type: 'v2_end'; matchId: string; result: MatchResult | null; reason: V2EndReason; logHash: string | null; debrief?: V2Debrief }
   /** Answer to v2_replay: a player's own crew view (the whole board for anyone else), ascending tick. */
-  | { type: 'v2_frames'; matchId: string; frames: V2Frame[] };
+  | { type: 'v2_frames'; matchId: string; frames: V2Frame[] }
+  /** Answer to v2_command, to the sender's crew only: the command is applied on `tick`; `left` remain. */
+  | { type: 'v2_command_ok'; matchId: string; tick: number; left: number };

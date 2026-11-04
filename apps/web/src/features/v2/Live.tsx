@@ -4,7 +4,8 @@
 //             drop, the difficulty's goal tag) and the rival's box.
 //   right   → the comms feed, filtered All / Team / Say / overheard / Mind (plan changes).
 //   bottom  → agent cards (carry slots with origin stripes, pickup and delivery floats; click to
-//             follow, double-click for third person) and the controls.
+//             follow, double-click for third person) and the controls; above them, for a player
+//             only, the live commands (hud/Commands.tsx).
 //   over it → the intro cutscene, the 3-2-1-GO count, callouts, and the VICTORY / DEFEAT banner.
 // The match is server-paced: Pause freezes this view only (resume jumps back to live), Story keeps
 // third person subtitles up for their full time, and the speed control shows only for a replay.
@@ -23,6 +24,7 @@ import type { ArenaState } from '@/features/arena/world';
 import { useSession } from '@/lib/auth/session';
 import type { FrameAgent, V2Frame } from '@/lib/realtime/protocol';
 import { AgentCards, type CardAgent } from './hud/AgentCards';
+import { CommandBar } from './hud/Commands';
 import { Comms } from './hud/Comms';
 import c from './hud/hud.module.css';
 import { Intro } from './hud/Intro';
@@ -272,6 +274,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
       />
       <Comms lines={comms} team={team} filter={filter} onFilter={setFilter} tickMs={view.tickMs} />
       <div className={c.mbot}>
+        {!watch && !replay && view.phase === 'live' ? <CommandBar view={view} frame={frame} /> : null}
         <AgentCards team={team} mapId={view.mapId} tick={tick} cards={own} pressed={tpv ?? focus} onPick={onPick} onWatch={enterTpv} />
         <div className={`sk-panel ${c.ctrl}`}>
           <Button size="sm" onClick={onPause} disabled={ended} aria-label={paused ? 'Resume' : 'Pause'} title={replay ? 'Pause (Space)' : 'Pause the view; the match goes on (Space)'} data-testid="v2-pause">

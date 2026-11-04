@@ -7,8 +7,10 @@ describe('§7 Elo', () => {
     expect(expectedScore(1200, 1200)).toBe(0.5);
   });
 
-  it('K = 32 for the first 20 ranked matches, then 16', () => {
-    expect(kFactor(0)).toBe(32);
+  it('K = 48 for the 5 placement matches, 32 up to the 20th ranked match, then 16', () => {
+    expect(kFactor(0)).toBe(48);
+    expect(kFactor(4)).toBe(48);
+    expect(kFactor(5)).toBe(32);
     expect(kFactor(19)).toBe(32);
     expect(kFactor(20)).toBe(16);
   });
@@ -46,7 +48,7 @@ describe('§7 Elo', () => {
 
   it('updates every agent of both crews; same K means the winner gains what the loser loses', () => {
     const r = updateMatch(
-      [{ rating: 1200, rankedMatches: 0 }],
+      [{ rating: 1200, rankedMatches: 5 }],
       [{ rating: 1300, rankedMatches: 5 }],
       1,
     );
@@ -63,6 +65,13 @@ describe('§7 Elo', () => {
     );
     expect(crew.a.map((x) => x.delta)).toEqual([10, 10]);
     expect(crew.b[0]!.delta).toBe(-10);
+  });
+
+  it('a placement match moves the placing player further (K 48)', () => {
+    const r = updateMatch([{ rating: 1200, rankedMatches: 0 }], [{ rating: 1300, rankedMatches: 30 }], 1);
+    // 48 × 0.640065 = 30.72 → +31; the placed rival loses 16 × 0.640065 = 10.24 → −10.
+    expect(r.a[0]).toEqual({ before: 1200, delta: 31, after: 1231 });
+    expect(r.b[0]!.delta).toBe(-10);
   });
 
   it('a draw between equals changes nothing; the floor caps a loss', () => {

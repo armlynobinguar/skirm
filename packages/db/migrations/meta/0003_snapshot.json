@@ -1,5 +1,5 @@
 {
-  "id": "452a0907-0a2e-439b-9a3b-c883ee99b52e",
+  "id": "04978272-2990-4846-afc5-73a34f373ddd",
   "prevId": "cdb877a8-1ea5-4e12-9e1d-53e0c3f2afc1",
   "version": "7",
   "dialect": "postgresql",
@@ -1137,51 +1137,43 @@
       },
       "isRLSEnabled": false
     },
-    "public.match_timelines": {
-      "name": "match_timelines",
+    "public.onboarding_progress": {
+      "name": "onboarding_progress",
       "schema": "",
       "columns": {
-        "match_id": {
-          "name": "match_id",
+        "account_id": {
+          "name": "account_id",
           "type": "text",
-          "primaryKey": false,
+          "primaryKey": true,
           "notNull": true
         },
-        "team": {
-          "name": "team",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "brain": {
-          "name": "brain",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "plans": {
-          "name": "plans",
-          "type": "jsonb",
+        "tutorial_step": {
+          "name": "tutorial_step",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": 0
         },
-        "decisions": {
-          "name": "decisions",
-          "type": "jsonb",
+        "tutorial_completed_at": {
+          "name": "tutorial_completed_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
+          "notNull": false
         },
-        "moments": {
-          "name": "moments",
-          "type": "jsonb",
+        "tutorial_skipped_at": {
+          "name": "tutorial_skipped_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
+          "notNull": false
         },
-        "created_at": {
-          "name": "created_at",
+        "checklist_dismissed_at": {
+          "name": "checklist_dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
@@ -1190,37 +1182,24 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "match_timelines_match_id_v2_matches_id_fk": {
-          "name": "match_timelines_match_id_v2_matches_id_fk",
-          "tableFrom": "match_timelines",
-          "tableTo": "v2_matches",
+        "onboarding_progress_account_id_accounts_id_fk": {
+          "name": "onboarding_progress_account_id_accounts_id_fk",
+          "tableFrom": "onboarding_progress",
+          "tableTo": "accounts",
           "columnsFrom": [
-            "match_id"
+            "account_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {
-        "match_timelines_match_id_team_pk": {
-          "name": "match_timelines_match_id_team_pk",
-          "columns": [
-            "match_id",
-            "team"
-          ]
-        }
-      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "match_timelines_team_ck": {
-          "name": "match_timelines_team_ck",
-          "value": "\"match_timelines\".\"team\" in ('A', 'B')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.prize_payouts": {

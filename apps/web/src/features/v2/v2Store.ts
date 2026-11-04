@@ -8,8 +8,10 @@
 // player view. A player view never takes a whole-board frame; a watch view that gets a crew's frame
 // turns into that crew's view, since the server sends those only to the crew's own player.
 // `said` keeps every say and team line for the debrief's transcript, uncapped (talk is rate-limited
-// per tier), unlike the feed, which keeps the last MAX_COMMS lines of everything.
-import { mapV2 } from '@skirm/engine/v2';
+// per tier), unlike the feed, which keeps the last MAX_COMMS lines of everything. Your own live
+// commands (the frame's `commands`, never in the rival's) join both as 'order' lines.
+import { commandLabel, mapV2 } from '@skirm/engine/v2';
+import type { PlayerTier } from '@skirm/shared';
 import { useEffect, useSyncExternalStore } from 'react';
 import type { Realtime } from '@/lib/realtime/client';
 import type { Difficulty, FrameAgent, MatchResult, TalkTier, Team, V2Debrief, V2EndReason, V2Frame, WsServerMessage } from '@/lib/realtime/protocol';
@@ -28,8 +30,8 @@ export interface V2CommsLine {
   from: string;
   fromName: string;
   team: Team;
-  /** Talk (say, team), an agent's action (verb), the arena itself (supply drops), or a plan change (mind). */
-  channel: 'say' | 'team' | 'verb' | 'arena' | 'mind';
+  /** Talk (say, team), an agent's action (verb), the arena itself (supply drops), a plan change (mind), or your own live command (order). */
+  channel: 'say' | 'team' | 'verb' | 'arena' | 'mind' | 'order';
   text: string;
   /** A rival's team message your agents overheard. */
   overheard: boolean;
@@ -43,6 +45,8 @@ export interface V2CommsLine {
   bluffReply?: true;
   /** mind lines: the agent's inner voice (its THINK line), not a plan change. */
   thought?: true;
+  /** order lines: who the command went to ("Crew" or the agent's name). */
+  orderTo?: string;
 }
 
 /** What a bluff's target answers (the prototype's lines). */
@@ -72,6 +76,8 @@ export interface V2MatchView {
   crewLimit: number | null;
   headStartTicks: Record<Team, number> | null;
   rivalHandle: string | null;
+  /** Ranked: both players' tiers from v2_found (the rival stays unnamed until the start). */
+  tiers?: { you: PlayerTier; rival: PlayerTier } | null;
   tickMs: number;
   holdTicks: Record<Team, number> | null;
   frame: V2Frame | null;
@@ -91,6 +97,8 @@ export interface V2MatchView {
   endAt: number | null;
   /** Every stored frame of the ended match (v2_frames, after sending v2_replay); null until asked. */
   replay: V2Frame[] | null;
+  /** The last v2_command_ok: the tick the command lands on and how many are left. */
+  commandAck: { tick: number; left: number } | null;
 }
 
 /** Most comms lines kept per match. */
@@ -116,6 +124,7 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
       crewLimit: null,
       headStartTicks: null,
       rivalHandle: m.rivalHandle ?? null,
+      tiers: m.tiers ?? null,
       tickMs: 2000,
       holdTicks: null,
       frame: null,
@@ -128,6 +137,7 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
       end: null,
       endAt: null,
       replay: null,
+      commandAck: null,
       // A repeat (reconnect) keeps what was already known.
       ...(prev && prev.phase === 'found' ? { accepted: prev.accepted } : {}),
     };
@@ -161,7 +171,7 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
       if (!prev.watch && m.frame.view === 'watch') return prev;
       if (prev.frame && m.frame.tick <= prev.frame.tick) return prev;
       const lines = linesOf(m.frame, prev.frame);
-      const said = saidOf(m.frame);
+      const said = [...ordersOf(m.frame, prev.frame), ...saidOf(m.frame)];
       return {
         ...prev,
         phase: prev.phase === 'ended' ? 'ended' : 'live',
@@ -177,6 +187,8 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
       return { ...prev, phase: 'ended', end: { result: m.result, reason: m.reason, logHash: m.logHash, debrief: m.debrief ?? null }, endAt: now };
     case 'v2_frames':
       return { ...prev, replay: m.frames };
+    case 'v2_command_ok':
+      return { ...prev, commandAck: { tick: m.tick, left: m.left } };
     default:
       return prev;
   }
@@ -188,7 +200,7 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
  */
 export function linesOf(frame: V2Frame, prev: V2Frame | null): V2CommsLine[] {
   const tick = frame.tick;
-  const out: V2CommsLine[] = frame.comms.map((c) => ({ ...c, tick }));
+  const out: V2CommsLine[] = [...ordersOf(frame, prev), ...frame.comms.map((c) => ({ ...c, tick }))];
   const def = mapV2(frame.mapId);
   const agent = (id: string) => frame.agents.find((a) => a.id === id);
   for (const e of frame.events) {
@@ -222,6 +234,17 @@ export function linesOf(frame: V2Frame, prev: V2Frame | null): V2CommsLine[] {
       out.push({ tick, from: a.id, fromName: a.name, team: a.team, channel: 'mind', text: a.thought, overheard: false, thought: true });
     }
   return out;
+}
+
+/** Your live commands this frame applied (new in its `commands` log since `prev`), as order lines. */
+export function ordersOf(frame: V2Frame, prev: V2Frame | null): V2CommsLine[] {
+  if (frame.view === 'watch' || !frame.commands) return [];
+  const seen = prev?.commands?.log.length ?? 0;
+  const own = frame.agents.filter((a) => a.team === frame.view);
+  return frame.commands.log.slice(seen).map((c) => {
+    const to = c.agents.length === 1 && own.length !== 1 ? (own.find((a) => a.id === c.agents[0])?.name ?? 'Agent') : 'Crew';
+    return { tick: c.tick, from: 'you', fromName: 'You', team: frame.view as Team, channel: 'order', text: commandLabel(c), overheard: false, orderTo: to };
+  });
 }
 
 /** The talk one frame carried (say and team lines), for the transcript. */
@@ -271,6 +294,7 @@ function bareView(matchId: string, last: V2Frame): V2MatchView {
     end: null,
     endAt: null,
     replay: null,
+    commandAck: null,
   };
 }
 
@@ -281,14 +305,14 @@ function replayView(matchId: string, frames: V2Frame[]): V2MatchView {
     ...bareView(matchId, last),
     phase: 'ended',
     end: last.result ? { result: last.result, reason: last.result.reason, logHash: null, debrief: null } : null,
-    said: frames.flatMap(saidOf),
+    said: frames.flatMap((f, i) => [...ordersOf(f, frames[i - 1] ?? null), ...saidOf(f)]),
     replay: frames,
   };
 }
 
 /** A live match first seen through one frame: spectating (a whole-board frame) or a player's resumed view. */
 function frameView(matchId: string, frame: V2Frame, now: number): V2MatchView {
-  return { ...bareView(matchId, frame), frame, frameAt: now, comms: linesOf(frame, null), said: saidOf(frame), rivals: rivalsSeen([], frame) };
+  return { ...bareView(matchId, frame), frame, frameAt: now, comms: linesOf(frame, null), said: [...ordersOf(frame, null), ...saidOf(frame)], rivals: rivalsSeen([], frame) };
 }
 
 type Listener = () => void;

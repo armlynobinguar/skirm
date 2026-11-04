@@ -73,7 +73,35 @@ describe('S16 Profile', () => {
     expect(within(rank).getByTestId('s16-rank-title')).toHaveTextContent('Breach Runner II');
     expect(within(rank).getByTestId('s16-rank-record')).toHaveTextContent('8–3–1 in 12');
     expect(within(rank).getByTestId('s16-rank-position')).toHaveTextContent('#14');
+    expect(within(rank).getByTestId('s16-rank-tier')).toHaveTextContent('Gold next at 1,500');
+    expect(within(rank).queryByTestId('s16-rank-decay')).not.toBeInTheDocument();
     expect(within(rank).getByRole('link', { name: 'Season standings' })).toHaveAttribute('href', '/leaderboards');
+  });
+
+  it('warns a Diamond player when inactivity costs Elo next', async () => {
+    renderWithProviders(<ProfileScreen />, {
+      handle: 'ada',
+      api: {
+        ...base,
+        me: async () =>
+          meFixture({
+            rank: {
+              elo: 1760,
+              rankedMatches: 40,
+              wins: 30,
+              losses: 10,
+              draws: 0,
+              title: 'Storm Marshal',
+              position: 1,
+              tier: { tier: 'Diamond', placementsPlayed: 5, placementMatches: 5, nextAt: 1900 },
+              decayAt: '2026-11-20T08:00:00.000Z',
+            },
+          }),
+      },
+    });
+    const rank = await screen.findByTestId('s16-rank');
+    expect(within(rank).getByTestId('s16-rank-tier')).toHaveTextContent('Diamond next at 1,900');
+    expect(within(rank).getByTestId('s16-rank-decay')).toHaveTextContent(/^Play a ranked match by .+ to keep your Elo$/);
   });
 
   it('shows a new account as unranked at the starting Elo', async () => {
@@ -82,6 +110,7 @@ describe('S16 Profile', () => {
     expect(within(rank).getByTestId('s16-rank-elo')).toHaveTextContent('1,200');
     expect(within(rank).getByTestId('s16-rank-record')).toHaveTextContent('0–0–0 in 0');
     expect(within(rank).getByTestId('s16-rank-position')).toHaveTextContent('Not placed yet');
+    expect(within(rank).getByTestId('s16-rank-tier')).toHaveTextContent('Placement 0/5 5 placement matches left');
   });
 
   it('lists recent v2 matches linking to their results', async () => {

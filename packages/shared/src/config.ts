@@ -67,10 +67,32 @@ const defaults = {
   },
   elo: {
     start: 1200,
+    /** K for a player's placement matches (the first `ranked.placementMatches`, see below). */
+    kPlacement: 48,
     kProvisional: 32,
     provisionalMatches: 20,
     k: 16,
     floor: 100,
+  },
+  /**
+   * Ranked tiers from Elo (lowest first, `min` is the tier floor). A tier is shown once a player has
+   * played `placementMatches` ranked matches; until then K is `elo.kPlacement`. Inactive players in
+   * `decay.fromTier` or above lose `decay.amount` Elo per `decay.days` without a ranked match, never
+   * below the floor of the tier they are in (the worker's `ranked` decay job). The skill leaderboard
+   * ranks win rate over skills with at least `skillMinMatches` ranked matches.
+   */
+  ranked: {
+    tiers: [
+      { name: 'Bronze', min: 0 },
+      { name: 'Silver', min: 1100 },
+      { name: 'Gold', min: 1300 },
+      { name: 'Platinum', min: 1500 },
+      { name: 'Diamond', min: 1700 },
+      { name: 'Master', min: 1900 },
+    ] as { name: 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond' | 'Master'; min: number }[],
+    placementMatches: 5,
+    decay: { fromTier: 'Diamond' as const, days: 14, amount: 25 },
+    skillMinMatches: 10,
   },
   /**
    * v2 talk tiers, integer credits per 100 agent-ticks. Quiet makes the same per-tick model calls
@@ -84,6 +106,17 @@ const defaults = {
    * v2 seasons: 14 days, standings from ranked v2 matches only, top 10 paid 30/20/15 then 5 × 7
    * (bps, the seasons contract's SPLIT_BPS). The pool is funded NEAR plus this share of market fees.
    */
+  /**
+   * Live commands: directives a player sends one agent or the whole crew during a match (presets
+   * plus optional free text). `perMatch` per crew; at most one every `cooldownTicks`; each holds in
+   * the agents' prompts for `activeTicks`; free text up to `maxChars` (it passes the speech filter).
+   */
+  commands: {
+    perMatch: 3,
+    cooldownTicks: 5,
+    activeTicks: 10,
+    maxChars: 80,
+  },
   season: {
     days: 14,
     splitBps: [3000, 2000, 1500, 500, 500, 500, 500, 500, 500, 500],

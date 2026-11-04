@@ -15,7 +15,7 @@ describe('v2 skill attribution', () => {
   it('asks for a SKILL line only when the agent carries skills', () => {
     const o = observe(match(), 'wick');
     expect(turnPrompt(o, null, false)).not.toContain('SKILL:');
-    expect(turnPrompt(o, null, false, [], 2)).toContain('"SKILL: <its number, 1 to 2>"');
+    expect(turnPrompt(o, null, false, [], null, 2)).toContain('"SKILL: <its number, 1 to 2>"');
   });
 
   it('parses the SKILL line within the numbered skills and ignores it otherwise', () => {

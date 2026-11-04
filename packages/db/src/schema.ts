@@ -88,6 +88,8 @@ export const accounts = pgTable(
     wins: integer('wins').notNull().default(0),
     losses: integer('losses').notNull().default(0),
     draws: integer('draws').notNull().default(0),
+    /** When the player's last ranked v2 result was written (the Elo decay's inactivity clock). */
+    lastRankedAt: ts('last_ranked_at'),
     createdAt: createdAt(),
     /** Set when the player deleted the account: it never signs in again (AccountsRepo.deleteAccount). */
     deletedAt: ts('deleted_at'),
@@ -489,6 +491,8 @@ export interface V2DebriefRecord {
   difficulty?: string;
   /** Ranked: the season this result counted towards and the standings points it gave (set by finish). */
   season?: { number: number; points: number };
+  /** The crew's own live commands (V2Debrief.commands); absent when none were sent. */
+  commands?: { tick: number; agents: { id: string; name: string }[]; preset: string | null; text: string | null }[];
 }
 
 /**
@@ -540,6 +544,8 @@ export const v2Matches = pgTable(
     index('v2_matches_status_idx').on(t.status, t.createdAt),
     index('v2_matches_team_a_idx').on(t.teamAAccountId, t.createdAt),
     index('v2_matches_team_b_idx').on(t.teamBAccountId, t.createdAt),
+    /** The per-map ranked leaderboard. */
+    index('v2_matches_map_idx').on(t.mapId, t.endedAt),
   ],
 );
 
@@ -822,4 +828,46 @@ export const cosmeticsOwned = pgTable(
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.accountId, t.itemId] })],
+);
+
+// ---------- Onboarding ----------
+
+/**
+ * How far a player got with onboarding (@skirm/shared TUTORIAL_STEPS, FIRST_STEPS). No row: a new
+ * player who has seen nothing. `tutorial_step` is the number of tips seen and only grows; the rest
+ * of the checklist is read from the player's own matches, skills and agents.
+ */
+export const onboardingProgress = pgTable('onboarding_progress', {
+  accountId: text('account_id')
+    .primaryKey()
+    .references(() => accounts.id),
+  tutorialStep: integer('tutorial_step').notNull().default(0),
+  tutorialCompletedAt: ts('tutorial_completed_at'),
+  tutorialSkippedAt: ts('tutorial_skipped_at'),
+  checklistDismissedAt: ts('checklist_dismissed_at'),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+// ---------- Ranked ----------
+
+/**
+ * Elo lost to inactivity (the worker's `ranked` decay job, @skirm/shared decayedElo): one row per
+ * step, so the next step waits `DEFAULTS.ranked.decay.days` from the later of this and the player's
+ * last ranked result.
+ */
+export const eloDecays = pgTable(
+  'elo_decays',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    eloBefore: integer('elo_before').notNull(),
+    eloAfter: integer('elo_after').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('elo_decays_account_idx').on(t.accountId, t.createdAt),
+    check('elo_decays_lower_ck', sql`${t.eloAfter} < ${t.eloBefore}`),
+  ],
 );

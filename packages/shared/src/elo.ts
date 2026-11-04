@@ -9,8 +9,16 @@ export function expectedScore(ratingA: number, ratingB: number): number {
   return 1 / (1 + 10 ** ((ratingB - ratingA) / 400));
 }
 
-/** K: 32 for an agent's first 20 ranked matches, then 16. `rankedMatchesPlayed` counts matches before this one. */
-export function kFactor(rankedMatchesPlayed: number, cfg = DEFAULTS.elo): number {
+/**
+ * K: 48 for a player's 5 placement matches, 32 up to their 20th ranked match, then 16.
+ * `rankedMatchesPlayed` counts matches before this one.
+ */
+export function kFactor(
+  rankedMatchesPlayed: number,
+  cfg = DEFAULTS.elo,
+  placementMatches: number = DEFAULTS.ranked.placementMatches,
+): number {
+  if (rankedMatchesPlayed < placementMatches) return cfg.kPlacement;
   return rankedMatchesPlayed < cfg.provisionalMatches ? cfg.kProvisional : cfg.k;
 }
 

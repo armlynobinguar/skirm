@@ -13,7 +13,7 @@ import { Ear } from './parts';
 /** Most lines the feed shows (the prototype keeps 70). */
 const SHOWN = 70;
 
-const LABEL: Record<Exclude<FeedTag, 'heard'>, string> = { team: 'Team', rteam: 'Team', say: 'Say', verb: 'Verb', arena: 'Arena', mind: 'Plan' };
+const LABEL: Record<Exclude<FeedTag, 'heard'>, string> = { team: 'Team', rteam: 'Team', say: 'Say', verb: 'Verb', arena: 'Arena', mind: 'Plan', order: 'Order' };
 
 const FILTERS: SegmentedOption<FeedFilter>[] = [
   { value: 'all', label: 'All' },
@@ -74,7 +74,7 @@ export function Comms({ lines, team, filter, onFilter, tickMs }: { lines: V2Comm
                   )}
                 </span>
               </span>
-              <span className={c.tx}>{l.text}</span>
+              <span className={c.tx}>{l.orderTo ? `${l.text} → ${l.orderTo}` : l.text}</span>
               {l.bluff ? (
                 <span className={c.note} data-testid="v2-bluff-note">
                   {l.bluffReply ? (l.bluff === 'landed' ? 'Believed it' : 'Saw through it') : l.bluff === 'landed' ? 'Bluff · landed' : 'Bluff · doubted'}

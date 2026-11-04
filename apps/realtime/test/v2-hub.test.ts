@@ -37,6 +37,9 @@ describe('v2 matches over the hub', () => {
     await ben.send({ type: 'v2_queue', crew: [{ agentId: ben.agents[0]!.id, tier: 'quiet' }], ranked: true });
     const found = await ana.inbox.next('v2_found');
     expect(found.team).toBe('A');
+    // Ranked: both players' tiers as they queued (new players are still placing).
+    const placing = { tier: null, placementsPlayed: 0, placementMatches: 5, nextAt: null };
+    expect(found.tiers).toEqual({ you: placing, rival: placing });
     await ben.inbox.next('v2_found');
 
     // Ana cannot queue again while matched.
@@ -115,6 +118,7 @@ describe('v2 matches over the hub', () => {
     await q(cy, 'hard');
     const found = await ana.inbox.next('v2_found');
     expect(found).toMatchObject({ mapId: 'frostline-depot', difficulty: 'hard', ranked: false });
+    expect(found.tiers).toBeUndefined();
     expect((await cy.inbox.next('v2_found')).matchId).toBe(found.matchId);
     expect(ben.inbox.ofType('v2_found')).toHaveLength(0);
     // A search that takes any map pairs with a picked map at the same difficulty, and plays that map.
