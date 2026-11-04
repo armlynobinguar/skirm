@@ -9,3 +9,5 @@ export * from './appearance';
 export * from './cosmetics';
 export * from './season';
 export * from './rank';
+export * from './onboarding';
+export * from './tier';

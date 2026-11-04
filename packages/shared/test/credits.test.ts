@@ -39,6 +39,7 @@ describe('config', () => {
       'market',
       'model',
       'price',
+      'ranked',
       'season',
       'talk',
       'tokens',

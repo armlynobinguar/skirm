@@ -67,10 +67,32 @@ const defaults = {
   },
   elo: {
     start: 1200,
+    /** K for a player's placement matches (the first `ranked.placementMatches`, see below). */
+    kPlacement: 48,
     kProvisional: 32,
     provisionalMatches: 20,
     k: 16,
     floor: 100,
+  },
+  /**
+   * Ranked tiers from Elo (lowest first, `min` is the tier floor). A tier is shown once a player has
+   * played `placementMatches` ranked matches; until then K is `elo.kPlacement`. Inactive players in
+   * `decay.fromTier` or above lose `decay.amount` Elo per `decay.days` without a ranked match, never
+   * below the floor of the tier they are in (the worker's `ranked` decay job). The skill leaderboard
+   * ranks win rate over skills with at least `skillMinMatches` ranked matches.
+   */
+  ranked: {
+    tiers: [
+      { name: 'Bronze', min: 0 },
+      { name: 'Silver', min: 1100 },
+      { name: 'Gold', min: 1300 },
+      { name: 'Platinum', min: 1500 },
+      { name: 'Diamond', min: 1700 },
+      { name: 'Master', min: 1900 },
+    ] as { name: 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond' | 'Master'; min: number }[],
+    placementMatches: 5,
+    decay: { fromTier: 'Diamond' as const, days: 14, amount: 25 },
+    skillMinMatches: 10,
   },
   /**
    * v2 talk tiers, integer credits per 100 agent-ticks. Quiet makes the same per-tick model calls

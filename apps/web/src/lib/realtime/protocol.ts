@@ -2,7 +2,7 @@
 // packages/server/src/queues.ts and the parser in apps/realtime/src/protocol.ts; copied here because
 // @skirm/server is Node-only (bullmq, ioredis). Keep in sync.
 import type { CommandPreset, Difficulty, FrameAgent, FrameCommand, FrameItem, ItemOrigin, MatchResult, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
-import type { Side } from '@skirm/shared';
+import type { PlayerTier, Side } from '@skirm/shared';
 
 export type { Side, V2Frame, FrameAgent, FrameCommand, FrameItem, ItemOrigin, TalkTier, Team, MatchResult, Difficulty, CommandPreset };
 
@@ -113,8 +113,13 @@ export interface V2PracticeFlags {
   rivalHandle?: string;
 }
 
+/** What ranked adds to v2_found: both players' ranked tiers as they queued (the rival stays unnamed). */
+export interface V2FoundTiers {
+  tiers?: { you: PlayerTier; rival: PlayerTier };
+}
+
 export type V2ServerMessage =
-  | ({ type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty; draft?: true } & V2PracticeFlags)
+  | ({ type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty; draft?: true } & V2PracticeFlags & V2FoundTiers)
   | { type: 'v2_accepted'; matchId: string; team: Team }
   /** Draft mode: each ban step (`turn` bans within `stepMs`, else it passes), then once more with `turn` null. */
   | { type: 'v2_draft'; matchId: string; turn: Team | null; step: number; steps: number; stepMs: number; pool: V2DraftSkill[]; bans: V2DraftBan[] }

@@ -35,6 +35,7 @@ The single reference for `apps/api`, `apps/worker`, `apps/realtime` and `apps/we
 | `COST_ALERT_DAILY_USD` | `10` | worker, realtime: daily model spend (USD, summed across instances in Redis `cost:usd:<UTC day>`) that logs `cost_alert` at 50 % / 80 % (warn) and 100 % (error); `0` = off |
 | `OPS_TOKEN` | unset | api: bearer token (≥ 32 characters) for `GET /ops/stats` and `GET /ops/talk-rates`; unset turns the route off (404) |
 | `SEED_OFFICIAL_SKILLS` | on | worker: `0` skips the official skills seed at boot |
+| `RANKED_DECAY_DAYS` / `RANKED_DECAY_AMOUNT` | `14` / `25` (`DEFAULTS.ranked.decay`) | worker, api: days without a ranked match before an inactive Diamond+ player loses `amount` Elo (again every `days`); `0` turns decay off. Not part of `loadConfig()`: `rankedDecayFromEnv` in `@skirm/shared` |
 
 ## New account defaults
 
@@ -58,7 +59,7 @@ Talk tiers are priced in whole credits per 100 agent-ticks (`DEFAULTS.talk.rateP
 
 ## REST (`apps/api`, JSON, no prefix)
 
-Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/players`, `GET /v2/matches/*`, `GET /seasons*` and `GET /ops/stats` / `GET /ops/talk-rates` (their own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
+Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/*`, `GET /v2/matches/*` (but `/v2/matches/:id/decisions`), `GET /seasons*` and `GET /ops/stats` / `GET /ops/talk-rates` (their own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
 
 ### Account
 
@@ -66,7 +67,7 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | --- | --- | --- | --- |
 | GET | `/health` | | `{ ok: true }` |
 | POST | `/auth/session` | `{ token?, nearAccountId?, nearProof? }`, or the `x-dev-user` header in dev | `{ account: {id, handle, nearAccountId, createdAt}, created }`, creating the account with the defaults on first sign-in. `nearAccountId` links a NEAR account (dev trusts it; otherwise a full-access key signs `skirm:link-near:<accountId>:<nearAccountId>`, raw or NEP-413); `409 near_account_taken` when another player holds it |
-| GET | `/me` | | `{ account, rank: {elo, rankedMatches, wins, losses, draws, title, position}, credits: {balance, held, allowanceLeft, allowanceResetAt, available}, agents: Agent[], unlocks: UnlockItem[], creditsPerNear, royaltiesYocto, cosmetics: string[] }`. `title` is `rankTitle(elo)`; `position` is the place on `/leaderboards/players`, null before the first ranked match; `cosmetics` are the premium item ids owned |
+| GET | `/me` | | `{ account, rank: {elo, rankedMatches, wins, losses, draws, title, position, tier, decayAt}, credits: {balance, held, allowanceLeft, allowanceResetAt, available}, agents: Agent[], unlocks: UnlockItem[], creditsPerNear, royaltiesYocto, cosmetics: string[] }`. `title` is `rankTitle(elo)`; `position` is the place on `/leaderboards/players`, null before the first ranked match; `tier` is a `PlayerTier` (below); `decayAt` is when inactivity next costs Elo, null when decay does not apply; `cosmetics` are the premium item ids owned |
 | GET | `/me/matches` | `?limit=` (≤ 50, default 20) | the caller's matches, newest first: `{ id, mapId, ranked, practice, result: 'win'\|'loss'\|'draw'\|'void'\|'live', score: {you, rival} \| null, endedAt, eloDelta \| null }` |
 | GET | `/me/earn-back` | | `{ royaltiesYocto, salesNetYocto, spentCredits, creditsPerNear, prizesYocto, rentalsYocto }`: creator royalties, sales as the seller after fee and royalty, paid credits charged on matches (the free allowance left out), season prizes won, agent rentals earned after the platform fee |
 | PUT | `/agents/:id/rental` | ✓ | `{ priceYocto \| null }` → `{ offer: { offerId, agentId, priceYocto, active } \| null }`: offer the agent at a price per match, or stop. Needs a linked NEAR account (renters pay it). 404 for another player's agent |
@@ -74,7 +75,7 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/rentals/mine` | ✓ | `{ offers, passes }`: the caller's active offers and unused one-match passes (each with the rented agent's public stats and owner handle) |
 | POST | `/rentals/:offerId` | ✓ | `{ txHash }` → `{ pass }`. A `market.rent` transaction from the caller's linked account whose `rental` event names this offer (`rental_id` = `<offerId>:<nonce>`), pays the owner's linked account and covers the price (422 `wrong_rental`, `wrong_owner`, `underpaid`, `wrong_sender`; 409 `own_agent`, `duplicate_tx`). Dev mode: `dev:<yocto>[:<nonce>]`. A replay returns the same pass. The pass is used up when a match with that agent ends (a void match keeps it); the agent plays with its owner's skills and its plans are withheld from the renter |
 | DELETE | `/me/near` | | `{ account }` with `nearAccountId: null`. `409 listing_active` while the player has an active listing |
-| GET | `/me/export` | ✓ | Everything skirm holds about the caller, one table per key (account, agents, skills created, ownership, listings, sales, rental offers and passes, ledger, matches with only the caller's debrief side, messages their agents said, standings, prizes, trials, cosmetics), plus `skillPrompts`: the caller's own skill prompts decrypted |
+| GET | `/me/export` | ✓ | Everything skirm holds about the caller, one table per key (account, agents, skills created, ownership, listings, sales, rental offers and passes, ledger, matches with only the caller's debrief side, messages their agents said, standings, prizes, trials, cosmetics, onboarding progress), plus `skillPrompts`: the caller's own skill prompts decrypted |
 | DELETE | `/me` | ✓ | `{ confirm }` (the current handle; 422 `confirm_mismatch`) → `{ deleted: true }`. 409 `agent_busy` mid-match, 409 `listing_active` with an open listing. Clears the Privy id, NEAR link and system prompts, ends rental offers, sets the handle to `~deleted-<id>` and `deleted_at`; the account never signs in again. Agents, match history, sales and the ledger stay (other players' records and paid rental passes depend on them); credits are forfeited |
 | GET | `/agents` | | `Agent[]`: `{ id, name, elo, matchesPlayed, wins, losses, draws, skills: [{id, version, name}], unlocks, role, vision, comms, tier, systemPrompt, appearance }` |
 | PATCH | `/agents/:id` | `{ name?, skills?: {id, version}[] (≤ 3, owned), unlocks?, role?, vision? (1-5), comms? (1-5), tier?, systemPrompt?: string \| null (≤ 600 characters; null or blank clears), appearance? }` | `Agent`. Gameplay fields are refused (`409 agent_busy`) while the agent is in a live match. `appearance` can change any time; a premium colour needs the cosmetic bought first (`403 cosmetic_not_owned`, `details.items`) |
@@ -86,7 +87,13 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/v2/matches/live` | | matches being played now, newest first: `{ id, mapId, difficulty, ranked, practice, startedAt, teams: {A, B}: {handle, size} }`. Crews stay hidden; the bot side of a practice match is `Greedy bot` |
 | GET | `/v2/matches/:id` | | `{ id, mapId, ranked, practice, status: 'live'\|'ended'\|'void', difficulty, teams: {A, B}: {accountId, handle, crew[]}, winner, reason, decidedBy, score: {A, B} \| null, ticks, elo: {accountId, team, before, delta, after}[], stats, logHash, registry: {status, txHash?}, createdAt, endedAt, you?, debrief? }`. While live the rival side is blank and only a player sees their own crew. `you` and `debrief` (that crew's, as sent with `v2_end`) only for a player. The log stays server side: `logHash` is its proof. `registry.status` is `none` for casual, practice and void matches |
 | GET | `/v2/matches/:id/messages` | `?afterTick=&limit=` (≤ `MATCH_MESSAGES_MAX_LIMIT`, default 200) | `{ messages: {tick, team, agent: {id, name}, channel, text, heardBy, overheardBy}[], next? }`: the lines realtime saw delivered. `409 match_live` until the match ends. Page with `next` as the following `afterTick` |
-| GET | `/leaderboards/players` | `?limit=` (≤ 200, default 100) | `{ rows: {rank, account: {id, handle}, elo, title, rankedMatches, wins, losses, draws}[], you? }`: players with a ranked match by Elo (ties share a rank) |
+| GET | `/v2/matches/:id/decisions` | ✓ | `{ matchId, you, ticks, crews: {team, own, brain, agents: {id, name, role, skills}[], plans: {tick, text, why, hidden?}[], decisions: {tick, agentId, observed, action, reason, outcome?, effect?, said?, thought?, skill: {id, version, by: 'model'\|'inferred'} \| null}[], moments: {tick, kind: 'hazard_breach'\|'switch'\|'supply_drop'\|'goal', team, agentId, text}[]}[], skills: {id, version, name, mine, prompt?}[] }`: the debrief's decision timeline (`match_timelines`, written by realtime at the end). Players only (403 otherwise), each their own crew; practice adds the bot's. `409 match_live` until it ends; a void match has no crews. `skill` is the one the agent's model named (a `SKILL:` line), else, on a model brain, the only equipped skill whose required action is the verb that resolved. Plans shaped by a bought skill are kept as `hidden`, and an agent on a bought or rented skill keeps no `thought`. `prompt` only for skills the caller wrote |
+| GET | `/leaderboards/players` | `?limit=` (≤ 200, default 100) | `{ rows: {rank, account: {id, handle}, elo, title, tier, rankedMatches, wins, losses, draws}[], you? }`: players with a ranked match by Elo (ties share a rank) |
+| GET | `/leaderboards/tiers` | | `{ tiers: {name, min, nextAt}[], placementMatches, kPlacement, decay: {fromTier, days, amount}, skillMinMatches }` |
+| GET | `/leaderboards/maps/:mapId` | `?limit=` (≤ 200, default 100) | `{ mapId, rows: {rank, account, elo, rankedMatches, tier, matches, wins, losses, draws, winRate}[] }`: players by ranked results on one map, most wins then win rate (ties share a rank). 404 for an unknown map |
+| GET | `/leaderboards/skills` | `?limit=&mapId=` | `{ minMatches, mapId?, rows: {rank, skill: {id, name}, creator: {id, handle}, matches, wins, losses, draws, winRate}[] }`: skills (all versions) with at least `minMatches` ranked matches by win rate (wins / matches; a crew carrying a skill counts once per match) |
+
+**Ranked tiers** (`DEFAULTS.ranked`, `@skirm/shared` `tier.ts`): Bronze 0, Silver 1,100, Gold 1,300, Platinum 1,500, Diamond 1,700, Master 1,900 Elo. A `PlayerTier` is `{ tier: name \| null, placementsPlayed, placementMatches, nextAt }`: `tier` is null until the player's first 5 ranked matches (placements, K 48) are played. Decay: the worker's `ranked` job takes `RANKED_DECAY_AMOUNT` Elo from a placed Diamond or Master player with no ranked result for `RANKED_DECAY_DAYS` days, then again each further period, never below the floor of the tier they are in (`elo_decays` keeps each step).
 
 ### Seasons
 
@@ -122,6 +129,18 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | POST | `/cosmetics/:id/buy` | | `{ owned }`. Paid credits only, never the free allowance: `402 insufficient_credits` with `need`, `have`. Buying an owned item is a no-op 200 |
 | GET | `/credits` | | `{ balance, held, allowanceLeft, allowanceResetAt, available, creditsPerNear, rows: {id, type, amount, source, note, matchId, txHash, createdAt}[] }` (latest 100) |
 | POST | `/credits/deposits` | `{ txHash }` | `{ credited, balance, amountYocto }`: a `deposits.deposit()` tx verified through RPC (dev mode: `dev:<yocto>`), credited once (`409 duplicate_receipt`) |
+
+### Onboarding
+
+The tips, checklist items and templates are static (`TUTORIAL_STEPS`, `FIRST_STEPS`, `SKILL_TEMPLATES` in `@skirm/shared`); `onboarding_progress` stores only how far each player got. The guided match is ordinary practice against the greedy bot on `TUTORIAL_MATCH` (Copper Hollow, Easy, one agent); nothing in realtime knows it is a tutorial.
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| GET | `/onboarding` | | `{ tutorial: {status: 'new'\|'in_progress'\|'done'\|'skipped', step, steps, match: {mapId, difficulty, crewSize}, completedAt, skippedAt}, checklist: {items: {id: 'tutorial'\|'practice'\|'skill'\|'equip'\|'pvp', done}[], done, dismissed}, showChecklist }`. `step` is the number of tips seen. `tutorial` is done once the tutorial is finished or skipped; the others are read from the player's rows: an ended practice match, a skill they wrote, an agent of theirs carrying a skill they wrote, an ended casual or ranked match. `showChecklist` until every item is done or it is dismissed |
+| PUT | `/onboarding/tutorial` | `{ step? (0..steps), status?: 'done'\|'skipped'\|'restart' }` (one at least) | the same view. `step` only grows; the first `done` or `skipped` time sticks; `restart` sets the step to 0 and clears a skip (a finished tutorial stays finished) |
+| POST | `/onboarding/checklist/dismiss` | | the same view, `checklist.dismissed: true` |
+| GET | `/onboarding/templates` | | `{ id, name, summary, bestFor, lesson, prompt, reflexes, requires_actions, handles_tags }[]`: starter strategies, full text (they are examples, not secret) |
+| POST | `/onboarding/templates/:id/copy` | | `201 SkillPublic`: a new draft skill of the caller's (version 1, sealed into the vault like `POST /skills`). 404 for an unknown template |
 
 ### Operations
 
@@ -167,7 +186,7 @@ Server → client (`WsServerMessage`):
 | Message | Meaning |
 | --- | --- |
 | `{type:'queue_status', searchingMs, eloRange}` | every second while searching; the Elo window widens from ±100 by 50 every 5 s up to ±1000 |
-| `{type:'v2_found', matchId, team, mapId, ranked, acceptMs, difficulty, practice?, free?, rivalHandle?}` | a match: accept within `acceptMs`. `practice` and `rivalHandle` ('Greedy bot') for practice; `free` when this crew holds nothing |
+| `{type:'v2_found', matchId, team, mapId, ranked, acceptMs, difficulty, practice?, free?, rivalHandle?, tiers?}` | a match: accept within `acceptMs`. `practice` and `rivalHandle` ('Greedy bot') for practice; `free` when this crew holds nothing; `tiers: {you, rival}` (`PlayerTier`) on ranked matches, as both players queued |
 | `{type:'v2_accepted', matchId, team}` | a crew accepted |
 | `{type:'v2_draft', matchId, turn, step, steps, stepMs, pool: {skillId, name, agents}[], bans: {team, step, skillId, name, timedOut?}[]}` | draft mode (`v2_found` carries `draft: true`): after accept, crews ban in turn, A first, `DEFAULTS.draft.bansPerSide` each; `turn` bans within `stepMs` (`DEFAULTS.draft.stepMs`, 15 s) or the step passes (`timedOut`). `pool` is the rival's equipped skills you may still ban, by id and public name only (never the prompt). Sent at each step and once more with `turn: null` when the draft is over; then `v2_lockin`. A banned skill is unequipped from the rival crew for that match (also from a crew swapped in at lock-in) and every ban is in both debriefs (`debrief.draft.bans`) |
 | `{type:'v2_lockin', matchId, lockMs, rival: {agents}, crewLimit, headStartTicks, free?}` | lock-in started (the rival's crew size only). Re-sent when a crew changes its roster |
@@ -189,7 +208,7 @@ WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthe
 - Each tick every agent's brain acts and may speak under a 1.5 s deadline (late, failed or illegal is a wait); the crew plan is rewritten every `V2_REPLAN_EVERY` (25) ticks. Speech passes the leak and abuse filter before anyone hears it, then goes by range (team, or overheard by the rival).
 - One `realtime` instance holds each match in memory and serves its players. A live row no instance holds (crash) is voided by the orphan sweep and its holds released; shutdown voids live matches with credits returned.
 - Practice: the player is crew A; crew B is `SYSTEM_ACCOUNT_ID` with a Standard crew the player's size on the greedy brain, accepting and locking in by itself. Casual only, no Elo, no registry write, `v2_matches.practice = true`.
-- Settlement (`V2MatchesRepo.finish`, one transaction): the result, both players' Elo (ranked; start 1200, K 32 for the first 20 ranked matches then 16, floor 100), season points (ranked), the skill versions' ranked records, the delivered lines (`match_messages`), each crew's debrief. Then a ranked result is queued for the registry, and the frames are kept for replay.
+- Settlement (`V2MatchesRepo.finish`, one transaction): the result, both players' Elo (ranked; start 1200, K 48 for the 5 placement matches, 32 up to the 20th ranked match, then 16, floor 100) and their last ranked result time, season points (ranked), the skill versions' ranked records, the delivered lines (`match_messages`), each crew's debrief. Each crew's decision timeline (`match_timelines`) is written right after, before `v2_end`. Then a ranked result is queued for the registry, and the frames are kept for replay.
 
 ## Queues (BullMQ, names in `@skirm/server`)
 
@@ -198,6 +217,7 @@ WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthe
 | `registry` | `{ kind: 'v2_match', id, seasonId? }` | `record_match` on the registry contract as a `MatchRecordV2` with per-player Elo and the season number, then the row's registry status and tx; retried 10 times |
 | `benchmarks` | `{ kind: 'mint', skillId, version }` or `{ kind: 'trial', trialId }` | the hidden gauntlet of a minted version, or one buyer's trial, on the headless match runner (`playHeadless`) against the greedy bot (below) |
 | `seasons` | `{ kind: 'tick' }`, repeatable every 10 min | opens the current season, locks ended ones, writes payouts, posts the top 10 to the seasons contract |
+| `ranked` | `{ kind: 'decay' }`, repeatable every hour | the Elo decay pass (ranked tiers above); safe to repeat, a player decays at most once per period |
 
 **Benchmark.** 6 (map, difficulty) picks from `PRACTICE_MAPS` × Easy / Normal, drawn from HMAC-SHA256(`BENCH_SECRET`, `<skillId>:<version>`). The tested crew is one Standard agent carrying the skill; every second pick also feeds it hijack lines. score = wins / matches × (1 − share of matches with a leak). With the greedy brain (no model key) a benchmark or trial plays nothing and ends `needs_model` with no score: greedy ignores skills, so it would prove nothing. See [benchmarks.md](benchmarks.md).
 

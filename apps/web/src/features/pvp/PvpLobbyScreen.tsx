@@ -25,6 +25,7 @@ import { DIFFS, MAPS, diffIndex, mapById } from '@/features/arena/world';
 import { other } from '@/features/v2/common';
 import { useV2Match, v2StoreFor, type V2MatchView } from '@/features/v2/v2Store';
 import { ButtonLink } from '@/components/ButtonLink';
+import { TierBadge } from '@/components/TierBadge';
 import { useEscapeLayer } from '@/components/shell/GlobalKeys';
 import { RequireSession } from '@/components/shell/RequireSession';
 import { EmptyState } from '@/components/states/EmptyState';
@@ -744,6 +745,7 @@ function VsTakeover({
           <b>You</b> · Elo {fmt(elo)}
         </span>
         <span className="sk-disp">{handle}</span>
+        {view.tiers ? <TierBadge tier={view.tiers.you} testId="s11-vs-tier-you" /> : null}
         <div className={h.faces} data-testid="s11-vs-faces-you">
           {crew.map(({ c, a }) => (
             <AgentPortrait
@@ -776,6 +778,7 @@ function VsTakeover({
           <span className="is-rival">Rival</span> · {view.accepted.includes(other(view.team)) ? 'accepted' : 'deciding'}
         </span>
         <span className="sk-disp">Rival</span>
+        {view.tiers ? <TierBadge tier={view.tiers.rival} testId="s11-vs-tier-rival" /> : null}
         <div className={h.faces} role="img" aria-label="Rival crew hidden" data-testid="s11-vs-faces-rival">
           <span className="sk-kick">? · ? · ?</span>
         </div>

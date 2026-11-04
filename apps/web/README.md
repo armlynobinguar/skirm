@@ -98,6 +98,7 @@ Route groups `(play)`, `(skills)`, … only split ownership; they add no layout 
 | S01 | Sign in (pitch, practice line) | `/` | `features/play/SignInScreen.tsx` | Play |
 | S02 | Home (Command deck) | `/play` | `features/play/HomeScreen.tsx` | Play |
 | — | Map atlas | `/maps` | `features/play/AtlasScreen.tsx` | Play |
+| — | Tutorial (guided first match: briefing, then tips over the match) | `/tutorial` | `features/onboarding/TutorialScreen.tsx`, `TutorialCoach.tsx` | Play |
 | S04 | Crew (casual, ranked, Vs Greedy bot) | `/maps/[mapId]/crew` (`?d=`, `?opponent=bot`) | `features/play/CrewBuilderScreenV2.tsx` (`V2CrewScreen`) | Play |
 | — | Agent editor | `/agents/[agentId]` | `features/agents/AgentEditorScreen.tsx` | Play |
 | S07 | My skills | `/skills` (`?tab=owned`) | `features/skills/MySkillsScreen.tsx` | Skills + Market |

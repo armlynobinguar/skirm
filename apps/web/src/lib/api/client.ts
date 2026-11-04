@@ -4,6 +4,7 @@
 // client. In components use `useApi()` (src/lib/providers.tsx), never construct one.
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
+import type { MatchDecisions } from './decisions';
 import { ApiError, errorFromBody } from './errors';
 import type {
   Agent,
@@ -22,10 +23,15 @@ import type {
   AgentRecord,
   MyMatch,
   MyRentalOffer,
+  Onboarding,
+  SkillTemplateView,
+  TutorialUpdate,
   RentalOffer,
   RentalPass,
   MintResponse,
+  MapLadder,
   PlayerLadder,
+  SkillLadder,
   PurchaseResponse,
   Season,
   SeasonStandings,
@@ -107,10 +113,27 @@ export interface ApiClient {
 
   /** GET /leaderboards/players: per-player Elo, rank and title (v2 ladder). */
   playerLadder(limit?: number): Promise<PlayerLadder>;
+  /** GET /leaderboards/maps/:mapId: players by ranked results on one map. */
+  mapLadder(mapId: string, limit?: number): Promise<MapLadder>;
+  /** GET /leaderboards/skills: skills by ranked win rate (minimum matches applied). */
+  skillLadder(opts?: { mapId?: string; limit?: number }): Promise<SkillLadder>;
   /** GET /v2/matches/:id: a v2 match with Elo changes and crew stats (the result screen). */
   v2Match(matchId: string): Promise<V2MatchRecord>;
   /** GET /v2/matches/live: v2 matches being played now, crews hidden. */
   v2LiveMatches(): Promise<V2LiveMatch[]>;
+  /** GET /v2/matches/:id/decisions: the caller's crew's decision timeline (players only, once ended). */
+  v2MatchDecisions(matchId: string): Promise<MatchDecisions>;
+
+  /** GET /onboarding: tutorial progress and the home checklist. */
+  onboarding(): Promise<Onboarding>;
+  /** PUT /onboarding/tutorial: tips seen (only grows), or `done` / `skipped` / `restart`. */
+  updateTutorial(body: TutorialUpdate): Promise<Onboarding>;
+  /** POST /onboarding/checklist/dismiss: hides the home checklist for good. */
+  dismissChecklist(): Promise<Onboarding>;
+  /** GET /onboarding/templates: the starter skill templates, full text. */
+  skillTemplates(): Promise<SkillTemplateView[]>;
+  /** POST /onboarding/templates/:id/copy: a new draft skill of the caller's from the template. */
+  copyTemplate(templateId: string): Promise<SkillView>;
 }
 
 export interface ApiClientOptions {
@@ -220,7 +243,16 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     deposit: (txHash) => json('POST', '/credits/deposits', { body: { txHash } }),
 
     playerLadder: (limit) => get('/leaderboards/players', { limit }),
+    mapLadder: (mapId, limit) => get(`/leaderboards/maps/${enc(mapId)}`, { limit }),
+    skillLadder: (opts = {}) => get('/leaderboards/skills', { mapId: opts.mapId, limit: opts.limit }),
     v2Match: (id) => get(`/v2/matches/${enc(id)}`),
     v2LiveMatches: () => get('/v2/matches/live'),
+    v2MatchDecisions: (id) => get(`/v2/matches/${enc(id)}/decisions`),
+
+    onboarding: () => get('/onboarding'),
+    updateTutorial: (body) => json('PUT', '/onboarding/tutorial', { body }),
+    dismissChecklist: () => json('POST', '/onboarding/checklist/dismiss'),
+    skillTemplates: () => get('/onboarding/templates'),
+    copyTemplate: (id) => json('POST', `/onboarding/templates/${enc(id)}/copy`),
   };
 }

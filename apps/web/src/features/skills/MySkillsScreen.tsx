@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
+import { SkillTemplates } from '@/features/onboarding/SkillTemplates';
 import { EmptyState } from '@/components/states/EmptyState';
 import { QueryView } from '@/components/states/QueryView';
 import { Skeleton } from '@/components/states/Skeleton';
@@ -92,6 +93,8 @@ function MySkills() {
           {(rows) => <SkillTable rows={rows} tab={tab} />}
         </QueryView>
       </div>
+
+      {tab === 'written' ? <SkillTemplates /> : null}
 
       <p className={s.note}>
         Royalties are paid to your NEAR wallet on each resale.

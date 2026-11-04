@@ -126,7 +126,7 @@ describe('seasons', () => {
         rank: 1,
         accountId: ana.id,
         handle: 'ana',
-        elo: 1216,
+        elo: 1224,
         points: 25,
         wins: 1,
         losses: 0,
@@ -137,7 +137,7 @@ describe('seasons', () => {
         rank: 2,
         accountId: ben.id,
         handle: 'ben',
-        elo: 1184,
+        elo: 1176,
         points: 5,
         wins: 0,
         losses: 1,
@@ -185,8 +185,8 @@ describe('seasons', () => {
     expect(m2.seasonId).toBe(racedId);
 
     expect((await ctx.repos.seasons.list()).map((s) => s.number)).toEqual([2, 1]);
-    expect(await ctx.repos.accounts.get(ana!.id)).toMatchObject({ elo: 1216, rankedMatches: 1 });
-    expect(await ctx.repos.accounts.get(di!.id)).toMatchObject({ elo: 1216, rankedMatches: 1 });
+    expect(await ctx.repos.accounts.get(ana!.id)).toMatchObject({ elo: 1224, rankedMatches: 1 });
+    expect(await ctx.repos.accounts.get(di!.id)).toMatchObject({ elo: 1224, rankedMatches: 1 });
     const { rows } = await ctx.repos.seasons.standings(racedId);
     expect(rows.map((r) => [r.handle, r.points])).toEqual([
       ['ana', 25],

@@ -2,13 +2,17 @@
 // S14 Leaderboards (/leaderboards). Design: S14-Leaderboards.dc.html; spec: uiux.md S14.
 // Tabs: Season (GET /seasons/current for the season, its pool and your row; GET /seasons/:id/standings
 // for the rows: points from ranked v2 matches, W–L–D, Elo and the place's projected prize) and
-// All-time (GET /leaderboards/players: per-player Elo on the v2 ladder).
+// All-time (GET /leaderboards/players: per-player Elo and ranked tier on the v2 ladder), By map
+// (GET /leaderboards/maps/:mapId: ranked wins on one map) and Skills (GET /leaderboards/skills: win
+// rate of skills with enough ranked matches).
 // The pool says "local" while it is kept offchain (the seasons contract is not deployed yet).
-// The tab is kept in the URL (?tab=alltime) for sharing; the season is the default.
+// The tab is kept in the URL (?tab=alltime|maps|skills) for sharing; the season is the default.
+import { DEFAULTS } from '@skirm/shared';
 import { Tabs, fmt } from '@skirm/ui';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { TierBadge, tierFrom } from '@/components/TierBadge';
 import { EmptyState } from '@/components/states/EmptyState';
 import { QueryView } from '@/components/states/QueryView';
 import { Skeleton } from '@/components/states/Skeleton';
@@ -18,13 +22,17 @@ import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
 import s from './pvp.module.css';
 import { fmtCountdown, nearText, useNow } from './pvpUtil';
+import { ByMap, SkillsBoard } from './RankedBoards';
 
-type Tab = 'season' | 'alltime';
+type Tab = 'season' | 'alltime' | 'maps' | 'skills';
 
 const TABS = [
   { id: 'season', label: 'Season', icon: 'trophy' as const },
   { id: 'alltime', label: 'All-time', icon: 'elo' as const },
+  { id: 'maps', label: 'By map', icon: 'map' as const },
+  { id: 'skills', label: 'Skills', icon: 'skill' as const },
 ];
+const TAB_LABEL: Record<Tab, string> = { season: 'Season', alltime: 'All-time', maps: 'By map', skills: 'Skills' };
 
 /** Rows of a season's standings shown on the screen. */
 const STANDINGS_LIMIT = 100;
@@ -33,12 +41,13 @@ const LADDER_LIMIT = 100;
 
 function readTab(): Tab {
   if (typeof window === 'undefined') return 'season';
-  return new URLSearchParams(window.location.search).get('tab') === 'alltime' ? 'alltime' : 'season';
+  const t = new URLSearchParams(window.location.search).get('tab');
+  return t === 'alltime' || t === 'maps' || t === 'skills' ? t : 'season';
 }
 
 function writeTab(tab: Tab) {
   try {
-    const qs = tab === 'alltime' ? '?tab=alltime' : '';
+    const qs = tab === 'season' ? '' : `?tab=${tab}`;
     window.history.replaceState(window.history.state, '', window.location.pathname + qs);
   } catch {
     /* ignore */
@@ -65,8 +74,8 @@ export function LeaderboardsScreen() {
           <Tabs tabs={TABS} value={tab} onChange={(id) => setTab(id as Tab)} label="Leaderboard" />
         </div>
       </div>
-      <div role="tabpanel" aria-label={tab === 'season' ? 'Season' : 'All-time'}>
-        {tab === 'season' ? <SeasonBoard /> : <AllTime />}
+      <div role="tabpanel" aria-label={TAB_LABEL[tab]}>
+        {tab === 'season' ? <SeasonBoard /> : tab === 'alltime' ? <AllTime /> : tab === 'maps' ? <ByMap /> : <SkillsBoard />}
       </div>
     </div>
   );
@@ -219,6 +228,7 @@ function AllTime() {
                   <tr>
                     <th scope="col">#</th>
                     <th scope="col">Player</th>
+                    <th scope="col">Tier</th>
                     <th scope="col">Title</th>
                     <th scope="col" className={s.num}>
                       Elo
@@ -239,7 +249,10 @@ function AllTime() {
           );
         }}
       </QueryView>
-      <p className={s.note}>Every player starts at 1,200. Only ranked matches move Elo.</p>
+      <p className={s.note}>
+        Every player starts at 1,200. Only ranked matches move Elo. The tier shows after {DEFAULTS.ranked.placementMatches}{' '}
+        placement matches.
+      </p>
     </section>
   );
 }
@@ -251,6 +264,9 @@ function LadderLine({ r, you }: { r: PlayerLadderRow; you: boolean }) {
       <td>
         {r.account.handle}
         {you ? ' · you' : ''}
+      </td>
+      <td>
+        <TierBadge tier={tierFrom(r)} size="sm" />
       </td>
       <td>{r.title}</td>
       <td className={s.num}>{fmt(r.elo)}</td>
