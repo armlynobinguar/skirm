@@ -337,6 +337,17 @@ describe('S11 PvP lobby', () => {
     expect(realtime.sent[0]).toEqual({ type: 'v2_queue', ranked: false, crew: [{ agentId: ROOK, tier: 'standard' }, { agentId: WREN, tier: 'open' }] });
   });
 
+  it('queues draft mode as a casual search with the ban rules shown', async () => {
+    const { realtime, user } = setup({ me: rich() });
+    await ready();
+    expect(screen.queryByTestId('s11-draft-rules')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Draft' }));
+    expect(screen.getByTestId('s11-rotation')).toHaveTextContent('Draft rotation');
+    expect(screen.getByTestId('s11-draft-rules')).toHaveTextContent('each crew bans one of the rival');
+    await user.click(screen.getByTestId('s11-find-match'));
+    expect(realtime.sent[0]).toEqual({ type: 'v2_queue', ranked: false, draft: true, crew: [{ agentId: ROOK, tier: 'standard' }] });
+  });
+
   it('queues again after a reconnect', async () => {
     const { realtime, user } = setup();
     await ready();
