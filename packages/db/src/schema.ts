@@ -580,6 +580,69 @@ export const matchMessages = pgTable(
   ],
 );
 
+/** One agent's turn in a crew's decision timeline (the debrief's "why did it do that?"). */
+export interface V2DecisionRecord {
+  /** The tick the action played on. */
+  tick: number;
+  agentId: string;
+  /** What the agent saw, summarised from its own fogged observation. */
+  observed: string;
+  /** The action as the engine names it ("move E", "verb dam E", "wait"). */
+  action: string;
+  /** Why it is a wait when it is: the brain missed the deadline, failed or answered nothing legal. */
+  reason: 'chosen' | 'timeout' | 'error' | 'illegal';
+  /** What the engine made of it: short tags (picked, delivered, blocked, dug, knocked_down, ...). */
+  outcome?: string[];
+  /** The effect class of a verb that resolved, or `remove_solid` for a dig (skill inference). */
+  effect?: string;
+  /** The line it said, as delivered (refused lines never appear). */
+  said?: string;
+  /** Its inner voice; never stored for an agent on a bought or rented skill. */
+  thought?: string;
+  /** The equipped skill the model said drove the move (id only; skill text never leaves the vault). */
+  skill?: { id: string; version: number };
+}
+
+/** A crew plan as it stood from `tick` on; `hidden` instead of text when a bought skill shaped it. */
+export interface V2PlanRecord {
+  tick: number;
+  text: string | null;
+  why: string | null;
+  hidden?: true;
+}
+
+/** A key moment on the timeline's scrubber. */
+export interface V2MomentRecord {
+  tick: number;
+  kind: 'hazard_breach' | 'switch' | 'supply_drop' | 'goal';
+  /** The crew it happened to (or that caused it). */
+  team: 'A' | 'B';
+  agentId: string | null;
+  text: string;
+}
+
+/**
+ * Each crew's decision timeline of a v2 match, written by realtime when the match ends: per agent
+ * per tick what it saw, the crew plan, the action and the skill that drove it, plus key moments.
+ * Read by GET /v2/matches/:id/decisions (players only, their own crew; practice adds the bot's).
+ */
+export const matchTimelines = pgTable(
+  'match_timelines',
+  {
+    matchId: text('match_id')
+      .notNull()
+      .references(() => v2Matches.id, { onDelete: 'cascade' }),
+    team: text('team').$type<'A' | 'B'>().notNull(),
+    /** The brain that played this crew ('haiku' or 'greedy'); greedy plays without skills. */
+    brain: text('brain').notNull(),
+    plans: jsonb('plans').$type<V2PlanRecord[]>().notNull().default([]),
+    decisions: jsonb('decisions').$type<V2DecisionRecord[]>().notNull().default([]),
+    moments: jsonb('moments').$type<V2MomentRecord[]>().notNull().default([]),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.matchId, t.team] }), check('match_timelines_team_ck', sql`${t.team} in ('A', 'B')`)],
+);
+
 // ---------- Seasons ----------
 
 /**

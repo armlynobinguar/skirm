@@ -43,6 +43,8 @@ export interface V2Decision {
   refusedSay?: 'leak' | 'abuse' | 'empty';
   /** The agent's inner voice this tick: first person, private to its crew (withheld like the plan). */
   thought?: string;
+  /** Index into the context's `skills` of the skill the model said drove this move (the debrief timeline). */
+  skill?: number;
   call?: V2Call;
 }
 
@@ -170,9 +172,13 @@ export function createHaikuBrain(opts: HaikuBrainOptions): V2Brain {
     model,
     async act(o, ctx) {
       const wait: Action = { type: 'wait' };
-      const r = await call('actor', systemPrompt(activeSkills(o, ctx), ctx.instructions), turnPrompt(o, ctx.plan, ctx.canSpeak, ctx.recent ?? [], ctx.command ?? null), V2_ACTOR_MAX_TOKENS, opts.deadlineMs ?? V2_ACTION_DEADLINE_MS);
+      // The system prompt numbers the non-blank skills whose trigger holds this tick; a SKILL line maps
+      // back to ctx.skills.
+      const numbered = ctx.skills.flatMap((t, i) => (t.trim() && skillTriggerHolds(ctx.skillTriggers?.[i], o) ? [i] : []));
+      const r = await call('actor', systemPrompt(numbered.map((i) => ctx.skills[i]!), ctx.instructions), turnPrompt(o, ctx.plan, ctx.canSpeak, ctx.recent ?? [], ctx.command ?? null, numbered.length), V2_ACTOR_MAX_TOKENS, opts.deadlineMs ?? V2_ACTION_DEADLINE_MS);
       if (r.text === null) return { action: wait, reason: r.reason === 'timeout' ? 'timeout' : 'error', say: null, call: r.call };
-      const parsed = parseReply(r.text, o.legal, ctx.canSpeak);
+      const parsed = parseReply(r.text, o.legal, ctx.canSpeak, numbered.length);
+      const skill = parsed.action && parsed.skill ? numbered[parsed.skill - 1] : undefined;
       let say: V2Decision['say'] = null;
       let refusedSay: V2Decision['refusedSay'];
       if (parsed.say) {
@@ -186,6 +192,7 @@ export function createHaikuBrain(opts: HaikuBrainOptions): V2Brain {
         say,
         ...(refusedSay ? { refusedSay } : {}),
         ...(parsed.thought ? { thought: parsed.thought } : {}),
+        ...(skill !== undefined ? { skill } : {}),
         call: r.call,
       };
     },

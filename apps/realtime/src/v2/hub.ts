@@ -545,6 +545,11 @@ export class V2Hub {
       return null;
     });
     if (row) for (const d of row.eloDeltas ?? []) out.eloDelta[d.team] = d.delta;
+    // The decision timelines, before v2_end goes out, so the debrief can ask for them at once.
+    if (row?.status === 'ended')
+      await this.deps.repos.matchTimelines
+        .put(end.matchId, match.timelines())
+        .catch((err: unknown) => log.warn(`v2 match ${end.matchId}: decision timeline not kept: ${(err as Error).message}`));
     // The season points finish stored in each crew's debrief (ranked only).
     for (const t of TEAMS) {
       const season = row?.debriefs?.[t]?.season;

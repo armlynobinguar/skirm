@@ -4,6 +4,7 @@
 // client. In components use `useApi()` (src/lib/providers.tsx), never construct one.
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
+import type { MatchDecisions } from './decisions';
 import { ApiError, errorFromBody } from './errors';
 import type {
   Agent,
@@ -120,6 +121,8 @@ export interface ApiClient {
   v2Match(matchId: string): Promise<V2MatchRecord>;
   /** GET /v2/matches/live: v2 matches being played now, crews hidden. */
   v2LiveMatches(): Promise<V2LiveMatch[]>;
+  /** GET /v2/matches/:id/decisions: the caller's crew's decision timeline (players only, once ended). */
+  v2MatchDecisions(matchId: string): Promise<MatchDecisions>;
 
   /** GET /onboarding: tutorial progress and the home checklist. */
   onboarding(): Promise<Onboarding>;
@@ -244,6 +247,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     skillLadder: (opts = {}) => get('/leaderboards/skills', { mapId: opts.mapId, limit: opts.limit }),
     v2Match: (id) => get(`/v2/matches/${enc(id)}`),
     v2LiveMatches: () => get('/v2/matches/live'),
+    v2MatchDecisions: (id) => get(`/v2/matches/${enc(id)}/decisions`),
 
     onboarding: () => get('/onboarding'),
     updateTutorial: (body) => json('PUT', '/onboarding/tutorial', { body }),

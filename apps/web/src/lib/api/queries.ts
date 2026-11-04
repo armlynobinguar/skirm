@@ -58,6 +58,7 @@ export const qk = {
     all: ['matches'] as const,
     v2: (matchId: string) => ['matches', 'v2', matchId] as const,
     v2Live: ['matches', 'v2-live'] as const,
+    v2Decisions: (matchId: string) => ['matches', 'v2', matchId, 'decisions'] as const,
   },
 };
 

@@ -41,6 +41,7 @@ describe('migrations', () => {
         'free_budget_days',
         'v2_matches',
         'match_messages',
+        'match_timelines',
         'seasons',
         'season_standings',
         'prize_payouts',
@@ -57,8 +58,8 @@ describe('migrations', () => {
     );
     expect(rowsOf<{ n: number }>(applied)[0]!.n).toBe(embeddedMigrations().length);
     // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_onboarding, 0004_ranked_tiers,
-    // 0006_skill_triggers (0005 is taken by an open PR).
-    expect(embeddedMigrations()).toHaveLength(6);
+    // 0005_match_timelines, 0006_skill_triggers.
+    expect(embeddedMigrations()).toHaveLength(7);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {

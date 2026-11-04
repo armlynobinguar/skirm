@@ -8,6 +8,7 @@ import { SessionGuard } from './auth';
 import { CoreController } from './controllers/core.controller';
 import { CosmeticsController } from './controllers/cosmetics.controller';
 import { CreditsController } from './controllers/credits.controller';
+import { DecisionsController } from './controllers/decisions.controller';
 import { MarketController } from './controllers/market.controller';
 import { OnboardingController } from './controllers/onboarding.controller';
 import { RentalsController } from './controllers/rentals.controller';
@@ -36,6 +37,7 @@ export class AppModule {
         SeasonsController,
         CosmeticsController,
         OpsController,
+        DecisionsController,
         OnboardingController,
       ],
       providers: [
