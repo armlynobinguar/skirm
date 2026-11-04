@@ -135,5 +135,17 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     "sql": [
       "ALTER TABLE \"accounts\" ADD COLUMN \"deleted_at\" timestamp with time zone;"
     ]
+  },
+  {
+    "tag": "0003_quests_achievements",
+    "folderMillis": 1793764237267,
+    "bps": true,
+    "hash": "593479cdbca45782b2d776a3f5c3b4ff29257350a41aadcdf96e060beee9f1cd",
+    "sql": [
+      "CREATE TABLE \"achievements_unlocked\" (\n\t\"account_id\" text NOT NULL,\n\t\"achievement_id\" text NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"badge_status\" text DEFAULT 'none' NOT NULL,\n\t\"badge_token_id\" text,\n\t\"badge_tx\" text,\n\t\"badge_owner\" text,\n\t\"badge_at\" timestamp with time zone,\n\tCONSTRAINT \"achievements_unlocked_account_id_achievement_id_pk\" PRIMARY KEY(\"account_id\",\"achievement_id\"),\n\tCONSTRAINT \"achievements_badge_status_ck\" CHECK (\"achievements_unlocked\".\"badge_status\" in ('none', 'pending', 'minted', 'local', 'failed'))\n);\n",
+      "\nCREATE TABLE \"quest_claims\" (\n\t\"account_id\" text NOT NULL,\n\t\"quest_id\" text NOT NULL,\n\t\"period\" text NOT NULL,\n\t\"period_key\" text NOT NULL,\n\t\"reward_credits\" integer NOT NULL,\n\t\"credited\" integer NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"quest_claims_account_id_quest_id_period_key_pk\" PRIMARY KEY(\"account_id\",\"quest_id\",\"period_key\"),\n\tCONSTRAINT \"quest_claims_period_ck\" CHECK (\"quest_claims\".\"period\" in ('daily', 'weekly'))\n);\n",
+      "\nALTER TABLE \"achievements_unlocked\" ADD CONSTRAINT \"achievements_unlocked_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"quest_claims\" ADD CONSTRAINT \"quest_claims_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;"
+    ]
   }
 ];

@@ -760,3 +760,60 @@ export const cosmeticsOwned = pgTable(
   },
   (t) => [primaryKey({ columns: [t.accountId, t.itemId] })],
 );
+
+// ---------- Quests and achievements ----------
+
+/**
+ * Quest rewards claimed (@skirm/shared quests). One row per account, quest and window: the window
+ * key is the UTC day (daily) or the Monday the week starts on (weekly). `credited` is what the
+ * claim actually refilled into the free allowance (never more than `reward_credits`).
+ */
+export const questClaims = pgTable(
+  'quest_claims',
+  {
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    questId: text('quest_id').notNull(),
+    period: text('period').$type<'daily' | 'weekly'>().notNull(),
+    periodKey: text('period_key').notNull(),
+    rewardCredits: integer('reward_credits').notNull(),
+    credited: integer('credited').notNull(),
+    claimedAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.accountId, t.questId, t.periodKey] }),
+    check('quest_claims_period_ck', sql`${t.period} in ('daily', 'weekly')`),
+  ],
+);
+
+/**
+ * Achievements an account has unlocked (first seen met), and its soulbound badge on the `badges`
+ * contract: `badge_status` none → pending → minted | local (no signer) | failed.
+ */
+export const achievementsUnlocked = pgTable(
+  'achievements_unlocked',
+  {
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    achievementId: text('achievement_id').notNull(),
+    unlockedAt: createdAt(),
+    badgeStatus: text('badge_status')
+      .$type<'none' | 'pending' | 'minted' | 'local' | 'failed'>()
+      .notNull()
+      .default('none'),
+    badgeTokenId: text('badge_token_id'),
+    badgeTx: text('badge_tx'),
+    /** The NEAR account the badge was minted to. */
+    badgeOwner: text('badge_owner'),
+    badgeAt: ts('badge_at'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.accountId, t.achievementId] }),
+    check(
+      'achievements_badge_status_ck',
+      sql`${t.badgeStatus} in ('none', 'pending', 'minted', 'local', 'failed')`,
+    ),
+  ],
+);
