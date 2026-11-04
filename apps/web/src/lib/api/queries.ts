@@ -54,10 +54,24 @@ export const qk = {
     map: (mapId: string, limit?: number) => ['leaderboards', 'map', mapId, limit ?? null] as const,
     skills: (mapId?: string, limit?: number) => ['leaderboards', 'skills', mapId ?? null, limit ?? null] as const,
   },
+  lobbies: {
+    all: ['lobbies'] as const,
+    mine: ['lobbies', 'mine'] as const,
+    one: (lobbyId: string) => ['lobbies', 'one', lobbyId] as const,
+    code: (code: string) => ['lobbies', 'code', code] as const,
+  },
+  tournaments: {
+    all: ['tournaments'] as const,
+    list: ['tournaments', 'list'] as const,
+    one: (id: string) => ['tournaments', 'one', id] as const,
+  },
   matches: {
     all: ['matches'] as const,
     v2: (matchId: string) => ['matches', 'v2', matchId] as const,
     v2Live: ['matches', 'v2-live'] as const,
+    highlights: (matchId: string) => ['matches', 'v2', matchId, 'highlights'] as const,
+    shares: (matchId: string) => ['matches', 'v2', matchId, 'shares'] as const,
+    shared: (shareId: string) => ['matches', 'shared', shareId] as const,
     v2Decisions: (matchId: string) => ['matches', 'v2', matchId, 'decisions'] as const,
   },
 };

@@ -5,8 +5,8 @@ import { useMemo, useSyncExternalStore } from 'react';
 import type { NearProof } from '../api/types';
 import { config } from '../config';
 import { useServices } from '../services';
-import { signLinkProof } from './contracts';
-import { WalletError, type NearTransaction, type NearWallet } from './types';
+import { linkRecipient, linkSignInMessage, newNonce, proofOf, signLinkProof } from './contracts';
+import { WalletError, type NearTransaction, type NearWallet, type WalletOption } from './types';
 
 export const useWallet = (): NearWallet => useServices().wallet;
 
@@ -18,8 +18,11 @@ export function useWalletAccount(): string | null {
 
 export interface NearSigner {
   contracts: typeof config.near.contracts;
-  /** Opens the wallet picker, then signs the link message: the body for POST /auth/session. */
-  connectAndProve(skirmAccountId: string): Promise<{ nearAccountId: string; nearProof: NearProof }>;
+  /**
+   * Signs in with the picked wallet (or opens the picker without one) and signs the link message:
+   * the body for POST /auth/session. One wallet approval when the wallet supports it, else two.
+   */
+  connectAndProve(skirmAccountId: string, wallet?: WalletOption): Promise<{ nearAccountId: string; nearProof: NearProof }>;
   /**
    * Makes sure the wallet is signed in as `linked` (restoring or opening it), then signs and sends
    * `tx`; resolves with the transaction hash for the api.
@@ -44,8 +47,18 @@ export function useNearSigner(): NearSigner {
     }
     return {
       contracts: config.near.contracts,
-      async connectAndProve(skirmAccountId) {
-        const nearAccountId = await wallet.connect();
+      async connectAndProve(skirmAccountId, picked) {
+        if (picked?.oneStep) {
+          const recipient = linkRecipient();
+          const nonce = newNonce();
+          const { accountId, signed } = await wallet.connectAndSign(picked.id, {
+            message: linkSignInMessage(skirmAccountId),
+            recipient,
+            nonce,
+          });
+          return { nearAccountId: accountId, nearProof: proofOf(signed, nonce, recipient) };
+        }
+        const nearAccountId = await wallet.connect(picked?.id);
         const nearProof = await signLinkProof(wallet, skirmAccountId, nearAccountId);
         return { nearAccountId, nearProof };
       },

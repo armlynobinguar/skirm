@@ -43,8 +43,11 @@ export interface LedgerRow {
   note?: LedgerNote;
 }
 
-export type SpendKind = 'cosmetic';
-export type LedgerNote = 'entry_fee' | 'reversal' | 'expired' | SpendKind;
+/** What paid credits outside a run bought: a cosmetic, or a tournament's prize pool. */
+export type SpendKind = 'cosmetic' | 'prize_pool';
+/** A credit that is not a deposit: a tournament prize, or a prize pool returned to its creator. */
+export type TopUpKind = 'prize' | 'prize_pool';
+export type LedgerNote = 'entry_fee' | 'reversal' | 'expired' | SpendKind | 'prize';
 
 // ---------- State ----------
 
@@ -229,6 +232,8 @@ export interface TopUpInput {
   credits: number;
   /** Deposit receipt id; a receipt is credited once. */
   ref?: string;
+  /** Not a deposit: a tournament prize or a returned prize pool (its `ref` is still credited once). */
+  note?: TopUpKind;
 }
 
 export function topUp(state: LedgerState, input: TopUpInput, now: number): LedgerResult {
@@ -240,7 +245,7 @@ export function topUp(state: LedgerState, input: TopUpInput, now: number): Ledge
   if (ref !== undefined && a.topupRefs[ref])
     return fail(state, 'duplicate_topup', `receipt ${ref} already credited`);
   const w = new RowWriter(state.seq, new Date(now).toISOString(), player);
-  w.add({ type: 'topup', amount: credits, source: 'paid', ...(ref !== undefined ? { ref } : {}) });
+  w.add({ type: 'topup', amount: credits, source: 'paid', ...(ref !== undefined ? { ref } : {}), ...(input.note ? { note: input.note } : {}) });
   const next: PlayerAccount = {
     ...a,
     paid: a.paid + credits,

@@ -1,8 +1,10 @@
 // Everything the api needs from the outside world, injected as one object so tests can swap the
 // queue, the spend reader and the NEAR adapters (docs/backend-contract.md).
 import type { Repos } from '@skirm/db';
+import type { Caster } from '@skirm/decision-engine/v2';
 import type { RankedDecayConfig } from '@skirm/shared';
 import type { NearKeyChecker } from './near-link';
+import type { ReplayFrameReader } from './replays';
 import type { RateLimitStore, RateLimits } from './rate-limit';
 import type {
   BenchmarkJobData,
@@ -72,4 +74,8 @@ export interface ApiDeps {
   externalTurns?: ExternalTurnStore;
   /** Tests only: the webhook transport for pings (default: the SSRF-safe safePostJson). */
   externalPost?: (url: string, body: string, opts: SafePostOptions) => Promise<SafePostResult>;
+  /** Stored frames of ended matches for shared replays (absent: no playback, highlights empty). */
+  replayFrames?: ReplayFrameReader;
+  /** Writes the highlights' caster lines (absent: the offline template caster). */
+  caster?: Caster;
 }

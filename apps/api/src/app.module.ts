@@ -11,10 +11,12 @@ import { AgentApiController, ExternalAgentsController } from './controllers/exte
 import { CreditsController } from './controllers/credits.controller';
 import { DecisionsController } from './controllers/decisions.controller';
 import { MarketController } from './controllers/market.controller';
+import { LobbiesController } from './controllers/lobbies.controller';
 import { OnboardingController } from './controllers/onboarding.controller';
 import { RentalsController } from './controllers/rentals.controller';
 import { OpsController } from './controllers/ops.controller';
 import { PublicController } from './controllers/public.controller';
+import { ReplaysController } from './controllers/replays.controller';
 import { RankedController } from './controllers/ranked.controller';
 import { SeasonsController } from './controllers/seasons.controller';
 import { SkillsController } from './controllers/skills.controller';
@@ -35,9 +37,11 @@ export class AppModule {
         SkillsController,
         MarketController,
         RentalsController,
+        LobbiesController,
         SeasonsController,
         CosmeticsController,
         OpsController,
+        ReplaysController,
         DecisionsController,
         OnboardingController,
         ExternalAgentsController,

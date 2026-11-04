@@ -33,6 +33,7 @@ describe('config', () => {
       'commands',
       'credits',
       'crew',
+      'draft',
       'elo',
       'external',
       'free',

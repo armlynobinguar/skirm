@@ -6,7 +6,9 @@ import { rankedDecayFromEnv } from '@skirm/shared';
 import {
   ConfigError,
   RedisExternalTurnStore,
+  CostMonitor,
   QUEUE_BENCHMARKS,
+  RedisCostStore,
   createNearAdapters,
   createQueue,
   createRedis,
@@ -19,6 +21,7 @@ import type { ApiDeps } from './deps';
 import { BullBenchmarkQueue, RedisDailyCosts } from './infra';
 import { RpcNearKeyChecker } from './near-link';
 import { RedisRateLimitStore } from './rate-limit';
+import { RedisReplayFrames, createApiCaster } from './replays';
 
 async function main(): Promise<void> {
   installCrashReporting('api');
@@ -36,6 +39,14 @@ async function main(): Promise<void> {
   for (const r of [queueRedis, readRedis])
     r.on('error', (err: Error) => console.error(`[api] redis: ${err.message}`));
   const benchmarkQueue = new BullBenchmarkQueue(createQueue(QUEUE_BENCHMARKS, queueRedis));
+  const casterCosts = new CostMonitor({
+    store: new RedisCostStore(queueRedis),
+    dailyBudgetUsd: config.COST_ALERT_DAILY_USD,
+    onAlert: (a) =>
+      (a.level >= 1 ? console.error : console.warn)(
+        `[api] cost_alert ${JSON.stringify({ day: a.day, level: a.level, spentUsd: a.spentUsd, budgetUsd: a.budgetUsd })}`,
+      ),
+  });
 
   const deps: ApiDeps = {
     config: { ...config, V2_BRAIN: process.env.V2_BRAIN, rankedDecay: rankedDecayFromEnv(process.env) },
@@ -52,6 +63,11 @@ async function main(): Promise<void> {
     costs: new RedisDailyCosts(readRedis),
     // Bring your own agent: pull turns realtime publishes, shared through Redis.
     externalTurns: new RedisExternalTurnStore(queueRedis),
+    // Shared replays read realtime's stored frames; the caster's spend joins the daily cost total.
+    replayFrames: new RedisReplayFrames(readRedis),
+    caster: createApiCaster({ ...config, V2_BRAIN: process.env.V2_BRAIN }, (usd) => {
+      void casterCosts.record(usd).catch(() => undefined);
+    }),
     rateLimit: {
       store: new RedisRateLimitStore(readRedis),
       limits: {

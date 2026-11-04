@@ -33,6 +33,13 @@ export class RpcNearKeyChecker implements NearKeyChecker {
 export const linkMessage = (accountId: string, nearAccountId: string) =>
   `skirm:link-near:${accountId}:${nearAccountId}`;
 
+/**
+ * The link message a wallet signs during sign-in (NEAR Connect `signInAndSignMessage`), before the
+ * app knows which NEAR account the player will pick. It is as strong as linkMessage(): the proof is
+ * only accepted when its key is a full-access key of the NEAR account being linked.
+ */
+export const linkSignInMessage = (accountId: string) => `skirm:link-near:${accountId}`;
+
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 export function base58Decode(s: string): Uint8Array | undefined {

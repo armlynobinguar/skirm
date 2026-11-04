@@ -38,6 +38,17 @@ export interface SignedMessage {
   signature: string;
 }
 
+/** A wallet the player can pick in skirm's own list (NEAR Connect's manifest). */
+export interface WalletOption {
+  id: string;
+  name: string;
+  /** Icon URL from the wallet's manifest (may be empty). */
+  icon: string;
+  description: string;
+  /** Signs in and signs the link message in one approval (NEAR Connect `signInAndSignMessage`). */
+  oneStep: boolean;
+}
+
 export interface NearWallet {
   readonly network: 'testnet' | 'mainnet';
   /** The connected account, or null. Only known after `restore()` / `connect()`. */
@@ -46,8 +57,15 @@ export interface NearWallet {
   subscribe(fn: (accountId: string | null) => void): () => void;
   /** Loads the connector and reads a session kept from an earlier visit; the account or null. */
   restore(): Promise<string | null>;
-  /** Opens the wallet picker and signs in; resolves with the account id. */
-  connect(): Promise<string>;
+  /** Wallets that can do what skirm asks on this network, for skirm's own picker. */
+  wallets(): Promise<WalletOption[]>;
+  /** Signs in with `walletId` (no picker), or opens the picker without one; resolves with the account id. */
+  connect(walletId?: string): Promise<string>;
+  /**
+   * Signs in with `walletId` and signs `message` in the same approval (wallets with `oneStep`).
+   * Resolves with the account and its signature.
+   */
+  connectAndSign(walletId: string, message: SignMessageInput): Promise<{ accountId: string; signed: SignedMessage }>;
   disconnect(): Promise<void>;
   signMessage(input: SignMessageInput): Promise<SignedMessage>;
   /** Signs and sends one transaction; resolves once it is final with its hash. */

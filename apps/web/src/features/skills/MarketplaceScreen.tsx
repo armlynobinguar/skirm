@@ -1,7 +1,7 @@
 'use client';
 // S09 Marketplace (/market), styled as the v2 Exchange (the prototype's #s-market, P 2405-2478): tilt
 // cards with rarity art on the left, the skill's proof in a side drawer on the right (S10, in
-// SkillDetailScreen.tsx). Owner: skills builder. Design: .design-src/screens/S09-Marketplace.dc.html
+// SkillDetailScreen.tsx). Owner: skills builder.
 // Tabs: Exchange (GET /market?tag=&sort=, api default sort `winrate`: ranked v2 win rate, nulls
 // last) and My skills (GET /skills?tab=written + ?tab=owned, merged). Picking a card opens the drawer
 // and moves the URL to /market/[skillId] (history.replaceState, no navigation), so the link can be
@@ -14,7 +14,7 @@
 import { Badge, Button, TextField } from '@skirm/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import type { Tag } from '@skirm/shared';
+import { describeSkillTrigger, type Tag } from '@skirm/shared';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
 import { EmptyState } from '@/components/states/EmptyState';
@@ -430,6 +430,11 @@ function Card({ card: c, selected, onSelect }: { card: CardModel; selected: bool
       <span className={x.in}>
         <b className={x.name}>{sk.name}</b>
         <span className={x.by}>by {c.creator}</span>
+        {sk.trigger && sk.trigger.kind !== 'always' ? (
+          <span className={x.by} data-testid="s09-trigger">
+            Plays when: {describeSkillTrigger(sk.trigger).toLowerCase()}
+          </span>
+        ) : null}
         <span className={x.wr}>
           <span className={x.proof} data-testid="s09-proof">
             {c.v2 ? v2ProofLine(c.v2) : ROW_PROOF}

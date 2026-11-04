@@ -27,7 +27,7 @@ function base(o: Partial<ApiClient> = {}): Partial<ApiClient> {
 }
 
 describe('M01 with a NEAR wallet', () => {
-  it('connects, signs the link message and links with the proof', async () => {
+  it('connects a two-step wallet in one click: sign in, sign the link message, link', async () => {
     const wallet = new FakeWallet({ account: 'ada.testnet' });
     const onConnected = vi.fn();
     const { user, api } = renderWithProviders(
@@ -44,12 +44,13 @@ describe('M01 with a NEAR wallet', () => {
         },
       },
     );
-    // No dev account field and no "not available" banner: one button opens the wallet picker.
+    // No dev account field and no extra "Choose a wallet" step: the wallets are listed at once.
     expect(screen.queryByTestId('m01-account-input')).not.toBeInTheDocument();
     expect(screen.queryByTestId('m01-unavailable')).not.toBeInTheDocument();
-    await user.click(screen.getByTestId('m01-connect'));
+    await user.click(await screen.findByTestId('m01-wallet-mynearwallet'));
     await waitFor(() => expect(onConnected).toHaveBeenCalledWith('ada.testnet'));
-    expect(wallet.connect).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('m01-connect')).not.toBeInTheDocument();
+    expect(wallet.connect).toHaveBeenCalledWith('mynearwallet');
     expect(wallet.signed[0]).toMatchObject({
       message: `skirm:link-near:${ME_ID}:ada.testnet`,
       recipient: window.location.host,
@@ -66,6 +67,60 @@ describe('M01 with a NEAR wallet', () => {
     });
   });
 
+  it('signs in and signs in one approval with a wallet that supports it', async () => {
+    const wallet = new FakeWallet({ account: 'bo.testnet' });
+    const onConnected = vi.fn();
+    const { user, api } = renderWithProviders(
+      <ConnectWalletModal open onClose={() => {}} onConnected={onConnected} />,
+      {
+        ...privy,
+        wallet,
+        api: {
+          me: async () => meFixture(),
+          createSession: async () => ({
+            account: { id: ME_ID, handle: 'ada', nearAccountId: 'bo.testnet' },
+            created: false,
+          }),
+        },
+      },
+    );
+    await user.click(await screen.findByTestId('m01-wallet-hot-wallet'));
+    await waitFor(() => expect(onConnected).toHaveBeenCalledWith('bo.testnet'));
+    expect(wallet.connect).not.toHaveBeenCalled();
+    expect(wallet.signMessage).not.toHaveBeenCalled();
+    expect(wallet.connectAndSign).toHaveBeenCalledWith(
+      'hot-wallet',
+      expect.objectContaining({ message: `skirm:link-near:${ME_ID}`, recipient: window.location.host }),
+    );
+    expect(api.createSession).toHaveBeenLastCalledWith({
+      nearAccountId: 'bo.testnet',
+      nearProof: expect.objectContaining({ publicKey: 'ed25519:11111111111111111111111111111111' }),
+    });
+  });
+
+  it('falls back to the NEAR Connect picker when no wallet list loads', async () => {
+    const wallet = new FakeWallet();
+    wallet.options = [];
+    const onConnected = vi.fn();
+    const { user } = renderWithProviders(
+      <ConnectWalletModal open onClose={() => {}} onConnected={onConnected} />,
+      {
+        ...privy,
+        wallet,
+        api: {
+          me: async () => meFixture(),
+          createSession: async () => ({
+            account: { id: ME_ID, handle: 'ada', nearAccountId: 'ada.testnet' },
+            created: false,
+          }),
+        },
+      },
+    );
+    await user.click(await screen.findByTestId('m01-connect'));
+    await waitFor(() => expect(onConnected).toHaveBeenCalledWith('ada.testnet'));
+    expect(wallet.connect).toHaveBeenCalledWith(undefined);
+  });
+
   it('says so when the player cancels in the wallet, and links nothing', async () => {
     const wallet = new FakeWallet();
     wallet.reject('signMessage');
@@ -77,12 +132,13 @@ describe('M01 with a NEAR wallet', () => {
         api: { me: async () => meFixture() },
       },
     );
-    await user.click(screen.getByTestId('m01-connect'));
+    await user.click(await screen.findByTestId('m01-wallet-mynearwallet'));
     expect(await screen.findByTestId('m01-error')).toHaveTextContent(
       'Cancelled in the wallet. Nothing was linked.',
     );
     expect(api.createSession).toHaveBeenCalledTimes(1); // the session check on load only
-    expect(screen.getByTestId('m01-connect')).toHaveTextContent('Try again');
+    // The list stays: a click on a wallet tries again.
+    expect(screen.getByTestId('m01-wallet-mynearwallet')).toBeEnabled();
   });
 
   it('explains a proof the api refused', async () => {
@@ -108,7 +164,7 @@ describe('M01 with a NEAR wallet', () => {
         },
       },
     );
-    await user.click(screen.getByTestId('m01-connect'));
+    await user.click(await screen.findByTestId('m01-wallet-hot-wallet'));
     expect(await screen.findByTestId('m01-error')).toHaveTextContent(
       'The wallet has to sign to prove the account is yours',
     );

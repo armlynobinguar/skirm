@@ -103,6 +103,9 @@ export async function setup(
     rateLimit?: ApiDeps['rateLimit'];
     /** Extra deps (the external agent relay and webhook transport). */
     deps?: Partial<Pick<ApiDeps, 'externalTurns' | 'externalPost'>>;
+    /** Stored frames for shared replays and the caster (default: none, template caster). */
+    replayFrames?: ApiDeps['replayFrames'];
+    caster?: ApiDeps['caster'];
   } = {},
 ): Promise<Harness> {
   const db = opts.db ?? (await createTestDb());
@@ -139,6 +142,8 @@ export async function setup(
     costs,
     ...(opts.rateLimit ? { rateLimit: opts.rateLimit } : {}),
     ...opts.deps,
+    ...(opts.replayFrames ? { replayFrames: opts.replayFrames } : {}),
+    ...(opts.caster ? { caster: opts.caster } : {}),
   };
   const app = await createApp(deps, { logger: false });
   await app.init();

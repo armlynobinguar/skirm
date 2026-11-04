@@ -206,5 +206,6 @@ function meta(b: z.output<typeof skillBody>) {
     requiresActions: b.requires_actions,
     handlesTags: b.handles_tags as SkillVersionView['handlesTags'],
     royaltyBps: b.royalty_bps,
+    trigger: b.trigger ?? null,
   };
 }
