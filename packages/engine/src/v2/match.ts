@@ -5,10 +5,12 @@
 // Each tick, in order (design doc "Match format"):
 //   1. timers: switch floods run out, cooldowns tick down, supply drops land (known to both crews)
 //   2. every agent's action resolves together: verbs first, then moves (two agents stepping onto one
-//      tile both stay put), digging takes three hits by hand
+//      tile both stay put), digging takes three hits by hand; an agent standing in gas loses every
+//      other action, and a mover that lands on ice slides one more tile the same way unless blocked
 //   3. pickups and deliveries
 //   4. the environment: hazards spread for `cap` waves, then recede, then grow again; anyone a
-//      hazard reaches is knocked down (lava removes them)
+//      hazard reaches is knocked down (lava removes them). Then gas clouds drift and thin (vents
+//      puff), and sparking cables electrify the water they touch (anyone on or next to it is stunned)
 //   5. what each crew can see (fog)
 //   6. talk: messages sent this tick are delivered to whoever hears them, bluffs among them (bluff.ts,
 //      judged on what the crews see now), then the goal check
@@ -35,6 +37,8 @@ export const REPEL_COOLDOWN = 15;
 /** Each agent a crew fields beyond the rival's gives the rival a 10 s head start. */
 export const HEAD_START_TICKS_PER_AGENT = 5;
 export const DIG_HITS = 3;
+/** Ticks an agent on or next to electrified water is stunned. */
+export const SHOCK_STUN = 2;
 
 export type Role = 'Builder' | 'Digger' | 'Firefighter' | 'Scout' | 'Runner' | 'Hauler';
 export const ROLES: readonly Role[] = ['Builder', 'Digger', 'Firefighter', 'Scout', 'Runner', 'Hauler'];
@@ -114,6 +118,8 @@ export interface AgentState {
   heardBluff: { by: string; tile: number; tick: number; believed: boolean } | null;
   /** Bluffs it told and the rival believed, and rival bluffs it heard and doubted (the agent record). */
   bluffs: { told: number; landed: number; seenThrough: number };
+  /** Lost last tick's action to gas: it acts this tick even in gas (gas halves an agent's pace). */
+  gasp?: boolean;
 }
 
 export type MatchEvent =
@@ -131,7 +137,17 @@ export type MatchEvent =
   | { kind: 'hazard'; hazard: HazardKind; wave: number; receding: boolean }
   | { kind: 'said'; agent: string; channel: 'say' | 'team'; text: string; heardBy: string[]; overheardBy: string[]; bluff?: true }
   | { kind: 'bluff'; agent: string; victim: string; at: [number, number]; believed: boolean }
-  | { kind: 'refused'; agent: string; reason: string };
+  | { kind: 'refused'; agent: string; reason: string }
+  /** Gas: the agent lost this tick's action coughing. */
+  | { kind: 'choked'; agent: string }
+  /** Ice: the agent slid one more tile after its move. */
+  | { kind: 'slid'; agent: string; from: [number, number]; to: [number, number] }
+  /** A sparking cable electrified the water it touches until `until`; `tiles` is how many water tiles. */
+  | { kind: 'sparked'; name: string; at: [number, number]; until: number; tiles: number }
+  /** Electrified water stunned the agent (`by`: the cable's name). */
+  | { kind: 'shocked'; agent: string; by: string }
+  /** A gas vent puffed. */
+  | { kind: 'gas_vent'; at: [number, number] };
 
 export interface MatchResult {
   winner: Team | 'draw';
@@ -197,6 +213,12 @@ export interface MatchState {
   hazards: Record<string, { waves: (readonly [number, Tile | null])[][]; receding: boolean; count: number }>;
   floods: { team: Team; until: number; tiles: number[]; kind: Tile }[];
   switchReady: number[];
+  /** Gas strength by tile (absent: clear air). */
+  gas: Record<number, number>;
+  /** Tick each sparking cable stops (map order); live while tick < it. */
+  sparkUntil: number[];
+  /** Water tiles electrified this tick. */
+  shocked: number[];
   /** Fog: per crew, the last tile seen at each index (undefined: never seen). */
   seen: Record<Team, (Tile | null | undefined)[]>;
   visible: Record<Team, boolean[]>;
@@ -276,6 +298,9 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
     hazards: {},
     floods: [],
     switchReady: def.switches.map(() => 0),
+    gas: {},
+    sparkUntil: (def.sparks ?? []).map(() => 0),
+    shocked: [],
     seen: { A: new Array(size), B: new Array(size) },
     visible: { A: new Array(size).fill(false), B: new Array(size).fill(false) },
     result: null,
@@ -344,6 +369,13 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
       continue;
     }
     if (s.tick <= s.holdTicks[a.team]) continue;
+    // Gas: every other action is lost while the agent stands in it.
+    if (s.gas[a.y * w + a.x] && !a.gasp) {
+      a.gasp = true;
+      ev.push({ kind: 'choked', agent: a.id });
+      continue;
+    }
+    delete a.gasp;
     actors.push(a);
   }
   const moves = new Map<AgentState, number>();
@@ -411,6 +443,8 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
 
   // 4. environment
   for (const hz of def.hazards) if (s.tick % hz.every === 0) spreadHazard(s, hz.kind, hz.cap, ev);
+  if (def.gas?.length) spreadGas(s, ev);
+  if (def.sparks?.length) electrify(s, ev);
 
   // 5. sight, before talk: a bluff is judged on what the target's crew sees after this tick's moves
   updateSight(s);
@@ -446,12 +480,13 @@ function used(s: MatchState, a: AgentState) {
 }
 
 function passable(t: Tile): boolean {
-  return t === 'item' || t === 'exit' || t === 'grass';
+  return t === 'item' || t === 'exit' || t === 'grass' || t === 'ice';
 }
 
 /** Moves resolve together: shared targets and targets held by agents that stay all block. */
 function resolveMoves(s: MatchState, moves: Map<AgentState, number>, ev: MatchEvent[]) {
   const { w } = s.map;
+  const from = new Map([...moves.keys()].map((a) => [a, a.y * w + a.x]));
   const count = new Map<number, number>();
   for (const t of moves.values()) count.set(t, (count.get(t) ?? 0) + 1);
   for (const [a, t] of [...moves]) if (count.get(t)! > 1) moves.delete(a), ev.push({ kind: 'blocked', agent: a.id });
@@ -469,6 +504,21 @@ function resolveMoves(s: MatchState, moves: Map<AgentState, number>, ev: MatchEv
   for (const [a, t] of moves) {
     a.x = t % w;
     a.y = (t / w) | 0;
+  }
+  // Ice: a mover that landed on ice slides one more tile the same way, unless that tile is solid,
+  // a hazard, the map's edge or held by an agent. Slides resolve in agent order.
+  for (const [a, t] of moves) {
+    if (s.grid[t] !== 'ice') continue;
+    const k = 2 * t - from.get(a)!;
+    const x = k % w;
+    const y = (k / w) | 0;
+    if (x <= 0 || y <= 0 || x >= w - 1 || y >= s.map.h - 1) continue;
+    const tt = s.grid[k];
+    if (tt !== null && (tt === undefined || !passable(tt))) continue;
+    if (s.agents.some((o) => o !== a && !o.out && !o.down && o.x === x && o.y === y)) continue;
+    ev.push({ kind: 'slid', agent: a.id, from: [a.x, a.y], to: [x, y] });
+    a.x = x;
+    a.y = y;
   }
 }
 
@@ -608,6 +658,87 @@ function spreadHazard(s: MatchState, kind: HazardKind, cap: number, ev: MatchEve
       ev.push({ kind: 'eliminated', agent: a.id, by: kind });
     } else knockDown(s, a, kind, ev);
   }
+}
+
+/**
+ * Gas: every tile's cloud drifts one tile to its open neighbours and thins by one (strength 3 at a
+ * vent reaches two tiles out, then clears). Walls, trees, crates, blocks, switches and rubble stop
+ * it; it drifts over water, fire and ice. Then each vent puffs on its beat.
+ */
+function spreadGas(s: MatchState, ev: MatchEvent[]) {
+  const { w, h } = s.map;
+  const next: Record<number, number> = {};
+  const put = (j: number, v: number) => {
+    if (v > 0 && v > (next[j] ?? 0)) next[j] = v;
+  };
+  for (const key of Object.keys(s.gas)) {
+    const j = Number(key);
+    const v = s.gas[j]! - 1;
+    put(j, v);
+    const x = j % w;
+    const y = (j / w) | 0;
+    for (const [dx, dy] of Object.values(DIRS)) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 1 || ny < 1 || nx >= w - 1 || ny >= h - 1) continue;
+      const k = ny * w + nx;
+      const t = s.grid[k];
+      if (t != null && SOLID.has(t)) continue;
+      put(k, v);
+    }
+  }
+  for (const v of s.map.def.gas ?? [])
+    if (s.tick % v.every === 0) {
+      put(idx(s, v.at), v.strength);
+      ev.push({ kind: 'gas_vent', at: v.at });
+    }
+  // Integer keys iterate in ascending order, so the record (and the match) is the same on every run.
+  s.gas = next;
+}
+
+/**
+ * Sparking cables: on its beat a cable electrifies the water body it touches (every water tile
+ * joined to it, as the water stands this tick) for `ticks` ticks. While live, any agent on or next to
+ * that water and not already stunned is stunned for SHOCK_STUN ticks.
+ */
+function electrify(s: MatchState, ev: MatchEvent[]) {
+  const { w } = s.map;
+  const sparks = s.map.def.sparks ?? [];
+  const bodies: { name: string; tiles: Set<number> }[] = [];
+  sparks.forEach((sp, k) => {
+    const starting = s.tick % sp.every === 0;
+    if (starting) s.sparkUntil[k] = s.tick + sp.ticks;
+    if (s.tick >= s.sparkUntil[k]!) return;
+    const body = waterBody(s, idx(s, sp.at));
+    bodies.push({ name: sp.name, tiles: new Set(body) });
+    if (starting) ev.push({ kind: 'sparked', name: sp.name, at: sp.at, until: s.sparkUntil[k]!, tiles: body.length });
+  });
+  s.shocked = [...new Set(bodies.flatMap((b) => [...b.tiles]))].sort((p, q) => p - q);
+  if (!s.shocked.length) return;
+  for (const a of s.agents) {
+    if (a.out || a.down || a.stun > 0) continue;
+    const here = [a.y * w + a.x, ...Object.values(DIRS).map(([dx, dy]) => (a.y + dy) * w + a.x + dx)];
+    const hit = bodies.find((b) => here.some((j) => b.tiles.has(j)));
+    if (!hit) continue;
+    a.stun = SHOCK_STUN;
+    ev.push({ kind: 'shocked', agent: a.id, by: hit.name });
+  }
+}
+
+/** Every water tile joined (orthogonally) to the water next to tile `from`, in tile order. */
+function waterBody(s: MatchState, from: number): number[] {
+  const { w } = s.map;
+  const q = [from - w, from - 1, from + 1, from + w].filter((j) => s.grid[j] === 'water');
+  const seen = new Set(q);
+  for (let i = 0; i < q.length; i++) {
+    const j = q[i]!;
+    for (const k of [j - w, j - 1, j + 1, j + w])
+      if (!seen.has(k) && s.grid[k] === 'water') {
+        seen.add(k);
+        q.push(k);
+      }
+  }
+  return q.sort((p, r) => p - r);
 }
 
 function knockDown(s: MatchState, a: AgentState, by: HazardKind | 'switch', ev: MatchEvent[]) {

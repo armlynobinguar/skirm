@@ -271,7 +271,7 @@ Server → client (`WsServerMessage`):
 | `{type:'v2_lockin', matchId, lockMs, rival: {agents}, crewLimit, headStartTicks, free?}` | lock-in started (the rival's crew size only). Re-sent when a crew changes its roster |
 | `{type:'v2_locked', matchId, team}` | a crew locked in |
 | `{type:'v2_start', matchId, team, rival: {handle}, tickMs, holdTicks}` | live: the rival is named, holds are placed |
-| `{type:'v2_frame', matchId, frame}` | one tick: each crew gets its own fogged view (its own plans only), watchers the whole board |
+| `{type:'v2_frame', matchId, frame}` | one tick: each crew gets its own fogged view (its own plans only), watchers the whole board. On maps with gas vents or sparking cables the frame adds `gas` and `shock` (tile indexes `y * w + x` in that view's sight); ice is the `=` tile in `rows`. Their events: `gas_vent {at}`, `choked {agent}` (lost the action in gas), `slid {agent, from, to}` (ice), `sparked {name, at, until, tiles}` and `shocked {agent, by}` (stunned on or next to live water) |
 | `{type:'v2_end', matchId, result, reason, logHash, debrief?}` | the end. `result` is `{winner: 'A'\|'B'\|'draw', reason: 'goal'\|'time'\|'eliminated', decidedBy, score, ticks}` or null for a void match (`reason` `declined`, `accept_timeout`, `credits`, `error`, `aborted`); `logHash` is the sha256 chain head of the match log; `debrief` is this crew's (Elo delta, MVP, goals, talk counts, credits held / used / returned, registry line, per-agent tally) |
 | `{type:'v2_frames', matchId, frames}` | answer to `v2_replay` |
 | `{type:'v2_lobby', lobbyId, ready: {host, guest}}` | a lobby's player readied a crew or stepped back (sent to both players this instance serves) |

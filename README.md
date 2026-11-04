@@ -53,6 +53,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 - **Private lobbies and tournaments**: challenge a friend with a code, or run a 4 to 16 player bracket
 - **Draft mode**: each crew bans one of the rival's skills before the match
 - **Live commands**: three orders a match to steer your crew without taking control
+- **Gas, ice and live water**: gas clouds that cost every other action, ice that slides you a tile further, and cables that electrify the water (Frostline Depot, Sunken Metro)
 - **Bring your own agent**: plug your own program (webhook, pull api, or an LLM through the bundled MCP server) into casual and practice matches. See [external agents](docs/external-agents.md)
 
 **Strategy**

@@ -4,6 +4,7 @@ import type { Dir, Tile } from './map';
 import type { Action, AgentState, MatchState, Role } from './match';
 import { avoidedTile } from './bluff';
 import { legalActions } from './match';
+import { overlaysFor } from './frame';
 import type { HeardMessage, TalkTier } from './talk';
 
 export interface SeenAgent {
@@ -37,10 +38,16 @@ export interface Observation {
    */
   bluff?: { by: string; at: [number, number]; believed: boolean; ticksLeft: number };
   legal: Action[];
+  /** Gas tiles in sight (maps with gas vents only). Standing in gas costs every other action. */
+  gas?: [number, number][];
+  /** Electrified water tiles in sight (maps with sparking cables only). On or next to them: stunned. */
+  shock?: [number, number][];
+  /** The agent stands in gas and will lose its next action coughing (maps with gas vents only). */
+  choking?: boolean;
 }
 
 const CHAR: Record<Tile, string> = {
-  wall: '#', grass: ',', tree: 'T', dirt: 'd', water: '~', lava: 'L', fire: '^', item: '*', exit: 'E', crate: 'c', block: 'B', valve: 'V',
+  wall: '#', grass: ',', tree: 'T', dirt: 'd', water: '~', lava: 'L', fire: '^', item: '*', exit: 'E', crate: 'c', block: 'B', valve: 'V', ice: '=',
 };
 
 /** The board as a crew has seen it ('?' never seen), or as it is when `team` is null. */
@@ -88,7 +95,20 @@ export function observe(s: MatchState, agentId: string): Observation {
     heard: a.inbox,
     ...bluffView(s, a),
     legal: legalActions(s, a.id),
+    ...hazardView(s, a),
   };
+}
+
+/** Gas and electrified water in the crew's sight now, and whether the agent is choking (only on maps that have them). */
+function hazardView(s: MatchState, a: AgentState): Pick<Observation, 'gas' | 'shock' | 'choking'> {
+  const { w, def } = s.map;
+  const o = overlaysFor(s, a.team);
+  const xy = (j: number): [number, number] => [j % w, (j / w) | 0];
+  const out: Pick<Observation, 'gas' | 'shock' | 'choking'> = {};
+  if (o.gas) out.gas = o.gas.map(xy);
+  if (o.shock) out.shock = o.shock.map(xy);
+  if (def.gas?.length) out.choking = !!s.gas[a.y * w + a.x] && !a.gasp && !a.out && !a.down;
+  return out;
 }
 
 /** A bluff still believed, or one seen through on the tick just played. */
