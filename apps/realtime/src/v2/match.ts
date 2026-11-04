@@ -121,9 +121,22 @@ export interface V2SkillMeta {
   trigger: SkillTrigger | null;
 }
 
+/**
+ * A player's crew playbook as a match plays it: the planner reads the text whole, each actor one line.
+ * Private like the skills: the text never leaves the server, and only the player's own frames carry
+ * the name. Never recorded on the match, its log or its replays.
+ */
+export interface V2Playbook {
+  id: string;
+  name: string;
+  text: string;
+}
+
 export interface V2Side extends V2Roster {
   accountId: string;
   handle: string;
+  /** The crew playbook (the one selected when the match was made; lock-in may change it). */
+  playbook?: V2Playbook | null;
   /** The player's Elo and ranked matches when they queued (the tiers on a ranked v2_found). */
   rank?: { elo: number; rankedMatches: number };
 }
@@ -284,11 +297,13 @@ export class V2Match {
   /**
    * Talk tier per agent, in crew order (ranked plays Standard whatever is sent). `roster`, when
    * given, replaces the crew (its agents' tiers win) and both crews are sent the new head start.
+   * `playbook`, when given, is the crew playbook for the match (null: none); absent keeps the side's.
    * Returns false when the crew can no longer lock in (not in lock-in, or already locked).
    */
-  lockIn(team: Team, tiers: TalkTier[], roster?: V2Roster): boolean {
+  lockIn(team: Team, tiers: TalkTier[], roster?: V2Roster, playbook?: V2Playbook | null): boolean {
     if (this.phase !== 'lockin' || this.locked.has(team)) return false;
     const side = this.setup.sides[team];
+    if (playbook !== undefined) side.playbook = playbook;
     if (roster) {
       roster = this.withoutBans(team, roster);
       if (roster.crew.length < 1 || roster.crew.length > this.crewLimit) throw new Error(`crew ${team} must field 1 to ${this.crewLimit} agents`);
@@ -547,7 +562,7 @@ export class V2Match {
       if ([...raw].length > cfg.maxChars) return { ok: false, code: 'invalid_command', message: `a command is at most ${cfg.maxChars} characters` };
       if (raw) {
         const side = this.setup.sides[team];
-        const secrets = [...side.skills.flat(), ...(side.instructions ?? []).filter((t): t is string => !!t)];
+        const secrets = [...side.skills.flat(), ...(side.instructions ?? []).filter((t): t is string => !!t), ...(side.playbook ? [side.playbook.text] : [])];
         const f = filterSpeech(raw, secrets);
         if (!f.ok) return { ok: false, code: 'command_refused', message: f.reason === 'leak' ? 'the command repeats a skill' : 'the command was refused by the filter' };
         text = f.text;
@@ -740,7 +755,7 @@ export class V2Match {
     if (skills.length) this.skillsActive.set(id, skills.map((_, i) => ({ name: meta[i]?.name ?? `Skill ${i + 1}`, trigger: skillTriggers[i] ?? { kind: 'always' }, active: active[i]! })));
     if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
     const command = this.orderFor(s, id, s.tick + 1);
-    const ctx = { skills, skillTriggers, instructions: side.instructions?.[a.slot] ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [], command };
+    const ctx = { skills, skillTriggers, instructions: side.instructions?.[a.slot] ?? null, playbook: side.playbook?.text ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [], command };
     const sched = this.deps.scheduler;
     return new Promise((resolve) => {
       let settled = false;
@@ -781,7 +796,7 @@ export class V2Match {
     const instructions = (this.setup.sides[team].instructions ?? []).filter((t): t is string => !!t).join('\n\n') || null;
     let timer: unknown;
     const late = new Promise<null>((r) => (timer = this.deps.scheduler.setTimeout(() => r(null), this.timing.planMs)));
-    const r = await Promise.race([this.deps.brains[team].plan(observe(s, lead.id), { skills, skillTriggers, instructions }).catch(() => null), late]);
+    const r = await Promise.race([this.deps.brains[team].plan(observe(s, lead.id), { skills, skillTriggers, instructions, playbook: side.playbook?.text ?? null }).catch(() => null), late]);
     this.deps.scheduler.clearTimeout(timer);
     if (r) {
       this.stats[team].costUsd += r.call?.costUsd ?? 0;
@@ -799,6 +814,9 @@ export class V2Match {
       let frame = withOwnCrew(frameFor(s, t, ev), s, t, ev, this.plans[t], this.setup.sides[t].bought ?? [], { why: this.planWhys[t], thoughts: this.thoughts, skills: this.skillsActive });
       // Its own live commands: the rival's frames and the watch view never carry them.
       frame = { ...frame, commands: { left: this.commandsLeft[t], log: this.commandLog[t].map((c) => ({ ...c, agents: [...c.agents] })) } };
+      // Its crew playbook by name only (the owner's mind panel); never the text, never another view.
+      const playbook = this.setup.sides[t].playbook;
+      if (playbook) frame.playbook = playbook.name;
       // Practice shows all minds (the prototype): the player also sees the bot's plan, reason and inner voice.
       if (this.setup.practice) {
         const r: Team = t === 'A' ? 'B' : 'A';

@@ -24,7 +24,7 @@ function keylessEnv() {
 
 /** A model brain stand-in: greedy moves, and a team line whenever its tier lets it speak. */
 const talkative: V2Brain = {
-  kind: 'haiku',
+  kind: 'model',
   model: 'fake-haiku',
   async act(o, ctx) {
     const d = await createGreedyBrain().act(o, { ...ctx, canSpeak: false });
@@ -289,7 +289,7 @@ describe('realtime v2 brain', () => {
   it('sends every model call’s cost to the CostMonitor', async () => {
     const recorded: number[] = [];
     const brain = createRealtimeV2Brain({ OPENROUTER_API_KEY: 'k' }, { record: async (usd) => void recorded.push(usd) }, quiet, fakeFetch(0.00042));
-    expect(brain.kind).toBe('haiku');
+    expect(brain.kind).toBe('model');
     await brain.plan(fakeObservation(), { skills: [] });
     expect(recorded).toEqual([0.00042]);
   });

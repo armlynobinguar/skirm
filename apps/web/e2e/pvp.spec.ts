@@ -1,6 +1,6 @@
 // v2 PvP against the real backend: two fresh players top up (dev deposit), queue a ranked v2 match
 // from the hub, accept on the hub's VS takeover, lock in and watch it play out on one shared map to a
-// result. The agents are played by whatever brain realtime booted: Haiku 5.5 when OPENROUTER_API_KEY
+// result. The agents are played by whatever brain realtime booted: the model when LLM_API_KEY
 // is set (up to 150 ticks of 2 s, about 5 minutes), else the offline greedy brain (usually under 2
 // minutes).
 import { expect, test, type Page } from '@playwright/test';

@@ -6,12 +6,14 @@
 // Ranked plays every agent at Standard. The rival's agent count shows, never who they are (practice:
 // the greedy bot, a Standard crew the size of yours). A free crew (practice on the offline brain)
 // holds nothing, so the hold line says so.
-// `v2_lock_in` carries the tiers, plus the crew when it differs from the queued one.
+// `v2_lock_in` carries the tiers, plus the crew when it differs from the queued one, and the crew
+// playbook (`playbookId`) when the picker moved off the one selected on the crew screen.
 import { DIFF_MODS, RANKED_DIFFICULTY, holdFor, type TalkTier } from '@skirm/engine/v2';
 import { Button, fmt } from '@skirm/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CreditEstimate, CrewCard, EmptySlot, GoalBox, RosterStrip } from '@/features/agents/CrewParts';
+import { PlaybookPicker, playbookChange, usePlaybooks } from '@/features/agents/Playbooks';
 import { TIER_INFO, clock, fmtRate, headStartLine, ratePerTick } from '@/features/agents/agentView';
 import c from '@/features/agents/crew.module.css';
 import { DIFFS, diffIndex, mapById } from '@/features/arena/world';
@@ -45,6 +47,8 @@ export function LockIn({ view }: { view: V2MatchView }) {
   const [crew, setCrew] = useState<string[]>(() => queued.map((a) => a.agentId));
   const [tiers, setTiers] = useState<Record<string, TalkTier>>(() => Object.fromEntries(queued.map((a) => [a.agentId, a.tier])));
   const [sent, setSent] = useState(false);
+  const playbooks = usePlaybooks(!!me.data);
+  const [playbook, setPlaybook] = useState<string | null | undefined>(undefined);
   const locked = view.locked.includes(view.team) || sent;
   const nameOf = (id: string) => byId.get(id)?.name ?? queued.find((a) => a.agentId === id)?.name ?? 'Agent';
   const tierOf = (id: string): TalkTier => (view.ranked ? 'standard' : (tiers[id] ?? 'standard'));
@@ -58,6 +62,8 @@ export function LockIn({ view }: { view: V2MatchView }) {
     if (locked) return;
     const msg: Extract<OutgoingMessage, { type: 'v2_lock_in' }> = { type: 'v2_lock_in', matchId: view.matchId, tiers: crew.map(tierOf) };
     if (changed && crew.length) msg.crew = crew.map((id) => ({ agentId: id, tier: tierOf(id) }));
+    const pick = playbookChange(playbooks.data, playbook);
+    if (pick !== undefined) msg.playbookId = pick;
     rt.send(msg);
     setSent(true);
   };
@@ -142,6 +148,7 @@ export function LockIn({ view }: { view: V2MatchView }) {
             <GoalBox map={map} di={diffIndex(difficulty)} lock={view.ranked} />
           </div>
         ) : null}
+        <PlaybookPicker value={playbook} onChange={setPlaybook} disabled={locked} />
         <CreditEstimate ticks={ticks} rates={rates} hold={hold}>
           <span className={c.formula} data-testid="v2-hold">
             {view.free
@@ -155,7 +162,7 @@ export function LockIn({ view }: { view: V2MatchView }) {
               {hs.text}
             </span>
           ) : null}
-          <span className={c.models}>Haiku 5.5 plans and acts · same for everyone</span>
+          <span className={c.models}>One model plans and acts · same for everyone</span>
           {locked ? (
             <span className="sk-kick">
               Locked · {rivalLocked ? 'starting…' : 'waiting for the rival'}

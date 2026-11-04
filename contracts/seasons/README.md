@@ -1,6 +1,6 @@
 # skirm seasons contract
 
-`seasons.playskirm.testnet`, built as `skirm_seasons.wasm`. One NEAR prize pool per 14-day season,
+[`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet), built as `skirm_seasons.wasm`. One NEAR prize pool per 14-day season,
 paid to the top 10 of the ranked v2 standings. Standings are computed offchain (win 25, draw 12,
 loss 5 points) and posted by the platform signer; winners pull their prize with `claim`.
 
@@ -55,4 +55,5 @@ NEP-297, standard `skirm_seasons`, version `1.0.0`: `season_opened`, `season_fun
 
 `packages/server/src/near/seasons.ts` wraps the ops calls (`SeasonsChain`); `NoopSeasons` stands
 in when `NEAR_OPS_*` is unset. The contract account is `NEAR_CONTRACT_SEASONS`
-(default `seasons.playskirm.testnet`). Not deployed yet.
+(default `seasons.playskirm.testnet`), deployed on testnet:
+[seasons.playskirm.testnet](https://testnet.nearblocks.io/address/seasons.playskirm.testnet).

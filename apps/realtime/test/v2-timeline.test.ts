@@ -26,7 +26,7 @@ const noCredits: V2Credits = {
 
 /** A model brain stand-in: greedy moves, a plan with a reason, a thought, and its first skill named whenever it carries one. */
 const naming: V2Brain = {
-  kind: 'haiku',
+  kind: 'model',
   model: 'fake-haiku',
   async act(o, ctx) {
     const d = await createGreedyBrain().act(o, { ...ctx, canSpeak: false });
@@ -63,7 +63,7 @@ describe('v2 decision timeline', () => {
     expect(end.result).not.toBeNull();
     const [a, b] = m.timelines();
     expect(a!.team).toBe('A');
-    expect(a!.brain).toBe('haiku');
+    expect(a!.brain).toBe('model');
     expect(b!.brain).toBe('greedy');
     const ticks = end.result!.ticks;
     const wick = a!.decisions.filter((d) => d.agentId === 'wick');
@@ -94,7 +94,7 @@ describe('v2 decision timeline', () => {
 
   it('marks hazard breaches for the agent’s own crew only, and switches and supply drops for both', () => {
     const t = new DecisionTimeline({
-      A: { brain: 'haiku', bought: [], skillKeys: [] },
+      A: { brain: 'model', bought: [], skillKeys: [] },
       B: { brain: 'greedy', bought: [], skillKeys: [] },
     });
     const agents = [

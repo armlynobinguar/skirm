@@ -13,7 +13,7 @@ function recordingBrain(say?: (o: Observation) => string | null) {
   const heard: { tick: number; agent: string; heard: HeardMessage[]; ctx: V2AgentContext }[] = [];
   const plans: { tick: number; skills: string[]; instructions?: string | null }[] = [];
   const brain: V2Brain = {
-    kind: 'haiku',
+    kind: 'model',
     model: 'fake',
     async act(o, ctx) {
       heard.push({ tick: o.tick, agent: o.me.id, heard: o.heard, ctx });
@@ -122,8 +122,8 @@ describe('playHeadless', () => {
   });
 
   it('turns a brain that misses the deadline or throws into waits', async () => {
-    const stuck: V2Brain = { kind: 'haiku', model: 'stuck', act: () => new Promise(() => undefined), plan: async () => ({ text: null }) };
-    const broken: V2Brain = { kind: 'haiku', model: 'broken', act: () => Promise.reject(new Error('boom')), plan: () => Promise.reject(new Error('boom')) };
+    const stuck: V2Brain = { kind: 'model', model: 'stuck', act: () => new Promise(() => undefined), plan: async () => ({ text: null }) };
+    const broken: V2Brain = { kind: 'model', model: 'broken', act: () => Promise.reject(new Error('boom')), plan: () => Promise.reject(new Error('boom')) };
     for (const brain of [stuck, broken]) {
       const r = await playHeadless({ def, difficulty, crews: crews(), brains: { A: brain, B: createGreedyBrain() }, deadlineMs: 2 });
       expect(r.result.winner).toBe('B');

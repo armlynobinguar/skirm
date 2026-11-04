@@ -161,9 +161,9 @@ export async function startWorkerApp(
     void costs
       .record(costUsd)
       .catch((err: unknown) => logger.warn('cost total update failed', { code: errorCode(err) }));
-  // Benchmarks and trials: Haiku when OPENROUTER_API_KEY is set (unless V2_BRAIN=greedy), else
+  // Benchmarks and trials: the configured model when a model key is set (unless V2_BRAIN=greedy), else
   // greedy (they need a model).
-  const brain = createV2Brain(env, { onUsage: (c) => recordCost(c.costUsd) });
+  const brain = createV2Brain(env, { onUsage: (c) => recordCost(c.costUsd), warn: (m) => logger.warn(m) });
 
   const vault = createVault(config);
   const deps: WorkerDeps = {
@@ -187,10 +187,11 @@ export async function startWorkerApp(
   await scheduleTournamentTick(tournamentQueue);
   if (brain.kind === 'greedy')
     logger.warn(
-      'benchmarks and trials need a model key (OPENROUTER_API_KEY): they end needs_model',
+      'benchmarks and trials need a model key (LLM_API_KEY): they end needs_model',
     );
   logger.info('worker ready', {
     v2Brain: brain.kind,
+    v2Model: brain.model,
     registry: near.registry.kind,
     seasons: near.seasons.kind,
     eloDecay: decay,

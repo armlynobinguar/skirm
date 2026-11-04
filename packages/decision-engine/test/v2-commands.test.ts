@@ -4,7 +4,7 @@ import type { Action, Observation } from '@skirm/engine/v2';
 import { describe, expect, it } from 'vitest';
 import {
   createGreedyBrain,
-  createHaikuBrain,
+  createModelBrain,
   greedyAct,
   greedyCommanded,
   turnPrompt,
@@ -99,7 +99,7 @@ describe('v2 live commands in the brains', () => {
         { status: 200 },
       );
     };
-    const brain = createHaikuBrain({ apiKey: 'k', fetch: fetch as never });
+    const brain = createModelBrain({ apiKey: 'k', fetch: fetch as never });
     await brain.act(obs(ROWS, [1, 1]), {
       skills: [],
       plan: null,

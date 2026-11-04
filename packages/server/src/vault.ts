@@ -9,7 +9,7 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto';
-import type { SealedSkill, SkillSealer } from '@skirm/db';
+import type { SealedPlaybook, SealedSkill, SkillSealer } from '@skirm/db';
 import type { ServerConfig } from './config';
 
 export type { SealedSkill } from '@skirm/db';
@@ -307,6 +307,13 @@ export interface SkillText {
 }
 
 const aadFor = (sha: string) => Buffer.from(`skirm/skill/v1:${sha}`);
+/** A playbook's AAD differs from a skill's, so neither row ever opens as the other. */
+const playbookAad = (sha: string) => Buffer.from(`skirm/playbook/v1:${sha}`);
+
+/** sha256 of a crew playbook's UTF-8 text (bound into its AAD). */
+export function playbookSha256(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
 
@@ -382,6 +389,61 @@ export class Vault implements SkillSealer {
     const want = Buffer.from(sealed.promptSha256, 'hex');
     if (sha.length !== want.length || !timingSafeEqual(sha, want))
       throw new VaultError('tampered', 'prompt_sha256 does not match the sealed text');
+    return text;
+  }
+
+  /** Seals a crew playbook's text under a fresh data key, with its own AAD (never a skill's). */
+  async encryptPlaybook(text: string): Promise<SealedPlaybook> {
+    const sha = playbookSha256(text);
+    const dataKey = randomBytes(32);
+    try {
+      const iv = randomBytes(IV_BYTES);
+      const c = createCipheriv('aes-256-gcm', dataKey, iv);
+      c.setAAD(playbookAad(sha));
+      const ciphertext = Buffer.concat([c.update(JSON.stringify({ text }), 'utf8'), c.final()]);
+      return {
+        ciphertext: new Uint8Array(ciphertext),
+        iv: new Uint8Array(iv),
+        authTag: new Uint8Array(c.getAuthTag()),
+        wrappedKey: await this.wrapper.wrap(dataKey),
+        keyId: this.wrapper.keyId,
+        promptSha256: sha,
+      };
+    } finally {
+      dataKey.fill(0);
+    }
+  }
+
+  /**
+   * Opens a sealed playbook. Only its owner's read-back (GET /playbooks/:id, GET /me/export) and the
+   * match runner (realtime) call this. Any change to the row fails with VaultError('tampered').
+   */
+  async decryptPlaybook(sealed: SealedPlaybook): Promise<string> {
+    const opener = this.openers.get(sealed.keyId);
+    if (!opener) throw new VaultError('wrong_key', 'sealed with a different key-encryption key');
+    if (sealed.iv.length !== IV_BYTES || sealed.authTag.length !== TAG_BYTES)
+      throw new VaultError('tampered', 'playbook ciphertext failed authentication');
+    const dataKey = Buffer.from(await opener.unwrap(sealed.wrappedKey));
+    let text: unknown;
+    try {
+      const d = createDecipheriv('aes-256-gcm', dataKey, Buffer.from(sealed.iv), {
+        authTagLength: TAG_BYTES,
+      });
+      d.setAAD(playbookAad(sealed.promptSha256));
+      d.setAuthTag(Buffer.from(sealed.authTag));
+      const plain = Buffer.concat([d.update(Buffer.from(sealed.ciphertext)), d.final()]);
+      text = (JSON.parse(plain.toString('utf8')) as { text?: unknown }).text;
+    } catch {
+      throw new VaultError('tampered', 'playbook ciphertext failed authentication');
+    } finally {
+      dataKey.fill(0);
+    }
+    if (typeof text !== 'string')
+      throw new VaultError('tampered', 'playbook ciphertext failed authentication');
+    const sha = Buffer.from(playbookSha256(text), 'hex');
+    const want = Buffer.from(sealed.promptSha256, 'hex');
+    if (sha.length !== want.length || !timingSafeEqual(sha, want))
+      throw new VaultError('tampered', 'the sha256 does not match the sealed playbook');
     return text;
   }
 }

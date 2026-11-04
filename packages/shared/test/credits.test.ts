@@ -40,6 +40,7 @@ describe('config', () => {
       'free',
       'market',
       'model',
+      'playbooks',
       'price',
       'ranked',
       'season',

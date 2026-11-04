@@ -128,7 +128,7 @@ describe('v2 match server', () => {
 
   it('collects every delivered line, and plays each crew with its own brain', async () => {
     const talker: V2Brain = {
-      kind: 'haiku',
+      kind: 'model',
       model: 'talker',
       act: async (o, ctx) => ({ action: o.legal[0] ?? { type: 'wait' }, reason: 'chosen', say: ctx.canSpeak ? { channel: 'team', text: 'Holding.' } : null }),
       plan: async () => ({ text: null }),
@@ -172,7 +172,7 @@ describe('v2 match server', () => {
   });
 
   it('turns a brain that misses the deadline into waits, and an abort into a void with every credit returned', async () => {
-    const slow: V2Brain = { kind: 'haiku', model: 'slow', act: () => new Promise(() => undefined), plan: async () => ({ text: null }) };
+    const slow: V2Brain = { kind: 'model', model: 'slow', act: () => new Promise(() => undefined), plan: async () => ({ text: null }) };
     const h = harness({ brains: both(slow), timing: { ...FAST, actionMs: 2 }, send: (t, msg) => {
       h.inbox[t].push(msg);
       h.answer(t, msg);
@@ -188,7 +188,7 @@ describe('v2 match server', () => {
 
 describe('v2 match: whole-credit charges never exceed the hold', () => {
   /** Every agent waits, so a match runs its whole clock. */
-  const idle: V2Brain = { kind: 'haiku', model: 'idle', act: async () => ({ action: { type: 'wait' }, reason: 'chosen', say: null }), plan: async () => ({ text: null }) };
+  const idle: V2Brain = { kind: 'model', model: 'idle', act: async () => ({ action: { type: 'wait' }, reason: 'chosen', say: null }), plan: async () => ({ text: null }) };
 
   class RecordingCredits extends FakeCredits {
     calls: Record<Team, number[]> = { A: [], B: [] };

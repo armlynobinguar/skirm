@@ -13,6 +13,12 @@ export interface SealedSkill {
   promptSha256: string;
 }
 
+/**
+ * Envelope-encrypted crew playbook text, the same envelope as a skill (`promptSha256` is the sha256 of
+ * the playbook text). Sealed under its own AAD, so a playbook row never opens as a skill or back.
+ */
+export type SealedPlaybook = SealedSkill;
+
 /** Anything that can seal skill text (the vault). The db package never sees a KEK. */
 export interface SkillSealer {
   encryptSkill(prompt: string, reflexes?: string): Promise<SealedSkill>;

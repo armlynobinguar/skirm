@@ -259,6 +259,39 @@ export const agentSkills = pgTable(
   ],
 );
 
+/**
+ * Crew playbooks: a player's crew-level strategy (who hauls, who scouts, when to regroup, goal or
+ * deny), sealed like a skill prompt (only the owner reads it back; the match runner decrypts it for
+ * the planner). A player keeps up to DEFAULTS.playbooks.maxSaved; `selected` marks the one lock-in
+ * starts with (at most one per player).
+ */
+export const playbooks = pgTable(
+  'playbooks',
+  {
+    /** `pbk_` + ULID. */
+    id: text('id').primaryKey(),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => accounts.id),
+    /** The player's own label (shown in their mind panel); never sent to the rival. */
+    name: text('name').notNull(),
+    /** sha256 of the text, bound into the ciphertext's AAD. */
+    textSha256: text('text_sha256').notNull(),
+    ciphertext: bytea('ciphertext').notNull(),
+    iv: bytea('iv').notNull(),
+    authTag: bytea('auth_tag').notNull(),
+    wrappedKey: bytea('wrapped_key').notNull(),
+    keyId: text('key_id').notNull(),
+    selected: boolean('selected').notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('playbooks_owner_idx').on(t.ownerId),
+    uniqueIndex('playbooks_selected_uq').on(t.ownerId).where(sql`${t.selected}`),
+  ],
+);
+
 export const listings = pgTable(
   'listings',
   {
@@ -646,7 +679,7 @@ export const matchTimelines = pgTable(
       .notNull()
       .references(() => v2Matches.id, { onDelete: 'cascade' }),
     team: text('team').$type<'A' | 'B'>().notNull(),
-    /** The brain that played this crew ('haiku' or 'greedy'); greedy plays without skills. */
+    /** The brain that played this crew ('model' or 'greedy'; 'haiku' on rows from before the provider became config); greedy plays without skills. */
     brain: text('brain').notNull(),
     plans: jsonb('plans').$type<V2PlanRecord[]>().notNull().default([]),
     decisions: jsonb('decisions').$type<V2DecisionRecord[]>().notNull().default([]),
@@ -746,7 +779,7 @@ export const skillBenchmarks = pgTable(
     skillId: text('skill_id').notNull(),
     version: integer('version').notNull(),
     status: text('status').$type<ProofJobStatus>().notNull().default('queued'),
-    /** Brain kind that played (greedy, haiku, ...). */
+    /** Brain kind that played (greedy, model; 'haiku' on older rows). */
     brain: text('brain'),
     seeds: jsonb('seeds'),
     matches: integer('matches').notNull().default(0),

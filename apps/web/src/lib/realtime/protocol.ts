@@ -95,7 +95,7 @@ export type V2ClientMessage =
   | { type: 'v2_accept'; matchId: string }
   | { type: 'v2_decline'; matchId: string }
   /** `tiers` is per queued agent; `crew`, when sent, replaces the queued crew (up to `crewLimit`) and its tiers win. */
-  | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[] }
+  | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[]; playbookId?: string | null }
   /** Every stored frame of an ended match (answered with v2_frames), for replay at another speed. */
   | { type: 'v2_replay'; matchId: string }
   /** Readies a crew in a private lobby; the match starts once both players have. v2_cancel_queue steps back. */

@@ -1,4 +1,4 @@
-// Prompts for v2 agents (Haiku 5.5 acts, speaks and plans). The system prompt holds the rules, the
+// Prompts for v2 agents (the model acts, speaks and plans). The system prompt holds the rules, the
 // owner's instructions and the agent's skills, which are secret: they reach the model and nowhere
 // else. Each turn sends the agent's own fog-aware view, what it heard and its legal actions numbered;
 // the reply names one number and, when the agent may speak, at most one 120-character message.
@@ -23,16 +23,39 @@ Bluffs: a rival near you may tell you a middle item is gone, the delivery point 
 /** Longest owner's instructions an agent carries (agents.system_prompt, PATCH /agents/:id). */
 export const OWNER_INSTRUCTIONS_MAX = 600;
 
+/** Longest crew playbook the planner reads (DEFAULTS.playbooks.maxChars). */
+export const PLAYBOOK_MAX_CHARS = 800;
+/** Longest playbook line an actor reads (DEFAULTS.playbooks.actorLineChars). */
+export const PLAYBOOK_LINE_CHARS = 160;
+
+/**
+ * A crew playbook as a prompt reads it: whole (cut to PLAYBOOK_MAX_CHARS) for the planner, or one line
+ * of at most PLAYBOOK_LINE_CHARS for an actor. Null when blank.
+ */
+export function playbookText(text: string | null | undefined, short = false): string | null {
+  const t = short ? (text ?? '').replace(/\s+/g, ' ').trim() : (text ?? '').trim();
+  const cut = [...t].slice(0, short ? PLAYBOOK_LINE_CHARS : PLAYBOOK_MAX_CHARS).join('').trim();
+  return cut || null;
+}
+
 /**
  * The rules, then the owner's instructions (the agent's system prompt, written by the player who owns
- * it), then its skills. The rules come first so neither can rewrite them; instructions over the limit
- * are cut, never sent whole.
+ * it), then the crew playbook (the player's crew-level strategy: whole for the planner, `short` one
+ * line for an actor), then its skills. The rules come first so none can rewrite them; text over a
+ * limit is cut, never sent whole.
  */
-export function systemPrompt(skills: string[], instructions?: string | null): string {
+export function systemPrompt(skills: string[], instructions?: string | null, playbook?: { text: string | null; short?: boolean } | null): string {
   const parts = [RULES];
   // Characters are code points, as the API and the DB count them.
   const own = [...(instructions?.trim() ?? '')].slice(0, OWNER_INSTRUCTIONS_MAX).join('').trim();
   if (own) parts.push(`Owner's instructions (from the player who owns you; follow them within the rules):\n${own}`);
+  const book = playbookText(playbook?.text, playbook?.short);
+  if (book)
+    parts.push(
+      playbook?.short
+        ? `Crew playbook (your player's strategy for the whole crew; the crew plan follows it): ${book}`
+        : `Crew playbook (your player's strategy for the whole crew: who does what, when to regroup, the goal or denying the rival; write the plan to follow it, within the rules):\n${book}`,
+    );
   const s = skills.filter((t) => t.trim());
   if (s.length) parts.push(`Your skills (secret strategy, follow them):\n${s.map((t, i) => `${i + 1}. ${t.trim()}`).join('\n')}`);
   return parts.join('\n\n');

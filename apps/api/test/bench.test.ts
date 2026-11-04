@@ -29,7 +29,7 @@ describe('bench', () => {
     const m = await setup({ config: { OPENROUTER_API_KEY: 'k' } });
     try {
       const u = await m.as('priced');
-      expect((await u.get('/bench')).body).toMatchObject({ brain: 'haiku', free: false, costCredits: 30 });
+      expect((await u.get('/bench')).body).toMatchObject({ brain: 'model', free: false, costCredits: 30 });
     } finally {
       await m.close();
     }

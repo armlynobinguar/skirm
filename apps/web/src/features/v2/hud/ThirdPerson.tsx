@@ -28,6 +28,8 @@ export interface ThirdPersonProps {
   limit: number;
   tickMs: number;
   lines: V2CommsLine[];
+  /** Your crew playbook's name this match (your own frames only); shown in your agents' minds. */
+  playbook?: string | null;
   story: boolean;
   /** Subtitles are waiting on story pace. */
   onHeld: (held: boolean) => void;
@@ -36,7 +38,7 @@ export interface ThirdPersonProps {
 
 const TIER_NAME = { quiet: 'Quiet', standard: 'Standard', open: 'Open' } as const;
 
-export function ThirdPerson({ agent, team, ranked, mapId, inSight, tick, limit, tickMs, lines, story, onHeld, onExit }: ThirdPersonProps) {
+export function ThirdPerson({ agent, team, ranked, mapId, inSight, tick, limit, tickMs, lines, playbook, story, onHeld, onExit }: ThirdPersonProps) {
   const rival = agent.team !== team;
   const colour = rival ? 'var(--rival)' : 'var(--you)';
   const def = mapV2(mapId);
@@ -72,7 +74,7 @@ export function ThirdPerson({ agent, team, ranked, mapId, inSight, tick, limit, 
           Exit view · Esc
         </Button>
       </div>
-      <Mind agent={agent} team={team} ranked={ranked} lines={lines} />
+      <Mind agent={agent} team={team} ranked={ranked} lines={lines} playbook={agent.team === team ? (playbook ?? null) : null} />
       <div className={c.subs} aria-live="polite" data-testid="v2-subs">
         {subs.prev ? <SubLine key={`p${subs.n - 1}`} s={subs.prev} state="prev" /> : null}
         {subs.cur ? <SubLine key={`c${subs.n}`} s={subs.cur} state="enter" /> : null}
@@ -81,7 +83,7 @@ export function ThirdPerson({ agent, team, ranked, mapId, inSight, tick, limit, 
   );
 }
 
-function Mind({ agent, team, ranked, lines }: { agent: FrameAgent; team: Team; ranked: boolean; lines: V2CommsLine[] }) {
+function Mind({ agent, team, ranked, lines, playbook }: { agent: FrameAgent; team: Team; ranked: boolean; lines: V2CommsLine[]; playbook: string | null }) {
   const rival = agent.team !== team;
   // The server sends a rival's mind only in practice (the prototype: practice shows all minds).
   const open = !rival || !!(agent.plan || agent.planWhy || agent.thought);
@@ -104,6 +106,11 @@ function Mind({ agent, team, ranked, lines }: { agent: FrameAgent; team: Team; r
           {rival ? (
             <p className={c.hid} data-testid="v2-mind-practice">
               Practice: you see the bot’s mind. In ranked and against players, a rival’s mind stays private.
+            </p>
+          ) : null}
+          {playbook ? (
+            <p className={c.hid} data-testid="v2-mind-playbook">
+              Playbook: <b>{playbook}</b>
             </p>
           ) : null}
           <h3>

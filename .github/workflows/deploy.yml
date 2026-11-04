@@ -52,8 +52,14 @@ jobs:
           CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
           # Platform signer account; only read when the <env>-near-ops-key secret exists.
           NEAR_OPS_ACCOUNT: ${{ vars.NEAR_OPS_ACCOUNT }}
-          # Staging plays Haiku 5.5 through OpenRouter (the <env>-openrouter-api-key secret); without
-          # that secret every agent falls back to the offline greedy brain.
-          V2_BRAIN: haiku
+          # Staging plays the configured model (the <env>-llm-api-key or <env>-openrouter-api-key
+          # secret; OpenRouter and its default model unless the LLM_* variables say otherwise);
+          # without a key every agent falls back to the offline greedy brain.
+          V2_BRAIN: model
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_PLANNER_MODEL: ${{ vars.LLM_PLANNER_MODEL }}
+          LLM_PRICE_INPUT_USD: ${{ vars.LLM_PRICE_INPUT_USD }}
+          LLM_PRICE_OUTPUT_USD: ${{ vars.LLM_PRICE_OUTPUT_USD }}
           # Pushes deploy only the pieces whose inputs changed (scripts/deploy-gcp.sh, "Only what changed").
           SERVICES: ${{ inputs.services || 'auto' }}

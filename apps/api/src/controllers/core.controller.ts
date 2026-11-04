@@ -231,7 +231,14 @@ export class CoreController {
       const text = await vault.decryptSkill(sealed);
       skillPrompts.push({ skillId: v.id, version: v.version, name: v.name, prompt: text.prompt, reflexes: text.reflexes ?? null });
     }
-    return { exportedAt: new Date().toISOString(), accountId: account.id, ...data, skillPrompts };
+    // The caller's crew playbooks, opened like their skill prompts.
+    const playbookTexts = [];
+    for (const p of await repos.playbooks.list(account.id)) {
+      const sealed = await repos.playbooks.loadSealed(account.id, p.id);
+      if (!sealed) continue;
+      playbookTexts.push({ playbookId: p.id, name: p.name, selected: p.selected, text: await vault.decryptPlaybook(sealed) });
+    }
+    return { exportedAt: new Date().toISOString(), accountId: account.id, ...data, skillPrompts, playbookTexts };
   }
 
   /**

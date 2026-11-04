@@ -19,8 +19,8 @@ function readingBrain(): V2Brain & { seen: Set<string>; triggers: Set<string> } 
   const seen = new Set<string>();
   const triggers = new Set<string>();
   return {
-    kind: 'haiku' as const,
-    model: 'fake-haiku',
+    kind: 'model' as const,
+    model: 'fake-model',
     seen,
     triggers,
     async act(o, c) {
@@ -94,7 +94,7 @@ describe('bench consumer', () => {
     expect([...brain.triggers]).toEqual([JSON.stringify([{ kind: 'hazard_within', tiles: 3 }])]);
     const row = (await ctx.repos.bench.get(run.id))!;
     const ticks = (row.result as BenchRunResult).ticks;
-    expect(row.brain).toBe('haiku');
+    expect(row.brain).toBe('model');
     expect(row.credits).toBe(Math.ceil((ticks * 20) / 100));
     const after = await ctx.repos.ledger.balance(account.id);
     expect(after.held).toBe(0);
@@ -112,7 +112,7 @@ describe('bench consumer', () => {
 
   it('a failure after the hold returns it before BullMQ retries', async () => {
     const brain: V2Brain = {
-      kind: 'haiku',
+      kind: 'model',
       model: 'waiting',
       act: async () => ({ action: { type: 'wait' }, reason: 'chosen', say: null }),
       plan: async () => ({ text: null }),

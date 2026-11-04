@@ -1,13 +1,14 @@
 // The replay caster: one short, punchy commentary line per highlight (engine detectHighlights).
 // - template: deterministic and offline, from the highlight's kind and public facts.
-// - model: Haiku 5.5 through OpenRouter writes every line of a match in one call, given only the
+// - model: the operator's model (LLM_MODEL, ../llm) writes every line of a match in one call, given only the
 //   public facts (map, crew names, what happened). Any line it misses, or that the filter refuses,
 //   falls back to the template line, and so does the whole match when the call fails.
 // The caller caches the result per match, so a match is cast at most once. Nobody is charged for it:
 // it is platform spend, reported through onUsage like the brain's calls.
 import type { ReplayHighlight, Team } from '@skirm/engine/v2';
-import { HAIKU_OPENROUTER_MODEL, OPENROUTER_BASE_URL, PRICES } from '../config';
-import { defaultFetch, dig, num, postJson, type FetchLike } from '../http';
+import { DEFAULT_LLM_BASE_URL, DEFAULT_LLM_MODEL } from '../config';
+import { defaultFetch, dig, postJson, type FetchLike } from '../http';
+import { chatRequest, pricesFor, usageCost, type LlmPrices } from '../llm';
 import { runWithPolicy } from '../policy';
 import { nowMs } from '../usage';
 import type { V2Call } from './brain';
@@ -118,19 +119,26 @@ export function parseCasterReply(text: string, ids: readonly string[]): Record<s
 }
 
 export interface ModelCasterOptions {
-  apiKey: string;
+  /** Bearer token; null or empty sends no Authorization header (a keyless local server). */
+  apiKey?: string | null;
   fetch?: FetchLike;
+  /** Default DEFAULT_LLM_MODEL. */
   model?: string;
+  /** An OpenAI-compatible API root (default DEFAULT_LLM_BASE_URL, OpenRouter). */
   baseUrl?: string;
+  /** USD per 1M tokens when the provider returns no cost (see ModelBrainOptions.prices). */
+  prices?: LlmPrices | null;
   deadlineMs?: number;
+  /** Where the once-per-model "no price" warning goes (default console.warn). */
+  warn?: (msg: string) => void;
   /** Hears the call once it completes, ok or not (platform spend). Errors it throws are swallowed. */
   onUsage?: (c: V2Call) => void;
 }
 
 export function createModelCaster(opts: ModelCasterOptions): Caster {
   const fetch = opts.fetch ?? defaultFetch();
-  const model = opts.model ?? HAIKU_OPENROUTER_MODEL;
-  const url = `${opts.baseUrl ?? OPENROUTER_BASE_URL}/chat/completions`;
+  const model = opts.model ?? DEFAULT_LLM_MODEL;
+  const baseUrl = opts.baseUrl ?? DEFAULT_LLM_BASE_URL;
   const report = (c: V2Call) => {
     try {
       opts.onUsage?.(c);
@@ -144,28 +152,19 @@ export function createModelCaster(opts: ModelCasterOptions): Caster {
       const fallback = templateLines(input);
       if (!input.highlights.length) return { lines: {}, caster: 'template', model: null, costUsd: 0 };
       const { system, user } = casterPrompt(input);
+      const req = chatRequest({ baseUrl, apiKey: opts.apiKey || null, model, maxTokens: CASTER_MAX_TOKENS, temperature: 0.8, system, user });
       const started = nowMs();
-      const out = await runWithPolicy(
-        (signal) =>
-          postJson({
-            fetch,
-            url,
-            headers: { Authorization: `Bearer ${opts.apiKey}`, 'X-Title': 'skirm' },
-            signal,
-            body: { model, max_tokens: CASTER_MAX_TOKENS, temperature: 0.8, reasoning: { enabled: false }, usage: { include: true }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] },
-          }),
-        { timeLimitMs: opts.deadlineMs ?? CASTER_DEADLINE_MS },
-      );
+      const out = await runWithPolicy((signal) => postJson({ fetch, url: req.url, headers: req.headers, signal, body: req.body }), {
+        timeLimitMs: opts.deadlineMs ?? CASTER_DEADLINE_MS,
+      });
       const latencyMs = nowMs() - started;
       if (!out.ok) {
         report({ role: 'planner', model, ok: false, latencyMs, inputTokens: 0, outputTokens: 0, costUsd: 0, error: out.reason });
         return { lines: fallback, caster: 'template', model: null, costUsd: 0 };
       }
-      const inputTokens = num(dig(out.value, 'usage', 'prompt_tokens'));
-      const outputTokens = num(dig(out.value, 'usage', 'completion_tokens'));
-      const billed = dig(out.value, 'usage', 'cost');
-      const costUsd = typeof billed === 'number' && Number.isFinite(billed) ? billed : (inputTokens * PRICES.haiku.input + outputTokens * PRICES.haiku.output) / 1e6;
-      report({ role: 'planner', model, ok: true, latencyMs, inputTokens, outputTokens, costUsd, ...(typeof billed === 'number' ? { billed: true } : {}) });
+      const usage = usageCost(out.value, model, pricesFor(model, opts.prices), opts.warn);
+      const costUsd = usage.costUsd;
+      report({ role: 'planner', model, ok: true, latencyMs, ...usage });
       const said = parseCasterReply(String(dig(out.value, 'choices', 0, 'message', 'content') ?? ''), input.highlights.map((h) => h.id));
       const lines: Record<string, string> = {};
       for (const h of input.highlights) {

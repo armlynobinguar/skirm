@@ -3,6 +3,7 @@
 // Totals only, never a player's handle, balance or ledger row.
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Controller, Get, Headers, Inject, Query } from '@nestjs/common';
+import { v2BrainKind, v2BrainModel, type LlmEnv } from '@skirm/decision-engine/v2';
 import { DEFAULTS, measureTalkRates } from '@skirm/shared';
 import { Public } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
@@ -16,11 +17,12 @@ const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const digest = (s: string) => createHash('sha256').update(s).digest();
 
 /**
- * The v2 brain the worker and realtime build from the same environment (createV2Brain): Haiku when an
- * OpenRouter key is set, unless V2_BRAIN=greedy; otherwise the offline greedy brain.
+ * The v2 brain the worker and realtime build from the same environment (createV2Brain): `model` and
+ * its id when a model key is set (or V2_BRAIN=model with a keyless local LLM_BASE_URL), unless
+ * V2_BRAIN=greedy; otherwise the offline greedy brain and a null model.
  */
-export function v2BrainKind(env: { V2_BRAIN?: string | undefined; OPENROUTER_API_KEY?: string | undefined }): 'haiku' | 'greedy' {
-  return env.V2_BRAIN !== 'greedy' && env.OPENROUTER_API_KEY ? 'haiku' : 'greedy';
+export function v2Engine(config: LlmEnv): { engine: 'model' | 'greedy'; model: string | null } {
+  return { engine: v2BrainKind(config), model: v2BrainModel(config) };
 }
 
 /** Constant-time compare of `Authorization: Bearer <token>` with the configured token. */
@@ -55,8 +57,8 @@ export class OpsController {
     const spend = this.deps.costs ? await this.deps.costs.usd(days) : null;
     return {
       at: new Date(now).toISOString(),
-      /** The v2 brain kind (V2_BRAIN, or 'haiku' when an OpenRouter key is set). */
-      engine: v2BrainKind(this.deps.config),
+      /** The v2 brain kind ('model' or 'greedy') and the model id it plays (null for greedy). */
+      ...v2Engine(this.deps.config),
       ai: {
         dailyBudgetUsd: this.deps.config.COST_ALERT_DAILY_USD ?? null,
         spend: spend ? days.map((day) => ({ day, usd: spend[day] ?? 0 })) : null,
@@ -82,6 +84,6 @@ export class OpsController {
     if (!opsTokenMatches(authorization, token)) throw new ApiError(401, 'unauthenticated', 'ops token required');
     const days = Math.min(365, Math.max(1, Number.parseInt(daysQ ?? '30', 10) || 30));
     const samples = await this.deps.repos.ops.talkUsage(new Date(Date.now() - days * DAY_MS));
-    return { days, margin: 1.25, creditUsd: DEFAULTS.credits.priceUsd, tiers: measureTalkRates(samples, { margin: 1.25 }) };
+    return { days, margin: 1.25, creditUsd: DEFAULTS.credits.priceUsd, ...v2Engine(this.deps.config), tiers: measureTalkRates(samples, { margin: 1.25 }) };
   }
 }

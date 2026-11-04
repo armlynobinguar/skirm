@@ -1,14 +1,12 @@
 name: ci
 
-# On main (merges and direct pushes) and on pull requests into main; start a run by hand from the
-# Actions tab ("Run workflow"). Typecheck and unit tests also run on each machine before a push
-# (.githooks/pre-push); CI repeats them so a merge that skipped the hook is still checked. e2e and
-# the full stack smoke run by hand (README, Testing), and the staging deploy (deploy.yml) builds the
-# images.
+# On main only (merges and direct pushes); start a run by hand from the Actions tab ("Run
+# workflow"). Pull requests are not checked here: typecheck and unit tests run on each machine
+# before a push (.githooks/pre-push), and CI repeats them on main so a merge that skipped the hook
+# is still checked. e2e and the full stack smoke run by hand (README, Testing), and the staging
+# deploy (deploy.yml) builds the images.
 on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
   workflow_dispatch:
 

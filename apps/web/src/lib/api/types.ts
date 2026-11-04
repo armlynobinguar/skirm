@@ -809,7 +809,7 @@ export type ExternalAgentPing =
 
 /** GET /bench: what a run costs on this server and how many the caller has left this hour. */
 export interface BenchInfo {
-  brain: 'greedy' | 'haiku';
+  brain: 'greedy' | 'model';
   /** True on the offline greedy brain: runs cost nothing (and the prompt does not change play). */
   free: boolean;
   /** Credits one run holds with a model brain (0 when free). */

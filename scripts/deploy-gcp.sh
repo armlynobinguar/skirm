@@ -20,9 +20,13 @@
 # Use SERVICES=all after changing something that lives outside git, such as a secret or a
 # repository variable.
 #
-# Optional: REGION (us-central1), TAG (git short sha), V2_BRAIN (haiku if the
-# <env>-openrouter-api-key secret exists, else greedy: the offline brain, no model spend),
-# NEAR_NETWORK (testnet), SKIP_BUILD=1.
+# Optional: REGION (us-central1), TAG (git short sha), V2_BRAIN (model if the
+# <env>-llm-api-key or <env>-openrouter-api-key secret exists, else greedy: the offline brain, no
+# model spend), NEAR_NETWORK (testnet), SKIP_BUILD=1.
+# Model provider (docs/backend-contract.md, Environment; unset keeps the app defaults: OpenRouter and
+# its default model): LLM_BASE_URL, LLM_MODEL, LLM_PLANNER_MODEL, LLM_PRICE_INPUT_USD,
+# LLM_PRICE_OUTPUT_USD. The key is a secret: <env>-llm-api-key (LLM_API_KEY) or, under its old name,
+# <env>-openrouter-api-key (OPENROUTER_API_KEY); LLM_API_KEY wins when both exist.
 # Custom domain: PUBLIC_API_URL, PUBLIC_WS_URL (default the run.app URLs; baked into the web image)
 # and CORS_ORIGINS (comma-separated browser origins; default the web run.app URL).
 set -euo pipefail
@@ -110,10 +114,10 @@ if [ "$DEPLOY" = " " ]; then
 fi
 echo "Deploying $TAG:$DEPLOY"
 
-# realtime plays Haiku through OpenRouter, and the worker benchmarks skills with it, unless
+# realtime plays the configured model (LLM_*), and the worker benchmarks skills with it, unless
 # V2_BRAIN=greedy.
 if [ -z "${V2_BRAIN:-}" ]; then
-  if has_secret openrouter-api-key; then V2_BRAIN=haiku; else V2_BRAIN=greedy; fi
+  if has_secret llm-api-key || has_secret openrouter-api-key; then V2_BRAIN=model; else V2_BRAIN=greedy; fi
 fi
 
 # ---------- images (only the ones being deployed, and only if missing for this tag) ----------
@@ -142,11 +146,15 @@ ENV_VARS="NODE_ENV=production@AUTH_MODE=privy@PRIVY_APP_ID=$PRIVY_APP_ID@V2_BRAI
 ENV_VARS+="@REDIS_URL=redis://$REDIS_HOST:6379@NEAR_NETWORK=$NEAR_NETWORK"
 ENV_VARS+="@SKILL_KEK_KMS=projects/$PROJECT/locations/$R/keyRings/skill-vault/cryptoKeys/skill-prompt-kek-$ENV"
 ENV_VARS+="@PUBLIC_API_URL=$API_URL@PUBLIC_WS_URL=$WS_URL@CORS_ORIGINS=$CORS"
+for v in LLM_BASE_URL LLM_MODEL LLM_PLANNER_MODEL LLM_PRICE_INPUT_USD LLM_PRICE_OUTPUT_USD; do
+  if [ -n "${!v:-}" ]; then ENV_VARS+="@$v=${!v}"; fi
+done
 # Never SKILL_KEK here: Cloud KMS (SKILL_KEK_KMS) seals the skill vault (docs/deploy.md).
 SECRETS="DATABASE_URL=$ENV-database-url:latest"
 SECRETS+=",PRIVY_VERIFICATION_KEY=$ENV-privy-verification-key:latest"
-# OPENROUTER_API_KEY is the v2 brain's key; BENCH_SECRET keys the hidden benchmark picks (worker).
-for s in openrouter-api-key near-ops-key bench-secret; do
+# LLM_API_KEY (or OPENROUTER_API_KEY, its old name) is the v2 brain's key; BENCH_SECRET keys the
+# hidden benchmark picks (worker).
+for s in llm-api-key openrouter-api-key near-ops-key bench-secret; do
   if has_secret $s; then
     var=$(echo "$s" | tr a-z- A-Z_)
     SECRETS+=",$var=$ENV-$s:latest"

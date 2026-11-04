@@ -91,6 +91,8 @@ export interface V2Frame {
   hazards?: { kind: HazardKind; waves: number; receding: boolean }[];
   /** The viewing crew's live commands (its own frames only; never the rival's or the watch view). */
   commands?: FrameCommands;
+  /** The viewing crew's crew playbook for this match, by its name (its own frames only; never the text). */
+  playbook?: string;
 }
 
 /** What the server knows beside the match state: each agent's current plan. */
