@@ -109,6 +109,8 @@ describe('S15 top-up with a NEAR wallet', () => {
     await screen.findByTestId('s15-balance-available');
     await user.click(screen.getByRole('button', { name: 'Top up 1 NEAR' }));
     expect(await screen.findByTestId('m01-connect-wallet')).toBeInTheDocument();
-    expect(screen.getByTestId('m01-connect')).toHaveTextContent('Choose a wallet');
+    // The wallets are listed at once (no "Choose a wallet" step since the one-click connect).
+    expect(await screen.findByTestId('m01-wallet-mynearwallet')).toBeInTheDocument();
+    expect(screen.queryByTestId('m01-connect')).not.toBeInTheDocument();
   });
 });
