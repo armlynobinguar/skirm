@@ -1,0 +1,12 @@
+{
+  "name": "@skirm/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A stdio MCP server that lets an LLM agent play skirm through the external agent pull api.",
+  "exports": { ".": "./src/index.ts" },
+  "bin": { "skirm-mcp": "./dist/main.js" },
+  "scripts": { "build": "tsup", "start": "node dist/main.js", "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": { "ws": "^8.18.0" },
+  "devDependencies": { "tsup": "^9.0.0", "@types/ws": "^8.5.13" }
+}

@@ -456,6 +456,8 @@ export interface V2CrewRecord {
   tier: string;
   /** Skill versions the agent played with (filled by realtime). */
   skills?: { id: string; version: number }[];
+  /** Played by its player's own program (bring your own agent): never in a ranked match. */
+  external?: true;
 }
 
 export interface V2EloDeltaRecord {
@@ -1063,5 +1065,46 @@ export const eloDecays = pgTable(
   (t) => [
     index('elo_decays_account_idx').on(t.accountId, t.createdAt),
     check('elo_decays_lower_ck', sql`${t.eloAfter} < ${t.eloBefore}`),
+  ],
+);
+
+// ---------- External agents (bring your own agent) ----------
+
+/**
+ * A player's own program registered to play one of their agents in casual and practice matches
+ * (docs/external-agents.md). `webhook_url` set: realtime POSTs each tick's turn to it, HMAC-signed
+ * with the secret; unset: the program pulls turns from the api (`/agent/v1/*`) with its token. The
+ * secret is sealed like a skill prompt (the vault's AES-256-GCM envelope) because realtime needs it
+ * back to sign; `secret_sha256` (sha256 of `secret + "\n"`, the vault's AAD hash) checks a token.
+ */
+export const externalAgents = pgTable(
+  'external_agents',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    /** The agent it plays; null while unbound. One external agent per agent. */
+    agentId: text('agent_id').references(() => agents.id),
+    name: text('name').notNull(),
+    webhookUrl: text('webhook_url'),
+    secretSha256: text('secret_sha256').notNull(),
+    secretCiphertext: bytea('secret_ciphertext').notNull(),
+    secretIv: bytea('secret_iv').notNull(),
+    secretAuthTag: bytea('secret_auth_tag').notNull(),
+    secretWrappedKey: bytea('secret_wrapped_key').notNull(),
+    secretKeyId: text('secret_key_id').notNull(),
+    /** Ticks it was asked and ticks it missed (timeout, error or an invalid reply: greedy played). */
+    calls: integer('calls').notNull().default(0),
+    misses: integer('misses').notNull().default(0),
+    lastError: text('last_error'),
+    lastSeenAt: ts('last_seen_at'),
+    rotatedAt: ts('rotated_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('external_agents_account_idx').on(t.accountId),
+    uniqueIndex('external_agents_agent_uq').on(t.agentId),
+    check('external_agents_name_ck', sql`char_length(${t.name}) between 1 and 40`),
   ],
 );

@@ -7,6 +7,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { SessionGuard } from './auth';
 import { CoreController } from './controllers/core.controller';
 import { CosmeticsController } from './controllers/cosmetics.controller';
+import { AgentApiController, ExternalAgentsController } from './controllers/external-agents.controller';
 import { CreditsController } from './controllers/credits.controller';
 import { DecisionsController } from './controllers/decisions.controller';
 import { MarketController } from './controllers/market.controller';
@@ -43,6 +44,8 @@ export class AppModule {
         ReplaysController,
         DecisionsController,
         OnboardingController,
+        ExternalAgentsController,
+        AgentApiController,
       ],
       providers: [
         { provide: DEPS, useValue: deps },

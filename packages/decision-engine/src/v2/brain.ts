@@ -88,7 +88,8 @@ export interface V2AgentCommand {
 }
 
 export interface V2Brain {
-  readonly kind: 'haiku' | 'greedy';
+  /** external: a player's own program (bring your own agent), greedy on any tick it misses. */
+  readonly kind: 'haiku' | 'greedy' | 'external';
   readonly model: string;
   act(o: Observation, ctx: V2AgentContext): Promise<V2Decision>;
   /** A short crew plan (null when the brain does not plan). */

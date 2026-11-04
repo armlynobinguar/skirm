@@ -33,6 +33,7 @@ const REPO_STATUS: Record<string, number> = {
   not_found: 404,
   forbidden: 403,
   agent_busy: 409,
+  agent_bound: 409,
   conflict: 409,
   invalid_transition: 409,
   hold_mismatch: 409,
