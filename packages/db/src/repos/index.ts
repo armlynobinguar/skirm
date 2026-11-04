@@ -9,6 +9,7 @@ import { MatchMessagesRepo } from './match-messages';
 import { OpsRepo } from './ops';
 import { ProofRepo } from './proof';
 import { RentalsRepo } from './rentals';
+import { ReplaysRepo } from './replays';
 import { SeasonsRepo } from './seasons';
 import { SkillsRepo } from './skills';
 import { tx, type Clock } from './util';
@@ -35,6 +36,8 @@ export interface Repos {
   cosmetics: CosmeticsRepo;
   /** Agent rental offers and one-match passes. */
   rentals: RentalsRepo;
+  /** Public replay links and the per-match highlight cache. */
+  replays: ReplaysRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -61,6 +64,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     proof: new ProofRepo(db),
     cosmetics: new CosmeticsRepo(db, opts.ledger),
     rentals: new RentalsRepo(db),
+    replays: new ReplaysRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -75,6 +79,7 @@ export * from './match-messages';
 export * from './ops';
 export * from './proof';
 export * from './rentals';
+export * from './replays';
 export * from './seasons';
 export * from './skills';
 export * from './v2-matches';

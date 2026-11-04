@@ -58,7 +58,7 @@ Talk tiers are priced in whole credits per 100 agent-ticks (`DEFAULTS.talk.rateP
 
 ## REST (`apps/api`, JSON, no prefix)
 
-Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/players`, `GET /v2/matches/*`, `GET /seasons*` and `GET /ops/stats` / `GET /ops/talk-rates` (their own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
+Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/players`, `GET /v2/matches/*` (but `/v2/matches/:id/shares`), `GET /replays/:shareId`, `GET /seasons*` and `GET /ops/stats` / `GET /ops/talk-rates` (their own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
 
 ### Account
 
@@ -87,6 +87,20 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/v2/matches/:id` | | `{ id, mapId, ranked, practice, status: 'live'\|'ended'\|'void', difficulty, teams: {A, B}: {accountId, handle, crew[]}, winner, reason, decidedBy, score: {A, B} \| null, ticks, elo: {accountId, team, before, delta, after}[], stats, logHash, registry: {status, txHash?}, createdAt, endedAt, you?, debrief? }`. While live the rival side is blank and only a player sees their own crew. `you` and `debrief` (that crew's, as sent with `v2_end`) only for a player. The log stays server side: `logHash` is its proof. `registry.status` is `none` for casual, practice and void matches |
 | GET | `/v2/matches/:id/messages` | `?afterTick=&limit=` (≤ `MATCH_MESSAGES_MAX_LIMIT`, default 200) | `{ messages: {tick, team, agent: {id, name}, channel, text, heardBy, overheardBy}[], next? }`: the lines realtime saw delivered. `409 match_live` until the match ends. Page with `next` as the following `afterTick` |
 | GET | `/leaderboards/players` | `?limit=` (≤ 200, default 100) | `{ rows: {rank, account: {id, handle}, elo, title, rankedMatches, wins, losses, draws}[], you? }`: players with a ranked match by Elo (ties share a rank) |
+
+### Replays and highlights
+
+Frames are read from realtime's `v2:match:<id>:frames:watch` key (6 h); only the watch view is ever served, stripped again of plans, planner reasons, inner voice and live commands. Highlights are worked out once per match from those frames and cached in `replay_casts` (they outlive the frames).
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| GET | `/v2/matches/:id/highlights` | | `{ matchId, highlights: {id, kind: 'goal'\|'switch_flood'\|'drop_fight'\|'lead_change', tick, start, end, team, title, facts, weight, score, line}[] (≤ 8, oldest first), caster: 'model'\|'template'\|null, framesKept }`. `409 match_live`. `line` is the caster's: Haiku through OpenRouter when `OPENROUTER_API_KEY` is set and `V2_BRAIN` is not `greedy` (one call per match, platform spend added to `cost:usd:<day>`, never charged to a player), else the deterministic template caster |
+| POST | `/v2/matches/:id/shares` | ✓ `{ clip?: {start, end} \| null }` | `201 { share: {id, matchId, clip, createdAt, path} }`: a player's public link (`rps_` + 16 base64url). `403 forbidden` (not a player), `409 match_live`, `not_ended` (void), `replay_expired` (frames no longer kept), `share_limit` (20 live links per player per match), `422 bad_clip` (needs 0 ≤ start < end ≤ ticks) |
+| GET | `/v2/matches/:id/shares` | ✓ | `{ shares }`: the caller's live links to the match, newest first |
+| GET | `/replays/:shareId` | `?frames=0` | `{ share: {…, by}, match (as GET /v2/matches/:id with no `you` or debrief, whoever asks), highlights (inside the clip), caster, framesKept, frames: V2Frame[] (watch view, the clip's ticks) \| null }`; `frames` absent with `?frames=0` (link previews). 404 for an unknown or ended link |
+| DELETE | `/replays/:shareId` | ✓ | `{ revoked: true }`: the creator ends the link (404 otherwise) |
+
+The web page `/replays/<shareId>` sets Open Graph metadata and a generated preview image from `GET /replays/:shareId?frames=0`, read server side at `API_INTERNAL_URL` (compose: `http://api:4000`) or the public api URL.
 
 ### Seasons
 
@@ -138,8 +152,8 @@ Besides `bad_request` (400), `unauthenticated` / `no_session` (401), `forbidden`
 | --- | --- |
 | 402 | `insufficient_credits` (with `need`, `have`) |
 | 403 | `dev_disabled`, `cosmetic_not_owned` |
-| 409 | `agent_busy`, `match_live`, `mint_in_progress`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch` |
-| 422 | `near_account_required`, `near_proof_required`, `near_proof_invalid`, `not_minted`, `invalid_hash`, `underpaid`, `purchase_unverified` |
+| 409 | `agent_busy`, `match_live`, `not_ended`, `replay_expired`, `share_limit`, `mint_in_progress`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch` |
+| 422 | `bad_clip`, `near_account_required`, `near_proof_required`, `near_proof_invalid`, `not_minted`, `invalid_hash`, `underpaid`, `purchase_unverified` |
 | 429 | `trial_limit` |
 | 502 | `mint_failed` |
 | 503 | `queue_unavailable`, `rpc_unavailable`, `near_unavailable`, `ownership_unavailable` |
@@ -205,7 +219,7 @@ WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthe
 | --- | --- |
 | channel `v2match:<id>` | every watch-view message of a live match (`v2_frame`, then `v2_end`), published by the instance running it |
 | key `v2match:<id>:last` | the latest of those, 120 s TTL: a watcher on another instance reads it first, then follows the channel |
-| key `v2:match:<id>:frames:<A\|B\|watch>` | the frames of an ended match per view, 6 h TTL, for `v2_replay` |
+| key `v2:match:<id>:frames:<A\|B\|watch>` | the frames of an ended match per view, 6 h TTL, for `v2_replay`; the api reads the `watch` key for shared replays and highlights |
 | key `cost:usd:<UTC day>` | model spend across worker and realtime, for `cost_alert` and `/ops/stats` |
 
 Frames carry each crew's own plan text only to that crew, and never the plan of an agent running a bought (encrypted) skill. Skill text never leaves the vault except into the agent's model call.

@@ -48,14 +48,16 @@ describe('migrations', () => {
         'match_skill_stats',
         'skill_trials',
         'cosmetics_owned',
+        'replay_shares',
+        'replay_casts',
       ]),
     );
     const applied = await db.execute(
       sql`select count(*)::int as n from drizzle.__drizzle_migrations`,
     );
     expect(rowsOf<{ n: number }>(applied)[0]!.n).toBe(embeddedMigrations().length);
-    // 0000_init, 0001_agent_rentals, 0002_account_deletion.
-    expect(embeddedMigrations()).toHaveLength(3);
+    // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_replay_shares.
+    expect(embeddedMigrations()).toHaveLength(4);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {

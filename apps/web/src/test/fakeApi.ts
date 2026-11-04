@@ -48,6 +48,11 @@ const METHODS: (keyof ApiClient)[] = [
   'playerLadder',
   'v2Match',
   'v2LiveMatches',
+  'v2Highlights',
+  'createReplayShare',
+  'replayShares',
+  'sharedReplay',
+  'revokeReplayShare',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {

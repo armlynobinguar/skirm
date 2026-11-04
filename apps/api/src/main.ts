@@ -4,7 +4,9 @@ import 'reflect-metadata';
 import { closeDb, createDb, createRepos, migrate } from '@skirm/db';
 import {
   ConfigError,
+  CostMonitor,
   QUEUE_BENCHMARKS,
+  RedisCostStore,
   createNearAdapters,
   createQueue,
   createRedis,
@@ -17,6 +19,7 @@ import type { ApiDeps } from './deps';
 import { BullBenchmarkQueue, RedisDailyCosts } from './infra';
 import { RpcNearKeyChecker } from './near-link';
 import { RedisRateLimitStore } from './rate-limit';
+import { RedisReplayFrames, createApiCaster } from './replays';
 
 async function main(): Promise<void> {
   installCrashReporting('api');
@@ -34,6 +37,14 @@ async function main(): Promise<void> {
   for (const r of [queueRedis, readRedis])
     r.on('error', (err: Error) => console.error(`[api] redis: ${err.message}`));
   const benchmarkQueue = new BullBenchmarkQueue(createQueue(QUEUE_BENCHMARKS, queueRedis));
+  const casterCosts = new CostMonitor({
+    store: new RedisCostStore(queueRedis),
+    dailyBudgetUsd: config.COST_ALERT_DAILY_USD,
+    onAlert: (a) =>
+      (a.level >= 1 ? console.error : console.warn)(
+        `[api] cost_alert ${JSON.stringify({ day: a.day, level: a.level, spentUsd: a.spentUsd, budgetUsd: a.budgetUsd })}`,
+      ),
+  });
 
   const deps: ApiDeps = {
     config: { ...config, V2_BRAIN: process.env.V2_BRAIN },
@@ -48,6 +59,11 @@ async function main(): Promise<void> {
     },
     benchmarkQueue,
     costs: new RedisDailyCosts(readRedis),
+    // Shared replays read realtime's stored frames; the caster's spend joins the daily cost total.
+    replayFrames: new RedisReplayFrames(readRedis),
+    caster: createApiCaster({ ...config, V2_BRAIN: process.env.V2_BRAIN }, (usd) => {
+      void casterCosts.record(usd).catch(() => undefined);
+    }),
     rateLimit: {
       store: new RedisRateLimitStore(readRedis),
       limits: {

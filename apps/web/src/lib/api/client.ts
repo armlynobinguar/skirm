@@ -41,6 +41,9 @@ import type {
   UnlinkNearResponse,
   V2LiveMatch,
   V2MatchRecord,
+  ReplayShare,
+  SharedReplay,
+  V2Highlights,
 } from './types';
 
 export interface ApiClient {
@@ -111,6 +114,16 @@ export interface ApiClient {
   v2Match(matchId: string): Promise<V2MatchRecord>;
   /** GET /v2/matches/live: v2 matches being played now, crews hidden. */
   v2LiveMatches(): Promise<V2LiveMatch[]>;
+  /** GET /v2/matches/:id/highlights: highlight moments with caster lines (public, once ended). */
+  v2Highlights(matchId: string): Promise<V2Highlights>;
+  /** POST /v2/matches/:id/shares: a player's public link to the replay, optionally a clip. */
+  createReplayShare(matchId: string, clip?: { start: number; end: number } | null): Promise<{ share: ReplayShare }>;
+  /** GET /v2/matches/:id/shares: the caller's live links to that match. */
+  replayShares(matchId: string): Promise<{ shares: ReplayShare[] }>;
+  /** GET /replays/:shareId: a shared replay (public); `frames: false` leaves the frames out. */
+  sharedReplay(shareId: string, opts?: { frames?: boolean }): Promise<SharedReplay>;
+  /** DELETE /replays/:shareId: its creator ends the link. */
+  revokeReplayShare(shareId: string): Promise<{ revoked: true }>;
 }
 
 export interface ApiClientOptions {
@@ -222,5 +235,10 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     playerLadder: (limit) => get('/leaderboards/players', { limit }),
     v2Match: (id) => get(`/v2/matches/${enc(id)}`),
     v2LiveMatches: () => get('/v2/matches/live'),
+    v2Highlights: (id) => get(`/v2/matches/${enc(id)}/highlights`),
+    createReplayShare: (id, clip) => json('POST', `/v2/matches/${enc(id)}/shares`, { body: clip ? { clip } : {} }),
+    replayShares: (id) => get(`/v2/matches/${enc(id)}/shares`),
+    sharedReplay: (id, opts = {}) => get(`/replays/${enc(id)}`, opts.frames === false ? { frames: 0 } : undefined),
+    revokeReplayShare: (id) => json('DELETE', `/replays/${enc(id)}`),
   };
 }

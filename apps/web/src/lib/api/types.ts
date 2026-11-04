@@ -7,7 +7,7 @@
 // browser-safe).
 import type { ActionKind, AgentAppearance, CosmeticItem, SkillPublic, Tag, Unlock } from '@skirm/shared';
 
-import type { Difficulty, V2Debrief } from '../realtime/protocol';
+import type { Difficulty, V2Debrief, V2Frame } from '../realtime/protocol';
 
 export type { AgentAppearance, CosmeticItem, SkillPublic, Tag, Unlock };
 
@@ -616,4 +616,53 @@ export interface SeasonStandings {
 export interface Cosmetics {
   items: CosmeticItem[];
   owned: string[];
+}
+
+// ---------- Replays ----------
+
+/** A highlight moment of an ended match (engine detectHighlights) with its caster line. */
+export interface ReplayHighlight {
+  id: string;
+  kind: 'goal' | 'switch_flood' | 'drop_fight' | 'lead_change';
+  tick: number;
+  /** The suggested clip around it. */
+  start: number;
+  end: number;
+  team: Side | null;
+  title: string;
+  facts: string;
+  weight: number;
+  score: Record<Side, number>;
+  /** The caster's line: the model's when a key is set, else the template's. */
+  line: string;
+}
+
+/** GET /v2/matches/:id/highlights. */
+export interface V2Highlights {
+  matchId: string;
+  highlights: ReplayHighlight[];
+  caster: 'model' | 'template' | null;
+  /** Whether the frames are still stored, so the replay can be played. */
+  framesKept: boolean;
+}
+
+/** A public replay link (POST/GET /v2/matches/:id/shares). */
+export interface ReplayShare {
+  id: string;
+  matchId: string;
+  clip: { start: number; end: number } | null;
+  createdAt: string;
+  /** Site path of the link, e.g. /replays/rps_… */
+  path: string;
+}
+
+/** GET /replays/:shareId: what anyone with the link sees (the whole board, never a crew's minds). */
+export interface SharedReplay {
+  share: ReplayShare & { by: string | null };
+  match: V2MatchRecord;
+  highlights: ReplayHighlight[];
+  caster: 'model' | 'template' | null;
+  framesKept: boolean;
+  /** The clip's whole-board frames; null once they are no longer kept; absent with ?frames=0. */
+  frames?: V2Frame[] | null;
 }
