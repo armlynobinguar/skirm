@@ -6,6 +6,8 @@ import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import { ApiError, errorFromBody } from './errors';
 import type {
+  AchievementBadge,
+  Achievements,
   Agent,
   AgentPatch,
   Cosmetics,
@@ -27,6 +29,8 @@ import type {
   MintResponse,
   PlayerLadder,
   PurchaseResponse,
+  QuestBoard,
+  QuestClaimResponse,
   Season,
   SeasonStandings,
   SessionRequest,
@@ -100,6 +104,15 @@ export interface ApiClient {
   cosmetics(): Promise<Cosmetics>;
   /** POST /cosmetics/:id/buy: paid credits only (402 `insufficient_credits` with need/have). */
   buyCosmetic(itemId: string): Promise<{ owned: string[] }>;
+
+  /** GET /quests: today's and this week's quests, progress and the play streak. */
+  quests(): Promise<QuestBoard>;
+  /** POST /quests/:id/claim: refills free credits (409 `quest_incomplete`, `already_claimed`, `allowance_full`). */
+  claimQuest(questId: string): Promise<QuestClaimResponse>;
+  /** GET /achievements: every achievement with progress, unlock time and badge. */
+  achievements(): Promise<Achievements>;
+  /** POST /achievements/:id/badge: mints the soulbound badge (local without a NEAR signer). */
+  mintBadge(achievementId: string): Promise<{ badge: AchievementBadge | null }>;
 
   credits(): Promise<CreditsWithRows>;
   /** Dev mode accepts `txHash: 'dev:<yocto>'`. */
@@ -215,6 +228,11 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
 
     cosmetics: () => get('/cosmetics'),
     buyCosmetic: (id) => json('POST', `/cosmetics/${enc(id)}/buy`),
+
+    quests: () => get('/quests'),
+    claimQuest: (id) => json('POST', `/quests/${enc(id)}/claim`),
+    achievements: () => get('/achievements'),
+    mintBadge: (id) => json('POST', `/achievements/${enc(id)}/badge`),
 
     credits: () => get('/credits'),
     deposit: (txHash) => json('POST', '/credits/deposits', { body: { txHash } }),

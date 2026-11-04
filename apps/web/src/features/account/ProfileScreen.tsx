@@ -8,7 +8,7 @@
 // facts (joined, royalties earned from GET /me) and unlocks, the linked NEAR account (M01 links it; in
 // AUTH_MODE=dev the api trusts a typed account id, outside dev mode it needs a NEP-413 proof;
 // Disconnect is DELETE /me/near, refused with 409 listing_active while a listing is open), the
-// credits balance and sign out.
+// credits balance, achievements with their soulbound badges (AchievementsCard.tsx) and sign out.
 import { AgentAvatar, Badge, Button, CreditsBalance, Icon, Modal, Tabs, UnlockChip, fmt, unlockName } from '@skirm/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -33,6 +33,7 @@ import s from './account.module.css';
 import { formatUtc, formatUtcDate } from './format';
 import { SettingsCard } from './SettingsCard';
 import { DataCard } from './DataCard';
+import { AchievementsCard } from './AchievementsCard';
 import { SkillLoadout } from './SkillLoadout';
 import { LookEditor } from './LookEditor';
 
@@ -71,6 +72,7 @@ function ProfileBody() {
             <SettingsCard />
             <DataCard handle={me.data.account.handle} />
             <RecentMatches />
+            <AchievementsCard />
           </div>
           <aside className={s.aside}>
             <ProfileCard me={me.data} mode={mode} />

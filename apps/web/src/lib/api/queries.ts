@@ -12,7 +12,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/session';
 import { useApi } from '../services';
-import type { Cosmetics, MarketQuery, Trial, TrialRequest } from './types';
+import type { Cosmetics, MarketQuery, QuestBoard, QuestView, Trial, TrialRequest } from './types';
 
 /** Query keys. Prefix-shaped so `invalidateQueries({ queryKey: qk.skills.all })` clears a family. */
 export const qk = {
@@ -23,6 +23,10 @@ export const qk = {
   cosmetics: ['me', 'cosmetics'] as const,
   /** Under `me`, so a match end (qk.me invalidated) refreshes it too. */
   myMatches: ['me', 'matches'] as const,
+  /** Under `me`, so a match end (qk.me invalidated) refreshes quest progress. */
+  quests: ['me', 'quests'] as const,
+  /** Under `me`, so a match end refreshes achievements. */
+  achievements: ['me', 'achievements'] as const,
   agents: ['agents'] as const,
   /** Under `me`, so a match end (qk.me invalidated) refreshes it too. */
   agentRecord: (agentId: string) => ['me', 'agent-record', agentId] as const,
@@ -172,5 +176,63 @@ export function useBuyCosmetic() {
       void qc.invalidateQueries({ queryKey: qk.me, exact: true });
       void qc.invalidateQueries({ queryKey: qk.credits });
     },
+  });
+}
+
+/** GET /quests (signed in): today's and this week's quests and the play streak. */
+export function useQuests() {
+  const api = useApi();
+  const { status } = useSession();
+  return useQuery({
+    queryKey: qk.quests,
+    queryFn: () => api.quests(),
+    enabled: status === 'signedIn',
+    staleTime: 30_000,
+  });
+}
+
+/** POST /quests/:id/claim: stores the claimed quest and refreshes credits. */
+export function useClaimQuest() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (questId: string) => api.claimQuest(questId),
+    onSuccess: ({ quest, allowanceLeft }) => {
+      qc.setQueryData<QuestBoard>(qk.quests, (b) => {
+        if (!b) return b;
+        const swap = (qs: QuestView[]) => qs.map((q) => (q.id === quest.id ? quest : q));
+        return {
+          ...b,
+          allowanceLeft,
+          daily: { ...b.daily, quests: swap(b.daily.quests) },
+          weekly: { ...b.weekly, quests: swap(b.weekly.quests) },
+        };
+      });
+      void qc.invalidateQueries({ queryKey: qk.me, exact: true });
+      void qc.invalidateQueries({ queryKey: qk.credits });
+      void qc.invalidateQueries({ queryKey: qk.achievements });
+    },
+  });
+}
+
+/** GET /achievements (signed in). */
+export function useAchievements() {
+  const api = useApi();
+  const { status } = useSession();
+  return useQuery({
+    queryKey: qk.achievements,
+    queryFn: () => api.achievements(),
+    enabled: status === 'signedIn',
+    staleTime: 30_000,
+  });
+}
+
+/** POST /achievements/:id/badge: mints the soulbound badge, then refreshes the list. */
+export function useMintBadge() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (achievementId: string) => api.mintBadge(achievementId),
+    onSettled: () => void qc.invalidateQueries({ queryKey: qk.achievements }),
   });
 }
