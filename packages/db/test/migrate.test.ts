@@ -61,7 +61,7 @@ describe('migrations', () => {
     // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_onboarding, 0004_ranked_tiers,
     // 0005_match_timelines, 0006_skill_triggers, 0007_replay_shares, 0008_lobbies_tournaments,
     // 0009_external_agents, 0010_skill_roles,
-    // 0011_skill_bench.
+    // 0012_skill_bench (0011 is taken by crew playbooks, #30).
     expect(embeddedMigrations()).toHaveLength(12);
   });
 

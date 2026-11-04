@@ -245,7 +245,7 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     ]
   },
   {
-    "tag": "0011_skill_bench",
+    "tag": "0012_skill_bench",
     "folderMillis": 1793790104214,
     "bps": true,
     "hash": "dcc5cf5916644d49fd5b5dc36cff5899811f6914aabfaecd14498b52e084f56d",
