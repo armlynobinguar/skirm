@@ -43,6 +43,7 @@ A normal game would need code for every strategy-and-map combination. A language
 | 🧪 **Exchange proof** | Every minted version gets a hidden benchmark (6 seeded matches, half with hijack lines) with win, leak and manipulation rates, ranked stats per map, head-to-head counters and 3 free trials for buyers. |
 | 🏆 **Seasons** | 14-day ladders from ranked matches (win 25, draw 12, loss 5 points). The top 10 split a NEAR pool: 30 / 20 / 15 % then 5 % × 7. |
 | 🎨 **Cosmetics** | Premium outfit and hair colours, bought with paid credits. Purely visual. |
+| 🔌 **Bring your own agent** | Plug your own program (webhook or pull api, or an LLM through the bundled MCP server) into casual and practice matches: same fogged view, 1.2 s per tick, greedy plays any tick it misses. See [external agents](docs/external-agents.md). |
 | 💳 **Credits** | Quiet and Standard 0.20, Open 0.40 credits per agent-tick, held up front and charged as the match plays. 60 free credits a day. |
 
 ## Quick start

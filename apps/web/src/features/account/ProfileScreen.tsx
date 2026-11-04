@@ -33,6 +33,7 @@ import s from './account.module.css';
 import { formatUtc, formatUtcDate } from './format';
 import { SettingsCard } from './SettingsCard';
 import { DataCard } from './DataCard';
+import { ExternalAgentsCard } from './ExternalAgentsCard';
 import { SkillLoadout } from './SkillLoadout';
 import { LookEditor } from './LookEditor';
 
@@ -69,6 +70,7 @@ function ProfileBody() {
             <RankCard me={me.data} />
             <AgentsCard agents={me.data.agents} />
             <SettingsCard />
+            <ExternalAgentsCard agents={me.data.agents} />
             <DataCard handle={me.data.account.handle} />
             <RecentMatches />
           </div>

@@ -12,6 +12,10 @@ import type {
   CreditsWithRows,
   CurrentSeason,
   DepositResponse,
+  ExternalAgent,
+  ExternalAgentBody,
+  ExternalAgentPing,
+  ExternalAgentSecret,
   EarnBack,
   Listing,
   ListingRequest,
@@ -125,6 +129,18 @@ export interface ApiClient {
   skillTemplates(): Promise<SkillTemplateView[]>;
   /** POST /onboarding/templates/:id/copy: a new draft skill of the caller's from the template. */
   copyTemplate(templateId: string): Promise<SkillView>;
+
+  /** GET /external-agents: the caller's own programs (bring your own agent). */
+  externalAgents(): Promise<ExternalAgent[]>;
+  /** POST /external-agents: registers one; the secret and token come back this once. */
+  createExternalAgent(body: ExternalAgentBody & { name: string }): Promise<ExternalAgentSecret>;
+  /** PATCH /external-agents/:id: name, bound agent (null unbinds), webhook (null: pull). */
+  updateExternalAgent(id: string, body: ExternalAgentBody): Promise<ExternalAgent>;
+  /** POST /external-agents/:id/rotate: a new secret; the old one stops working. */
+  rotateExternalAgent(id: string): Promise<ExternalAgentSecret>;
+  /** POST /external-agents/:id/ping: a signed ping to the webhook (pull: whether it was seen). */
+  pingExternalAgent(id: string): Promise<ExternalAgentPing>;
+  deleteExternalAgent(id: string): Promise<{ deleted: true }>;
 }
 
 export interface ApiClientOptions {
@@ -242,5 +258,12 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     dismissChecklist: () => json('POST', '/onboarding/checklist/dismiss'),
     skillTemplates: () => get('/onboarding/templates'),
     copyTemplate: (id) => json('POST', `/onboarding/templates/${enc(id)}/copy`),
+
+    externalAgents: () => get('/external-agents'),
+    createExternalAgent: (body) => json('POST', '/external-agents', { body }),
+    updateExternalAgent: (id, body) => json('PATCH', `/external-agents/${enc(id)}`, { body }),
+    rotateExternalAgent: (id) => json('POST', `/external-agents/${enc(id)}/rotate`),
+    pingExternalAgent: (id) => json('POST', `/external-agents/${enc(id)}/ping`),
+    deleteExternalAgent: (id) => json('DELETE', `/external-agents/${enc(id)}`),
   };
 }

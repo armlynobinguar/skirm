@@ -658,3 +658,37 @@ export interface SkillTemplateView {
   requires_actions: ('place_block' | 'dig' | 'extinguish')[];
   handles_tags: Tag[];
 }
+
+/** GET /external-agents: a player's own program bound to one of their agents (bring your own agent). */
+export interface ExternalAgent {
+  id: string;
+  name: string;
+  agentId: string | null;
+  mode: 'webhook' | 'pull';
+  webhookUrl: string | null;
+  calls: number;
+  misses: number;
+  lastError: string | null;
+  lastSeenAt: string | null;
+  rotatedAt: string | null;
+  createdAt: string;
+}
+
+/** POST /external-agents and /external-agents/:id/rotate: the secret and token, shown this once. */
+export interface ExternalAgentSecret {
+  externalAgent: ExternalAgent;
+  secret: string;
+  token: string;
+}
+
+export interface ExternalAgentBody {
+  name?: string;
+  agentId?: string | null;
+  webhookUrl?: string | null;
+}
+
+/** POST /external-agents/:id/ping. */
+export type ExternalAgentPing =
+  | { ok: true; mode: 'webhook'; status: number; latencyMs: number }
+  | { ok: false; mode: 'webhook'; error: string; message: string }
+  | { ok: boolean; mode: 'pull'; lastSeenAt: string | null };

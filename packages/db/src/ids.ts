@@ -54,7 +54,7 @@ function encodeRandom(bytes: Uint8Array): string {
 }
 
 export type IdPrefix =
-  'acc' | 'agt' | 'unl' | 'skl' | 'run' | 'mat' | 'lst' | 'sal' | 'bdg' | 'ssn' | 'trl' | 'rof' | 'rnt';
+  'acc' | 'agt' | 'unl' | 'skl' | 'run' | 'mat' | 'lst' | 'sal' | 'bdg' | 'ssn' | 'trl' | 'rof' | 'rnt' | 'ext';
 
 export function newId(prefix: IdPrefix): string {
   return `${prefix}_${ulid()}`;

@@ -95,6 +95,17 @@ const defaults = {
     activeTicks: 10,
     maxChars: 80,
   },
+  /**
+   * Bring your own agent (docs/external-agents.md): a player's own program plays one of their
+   * agents in casual and practice matches. Each tick it has `timeoutMs` to answer (under the 1.5 s
+   * action deadline) or the greedy brain plays that tick; webhook replies over `maxResponseBytes`
+   * count as a miss. At most `perAccount` registered per player.
+   */
+  external: {
+    timeoutMs: 1200,
+    maxResponseBytes: 16_384,
+    perAccount: 5,
+  },
   season: {
     days: 14,
     splitBps: [3000, 2000, 1500, 500, 500, 500, 500, 500, 500, 500],

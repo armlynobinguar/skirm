@@ -145,5 +145,18 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "CREATE TABLE \"onboarding_progress\" (\n\t\"account_id\" text PRIMARY KEY NOT NULL,\n\t\"tutorial_step\" integer DEFAULT 0 NOT NULL,\n\t\"tutorial_completed_at\" timestamp with time zone,\n\t\"tutorial_skipped_at\" timestamp with time zone,\n\t\"checklist_dismissed_at\" timestamp with time zone,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL\n);\n",
       "\nALTER TABLE \"onboarding_progress\" ADD CONSTRAINT \"onboarding_progress_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;"
     ]
+  },
+  {
+    "tag": "0004_external_agents",
+    "folderMillis": 1793773316796,
+    "bps": true,
+    "hash": "caae6bd76fc7fcb4f6c037a22922416a3af584d8fcabea66c5f2acdf3406b9c9",
+    "sql": [
+      "CREATE TABLE \"external_agents\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"agent_id\" text,\n\t\"name\" text NOT NULL,\n\t\"webhook_url\" text,\n\t\"secret_sha256\" text NOT NULL,\n\t\"secret_ciphertext\" \"bytea\" NOT NULL,\n\t\"secret_iv\" \"bytea\" NOT NULL,\n\t\"secret_auth_tag\" \"bytea\" NOT NULL,\n\t\"secret_wrapped_key\" \"bytea\" NOT NULL,\n\t\"secret_key_id\" text NOT NULL,\n\t\"calls\" integer DEFAULT 0 NOT NULL,\n\t\"misses\" integer DEFAULT 0 NOT NULL,\n\t\"last_error\" text,\n\t\"last_seen_at\" timestamp with time zone,\n\t\"rotated_at\" timestamp with time zone,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"external_agents_name_ck\" CHECK (char_length(\"external_agents\".\"name\") between 1 and 40)\n);\n",
+      "\nALTER TABLE \"external_agents\" ADD CONSTRAINT \"external_agents_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"external_agents\" ADD CONSTRAINT \"external_agents_agent_id_agents_id_fk\" FOREIGN KEY (\"agent_id\") REFERENCES \"public\".\"agents\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"external_agents_account_idx\" ON \"external_agents\" USING btree (\"account_id\");",
+      "\nCREATE UNIQUE INDEX \"external_agents_agent_uq\" ON \"external_agents\" USING btree (\"agent_id\");"
+    ]
   }
 ];

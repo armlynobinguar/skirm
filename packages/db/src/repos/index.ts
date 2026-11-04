@@ -2,6 +2,7 @@ import type { Executor } from '../client';
 import { AccountsRepo } from './accounts';
 import { AgentsRepo } from './agents';
 import { CosmeticsRepo } from './cosmetics';
+import { ExternalAgentsRepo } from './external-agents';
 import { LeaderboardsRepo } from './leaderboards';
 import { LedgerRepo, type LedgerRepoOptions } from './ledger';
 import { MarketRepo } from './market';
@@ -38,6 +39,8 @@ export interface Repos {
   rentals: RentalsRepo;
   /** Tutorial progress and the home checklist. */
   onboarding: OnboardingRepo;
+  /** Players' own programs bound to their agents (bring your own agent). */
+  externalAgents: ExternalAgentsRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -65,6 +68,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     cosmetics: new CosmeticsRepo(db, opts.ledger),
     rentals: new RentalsRepo(db),
     onboarding: new OnboardingRepo(db),
+    externalAgents: new ExternalAgentsRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -72,6 +76,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
 export * from './accounts';
 export * from './agents';
 export * from './cosmetics';
+export * from './external-agents';
 export * from './leaderboards';
 export * from './ledger';
 export * from './market';

@@ -6,6 +6,9 @@ import type { RateLimitStore, RateLimits } from './rate-limit';
 import type {
   BenchmarkJobData,
   DepositVerifier,
+  ExternalTurnStore,
+  SafePostOptions,
+  SafePostResult,
   RentalVerifier,
   Minter,
   OwnershipReader,
@@ -62,4 +65,8 @@ export interface ApiDeps {
   corsOrigins?: string[];
   /** Request rate limits (./rate-limit.ts): Redis counters in production; absent, no limits (tests). */
   rateLimit?: { store: RateLimitStore; limits?: Partial<RateLimits> };
+  /** Bring your own agent: the pull relay shared with realtime (Redis; absent: /agent/v1/turn and /action answer 503). */
+  externalTurns?: ExternalTurnStore;
+  /** Tests only: the webhook transport for pings (default: the SSRF-safe safePostJson). */
+  externalPost?: (url: string, body: string, opts: SafePostOptions) => Promise<SafePostResult>;
 }

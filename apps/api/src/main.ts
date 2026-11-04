@@ -4,6 +4,7 @@ import 'reflect-metadata';
 import { closeDb, createDb, createRepos, migrate } from '@skirm/db';
 import {
   ConfigError,
+  RedisExternalTurnStore,
   QUEUE_BENCHMARKS,
   createNearAdapters,
   createQueue,
@@ -48,6 +49,8 @@ async function main(): Promise<void> {
     },
     benchmarkQueue,
     costs: new RedisDailyCosts(readRedis),
+    // Bring your own agent: pull turns realtime publishes, shared through Redis.
+    externalTurns: new RedisExternalTurnStore(queueRedis),
     rateLimit: {
       store: new RedisRateLimitStore(readRedis),
       limits: {

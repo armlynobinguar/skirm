@@ -101,6 +101,8 @@ export async function setup(
     now?: string;
     /** Turn request rate limits on (off by default: the harness signs many players in a minute). */
     rateLimit?: ApiDeps['rateLimit'];
+    /** Extra deps (the external agent relay and webhook transport). */
+    deps?: Partial<Pick<ApiDeps, 'externalTurns' | 'externalPost'>>;
   } = {},
 ): Promise<Harness> {
   const db = opts.db ?? (await createTestDb());
@@ -136,6 +138,7 @@ export async function setup(
     benchmarkQueue: benchmarks,
     costs,
     ...(opts.rateLimit ? { rateLimit: opts.rateLimit } : {}),
+    ...opts.deps,
   };
   const app = await createApp(deps, { logger: false });
   await app.init();
