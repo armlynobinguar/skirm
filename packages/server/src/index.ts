@@ -8,3 +8,5 @@ export * from './cost';
 export * from './report';
 export * from './v2';
 export * from './v2-channels';
+export * from './external';
+export * from './external-http';
