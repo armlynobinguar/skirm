@@ -58,7 +58,7 @@ Talk tiers are priced in whole credits per 100 agent-ticks (`DEFAULTS.talk.rateP
 
 ## REST (`apps/api`, JSON, no prefix)
 
-Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/players`, `GET /v2/matches/*`, `GET /seasons*` and `GET /ops/stats` / `GET /ops/talk-rates` (their own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
+Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/players`, `GET /v2/matches/*` (but `/v2/matches/:id/decisions`), `GET /seasons*` and `GET /ops/stats` / `GET /ops/talk-rates` (their own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
 
 ### Account
 
@@ -86,6 +86,7 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/v2/matches/live` | | matches being played now, newest first: `{ id, mapId, difficulty, ranked, practice, startedAt, teams: {A, B}: {handle, size} }`. Crews stay hidden; the bot side of a practice match is `Greedy bot` |
 | GET | `/v2/matches/:id` | | `{ id, mapId, ranked, practice, status: 'live'\|'ended'\|'void', difficulty, teams: {A, B}: {accountId, handle, crew[]}, winner, reason, decidedBy, score: {A, B} \| null, ticks, elo: {accountId, team, before, delta, after}[], stats, logHash, registry: {status, txHash?}, createdAt, endedAt, you?, debrief? }`. While live the rival side is blank and only a player sees their own crew. `you` and `debrief` (that crew's, as sent with `v2_end`) only for a player. The log stays server side: `logHash` is its proof. `registry.status` is `none` for casual, practice and void matches |
 | GET | `/v2/matches/:id/messages` | `?afterTick=&limit=` (≤ `MATCH_MESSAGES_MAX_LIMIT`, default 200) | `{ messages: {tick, team, agent: {id, name}, channel, text, heardBy, overheardBy}[], next? }`: the lines realtime saw delivered. `409 match_live` until the match ends. Page with `next` as the following `afterTick` |
+| GET | `/v2/matches/:id/decisions` | ✓ | `{ matchId, you, ticks, crews: {team, own, brain, agents: {id, name, role, skills}[], plans: {tick, text, why, hidden?}[], decisions: {tick, agentId, observed, action, reason, outcome?, effect?, said?, thought?, skill: {id, version, by: 'model'\|'inferred'} \| null}[], moments: {tick, kind: 'hazard_breach'\|'switch'\|'supply_drop'\|'goal', team, agentId, text}[]}[], skills: {id, version, name, mine, prompt?}[] }`: the debrief's decision timeline (`match_timelines`, written by realtime at the end). Players only (403 otherwise), each their own crew; practice adds the bot's. `409 match_live` until it ends; a void match has no crews. `skill` is the one the agent's model named (a `SKILL:` line), else, on a model brain, the only equipped skill whose required action is the verb that resolved. Plans shaped by a bought skill are kept as `hidden`, and an agent on a bought or rented skill keeps no `thought`. `prompt` only for skills the caller wrote |
 | GET | `/leaderboards/players` | `?limit=` (≤ 200, default 100) | `{ rows: {rank, account: {id, handle}, elo, title, rankedMatches, wins, losses, draws}[], you? }`: players with a ranked match by Elo (ties share a rank) |
 
 ### Seasons
@@ -185,7 +186,7 @@ WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthe
 - Each tick every agent's brain acts and may speak under a 1.5 s deadline (late, failed or illegal is a wait); the crew plan is rewritten every `V2_REPLAN_EVERY` (25) ticks. Speech passes the leak and abuse filter before anyone hears it, then goes by range (team, or overheard by the rival).
 - One `realtime` instance holds each match in memory and serves its players. A live row no instance holds (crash) is voided by the orphan sweep and its holds released; shutdown voids live matches with credits returned.
 - Practice: the player is crew A; crew B is `SYSTEM_ACCOUNT_ID` with a Standard crew the player's size on the greedy brain, accepting and locking in by itself. Casual only, no Elo, no registry write, `v2_matches.practice = true`.
-- Settlement (`V2MatchesRepo.finish`, one transaction): the result, both players' Elo (ranked; start 1200, K 32 for the first 20 ranked matches then 16, floor 100), season points (ranked), the skill versions' ranked records, the delivered lines (`match_messages`), each crew's debrief. Then a ranked result is queued for the registry, and the frames are kept for replay.
+- Settlement (`V2MatchesRepo.finish`, one transaction): the result, both players' Elo (ranked; start 1200, K 32 for the first 20 ranked matches then 16, floor 100), season points (ranked), the skill versions' ranked records, the delivered lines (`match_messages`), each crew's debrief. Each crew's decision timeline (`match_timelines`) is written right after, before `v2_end`. Then a ranked result is queued for the registry, and the frames are kept for replay.
 
 ## Queues (BullMQ, names in `@skirm/server`)
 

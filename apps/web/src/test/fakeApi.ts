@@ -48,6 +48,7 @@ const METHODS: (keyof ApiClient)[] = [
   'playerLadder',
   'v2Match',
   'v2LiveMatches',
+  'v2MatchDecisions',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {

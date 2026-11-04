@@ -39,11 +39,12 @@ import {
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
-import type { V2MatchMessageInput } from '@skirm/db';
+import type { MatchTimelineInput, V2MatchMessageInput } from '@skirm/db';
 import type { V2Debrief, V2EndReason, V2ServerMessage } from '@skirm/server';
 import type { Logger } from '../deps';
 import type { Scheduler } from '../timing';
 import { DebriefTally, buildDebrief } from './debrief';
+import { DecisionTimeline } from './timeline';
 
 export const TEAMS: readonly Team[] = ['A', 'B'];
 
@@ -166,6 +167,8 @@ export class V2Match {
   private planWhys: Record<Team, string | null> = { A: null, B: null };
   /** Each agent's latest inner voice (its THINK line), by agent id. */
   private thoughts = new Map<string, string>();
+  /** Each crew's decision timeline for the debrief; set when the match goes live. */
+  private timeline: DecisionTimeline | null = null;
   /** Holds still open (released on a void). */
   private held = new Map<Team, number>();
   /** What each crew had held, kept for the debrief. */
@@ -282,6 +285,11 @@ export class V2Match {
     return this.frames[view];
   }
 
+  /** Each crew's decision timeline (the debrief's "why did it do that?"); empty until the match went live. */
+  timelines(): MatchTimelineInput[] {
+    return this.timeline?.records() ?? [];
+  }
+
   /** Stops the match at the next checkpoint; it ends void with every credit returned. */
   abort(reason: string): void {
     this.stopReason ??= reason;
@@ -378,6 +386,8 @@ export class V2Match {
     }
 
     this.state = s;
+    const crewOf = (t: Team) => ({ brain: this.deps.brains[t].kind, bought: setup.sides[t].bought ?? [], skillKeys: setup.sides[t].skillKeys ?? [] });
+    this.timeline = new DecisionTimeline({ A: crewOf('A'), B: crewOf('B') });
     // One model name when both crews share a brain, else each crew's (as the headless runner writes it).
     const { A: brainA, B: brainB } = this.deps.brains;
     const model = brainA.model === brainB.model ? brainA.model : `A:${brainA.model} B:${brainB.model}`;
@@ -418,10 +428,12 @@ export class V2Match {
         // The inner voice is never part of the match (not in the log, never heard); only its own crew's frames show it.
         if (d.thought) this.thoughts.set(a.id, d.thought);
         this.count(a.team, d);
+        this.timeline?.turn(a, d);
       });
       const ev = stepMatch(s, { actions, says });
       appendTick(log, { tick: s.tick, actions, says });
       this.tally.add(ev);
+      this.timeline?.resolve(s, ev);
       this.collect(s, ev);
       for (const t of pays) {
         cum100[t] += costPer100[t];
@@ -460,6 +472,7 @@ export class V2Match {
   private decide(s: MatchState, id: string): Promise<V2Decision> {
     const a = s.agents.find((x) => x.id === id)!;
     const o = observe(s, id);
+    this.timeline?.observe(id, o);
     const canSpeak = maySpeak(a.tier, s.tick + 1, a.lastSpoke);
     const wait: Action = { type: 'wait' };
     if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
@@ -504,6 +517,7 @@ export class V2Match {
       if (r.text) {
         this.plans[team] = r.text;
         this.planWhys[team] = r.why ?? null;
+        this.timeline?.plan(team, s.tick + 1, r.text, r.why ?? null);
       }
     }
   }

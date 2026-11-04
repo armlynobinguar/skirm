@@ -64,8 +64,12 @@ export function viewText(o: Observation): string {
   return lines.join('\n');
 }
 
-/** `recent`: the agent's last few actions with where it stood, oldest first (so it does not walk in circles). */
-export function turnPrompt(o: Observation, plan: string | null, canSpeak: boolean, recent: string[] = []): string {
+/**
+ * `recent`: the agent's last few actions with where it stood, oldest first (so it does not walk in
+ * circles). `skills`: how many skills the agent carries; with any, the reply may name the one that
+ * drove the move (the debrief's decision timeline, by skill id, never its text).
+ */
+export function turnPrompt(o: Observation, plan: string | null, canSpeak: boolean, recent: string[] = [], skills = 0): string {
   const legal = o.legal.map((a, i) => `${i + 1}. ${actionText(a)}${routeHint(o, a)}`).join('\n');
   const here = distancesFrom(o, o.me.x, o.me.y);
   const where = [here.item !== null ? `nearest item ${here.item} steps` : 'no item seen yet', here.deliver !== null ? `delivery point ${here.deliver} steps` : null]
@@ -80,6 +84,7 @@ export function turnPrompt(o: Observation, plan: string | null, canSpeak: boolea
     canSpeak
       ? `Answer at once, no explanation. First line "ACTION: <number>"; then, if you want to talk, one line "SAY: team <message>" or "SAY: say <message>" (at most ${MAX_MESSAGE_CHARS} characters); then one line "THINK: <your inner voice, first person, at most ${MAX_THOUGHT_CHARS} characters>" (private to your crew).`
       : `Answer at once, no explanation: one line "ACTION: <number>", then one line "THINK: <your inner voice, first person, at most ${MAX_THOUGHT_CHARS} characters>" (private to your crew).`,
+    skills > 0 ? `If one of your skills drove this move, add one line "SKILL: <its number, 1 to ${skills}>".` : '',
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -90,6 +95,8 @@ export interface ParsedReply {
   say: { channel: Channel; text: string } | null;
   /** The agent's inner voice this tick (the THINK line), or null. */
   thought: string | null;
+  /** The skill that drove the move (the SKILL line, 1-based as the system prompt numbers them); absent when none. */
+  skill?: number;
 }
 
 /** One line, quotes trimmed, cut to `max` characters; null when empty. */
@@ -98,7 +105,8 @@ function oneLine(text: string | undefined, max: number): string | null {
   return t ? [...t].slice(0, max).join('') : null;
 }
 
-export function parseReply(text: string, legal: Action[], canSpeak: boolean): ParsedReply {
+/** `skills`: how many skills the system prompt numbered; a SKILL line outside 1..skills is ignored. */
+export function parseReply(text: string, legal: Action[], canSpeak: boolean, skills = 0): ParsedReply {
   const m = /ACTION:\s*(\d+)/i.exec(text) ?? /^\s*(\d+)/.exec(text);
   const n = m ? Number(m[1]) : NaN;
   const action = Number.isInteger(n) && n >= 1 && n <= legal.length ? legal[n - 1]! : null;
@@ -108,7 +116,9 @@ export function parseReply(text: string, legal: Action[], canSpeak: boolean): Pa
     if (s) say = { channel: s[1]!.toLowerCase() as Channel, text: s[2]!.trim().replace(/^"|"$/g, '').slice(0, MAX_MESSAGE_CHARS) };
   }
   const thought = oneLine(/THINK:\s*(.+)/i.exec(text)?.[1], MAX_THOUGHT_CHARS);
-  return { action, say, thought };
+  const k = Number(/SKILL:\s*(\d+)/i.exec(text)?.[1]);
+  const skill = Number.isInteger(k) && k >= 1 && k <= skills ? k : undefined;
+  return { action, say, thought, ...(skill ? { skill } : {}) };
 }
 
 export function planPrompt(o: Observation): string {
