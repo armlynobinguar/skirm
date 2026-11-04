@@ -207,5 +207,6 @@ function meta(b: z.output<typeof skillBody>) {
     handlesTags: b.handles_tags as SkillVersionView['handlesTags'],
     roles: b.roles,
     royaltyBps: b.royalty_bps,
+    trigger: b.trigger ?? null,
   };
 }

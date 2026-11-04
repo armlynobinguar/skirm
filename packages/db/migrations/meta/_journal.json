@@ -43,6 +43,34 @@
       "when": 1793773723595,
       "tag": "0005_match_timelines",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793776907145,
+      "tag": "0006_skill_triggers",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793782667055,
+      "tag": "0007_replay_shares",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793782742570,
+      "tag": "0008_lobbies_tournaments",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793786073544,
+      "tag": "0009_skill_roles",
+      "breakpoints": true
     }
   ]
 }

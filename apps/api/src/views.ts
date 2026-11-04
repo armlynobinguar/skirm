@@ -15,7 +15,7 @@ import {
   type V2MatchRow,
 } from '@skirm/db';
 import { BOT_HANDLE } from '@skirm/engine/v2';
-import { SEASON, normalizeSkillRoles, splitSale, type SkillPublic, type SkillRole } from '@skirm/shared';
+import { SEASON, normalizeSkillRoles, skillTriggerOf, splitSale, type SkillPublic, type SkillRole } from '@skirm/shared';
 
 export const accountView = (a: AccountRow) => ({
   id: a.id,
@@ -56,6 +56,7 @@ export function skillPublic(v: SkillVersionView, owner?: string): SkillPublicVie
     roles: normalizeSkillRoles(v.roles),
     prompt_sha256: v.promptSha256,
     created_at: new Date(v.createdAt).toISOString(),
+    trigger: skillTriggerOf(v.trigger),
     status: v.accountBound ? STARTER_LABEL : STATUS_LABEL[v.status],
     tokenId: v.tokenId,
     latestVersion: v.latestVersion,

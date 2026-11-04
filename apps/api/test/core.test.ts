@@ -233,6 +233,13 @@ describe('NEAR account linking outside dev mode', () => {
       });
       fullAccess.add(`linker.testnet/${pk}`);
       await expect(check({ publicKey: pk, signature: sig })).resolves.toBeUndefined();
+      // The sign-in form (no NEAR id in the text) passes too, and is bound by the same key check.
+      const { linkSignInMessage } = await import('../src/near-link');
+      const sigIn = sign(null, Buffer.from(linkSignInMessage(account.id)), privateKey).toString('base64');
+      await expect(check({ publicKey: pk, signature: sigIn })).resolves.toBeUndefined();
+      fullAccess.delete(`linker.testnet/${pk}`);
+      await expect(check({ publicKey: pk, signature: sigIn })).rejects.toMatchObject({ status: 422 });
+      fullAccess.add(`linker.testnet/${pk}`);
     } finally {
       await p.close();
     }

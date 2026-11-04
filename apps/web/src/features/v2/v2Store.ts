@@ -9,12 +9,13 @@
 // turns into that crew's view, since the server sends those only to the crew's own player.
 // `said` keeps every say and team line for the debrief's transcript, uncapped (talk is rate-limited
 // per tier), unlike the feed, which keeps the last MAX_COMMS lines of everything. Your own live
-// commands (the frame's `commands`, never in the rival's) join both as 'order' lines.
+// commands (the frame's `commands`, never in the rival's) join both as 'order' lines. Draft mode adds
+// a 'draft' phase between found and lock-in, built from v2_draft (whose ban it is, the pool, the bans).
 import { commandLabel, mapV2 } from '@skirm/engine/v2';
 import type { PlayerTier } from '@skirm/shared';
 import { useEffect, useSyncExternalStore } from 'react';
 import type { Realtime } from '@/lib/realtime/client';
-import type { Difficulty, FrameAgent, MatchResult, TalkTier, Team, V2Debrief, V2EndReason, V2Frame, WsServerMessage } from '@/lib/realtime/protocol';
+import type { Difficulty, FrameAgent, MatchResult, TalkTier, Team, V2Debrief, V2DraftBan, V2DraftSkill, V2EndReason, V2Frame, WsServerMessage } from '@/lib/realtime/protocol';
 import { useRealtime } from '@/lib/services';
 
 export interface V2QueuedAgent {
@@ -23,7 +24,22 @@ export interface V2QueuedAgent {
   tier: TalkTier;
 }
 
-export type V2Phase = 'found' | 'lockin' | 'live' | 'ended';
+export type V2Phase = 'found' | 'draft' | 'lockin' | 'live' | 'ended';
+
+/** Draft mode as the latest v2_draft left it. */
+export interface V2DraftView {
+  /** Whose ban it is; null before the first step and once the draft is over. */
+  turn: Team | null;
+  step: number;
+  steps: number;
+  /** Wall time (ms) the current step runs out; null when no step is open. */
+  by: number | null;
+  /** The rival's skills you may still ban. */
+  pool: V2DraftSkill[];
+  bans: V2DraftBan[];
+  /** The last step has been played (v2_draft with no turn). */
+  done: boolean;
+}
 
 export interface V2CommsLine {
   tick: number;
@@ -99,6 +115,8 @@ export interface V2MatchView {
   replay: V2Frame[] | null;
   /** The last v2_command_ok: the tick the command lands on and how many are left. */
   commandAck: { tick: number; left: number } | null;
+  /** Draft mode (v2_found `draft`): the ban phase; null outside draft mode. */
+  draft: V2DraftView | null;
 }
 
 /** Most comms lines kept per match. */
@@ -138,6 +156,7 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
       endAt: null,
       replay: null,
       commandAck: null,
+      draft: m.draft ? { turn: null, step: 0, steps: 0, by: null, pool: [], bans: [], done: false } : null,
       // A repeat (reconnect) keeps what was already known.
       ...(prev && prev.phase === 'found' ? { accepted: prev.accepted } : {}),
     };
@@ -149,10 +168,16 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
   switch (m.type) {
     case 'v2_accepted':
       return prev.accepted.includes(m.team) ? prev : { ...prev, accepted: [...prev.accepted, m.team] };
+    case 'v2_draft':
+      return {
+        ...prev,
+        phase: prev.phase === 'found' ? 'draft' : prev.phase,
+        draft: { turn: m.turn, step: m.step, steps: m.steps, by: m.turn ? now + m.stepMs : null, pool: m.pool, bans: m.bans, done: m.turn === null && m.bans.length >= m.steps },
+      };
     case 'v2_lockin':
       return {
         ...prev,
-        phase: prev.phase === 'found' ? 'lockin' : prev.phase,
+        phase: prev.phase === 'found' || prev.phase === 'draft' ? 'lockin' : prev.phase,
         lockBy: now + m.lockMs,
         rivalAgents: m.rival.agents,
         crewLimit: m.crewLimit ?? prev.crewLimit,
@@ -295,11 +320,12 @@ function bareView(matchId: string, last: V2Frame): V2MatchView {
     endAt: null,
     replay: null,
     commandAck: null,
+    draft: null,
   };
 }
 
 /** An ended match known only from its stored frames (replay in a fresh tab). */
-function replayView(matchId: string, frames: V2Frame[]): V2MatchView {
+export function replayView(matchId: string, frames: V2Frame[]): V2MatchView {
   const last = frames[frames.length - 1]!;
   return {
     ...bareView(matchId, last),

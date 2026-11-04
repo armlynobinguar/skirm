@@ -1,5 +1,5 @@
-/* PvP screens S11–S14. Values are design tokens; layouts follow the artboards in
- * .design-src/screens/S11..S14 (flex-wrap columns that stack on phones). */
+/* PvP screens S11–S14. Values are design tokens; flex-wrap columns
+ * stack on phones. */
 
 .page { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
 .pageTight { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }

@@ -1,6 +1,7 @@
 // Cross-package contract: the tag and unlock vocabulary skills are written against, the sides of a
 // match, the charge reasons the ledger reads and the public skill record (Game Spec §2, §4, §9).
 // Change this file only on purpose: every package builds against it.
+import type { SkillTrigger } from './skill-trigger';
 
 // ---------- Vocabulary ----------
 
@@ -85,6 +86,8 @@ export interface SkillPublic {
   handles_tags: Tag[];
   prompt_sha256: string;
   created_at: string;
+  /** When the skill is put into its agent's prompt (public, unlike the prompt). Absent: always. */
+  trigger?: SkillTrigger;
 }
 
 /** Stored form; prompt and reflexes are write-only and never leave the runner. */

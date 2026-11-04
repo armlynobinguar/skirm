@@ -1,6 +1,18 @@
 // Skills + Market helpers: limits mirrored from apps/api/src/validation.ts (Spec §9), NEAR amounts as
 // bigint strings (never floats) and test-run outcome labels.
-import { AGENT_ROLES, TAGS, UNLOCK_ACTION, type AgentRoleName, type Tag, type Unlock } from '@skirm/shared';
+import {
+  AGENT_ROLES,
+  ALWAYS_TRIGGER,
+  SKILL_TRIGGER_LIMITS,
+  SKILL_TRIGGER_PARAM,
+  TAGS,
+  UNLOCK_ACTION,
+  storedSkillTrigger,
+  type AgentRoleName,
+  type SkillTrigger,
+  type Tag,
+  type Unlock,
+} from '@skirm/shared';
 import { formatNear, parseNear } from '@/lib/constants';
 import type { GatedAction, SkillBody, SkillStatus } from '@/lib/api/types';
 
@@ -87,6 +99,8 @@ export interface SkillForm {
   roles: AgentRoleName[];
   /** Percent text as typed ("5"). */
   royalty: string;
+  /** When the skill plays (public): `always` unless the creator picks a condition. */
+  trigger: SkillTrigger;
 }
 
 export const emptyForm = (): SkillForm => ({
@@ -98,6 +112,7 @@ export const emptyForm = (): SkillForm => ({
   tags: [],
   roles: [],
   royalty: '5',
+  trigger: ALWAYS_TRIGGER,
 });
 
 export type FormErrors = Partial<Record<keyof SkillForm, string>>;
@@ -112,6 +127,13 @@ export function validateForm(f: SkillForm): FormErrors {
   if (f.reflexes.length > LIMITS.reflexes) e.reflexes = `At most ${LIMITS.reflexes} characters.`;
   if (f.tags.length < 1) e.tags = 'Pick at least one tag the skill handles.';
   if (pctToBps(f.royalty) === null) e.royalty = '0 to 10%, up to 2 decimals.';
+  const param = SKILL_TRIGGER_PARAM[f.trigger.kind];
+  if (param) {
+    const v = (f.trigger as Record<string, unknown>)[param];
+    const lim = SKILL_TRIGGER_LIMITS[param];
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < lim.min || v > lim.max)
+      e.trigger = `${lim.min} to ${lim.max} ${param === 'tiles' ? 'tiles' : 'seconds'}.`;
+  }
   return e;
 }
 
@@ -125,6 +147,7 @@ export function toBody(f: SkillForm): SkillBody {
     handles_tags: TAGS.filter((t) => f.tags.includes(t)),
     roles: f.roles.length ? AGENT_ROLES.filter((r) => f.roles.includes(r)) : ['any'],
     royalty_bps: pctToBps(f.royalty) ?? LIMITS.royaltyDefaultBps,
+    trigger: storedSkillTrigger(f.trigger),
   };
 }
 

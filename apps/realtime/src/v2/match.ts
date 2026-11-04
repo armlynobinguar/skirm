@@ -11,7 +11,10 @@
 // holds and pays nothing. The match log is hash-chained per tick. At the end each crew gets its
 // debrief, and every frame is kept for replay. A player may send live commands (command()): each crew
 // has DEFAULTS.commands.perMatch, applied on the next tick, logged in the hash chain and shown only
-// to that crew.
+// to that crew. Draft mode (casual, `setup.draft`): between accept and lock-in each crew in turn
+// bans one of the rival's equipped skills (DEFAULTS.draft: bans per crew, the time per step; a step
+// not answered in time passes). A banned skill is unequipped from the rival crew for this match,
+// also from a crew swapped in at lock-in, and every ban is in both debriefs.
 import { V2_ACTION_DEADLINE_MS, V2_PLANNER_DEADLINE_MS, filterSpeech, maySpeak, type V2AgentCommand, type V2Brain, type V2Decision } from '@skirm/decision-engine/v2';
 import { DEFAULTS, chargeDue, playerTier, type PlayerTier } from '@skirm/shared';
 import {
@@ -27,6 +30,7 @@ import {
   holdFor,
   logHash,
   observe,
+  skillActivity,
   startLog,
   stepMatch,
   tickCostPer100,
@@ -36,18 +40,20 @@ import {
   type CrewCommand,
   type Difficulty,
   type FrameCommand,
+  type FrameSkill,
   type FrameView,
   type MapDefV2,
   type MatchEvent,
   type MatchLog,
   type MatchState,
   type SayInput,
+  type SkillTrigger,
   type TalkTier,
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
 import type { MatchTimelineInput, V2MatchMessageInput } from '@skirm/db';
-import type { V2Debrief, V2EndReason, V2ServerMessage } from '@skirm/server';
+import type { V2Debrief, V2DraftBan, V2DraftSkill, V2EndReason, V2ServerMessage } from '@skirm/server';
 import type { Logger } from '../deps';
 import type { Scheduler } from '../timing';
 import { DebriefTally, buildDebrief } from './debrief';
@@ -57,6 +63,8 @@ export const TEAMS: readonly Team[] = ['A', 'B'];
 
 export interface V2Timing {
   acceptMs: number;
+  /** Draft mode: the time each ban step lasts. */
+  draftStepMs: number;
   lockMs: number;
   tickMs: number;
   actionMs: number;
@@ -67,6 +75,7 @@ export interface V2Timing {
 
 export const DEFAULT_V2_TIMING: V2Timing = {
   acceptMs: 10_000,
+  draftStepMs: DEFAULTS.draft.stepMs,
   lockMs: 30_000,
   tickMs: TICK_MS,
   actionMs: V2_ACTION_DEADLINE_MS,
@@ -95,6 +104,19 @@ export interface V2Roster {
   instructions?: (string | null)[];
   /** Per agent: the skill versions it plays with (recorded on v2_matches.crews, never in the log). */
   skillKeys?: { id: string; version: number }[][];
+  /** Per agent: the public names of `skillKeys`, in the same order (the draft's ban pool). */
+  skillNames?: string[][];
+  /**
+   * Per agent, in skill order: each skill's public name and trigger (null: always). A skill joins
+   * its agent's prompt only on ticks its trigger holds. Absent: every skill always plays.
+   */
+  skillMeta?: V2SkillMeta[][];
+}
+
+/** A skill's public metadata as a match uses it. */
+export interface V2SkillMeta {
+  name: string;
+  trigger: SkillTrigger | null;
 }
 
 export interface V2Side extends V2Roster {
@@ -119,6 +141,12 @@ export interface V2Setup {
   hold?: Partial<Record<Team, number>>;
   /** Bluffs a crew may tell when not BLUFF_CAP (the practice bot, practiceRival). */
   lieCap?: Partial<Record<Team, number>>;
+  /** A private lobby's talk rule: every agent of both crews plays this tier. */
+  talk?: TalkTier;
+  /** A private lobby's crew size: at most this many agents a crew (the map may allow fewer). */
+  crewMax?: number;
+  /** Draft mode (casual): a ban phase between accept and lock-in. */
+  draft?: boolean;
 }
 
 /** What the hub knows once the result is written: each player's Elo change, the registry line and (ranked) the season points. */
@@ -156,7 +184,7 @@ export interface V2MatchDeps {
   log: Logger;
 }
 
-type Phase = 'found' | 'lockin' | 'live' | 'ended';
+type Phase = 'found' | 'draft' | 'lockin' | 'live' | 'ended';
 
 /** A live command as the player sends it: one agent (absent: the whole crew), a preset and/or free text. */
 export interface V2CommandInput {
@@ -166,6 +194,10 @@ export interface V2CommandInput {
 }
 
 export type V2CommandError = 'not_live' | 'no_commands' | 'rate_limited' | 'invalid_command' | 'command_refused';
+
+export type V2BanError = 'not_your_turn' | 'invalid_ban';
+
+export type V2BanResult = { ok: true } | { ok: false; code: V2BanError; message: string };
 
 export type V2CommandResult = { ok: true; left: number; tick: number } | { ok: false; code: V2CommandError; message: string };
 
@@ -187,6 +219,8 @@ export class V2Match {
   private planWhys: Record<Team, string | null> = { A: null, B: null };
   /** Each agent's latest inner voice (its THINK line), by agent id. */
   private thoughts = new Map<string, string>();
+  /** Each agent's skills on its latest turn and whether their triggers held, by agent id (own crew's mind panel). */
+  private skillsActive = new Map<string, FrameSkill[]>();
   /** Each crew's decision timeline for the debrief; set when the match goes live. */
   private timeline: DecisionTimeline | null = null;
   /** Holds still open (released on a void). */
@@ -194,6 +228,10 @@ export class V2Match {
   /** What each crew had held, kept for the debrief. */
   private heldFor: Partial<Record<Team, number>> = {};
   private lockBy = 0;
+  /** Draft mode: every ban step so far, the crew whose turn it is and when its step runs out. */
+  private readonly bans: V2DraftBan[] = [];
+  private draftTurn: Team | null = null;
+  private draftBy = 0;
   private readonly tally: DebriefTally;
   /** Every frame sent, per view, for replay once the match has ended. */
   private readonly frames: Record<FrameView, V2Frame[]> = { A: [], B: [], watch: [] };
@@ -224,7 +262,7 @@ export class V2Match {
     this.matchId = setup.matchId;
     this.timing = { ...DEFAULT_V2_TIMING, ...deps.timing };
     this.difficulty = setup.ranked ? RANKED_DIFFICULTY : (setup.difficulty ?? RANKED_DIFFICULTY);
-    this.crewLimit = crewLimitOf(setup.map);
+    this.crewLimit = Math.min(crewLimitOf(setup.map), setup.crewMax ?? 3);
     this.tally = new DebriefTally((id) => this.state?.agents.find((a) => a.id === id)?.team);
   }
 
@@ -250,18 +288,113 @@ export class V2Match {
     if (this.phase !== 'lockin' || this.locked.has(team)) return false;
     const side = this.setup.sides[team];
     if (roster) {
+      roster = this.withoutBans(team, roster);
       if (roster.crew.length < 1 || roster.crew.length > this.crewLimit) throw new Error(`crew ${team} must field 1 to ${this.crewLimit} agents`);
       side.crew = roster.crew;
       side.skills = roster.skills;
       side.bought = roster.bought ?? [];
       side.instructions = roster.instructions ?? [];
       side.skillKeys = roster.skillKeys ?? [];
+      side.skillMeta = roster.skillMeta ?? [];
     }
-    this.locked.set(team, side.crew.map((a, i) => (roster ? a.tier : (tiers[i] ?? a.tier))));
+    const forced = this.setup.talk;
+    this.locked.set(team, side.crew.map((a, i) => forced ?? (roster ? a.tier : (tiers[i] ?? a.tier))));
     if (roster) for (const t of TEAMS) this.deps.send(t, this.lockinMessage(t));
     this.toAll({ type: 'v2_locked', matchId: this.matchId, team });
     this.poke?.();
     return true;
+  }
+
+  /** Draft mode, the steps of the ban phase: DEFAULTS.draft.bansPerSide per crew, A first. */
+  get draftSteps(): number {
+    return this.setup.draft ? DEFAULTS.draft.bansPerSide * TEAMS.length : 0;
+  }
+
+  /**
+   * Draft mode: `team` bans one skill of the rival's crew (or passes, `skillId` null) on its own step.
+   * Only a skill in its pool (draftPool) may be banned.
+   */
+  ban(team: Team, skillId: string | null): V2BanResult {
+    if (this.phase !== 'draft' || this.draftTurn !== team) return { ok: false, code: 'not_your_turn', message: 'it is not your ban' };
+    let name: string | null = null;
+    if (skillId !== null) {
+      const pick = this.draftPool(team).find((s) => s.skillId === skillId);
+      if (!pick) return { ok: false, code: 'invalid_ban', message: 'that skill is not one the rival has equipped' };
+      name = pick.name;
+    }
+    this.bans.push({ team, step: this.bans.length, skillId, name });
+    this.draftTurn = null;
+    this.poke?.();
+    return { ok: true };
+  }
+
+  /** The rival's equipped skills `team` may still ban (ids and public names only, never prompts). */
+  draftPool(team: Team): V2DraftSkill[] {
+    const rival = this.setup.sides[other(team)];
+    const banned = this.bannedFor(other(team));
+    const out = new Map<string, V2DraftSkill>();
+    (rival.skillKeys ?? []).forEach((keys, i) => {
+      const seen = new Set<string>();
+      keys.forEach((k, j) => {
+        if (banned.has(k.id) || seen.has(k.id)) return;
+        seen.add(k.id);
+        const cur = out.get(k.id);
+        if (cur) cur.agents++;
+        else out.set(k.id, { skillId: k.id, name: rival.skillNames?.[i]?.[j] ?? k.id, agents: 1 });
+      });
+    });
+    return [...out.values()];
+  }
+
+  /** v2_draft for a crew: whose step it is, the time left, its pool and every ban so far. */
+  draftMessage(team: Team): V2ServerMessage {
+    return {
+      type: 'v2_draft',
+      matchId: this.matchId,
+      turn: this.draftTurn,
+      step: this.bans.length,
+      steps: this.draftSteps,
+      stepMs: this.draftTurn ? Math.max(0, this.draftBy - this.deps.scheduler.now()) : 0,
+      pool: this.draftPool(team),
+      bans: this.bans.map((b) => ({ ...b })),
+    };
+  }
+
+  /** The skill ids the rival banned from `team`'s crew. */
+  private bannedFor(team: Team): Set<string> {
+    return new Set(this.bans.filter((b) => b.team !== team && b.skillId !== null).map((b) => b.skillId!));
+  }
+
+  /** A roster for `team` with the skills its rival banned taken off every agent. */
+  private withoutBans<R extends V2Roster>(team: Team, r: R): R {
+    const banned = this.bannedFor(team);
+    if (!banned.size || !r.skillKeys) return r;
+    const keep = r.skillKeys.map((keys) => keys.map((k) => !banned.has(k.id)));
+    const pick = <T,>(rows: T[][]) => rows.map((row, i) => row.filter((_, j) => keep[i]?.[j] ?? true));
+    return { ...r, skills: pick(r.skills), skillKeys: pick(r.skillKeys), ...(r.skillNames ? { skillNames: pick(r.skillNames) } : {}), ...(r.skillMeta ? { skillMeta: pick(r.skillMeta) } : {}) };
+  }
+
+  /** The ban phase: each step waits for its crew's ban, or passes when it runs out (or the crew has nothing to ban). */
+  private async draft(): Promise<void> {
+    this.phase = 'draft';
+    for (let step = 0; step < this.draftSteps; step++) {
+      const turn = TEAMS[step % TEAMS.length]!;
+      if (!this.draftPool(turn).length) {
+        this.bans.push({ team: turn, step, skillId: null, name: null });
+        continue;
+      }
+      this.draftTurn = turn;
+      this.draftBy = this.deps.scheduler.now() + this.timing.draftStepMs;
+      for (const t of TEAMS) this.deps.send(t, this.draftMessage(t));
+      await this.waitFor(() => this.bans.length > step, this.timing.draftStepMs);
+      if (this.stopReason) return;
+      if (this.bans.length <= step) this.bans.push({ team: turn, step, skillId: null, name: null, timedOut: true });
+      this.draftTurn = null;
+    }
+    for (const t of TEAMS) Object.assign(this.setup.sides[t], this.withoutBans(t, this.setup.sides[t]));
+    for (const t of TEAMS) this.deps.send(t, this.draftMessage(t));
+    const done = this.bans.filter((b) => b.skillId).map((b) => `${b.team} banned ${b.skillId}`);
+    this.deps.log.info(`v2 match ${this.matchId}: draft over (${done.length ? done.join(', ') : 'no bans'})`);
   }
 
   /** v2_lockin for a crew: the time left, the rival's crew size and both head starts as the crews stand. */
@@ -291,6 +424,7 @@ export class V2Match {
       difficulty: this.difficulty,
       ...(setup.practice ? { practice: true as const, rivalHandle: setup.sides[team === 'A' ? 'B' : 'A'].handle } : {}),
       ...(setup.free?.[team] ? { free: true as const } : {}),
+      ...(setup.draft ? { draft: true as const } : {}),
       ...this.foundTiers(team),
     };
   }
@@ -362,7 +496,7 @@ export class V2Match {
   /** One crew's own numbers for v2_end. */
   debrief(team: Team, end: V2MatchEnd, fin: V2Finish): V2Debrief {
     const held = this.heldFor[team] ?? 0;
-    return buildDebrief({
+    const d = buildDebrief({
       state: this.state,
       team,
       difficulty: this.difficulty,
@@ -375,6 +509,7 @@ export class V2Match {
       ...(end.result && fin.season?.[team] ? { season: fin.season[team] } : {}),
       commands: this.commandLog[team],
     });
+    return this.setup.draft ? { ...d, draft: { bans: this.bans.map((b) => ({ ...b })) } } : d;
   }
 
   /** Commands a crew can still send. */
@@ -475,6 +610,11 @@ export class V2Match {
     if (this.stopReason) return this.voidMatch('aborted');
     if (this.declined) return this.voidMatch('declined', this.declined);
     if (this.accepted.size < 2) return this.voidMatch('accept_timeout', TEAMS.find((t) => !this.accepted.has(t)));
+
+    if (setup.draft) {
+      await this.draft();
+      if (this.stopReason) return this.voidMatch('aborted');
+    }
 
     this.phase = 'lockin';
     this.lockBy = this.deps.scheduler.now() + timing.lockMs;
@@ -589,10 +729,15 @@ export class V2Match {
     this.timeline?.observe(id, o);
     const canSpeak = maySpeak(a.tier, s.tick + 1, a.lastSpoke);
     const wait: Action = { type: 'wait' };
-    if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
     const side = this.setup.sides[a.team];
+    const skills = side.skills[a.slot] ?? [];
+    const meta = side.skillMeta?.[a.slot] ?? [];
+    const skillTriggers = skills.map((_, i) => meta[i]?.trigger ?? null);
+    const active = skillActivity(skillTriggers, o);
+    if (skills.length) this.skillsActive.set(id, skills.map((_, i) => ({ name: meta[i]?.name ?? `Skill ${i + 1}`, trigger: skillTriggers[i] ?? { kind: 'always' }, active: active[i]! })));
+    if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
     const command = this.orderFor(s, id, s.tick + 1);
-    const ctx = { skills: side.skills[a.slot] ?? [], instructions: side.instructions?.[a.slot] ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [], command };
+    const ctx = { skills, skillTriggers, instructions: side.instructions?.[a.slot] ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [], command };
     const sched = this.deps.scheduler;
     return new Promise((resolve) => {
       let settled = false;
@@ -621,11 +766,14 @@ export class V2Match {
     const s = this.state!;
     const lead = s.agents.find((a) => a.team === team && !a.out);
     if (!lead) return;
-    const skills = this.setup.sides[team].skills.flat();
+    const side = this.setup.sides[team];
+    const skills = side.skills.flat();
+    // The plan is written from the lead's view, so each skill joins it when its trigger holds there.
+    const skillTriggers = side.skills.flatMap((sk, slot) => sk.map((_, i) => side.skillMeta?.[slot]?.[i]?.trigger ?? null));
     const instructions = (this.setup.sides[team].instructions ?? []).filter((t): t is string => !!t).join('\n\n') || null;
     let timer: unknown;
     const late = new Promise<null>((r) => (timer = this.deps.scheduler.setTimeout(() => r(null), this.timing.planMs)));
-    const r = await Promise.race([this.deps.brains[team].plan(observe(s, lead.id), { skills, instructions }).catch(() => null), late]);
+    const r = await Promise.race([this.deps.brains[team].plan(observe(s, lead.id), { skills, skillTriggers, instructions }).catch(() => null), late]);
     this.deps.scheduler.clearTimeout(timer);
     if (r) {
       this.stats[team].costUsd += r.call?.costUsd ?? 0;
@@ -640,7 +788,7 @@ export class V2Match {
   private publish(ev: MatchEvent[]) {
     const s = this.state!;
     for (const t of TEAMS) {
-      let frame = withOwnCrew(frameFor(s, t, ev), s, t, ev, this.plans[t], this.setup.sides[t].bought ?? [], { why: this.planWhys[t], thoughts: this.thoughts });
+      let frame = withOwnCrew(frameFor(s, t, ev), s, t, ev, this.plans[t], this.setup.sides[t].bought ?? [], { why: this.planWhys[t], thoughts: this.thoughts, skills: this.skillsActive });
       // Its own live commands: the rival's frames and the watch view never carry them.
       frame = { ...frame, commands: { left: this.commandsLeft[t], log: this.commandLog[t].map((c) => ({ ...c, agents: [...c.agents] })) } };
       // Practice shows all minds (the prototype): the player also sees the bot's plan, reason and inner voice.
@@ -676,7 +824,8 @@ export class V2Match {
  * messages. The plan is one crew plan written with every equipped skill in its prompt, so when any
  * agent of the crew runs a bought skill the plan and its reason are withheld from the whole crew
  * (`planHidden`): a bought skill never leaks through plan text. An agent's inner voice comes from its
- * own prompt, so it is withheld when that agent runs a bought (or rented) skill.
+ * own prompt, so it is withheld when that agent runs a bought (or rented) skill. Each agent's skills
+ * show by name and trigger with whether the trigger held on its last turn (public metadata only).
  */
 export function withOwnCrew(
   frame: V2Frame,
@@ -685,14 +834,16 @@ export function withOwnCrew(
   ev: readonly MatchEvent[],
   plan: string | null,
   bought: readonly boolean[],
-  mind: { why?: string | null; thoughts?: ReadonlyMap<string, string> } = {},
+  mind: { why?: string | null; thoughts?: ReadonlyMap<string, string>; skills?: ReadonlyMap<string, FrameSkill[]> } = {},
 ): V2Frame {
   const hidden = bought.some(Boolean);
   const slotOf = (id: string) => s.agents.find((x) => x.id === id)?.slot ?? -1;
   const agents = frame.agents.map((a) => {
     if (a.team !== team) return a;
     const thought = bought[slotOf(a.id)] ? undefined : mind.thoughts?.get(a.id);
-    const own = thought ? { ...a, thought } : a;
+    // Skill names and triggers are public metadata, so they show even on a bought skill; never the prompt.
+    const skills = mind.skills?.get(a.id);
+    const own = { ...a, ...(thought ? { thought } : {}), ...(skills?.length ? { skills: skills.map((k) => ({ ...k })) } : {}) };
     if (hidden) return { ...own, planHidden: true };
     return plan ? { ...own, plan, ...(mind.why ? { planWhy: mind.why } : {}) } : own;
   });
@@ -728,5 +879,7 @@ export function withRivalMind(
   });
   return { ...frame, agents };
 }
+
+const other = (t: Team): Team => (t === 'A' ? 'B' : 'A');
 
 const header = (a: { id: string; name: string; role: string; vision: number; comms: number; tier: string }) => ({ id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier });

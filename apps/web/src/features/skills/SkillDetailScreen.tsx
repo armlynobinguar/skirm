@@ -45,6 +45,7 @@ import { StatusBadge, rarityOf, shortHash } from './parts';
 import { RoleTag, roleBlockReason } from './RoleTag';
 import s from './skills.module.css';
 import x from './exchange.module.css';
+import { triggerSentence } from './TriggerField';
 
 /** /market/[skillId]: the Exchange with the drawer open on this skill. */
 export function SkillDetailScreen({ skillId }: { skillId: string }) {
@@ -179,6 +180,10 @@ function DrawerView({ d, me, onClose }: { d: MarketDetail; me: Me | undefined; o
           <TagChip key={t} tag={t} />
         ))}
       </div>
+
+      <p className={x.blurb} data-testid="s10-trigger">
+        <b>When it plays</b> · {triggerSentence(sk.trigger)}
+      </p>
 
       {isCreator ? (
         <div className={x.hid} data-testid="s10-prompt-own">

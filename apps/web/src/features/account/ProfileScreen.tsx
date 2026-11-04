@@ -1,6 +1,5 @@
 'use client';
-// S16 Profile and settings (/account). Owner: account builder. Design: .design-src/screens/S16-Profile.dc.html
-// Spec: .design-src/docs/uiux.md (S16 row, Account states).
+// S16 Profile and settings (/account). Owner: account builder.
 //
 // Agents (role, talk tier, unlocks, skills), the account's rank (Elo, title, ranked record and ladder
 // place from GET /me `rank`), Settings (usePreferences: sound effects, replay speed, reduced motion,

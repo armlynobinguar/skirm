@@ -172,7 +172,7 @@ describe('S10 Skill detail', () => {
       }),
     });
     const btn = await screen.findByTestId('s10-equip-btn');
-    expect(screen.getAllByTestId('role-tag')[0]).toHaveTextContent('Runner');
+    expect(screen.getAllByTestId('role-tag').some((t) => t.textContent === 'Runner')).toBe(true);
     // Rook is a Builder: listed, but disabled; Wren (Runner) is picked.
     await waitFor(() => expect(btn).toHaveTextContent('Equip on Wren'));
     const rook = within(screen.getByTestId('s10-equip-agent')).getByRole('option', { name: /Rook/ });

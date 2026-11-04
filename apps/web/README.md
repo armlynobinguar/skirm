@@ -4,9 +4,6 @@ The skirm web app: Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tan
 REST data, one shared WebSocket for v2 matches (queue, accept, lock-in, live, spectate), and
 `@skirm/ui` for every component.
 
-Design sources: `.design-src/docs/uiux.md` (screens S01–S16, M01–M03, states, keyboard, copy),
-`.design-src/screens/*.dc.html` (artboards; `TopBar.dc.html` is the header),
-`.design-src/design-system/`. The docs say "Promptlings"; the product is **skirm** everywhere.
 Backend shapes: `src/lib/api/types.ts` (mirrors `apps/api/src/views.ts` and the controllers).
 
 ## Run it
