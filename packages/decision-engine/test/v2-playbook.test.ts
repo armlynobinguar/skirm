@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MAPS_V2, createMatch, observe, type AgentSpec } from '@skirm/engine/v2';
-import { PLAYBOOK_LINE_CHARS, PLAYBOOK_MAX_CHARS, createGreedyBrain, createHaikuBrain, playbookText, systemPrompt } from '../src/v2';
+import { PLAYBOOK_LINE_CHARS, PLAYBOOK_MAX_CHARS, createGreedyBrain, createModelBrain, playbookText, systemPrompt } from '../src/v2';
 
 const map = MAPS_V2.find((m) => m.id === 'copper-hollow')!;
 const spec = (id: string, role: AgentSpec['role']): AgentSpec => ({ id, name: id, role, vision: 3, comms: 3, tier: 'standard' });
@@ -34,11 +34,11 @@ describe('crew playbook prompts', () => {
 
   it('sends it to the planner whole and to the actor as a line, and drops speech that repeats it', async () => {
     const planFetch = fakeFetch('Wick hauls, Moss scouts.\nWHY: the playbook says so.');
-    await createHaikuBrain({ apiKey: 'k', fetch: planFetch }).plan(observe(match(), 'wick'), { skills: [], playbook: BOOK });
+    await createModelBrain({ apiKey: 'k', fetch: planFetch }).plan(observe(match(), 'wick'), { skills: [], playbook: BOOK });
     expect(systemOf(planFetch)).toContain(BOOK);
 
     const actFetch = fakeFetch('ACTION: 1\nSAY: team moss scouts and calls hazards on team now');
-    const d = await createHaikuBrain({ apiKey: 'k', fetch: actFetch }).act(observe(match(), 'wick'), { skills: [], playbook: BOOK, plan: null, canSpeak: true });
+    const d = await createModelBrain({ apiKey: 'k', fetch: actFetch }).act(observe(match(), 'wick'), { skills: [], playbook: BOOK, plan: null, canSpeak: true });
     expect(systemOf(actFetch)).toContain(playbookText(BOOK, true)!);
     expect(systemOf(actFetch)).not.toContain(BOOK);
     expect(d).toMatchObject({ say: null, refusedSay: 'leak' });
