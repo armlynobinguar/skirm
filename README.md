@@ -234,7 +234,7 @@ npm run smoke           # full stack in Docker: practice, ranked, credits, Elo, 
 cd contracts && cargo test
 ```
 
-CI runs typecheck, unit tests, the contract tests and the wasm build on every pull request and every push to `main`. More in [docs/development.md](docs/development.md).
+CI runs typecheck, unit tests, the contract tests and the wasm build on every push to `main`; pull requests are not checked in CI. More in [docs/development.md](docs/development.md).
 
 ## Documentation
 
