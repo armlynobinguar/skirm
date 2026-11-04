@@ -1,0 +1,87 @@
+/* Campaign (/campaign) and its strip on home. Tokens only; nothing scrolls the page sideways at 360 px. */
+
+.chapter, .brief, .strip {
+  background: var(--panel);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+  border-radius: var(--radius-3);
+  box-shadow: var(--elev-1);
+}
+
+.page { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+.head { display: flex; flex-direction: column; gap: var(--space-2); max-width: 760px; }
+.lede { margin: 0; font-size: 16px; line-height: 24px; color: var(--ink-muted); }
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- Chapters ---------- */
+.chapters { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.chapter { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.chapter[data-locked] { opacity: 0.6; }
+.chapterHead { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); }
+.chapterTitle { margin: 2px 0 0; font: 700 22px/28px var(--font-sans); }
+.blurb { margin: 4px 0 0; font-size: 15px; line-height: 22px; color: var(--ink-muted); }
+.state { flex: 0 0 auto; font: 600 14px/20px var(--font-mono); color: var(--ink-muted); }
+
+.missions { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: var(--space-3); }
+.mission {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  padding: var(--space-3);
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  border-radius: var(--radius-1, 2px);
+  cursor: pointer;
+  font: inherit;
+}
+.mission:disabled { cursor: not-allowed; color: var(--ink-muted); }
+.mission[aria-pressed='true'] { box-shadow: inset 0 0 0 2px var(--ink); }
+.mission[data-status='cleared'] .missionNo { color: var(--good); box-shadow: inset 0 0 0 1px var(--good); }
+.missionNo {
+  flex: 0 0 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font: 700 14px/1 var(--font-mono);
+}
+.missionText { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.missionTitle { font: 700 15px/22px var(--font-sans); }
+.missionMeta { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.missionState { flex: 0 0 auto; font: 600 12px/16px var(--font-mono); color: var(--ink-muted); }
+
+.reward { display: flex; flex-direction: column; gap: 2px; padding-top: var(--space-3); border-top: 1px solid var(--line-strong); }
+.reward[data-granted] .rewardName { color: var(--good); }
+.rewardName { font: 700 16px/22px var(--font-sans); }
+.rewardKind { font: 500 12px/16px var(--font-mono); color: var(--ink-muted); }
+.rewardSummary { font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+.rewardLink { font: 700 13px/18px var(--font-sans); min-height: 44px; display: inline-flex; align-items: center; }
+
+/* ---------- Briefing ---------- */
+.brief { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; position: sticky; top: var(--space-4); }
+.briefTitle { margin: 0; font: 700 24px/30px var(--font-sans); }
+.briefBody { margin: 0; font-size: 16px; line-height: 24px; }
+.facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; font-size: 15px; line-height: 22px; }
+.facts dt { color: var(--ink-muted); }
+.facts dd { margin: 0; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+
+/* ---------- Home strip ---------- */
+.strip { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; padding: var(--space-3) var(--space-5); max-width: 560px; min-width: 0; }
+.stripText { display: flex; flex-direction: column; min-width: 0; flex: 1 1 220px; }
+.stripTitle { margin: 2px 0 0; font: 700 17px/24px var(--font-sans); }
+.stripSub { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.stripGo { flex: 0 0 auto; font: 700 13px/18px var(--font-sans); min-height: 44px; display: inline-flex; align-items: center; }

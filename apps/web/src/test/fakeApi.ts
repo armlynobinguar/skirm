@@ -91,6 +91,8 @@ const METHODS: (keyof ApiClient)[] = [
   'rotateExternalAgent',
   'pingExternalAgent',
   'deleteExternalAgent',
+  'campaign',
+  'startMission',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {

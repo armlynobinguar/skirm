@@ -94,7 +94,12 @@ export type V2ClientMessage =
    * `draft: true` queues draft mode (casual only, `draft_casual`): draft searches pair only with
    * draft searches, and after accept each crew bans a rival skill in turn (v2_draft / v2_ban).
    */
-  | { type: 'v2_queue'; crew: V2CrewEntry[]; ranked: boolean; mapId?: string; difficulty?: Difficulty; opponent?: V2Opponent; draft?: boolean }
+  /**
+   * `mission` (with `opponent: 'bot'` only) plays a campaign mission (@skirm/shared CAMPAIGN_CHAPTERS):
+   * its map and difficulty win over `mapId` and `difficulty`, the crew is at most its crew size, and
+   * a mission not yet unlocked is refused with mission_locked. The result is recorded when it ends.
+   */
+  | { type: 'v2_queue'; crew: V2CrewEntry[]; ranked: boolean; mapId?: string; difficulty?: Difficulty; opponent?: V2Opponent; draft?: boolean; mission?: string }
   | { type: 'v2_cancel_queue' }
   | { type: 'v2_watch'; matchId: string }
   | { type: 'v2_unwatch'; matchId: string }

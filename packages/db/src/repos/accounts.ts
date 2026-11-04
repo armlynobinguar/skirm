@@ -7,6 +7,8 @@ import { newId } from '../ids';
 import {
   accounts,
   agentSkills,
+  campaignProgress,
+  campaignRewards,
   agents,
   cosmeticsOwned,
   eloDecays,
@@ -152,6 +154,10 @@ export class AccountsRepo {
       return { ...m, debriefs: m.debriefs?.[side] ? { [side]: m.debriefs[side] } : null };
     });
     const messages = agentIds.length ? await this.db.select().from(matchMessages).where(inArray(matchMessages.agentId, agentIds)) : [];
+    const [campaign, campaignRewardRows] = await Promise.all([
+      this.db.select().from(campaignProgress).where(eq(campaignProgress.accountId, accountId)),
+      this.db.select().from(campaignRewards).where(eq(campaignRewards.accountId, accountId)),
+    ]);
     return {
       account: [account],
       agents: myAgents,
@@ -175,6 +181,8 @@ export class AccountsRepo {
       eloDecays: decays,
       skillBenchRuns: benchRuns,
       playbooks: playbookRows,
+      campaign,
+      campaignRewards: campaignRewardRows,
     };
   }
 

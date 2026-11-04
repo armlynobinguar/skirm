@@ -1,7 +1,7 @@
 // WebSocket protocol on /ws (docs/backend-contract.md, WebSocket). Every client message is checked
 // here before the hub acts on it; anything else gets `{type:'error', code, message}`.
 import { isCommandPreset, isDifficulty } from '@skirm/engine/v2';
-import { DEFAULTS } from '@skirm/shared';
+import { DEFAULTS, campaignMission } from '@skirm/shared';
 import {
   isV2Opponent,
   type V2ClientMessage,
@@ -36,6 +36,7 @@ export type ErrorCode =
   | 'practice_unranked'
   | 'external_unranked'
   | 'draft_casual'
+  | 'mission_locked'
   | 'not_your_turn'
   | 'invalid_ban'
   | 'agent_busy'
@@ -149,8 +150,8 @@ export function parseClientMessage(raw: unknown): ParseResult {
       return { ok: true, msg };
     }
     case 'v2_queue': {
-      if (extraKeys(v, ['type', 'crew', 'ranked', 'mapId', 'difficulty', 'opponent', 'draft']))
-        return bad('v2_queue takes {crew, ranked, mapId?, difficulty?, opponent?, draft?}');
+      if (extraKeys(v, ['type', 'crew', 'ranked', 'mapId', 'difficulty', 'opponent', 'draft', 'mission']))
+        return bad('v2_queue takes {crew, ranked, mapId?, difficulty?, opponent?, draft?, mission?}');
       if (typeof v.ranked !== 'boolean') return bad('v2_queue.ranked must be a boolean');
       const practice = v.opponent !== undefined && v.opponent !== null;
       if (practice && !isV2Opponent(v.opponent)) return bad("v2_queue.opponent must be 'bot'");
@@ -168,6 +169,11 @@ export function parseClientMessage(raw: unknown): ParseResult {
       if (v.difficulty !== undefined && v.difficulty !== null) {
         if (!isDifficulty(v.difficulty)) return bad('v2_queue.difficulty must be easy, normal, hard, agentic or mega');
         msg.difficulty = v.difficulty;
+      }
+      if (v.mission !== undefined && v.mission !== null) {
+        if (typeof v.mission !== 'string' || !campaignMission(v.mission)) return bad('v2_queue.mission must be a campaign mission id');
+        if (!practice) return bad("v2_queue.mission plays against the bot (opponent 'bot')");
+        msg.mission = v.mission;
       }
       if (practice) msg.opponent = 'bot';
       if (draft) msg.draft = true;
