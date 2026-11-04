@@ -1,5 +1,5 @@
 {
-  "id": "b25e6c9b-62b9-4d71-8e23-b5524798e3f6",
+  "id": "40b55336-09a5-4b34-8765-63f97b3cb0eb",
   "prevId": "065a4e45-700b-4022-832c-0879082941c8",
   "version": "7",
   "dialect": "postgresql",
@@ -162,96 +162,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.achievements_unlocked": {
-      "name": "achievements_unlocked",
-      "schema": "",
-      "columns": {
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "achievement_id": {
-          "name": "achievement_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "badge_status": {
-          "name": "badge_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "badge_token_id": {
-          "name": "badge_token_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "badge_tx": {
-          "name": "badge_tx",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "badge_owner": {
-          "name": "badge_owner",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "badge_at": {
-          "name": "badge_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "achievements_unlocked_account_id_accounts_id_fk": {
-          "name": "achievements_unlocked_account_id_accounts_id_fk",
-          "tableFrom": "achievements_unlocked",
-          "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "achievements_unlocked_account_id_achievement_id_pk": {
-          "name": "achievements_unlocked_account_id_achievement_id_pk",
-          "columns": [
-            "account_id",
-            "achievement_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "achievements_badge_status_ck": {
-          "name": "achievements_badge_status_ck",
-          "value": "\"achievements_unlocked\".\"badge_status\" in ('none', 'pending', 'minted', 'local', 'failed')"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.agent_skills": {
@@ -2220,90 +2130,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.quest_claims": {
-      "name": "quest_claims",
-      "schema": "",
-      "columns": {
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quest_id": {
-          "name": "quest_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period": {
-          "name": "period",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period_key": {
-          "name": "period_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reward_credits": {
-          "name": "reward_credits",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "credited": {
-          "name": "credited",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "quest_claims_account_id_accounts_id_fk": {
-          "name": "quest_claims_account_id_accounts_id_fk",
-          "tableFrom": "quest_claims",
-          "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "quest_claims_account_id_quest_id_period_key_pk": {
-          "name": "quest_claims_account_id_quest_id_period_key_pk",
-          "columns": [
-            "account_id",
-            "quest_id",
-            "period_key"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "quest_claims_period_ck": {
-          "name": "quest_claims_period_ck",
-          "value": "\"quest_claims\".\"period\" in ('daily', 'weekly')"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.rental_offers": {
       "name": "rental_offers",
       "schema": "",
@@ -3329,6 +3155,192 @@
         "seasons_window_ck": {
           "name": "seasons_window_ck",
           "value": "\"seasons\".\"ends_at\" > \"seasons\".\"starts_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.skill_bench_runs": {
+      "name": "skill_bench_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "skill_id": {
+          "name": "skill_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "map_id": {
+          "name": "map_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "difficulty": {
+          "name": "difficulty",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prompt_sha256": {
+          "name": "prompt_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ciphertext": {
+          "name": "ciphertext",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "iv": {
+          "name": "iv",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auth_tag": {
+          "name": "auth_tag",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wrapped_key": {
+          "name": "wrapped_key",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "key_id": {
+          "name": "key_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "brain": {
+          "name": "brain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "credits": {
+          "name": "credits",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "result": {
+          "name": "result",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "skill_bench_runs_account_idx": {
+          "name": "skill_bench_runs_account_idx",
+          "columns": [
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "skill_bench_runs_account_id_accounts_id_fk": {
+          "name": "skill_bench_runs_account_id_accounts_id_fk",
+          "tableFrom": "skill_bench_runs",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "skill_bench_runs_skill_id_version_skill_versions_skill_id_version_fk": {
+          "name": "skill_bench_runs_skill_id_version_skill_versions_skill_id_version_fk",
+          "tableFrom": "skill_bench_runs",
+          "tableTo": "skill_versions",
+          "columnsFrom": [
+            "skill_id",
+            "version"
+          ],
+          "columnsTo": [
+            "skill_id",
+            "version"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "skill_bench_runs_status_ck": {
+          "name": "skill_bench_runs_status_ck",
+          "value": "\"skill_bench_runs\".\"status\" in ('queued', 'running', 'done', 'failed', 'insufficient_credits')"
         }
       },
       "isRLSEnabled": false

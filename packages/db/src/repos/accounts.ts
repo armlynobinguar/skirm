@@ -24,6 +24,7 @@ import {
   sales,
   seasonStandings,
   skillOwnership,
+  skillBenchRuns,
   skillTrials,
   skillVersions,
   skills,
@@ -118,7 +119,7 @@ export class AccountsRepo {
     const agentIds = myAgents.map((a) => a.id);
     const [
       agentSkillRows, unlockRows, skillRows, ownership, listingRows, saleRows, offers, rentalRows,
-      ledger, ledgerRowsOut, matches, standings, payouts, trials, cosmetics, onboarding, decays, playbookRows,
+      ledger, ledgerRowsOut, matches, standings, payouts, trials, cosmetics, onboarding, decays, benchRuns, playbookRows,
     ] = await Promise.all([
       this.db.select().from(agentSkills).where(agentIds.length ? inArray(agentSkills.agentId, agentIds) : sql`false`),
       this.db.select().from(unlockItems).where(eq(unlockItems.ownerId, accountId)),
@@ -140,6 +141,11 @@ export class AccountsRepo {
       this.db.select().from(cosmeticsOwned).where(eq(cosmeticsOwned.accountId, accountId)),
       this.db.select().from(onboardingProgress).where(eq(onboardingProgress.accountId, accountId)),
       this.db.select().from(eloDecays).where(eq(eloDecays.accountId, accountId)),
+      // Bench runs, without their sealed prompt drafts (ciphertext is no use to the player).
+      this.db
+        .select({ id: skillBenchRuns.id, skillId: skillBenchRuns.skillId, version: skillBenchRuns.version, mapId: skillBenchRuns.mapId, difficulty: skillBenchRuns.difficulty, status: skillBenchRuns.status, brain: skillBenchRuns.brain, credits: skillBenchRuns.credits, result: skillBenchRuns.result, createdAt: skillBenchRuns.createdAt, finishedAt: skillBenchRuns.finishedAt })
+        .from(skillBenchRuns)
+        .where(eq(skillBenchRuns.accountId, accountId)),
       this.db.select().from(playbooks).where(eq(playbooks.ownerId, accountId)),
     ]);
     // A match's debriefs hold both crews' private numbers: keep only the player's own side.
@@ -173,6 +179,7 @@ export class AccountsRepo {
       achievements,
       onboarding,
       eloDecays: decays,
+      skillBenchRuns: benchRuns,
       playbooks: playbookRows,
     };
   }

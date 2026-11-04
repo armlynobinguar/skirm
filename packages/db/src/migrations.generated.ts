@@ -257,8 +257,20 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     ]
   },
   {
-    "tag": "0012_quests_achievements",
-    "folderMillis": 1793798956631,
+    "tag": "0012_skill_bench",
+    "folderMillis": 1793799819457,
+    "bps": true,
+    "hash": "dcc5cf5916644d49fd5b5dc36cff5899811f6914aabfaecd14498b52e084f56d",
+    "sql": [
+      "CREATE TABLE \"skill_bench_runs\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"skill_id\" text NOT NULL,\n\t\"version\" integer NOT NULL,\n\t\"map_id\" text NOT NULL,\n\t\"difficulty\" text NOT NULL,\n\t\"prompt_sha256\" text,\n\t\"ciphertext\" \"bytea\",\n\t\"iv\" \"bytea\",\n\t\"auth_tag\" \"bytea\",\n\t\"wrapped_key\" \"bytea\",\n\t\"key_id\" text,\n\t\"status\" text DEFAULT 'queued' NOT NULL,\n\t\"brain\" text,\n\t\"credits\" integer DEFAULT 0 NOT NULL,\n\t\"result\" jsonb,\n\t\"error\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"finished_at\" timestamp with time zone,\n\tCONSTRAINT \"skill_bench_runs_status_ck\" CHECK (\"skill_bench_runs\".\"status\" in ('queued', 'running', 'done', 'failed', 'insufficient_credits'))\n);\n",
+      "\nALTER TABLE \"skill_bench_runs\" ADD CONSTRAINT \"skill_bench_runs_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"skill_bench_runs\" ADD CONSTRAINT \"skill_bench_runs_skill_id_version_skill_versions_skill_id_version_fk\" FOREIGN KEY (\"skill_id\",\"version\") REFERENCES \"public\".\"skill_versions\"(\"skill_id\",\"version\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"skill_bench_runs_account_idx\" ON \"skill_bench_runs\" USING btree (\"account_id\",\"created_at\");"
+    ]
+  },
+  {
+    "tag": "0013_quests_achievements",
+    "folderMillis": 1793808491502,
     "bps": true,
     "hash": "593479cdbca45782b2d776a3f5c3b4ff29257350a41aadcdf96e060beee9f1cd",
     "sql": [

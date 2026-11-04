@@ -41,6 +41,7 @@ The single reference for `apps/api`, `apps/worker`, `apps/realtime` and `apps/we
 | `OPS_TOKEN` | unset | api: bearer token (≥ 32 characters) for `GET /ops/stats` and `GET /ops/talk-rates`; unset turns the route off (404) |
 | `SEED_OFFICIAL_SKILLS` | on | worker: `0` skips the official skills seed at boot |
 | `RANKED_DECAY_DAYS` / `RANKED_DECAY_AMOUNT` | `14` / `25` (`DEFAULTS.ranked.decay`) | worker, api: days without a ranked match before an inactive Diamond+ player loses `amount` Elo (again every `days`); `0` turns decay off. Not part of `loadConfig()`: `rankedDecayFromEnv` in `@skirm/shared` |
+| `BENCH_RUNS_PER_HOUR` | `20` (`DEFAULTS.bench.runsPerHour`) | api: test-bench runs per account per rolling hour |
 
 ## New account defaults
 
@@ -141,6 +142,16 @@ The web page `/replays/<shareId>` sets Open Graph metadata and a generated previ
 | POST | `/market/:skillId/listing` | `{ priceYocto, txHash?, version? }` | the listing, with `split: {primary, feeYocto, royaltyYocto, sellerYocto}` (no royalty on a primary sale). `422 not_minted` |
 | POST | `/market/:skillId/purchase` | `{ txHash, version? }` | `{ owned: true, sale }` once the NEAR owner is the buyer (dev mode: `dev:<yocto>[:<nonce>]`). `409 not_listed`, `own_listing`, `duplicate_tx`; `422 underpaid`, `purchase_unverified`, `near_account_required`. A bought skill grants use, never its text; a sold skill is unequipped from the seller's agents |
 
+### Skill test bench
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| GET | `/bench` | | `{ brain: 'greedy'\|'model', free, costCredits, limit: {perHour, used, left} }`. Free on the greedy brain; with a model a run holds one Standard agent (30) |
+| POST | `/bench/runs` | `{ skillId, version?, mapId, difficulty, prompt? (≤ 1200), reflexes? (≤ 400) }` | `202 BenchRun`: one headless match of a draft the caller wrote or a version they hold, against the greedy bot, queued as `benchmarks` `{ kind: 'bench', runId }`. `prompt` plays an edited draft (sealed on the run like a version; the writer's own skills only, else 403). `429 bench_limit` past `BENCH_RUNS_PER_HOUR` (details `limit`, `used`, `retryAt`), `503 queue_unavailable` |
+| GET | `/bench/runs` | `?skillId=` | the caller's runs, newest first: `{ id, skillId, version, skillName, mapId, difficulty, seed, status: queued\|running\|done\|failed\|insufficient_credits, brain, credits, edited, promptSha256, result, shortfall, error, createdAt, finishedAt }`. `result` once done: `{ seed, outcome, reason, decidedBy, score: {you, bot}, ticks, logHash, talk, calls, events[] (≤ 80, no speech text), debrief (crewReport) }` |
+| GET | `/bench/runs/:id` | | one of the caller's runs plus `{ prompt, reflexes, promptHidden }`: the text that played, only when it is the caller's own (a draft they typed or a version they wrote). 404 for another player's run |
+| GET | `/bench/compare` | `?a=&b=` | `{ a, b, prompt }`: two of the caller's runs and a word diff of their prompts (`{ hidden: false, same, diff: {op: same\|del\|add, text}[] }`, or `{ hidden: true }` when either text is not theirs) |
+
 ### Crew playbooks
 
 A player's crew-level strategy (who hauls, who scouts and calls hazards, who blocks; when to regroup; the goal or denying the rival), separate from any agent's skills. Sealed in the vault like a skill prompt (its own AAD); only the owner reads it back. Limits in `DEFAULTS.playbooks`: text ≤ 800 characters, name ≤ 32, at most 5 kept. Realtime puts the one selected (or picked at lock-in) into the crew planner's prompt whole and each actor's as one line (≤ 160), adds it to the speech filter's secrets, and names it (never the text) on the player's own frames (`V2Frame.playbook`); the rival, spectators, the match log and shared replays never see it. The greedy brain ignores it.
@@ -235,7 +246,7 @@ Besides `bad_request` (400), `unauthenticated` / `no_session` / `invalid_agent_t
 | 403 | `dev_disabled`, `cosmetic_not_owned` |
 | 409 | `agent_busy`, `agent_bound`, `external_limit`, `stale_turn`, `too_late`, `already_answered`, `match_live`, `not_ended`, `replay_expired`, `share_limit`, `mint_in_progress`, `quest_incomplete`, `already_claimed`, `allowance_full`, `not_unlocked`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch`, `own_lobby`, `lobby_full`, `lobby_closed`, `lobby_ready`, `tournament_match`, `tournament_full`, `not_open` |
 | 422 | `bad_clip`, `invalid_webhook`, `invalid_action`, `near_account_required`, `near_proof_required`, `near_proof_invalid`, `not_minted`, `invalid_hash`, `underpaid`, `purchase_unverified` |
-| 429 | `trial_limit` |
+| 429 | `trial_limit`, `bench_limit` |
 | 502 | `mint_failed` |
 | 503 | `relay_unavailable`, `queue_unavailable`, `rpc_unavailable`, `near_unavailable`, `ownership_unavailable` |
 
@@ -294,7 +305,7 @@ WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthe
 | Queue | Job data | Consumer (worker) |
 | --- | --- | --- |
 | `registry` | `{ kind: 'v2_match', id, seasonId? }` | `record_match` on the registry contract as a `MatchRecordV2` with per-player Elo and the season number, then the row's registry status and tx; retried 10 times |
-| `benchmarks` | `{ kind: 'mint', skillId, version }` or `{ kind: 'trial', trialId }` | the hidden gauntlet of a minted version, or one buyer's trial, on the headless match runner (`playHeadless`) against the greedy bot (below) |
+| `benchmarks` | `{ kind: 'mint', skillId, version }`, `{ kind: 'trial', trialId }` or `{ kind: 'bench', runId }` | the hidden gauntlet of a minted version, one buyer's trial, or one writer's test-bench run (held and charged on the ledger as `bench-<runId>-<attempt>` with a model brain, free on greedy), on the headless match runner (`playHeadless`) against the greedy bot (below) |
 | `seasons` | `{ kind: 'tick' }`, repeatable every 10 min | opens the current season, locks ended ones, writes payouts, posts the top 10 to the seasons contract |
 | `tournaments` | `{ kind: 'tick' }`, repeatable every minute | settles lobbies whose match ended without realtime settling them; decides bracket matches nobody started within 15 minutes |
 | `ranked` | `{ kind: 'decay' }`, repeatable every hour | the Elo decay pass (ranked tiers above); safe to repeat, a player decays at most once per period |
