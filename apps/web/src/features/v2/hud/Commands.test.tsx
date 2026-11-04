@@ -181,6 +181,9 @@ describe('live commands: the panel', () => {
       }),
     );
     const panel = screen.getByTestId('v2-commands');
+    // Collapsed until opened, so it never covers the map.
+    expect(screen.queryByTestId('v2-command-target')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('v2-commands-toggle'));
     expect(screen.getByTestId('v2-commands-left')).toHaveAccessibleName('3 of 3 commands left');
     expect(panel).toHaveTextContent('Ready');
 
@@ -254,6 +257,7 @@ describe('live commands: the panel', () => {
       }),
     );
     expect(screen.getByTestId('v2-commands')).toHaveTextContent('No commands left');
+    act(() => screen.getByTestId('v2-commands-toggle').click());
     expect(screen.getByTestId('v2-command-hold_gate')).toBeDisabled();
   });
 
