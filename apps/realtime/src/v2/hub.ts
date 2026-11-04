@@ -46,6 +46,8 @@ export interface V2Search {
   mapId?: string;
   /** Ranked: always RANKED_DIFFICULTY. */
   difficulty: Difficulty;
+  /** The player's Elo and ranked matches as they queued (their tier on v2_found). */
+  rank?: { elo: number; rankedMatches: number };
 }
 
 /** Casual pick: a map (or any) and a difficulty. */
@@ -151,7 +153,14 @@ export class V2Hub {
     if (!this.fitting(crew.length).length) throw new V2HubError('invalid_crew', 'no map takes a crew this size');
     const account = await this.deps.repos.accounts.get(user.accountId);
     check();
-    const payload: V2Search = { ...user, crew, ranked, difficulty, ...(mapId !== undefined ? { mapId } : {}) };
+    const payload: V2Search = {
+      ...user,
+      crew,
+      ranked,
+      difficulty,
+      ...(mapId !== undefined ? { mapId } : {}),
+      ...(account ? { rank: { elo: account.elo, rankedMatches: account.rankedMatches } } : {}),
+    };
     const pool = v2Pool(payload);
     this.matchmaker.add({ key: user.accountId, lane: lane(ranked), ...(pool ? { pool } : {}), rating: account?.elo ?? 1200, payload });
   }
@@ -363,8 +372,8 @@ export class V2Hub {
     void p.finally(() => this.running.delete(p));
   }
 
-  private async side(s: Pick<V2Search, 'accountId' | 'handle' | 'crew'>): Promise<V2Side> {
-    return { accountId: s.accountId, handle: s.handle, ...(await this.roster(s.accountId, s.crew)) };
+  private async side(s: Pick<V2Search, 'accountId' | 'handle' | 'crew' | 'rank'>): Promise<V2Side> {
+    return { accountId: s.accountId, handle: s.handle, ...(s.rank ? { rank: s.rank } : {}), ...(await this.roster(s.accountId, s.crew)) };
   }
 
   /**

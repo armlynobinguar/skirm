@@ -46,6 +46,8 @@ const METHODS: (keyof ApiClient)[] = [
   'credits',
   'deposit',
   'playerLadder',
+  'mapLadder',
+  'skillLadder',
   'v2Match',
   'v2LiveMatches',
   'onboarding',

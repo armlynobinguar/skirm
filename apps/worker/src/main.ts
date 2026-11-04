@@ -1,6 +1,6 @@
 // skirm worker: BullMQ consumers for `registry` (record_match for ranked v2 matches), `benchmarks`
-// (skill benchmarks and trials) and `seasons` (the season tick). Config from env (@skirm/server
-// loadConfig); NoopRegistry and NoopSeasons when NEAR_OPS_* are unset.
+// (skill benchmarks and trials), `seasons` (the season tick) and `ranked` (the Elo decay pass).
+// Config from env (@skirm/server loadConfig); NoopRegistry and NoopSeasons when NEAR_OPS_* are unset.
 import { ConfigError, installCrashReporting, loadConfig } from '@skirm/server';
 import { errorCode, jsonLogger } from './deps';
 import { startWorkerApp } from './app';

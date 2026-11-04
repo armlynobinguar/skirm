@@ -398,7 +398,7 @@ checks "$TMP/pvp-match.json" "(() => {
 # Each player's own Elo and season row: win 25 points, draw 12, loss 5 (SEASON.points).
 for u in "$PVP_A" "$PVP_B"; do
   if [[ "$u" == "$PVP_A" ]]; then team="$TEAM_A"; else team="$([[ "$TEAM_A" == A ]] && echo B || echo A)"; fi
-  if [[ "$WINNER" == draw ]]; then elo=1200 points=12; elif [[ "$WINNER" == "$team" ]]; then elo=1216 points=25; else elo=1184 points=5; fi
+  if [[ "$WINNER" == draw ]]; then elo=1200 points=12; elif [[ "$WINNER" == "$team" ]]; then elo=1224 points=25; else elo=1176 points=5; fi
   req GET /me '' "$u"
   checks "$TMP/body" "(() => {
     const r = o.rank || {};

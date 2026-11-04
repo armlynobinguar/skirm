@@ -29,6 +29,13 @@
       "when": 1793764247015,
       "tag": "0003_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793771758405,
+      "tag": "0004_ranked_tiers",
+      "breakpoints": true
     }
   ]
 }
