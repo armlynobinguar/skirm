@@ -1,0 +1,34 @@
+/* Private lobbies and tournaments. Values are design tokens; cards come from pvp.module.css. */
+
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: var(--space-3); }
+.field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.rowEnd { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: flex-end; }
+.check { display: inline-flex; gap: var(--space-2); align-items: center; font-size: 15px; }
+
+.code { font: 800 32px/36px var(--font-mono); letter-spacing: 0.2em; }
+.link { font: 500 13px/18px var(--font-mono); color: var(--ink-muted); word-break: break-all; }
+
+.players { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: var(--space-3); }
+.player { border: 1px solid var(--line-strong); border-radius: var(--radius-2); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.player[data-ready='true'] { border-color: var(--good); background: var(--good-soft); }
+.muted { color: var(--ink-muted); }
+
+.tiers { display: flex; flex-direction: column; gap: var(--space-2); }
+.tierRow { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; justify-content: space-between; }
+
+.list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.item { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); }
+
+/* Bracket: one column per round, scrolling sideways on phones. */
+.bracket { display: flex; gap: var(--space-4); overflow-x: auto; padding-bottom: var(--space-2); }
+.round { flex: 0 0 220px; display: flex; flex-direction: column; gap: var(--space-3); justify-content: space-around; }
+.roundName { font: 700 13px/18px var(--font-sans); text-transform: uppercase; color: var(--ink-muted); }
+.match { border: 1px solid var(--line-strong); border-radius: var(--radius-2); display: flex; flex-direction: column; min-width: 0; }
+.match[data-mine='true'] { border: 2px solid var(--chalk); }
+.slot { display: flex; justify-content: space-between; gap: var(--space-2); padding: 6px var(--space-3); font-size: 14px; min-width: 0; }
+.slot + .slot { border-top: 1px solid var(--line); }
+.slot[data-won='true'] { font-weight: 800; background: var(--good-soft); }
+.slot[data-lost='true'] { color: var(--ink-muted); text-decoration: line-through; }
+.seed { font: 500 11px/18px var(--font-mono); color: var(--ink-muted); }
+.matchFoot { padding: 4px var(--space-3); font: 500 11px/16px var(--font-mono); color: var(--ink-muted); border-top: 1px solid var(--line); }

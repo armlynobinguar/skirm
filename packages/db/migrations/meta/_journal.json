@@ -22,6 +22,13 @@
       "when": 1793668430088,
       "tag": "0002_account_deletion",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793770580665,
+      "tag": "0003_lobbies_tournaments",
+      "breakpoints": true
     }
   ]
 }

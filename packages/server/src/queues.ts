@@ -17,10 +17,13 @@ export const QUEUE_REGISTRY = 'registry' as const;
 export const QUEUE_BENCHMARKS = 'benchmarks' as const;
 /** Season upkeep: lock ended seasons, write payouts, open the next one. */
 export const QUEUE_SEASONS = 'seasons' as const;
+/** Tournament upkeep: settle lobbies whose match ended unsettled, decide bracket no-shows. */
+export const QUEUE_TOURNAMENTS = 'tournaments' as const;
 export const QUEUE_NAMES = {
   registry: QUEUE_REGISTRY,
   benchmarks: QUEUE_BENCHMARKS,
   seasons: QUEUE_SEASONS,
+  tournaments: QUEUE_TOURNAMENTS,
 } as const;
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
@@ -43,10 +46,16 @@ export interface SeasonJobData {
   kind: 'tick';
 }
 
+/** `tournaments` queue: one repeatable tick. */
+export interface TournamentJobData {
+  kind: 'tick';
+}
+
 export interface JobDataByQueue {
   registry: RegistryJobData;
   benchmarks: BenchmarkJobData;
   seasons: SeasonJobData;
+  tournaments: TournamentJobData;
 }
 
 /** Every queue retries: registry writes, benchmarks and the season tick. */
@@ -69,6 +78,11 @@ export const DEFAULT_JOB_OPTIONS: Record<QueueName, JobsOptions> = {
     removeOnComplete: 100,
     removeOnFail: 1000,
   },
+  tournaments: {
+    attempts: 1,
+    removeOnComplete: 100,
+    removeOnFail: 1000,
+  },
 };
 
 /** Stable job ids: one job per registry record / per benchmark or trial. */
@@ -78,6 +92,9 @@ export const benchmarkJobId = (d: BenchmarkJobData) =>
 /** The season tick's job scheduler id: one schedule however many workers start it. */
 export const SEASON_TICK_JOB_ID = 'season-tick';
 export const SEASON_TICK_EVERY_MS = 10 * 60_000;
+/** The tournament tick's job scheduler id, and how often it runs. */
+export const TOURNAMENT_TICK_JOB_ID = 'tournament-tick';
+export const TOURNAMENT_TICK_EVERY_MS = 60_000;
 
 // ---------- WebSocket (apps/realtime, path /ws) ----------
 
@@ -119,7 +136,7 @@ export function createWorker<Q extends QueueName, R = unknown>(
   opts: Omit<WorkerOptions, 'connection'> = {},
 ): Worker<JobDataByQueue[Q], R> {
   return new Worker<JobDataByQueue[Q], R>(name, processor, {
-    concurrency: name === 'seasons' ? 1 : 4,
+    concurrency: name === 'seasons' || name === 'tournaments' ? 1 : 4,
     ...opts,
     connection,
   });
@@ -148,6 +165,18 @@ export async function scheduleSeasonTick(
 ): Promise<void> {
   await queue.upsertJobScheduler(
     SEASON_TICK_JOB_ID,
+    { every: everyMs },
+    { name: 'tick', data: { kind: 'tick' } },
+  );
+}
+
+/** Schedules the tournament tick every TOURNAMENT_TICK_EVERY_MS (an upsert: one schedule per queue). */
+export async function scheduleTournamentTick(
+  queue: Queue<TournamentJobData>,
+  everyMs: number = TOURNAMENT_TICK_EVERY_MS,
+): Promise<void> {
+  await queue.upsertJobScheduler(
+    TOURNAMENT_TICK_JOB_ID,
     { every: everyMs },
     { name: 'tick', data: { kind: 'tick' } },
   );

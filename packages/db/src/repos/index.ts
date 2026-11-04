@@ -4,6 +4,7 @@ import { AgentsRepo } from './agents';
 import { CosmeticsRepo } from './cosmetics';
 import { LeaderboardsRepo } from './leaderboards';
 import { LedgerRepo, type LedgerRepoOptions } from './ledger';
+import { LobbiesRepo } from './lobbies';
 import { MarketRepo } from './market';
 import { MatchMessagesRepo } from './match-messages';
 import { OpsRepo } from './ops';
@@ -11,6 +12,7 @@ import { ProofRepo } from './proof';
 import { RentalsRepo } from './rentals';
 import { SeasonsRepo } from './seasons';
 import { SkillsRepo } from './skills';
+import { TournamentsRepo } from './tournaments';
 import { tx, type Clock } from './util';
 import { V2MatchesRepo } from './v2-matches';
 
@@ -35,6 +37,10 @@ export interface Repos {
   cosmetics: CosmeticsRepo;
   /** Agent rental offers and one-match passes. */
   rentals: RentalsRepo;
+  /** Private lobbies (friend challenges and bracket matches). */
+  lobbies: LobbiesRepo;
+  /** Single-elimination tournaments built from lobbies, with prize pools in paid credits. */
+  tournaments: TournamentsRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -61,6 +67,8 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     proof: new ProofRepo(db),
     cosmetics: new CosmeticsRepo(db, opts.ledger),
     rentals: new RentalsRepo(db),
+    lobbies: new LobbiesRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
+    tournaments: new TournamentsRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -70,6 +78,7 @@ export * from './agents';
 export * from './cosmetics';
 export * from './leaderboards';
 export * from './ledger';
+export * from './lobbies';
 export * from './market';
 export * from './match-messages';
 export * from './ops';
@@ -77,5 +86,6 @@ export * from './proof';
 export * from './rentals';
 export * from './seasons';
 export * from './skills';
+export * from './tournaments';
 export * from './v2-matches';
 export { isUniqueViolation, nextUtcMidnight, rowsOf, utcDay, utcDayStart, type Clock } from './util';

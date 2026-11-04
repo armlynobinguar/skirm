@@ -68,7 +68,9 @@ export type V2ClientMessage =
   /** `tiers` is per queued agent; `crew`, when sent, replaces the queued crew (up to `crewLimit`) and its tiers win. */
   | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[] }
   /** Every stored frame of an ended match (answered with v2_frames), for replay at another speed. */
-  | { type: 'v2_replay'; matchId: string };
+  | { type: 'v2_replay'; matchId: string }
+  /** Readies a crew in a private lobby; the match starts once both players have. v2_cancel_queue steps back. */
+  | { type: 'v2_lobby_ready'; lobbyId: string; crew: V2CrewEntry[] };
 
 /** What practice adds to v2_found and v2_lockin. */
 export interface V2PracticeFlags {
@@ -90,7 +92,9 @@ export type V2ServerMessage =
   | { type: 'v2_frame'; matchId: string; frame: V2Frame }
   | { type: 'v2_end'; matchId: string; result: MatchResult | null; reason: V2EndReason; logHash: string | null; debrief?: V2Debrief }
   /** Answer to v2_replay: a player's own crew view (the whole board for anyone else), ascending tick. */
-  | { type: 'v2_frames'; matchId: string; frames: V2Frame[] };
+  | { type: 'v2_frames'; matchId: string; frames: V2Frame[] }
+  /** A private lobby's players readied or stepped back. */
+  | { type: 'v2_lobby'; lobbyId: string; ready: { host: boolean; guest: boolean } };
 
 export type WsClientMessage = { type: 'auth'; token?: string; devUser?: string } | V2ClientMessage;
 
@@ -117,6 +121,7 @@ export type WsErrorCode =
   | 'insufficient_credits'
   | 'match_void'
   | 'not_found'
+  | 'lobby_closed'
   | 'too_many_subscriptions'
   | 'unavailable'
   | 'internal'

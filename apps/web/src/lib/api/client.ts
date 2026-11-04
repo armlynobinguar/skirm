@@ -5,6 +5,7 @@
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import { ApiError, errorFromBody } from './errors';
+import type { CreateTournament, Lobby, LobbySettings, TournamentDetail, TournamentStatus, TournamentSummary } from './lobbyTypes';
 import type {
   Agent,
   AgentPatch,
@@ -111,6 +112,28 @@ export interface ApiClient {
   v2Match(matchId: string): Promise<V2MatchRecord>;
   /** GET /v2/matches/live: v2 matches being played now, crews hidden. */
   v2LiveMatches(): Promise<V2LiveMatch[]>;
+
+  /** POST /lobbies: a private friend lobby with the caller as host. */
+  createLobby(settings: Partial<LobbySettings> & { mapId: string }): Promise<Lobby>;
+  /** GET /lobbies: the caller's lobbies still to play (friend and bracket ones). */
+  myLobbies(): Promise<Lobby[]>;
+  lobby(lobbyId: string): Promise<Lobby>;
+  /** GET /lobbies/code/:code: an invite's lobby before joining it. */
+  lobbyByCode(code: string): Promise<Lobby>;
+  /** POST /lobbies/join: takes the guest seat (409 `lobby_full`, `own_lobby`, `lobby_closed`). */
+  joinLobby(code: string): Promise<Lobby>;
+  /** PATCH /lobbies/:id: the host changes the settings (409 `lobby_ready` while a crew is readied). */
+  updateLobby(lobbyId: string, patch: Partial<LobbySettings>): Promise<Lobby>;
+  /** DELETE /lobbies/:id: a guest leaves; the host closes the lobby. */
+  leaveLobby(lobbyId: string): Promise<Lobby>;
+  tournaments(status?: TournamentStatus): Promise<TournamentSummary[]>;
+  tournament(id: string): Promise<TournamentDetail>;
+  /** POST /tournaments: a prize pool is spent from paid credits (402 `insufficient_credits`). */
+  createTournament(body: CreateTournament): Promise<TournamentDetail>;
+  joinTournament(id: string): Promise<TournamentDetail>;
+  leaveTournament(id: string): Promise<TournamentDetail>;
+  /** POST /tournaments/:id/cancel: the creator, before it starts; the pool comes back. */
+  cancelTournament(id: string): Promise<TournamentDetail>;
 }
 
 export interface ApiClientOptions {
@@ -222,5 +245,19 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     playerLadder: (limit) => get('/leaderboards/players', { limit }),
     v2Match: (id) => get(`/v2/matches/${enc(id)}`),
     v2LiveMatches: () => get('/v2/matches/live'),
+
+    createLobby: (settings) => json('POST', '/lobbies', { body: settings }),
+    myLobbies: () => get('/lobbies'),
+    lobby: (id) => get(`/lobbies/${enc(id)}`),
+    lobbyByCode: (code) => get(`/lobbies/code/${enc(code)}`),
+    joinLobby: (code) => json('POST', '/lobbies/join', { body: { code } }),
+    updateLobby: (id, patch) => json('PATCH', `/lobbies/${enc(id)}`, { body: patch }),
+    leaveLobby: (id) => json('DELETE', `/lobbies/${enc(id)}`),
+    tournaments: (status) => get('/tournaments', { status }),
+    tournament: (id) => get(`/tournaments/${enc(id)}`),
+    createTournament: (body) => json('POST', '/tournaments', { body }),
+    joinTournament: (id) => json('POST', `/tournaments/${enc(id)}/join`),
+    leaveTournament: (id) => json('POST', `/tournaments/${enc(id)}/leave`),
+    cancelTournament: (id) => json('POST', `/tournaments/${enc(id)}/cancel`),
   };
 }

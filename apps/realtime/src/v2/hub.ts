@@ -10,12 +10,20 @@
 // Watchers can be anywhere: the running instance publishes every watch-view message on
 // `v2match:<id>` and keeps the latest in `v2match:<id>:last`, and watch() on any other instance
 // relays that channel.
-import { SYSTEM_ACCOUNT_ID, newId, type Repos, type V2CrewRecord, type V2MatchRow } from '@skirm/db';
+//
+// Private lobbies (made and joined over REST) skip matchmaking too: each player readies a crew in
+// the lobby (`lobbyReady`), and once both have, the match starts on the host's map, difficulty,
+// talk rule and crew size, host as crew A. It is casual (no Elo, no registry) and both crews hold
+// credits as usual. When it ends the lobby is settled (LobbiesRepo.settleMatch), which moves a
+// tournament bracket on.
+import { SYSTEM_ACCOUNT_ID, newId, type LobbyRow, type Repos, type V2CrewRecord, type V2MatchRow } from '@skirm/db';
+import { forcedTier, isLobbyTalkRule } from '@skirm/shared';
 import { createGreedyBrain, type V2Brain } from '@skirm/decision-engine/v2';
 import {
   BOT_HANDLE,
   DEFAULT_PRACTICE,
   MAPS_V2,
+  isDifficulty,
   RANKED_DIFFICULTY,
   botCrew,
   practiceRival,
@@ -46,6 +54,12 @@ export interface V2Search {
   mapId?: string;
   /** Ranked: always RANKED_DIFFICULTY. */
   difficulty: Difficulty;
+}
+
+/** A crew readied in a private lobby. */
+interface LobbyWait {
+  user: { accountId: string; handle: string };
+  crew: V2CrewEntry[];
 }
 
 /** Casual pick: a map (or any) and a difficulty. */
@@ -88,7 +102,7 @@ export interface V2HubDeps {
 
 export class V2HubError extends Error {
   constructor(
-    readonly code: 'invalid_crew' | 'agent_busy' | 'already_queued' | 'in_match' | 'not_queued' | 'not_found' | 'unavailable' | 'not_in_lockin',
+    readonly code: 'invalid_crew' | 'agent_busy' | 'already_queued' | 'in_match' | 'not_queued' | 'not_found' | 'unavailable' | 'not_in_lockin' | 'lobby_closed',
     message: string,
   ) {
     super(message);
@@ -105,6 +119,12 @@ export class V2Hub {
   private readonly playing = new Map<string, V2Match | undefined>();
   private readonly watchers = new Map<string, Set<(msg: V2ServerMessage) => void>>();
   private readonly running = new Set<Promise<void>>();
+  /** Crews readied in private lobbies on this instance: lobby id → account id → the crew. */
+  private readonly lobbyWaits = new Map<string, Map<string, LobbyWait>>();
+  /** The lobby each waiting account readied in. */
+  private readonly waitingIn = new Map<string, string>();
+  /** Matches started from a lobby: settled when they end. */
+  private readonly lobbyMatches = new Set<string>();
   private closing = false;
 
   constructor(private readonly deps: V2HubDeps) {
@@ -117,12 +137,13 @@ export class V2Hub {
   }
 
   isBusy(accountId: string): boolean {
-    return this.matchmaker.has(accountId) || this.playing.has(accountId);
+    return this.matchmaker.has(accountId) || this.playing.has(accountId) || this.waitingIn.has(accountId);
   }
 
-  /** Throws when the account is already searching or playing. */
+  /** Throws when the account is already searching, waiting in a lobby or playing. */
   private free(accountId: string): void {
     if (this.matchmaker.has(accountId)) throw new V2HubError('already_queued', 'already searching for a match');
+    if (this.waitingIn.has(accountId)) throw new V2HubError('already_queued', 'already waiting in a lobby');
     if (this.playing.has(accountId)) throw new V2HubError('in_match', 'already in a match');
   }
 
@@ -183,8 +204,76 @@ export class V2Hub {
     if (busy.length) throw new V2HubError('agent_busy', 'an agent is in a match that has not ended');
   }
 
+  /**
+   * Readies a crew in a private lobby the player is in. Once both players have, the match starts.
+   * Readying again replaces the crew. The crew must fit the lobby: its crew size (and the map's),
+   * and every agent plays the lobby's talk tier when it forces one.
+   */
+  async lobbyReady(user: { accountId: string; handle: string }, lobbyId: string, crew: V2CrewEntry[]): Promise<void> {
+    if (this.closing) throw new V2HubError('unavailable', 'server is shutting down');
+    const { repos } = this.deps;
+    if (this.waitingIn.get(user.accountId) === lobbyId) this.unready(user.accountId, false);
+    this.free(user.accountId);
+    const lobby = await repos.lobbies.get(lobbyId);
+    if (!lobby || (lobby.hostId !== user.accountId && lobby.guestId !== user.accountId)) throw new V2HubError('not_found', 'lobby not found');
+    if (lobby.status !== 'open') throw new V2HubError('lobby_closed', 'this lobby is not open');
+    if (!lobby.guestId) throw new V2HubError('lobby_closed', 'the lobby is waiting for a guest');
+    const map = this.pool().find((m) => m.id === lobby.mapId);
+    if (!map) throw new V2HubError('invalid_crew', 'no such map');
+    const limit = Math.min(crewLimitOf(map), lobby.crewSize);
+    if (crew.length > limit) throw new V2HubError('invalid_crew', `this lobby takes at most ${limit} agents`);
+    const forced = isLobbyTalkRule(lobby.talk) ? forcedTier(lobby.talk) : null;
+    const entries = forced ? crew.map((c) => ({ ...c, tier: forced })) : crew;
+    await this.ownCrew(user.accountId, entries);
+    this.free(user.accountId);
+    let waits = this.lobbyWaits.get(lobbyId);
+    if (!waits) this.lobbyWaits.set(lobbyId, (waits = new Map()));
+    waits.set(user.accountId, { user, crew: entries });
+    this.waitingIn.set(user.accountId, lobbyId);
+    const host = waits.get(lobby.hostId);
+    const guest = waits.get(lobby.guestId);
+    if (host && guest) {
+      this.lobbyWaits.delete(lobbyId);
+      this.waitingIn.delete(lobby.hostId);
+      this.waitingIn.delete(lobby.guestId);
+      this.lobbyStatus(lobby, { host: true, guest: true });
+      this.track(this.startLobby(lobby, host, guest));
+      return;
+    }
+    this.lobbyStatus(lobby);
+    await repos.lobbies.setReady(lobbyId, user.accountId, true).catch((err: unknown) => this.deps.log.warn(`lobby ${lobbyId}: ready not stored: ${(err as Error).message}`));
+  }
+
+  /** Steps out of a lobby wait (cancel, disconnect). Returns whether there was one. */
+  private unready(accountId: string, store = true): boolean {
+    const lobbyId = this.waitingIn.get(accountId);
+    if (lobbyId === undefined) return false;
+    this.waitingIn.delete(accountId);
+    const waits = this.lobbyWaits.get(lobbyId);
+    waits?.delete(accountId);
+    if (waits && !waits.size) this.lobbyWaits.delete(lobbyId);
+    if (!store) return true;
+    const { repos, log } = this.deps;
+    this.track(
+      repos.lobbies
+        .setReady(lobbyId, accountId, false)
+        .then(() => repos.lobbies.get(lobbyId))
+        .then((l) => void (l && this.lobbyStatus(l)))
+        .catch((err: unknown) => log.warn(`lobby ${lobbyId}: unready not stored: ${(err as Error).message}`)),
+    );
+    return true;
+  }
+
+  /** Tells both players who has a crew readied (as this instance knows it). */
+  private lobbyStatus(lobby: LobbyRow, ready?: { host: boolean; guest: boolean }): void {
+    const waits = this.lobbyWaits.get(lobby.id);
+    const r = ready ?? { host: !!waits?.has(lobby.hostId), guest: !!(lobby.guestId && waits?.has(lobby.guestId)) };
+    for (const a of [lobby.hostId, lobby.guestId]) if (a) this.deps.send(a, { type: 'v2_lobby', lobbyId: lobby.id, ready: r });
+  }
+
   cancel(accountId: string): void {
     if (this.matchmaker.remove(accountId)) return;
+    if (this.unready(accountId)) return;
     if (this.playing.has(accountId)) throw new V2HubError('in_match', 'the match is already found');
     throw new V2HubError('not_queued', 'not searching for a match');
   }
@@ -192,6 +281,7 @@ export class V2Hub {
   /** Drops a search when its player has no connection left (a found match plays on). */
   dropSearch(accountId: string): void {
     this.matchmaker.remove(accountId);
+    this.unready(accountId);
   }
 
   private mine(accountId: string, matchId: string): { match: V2Match; team: Team } {
@@ -437,6 +527,27 @@ export class V2Hub {
     });
   }
 
+  /** A private lobby's match: the host is crew A, casual on the lobby's map, difficulty and rules. */
+  private async startLobby(lobby: LobbyRow, host: LobbyWait, guest: LobbyWait): Promise<void> {
+    const matchId = newId('mat');
+    const { repos } = this.deps;
+    await this.launch(matchId, [host.user.accountId, guest.user.accountId], async () => {
+      const map = this.pool().find((m) => m.id === lobby.mapId);
+      if (!map) throw new V2HubError('invalid_crew', 'no such map');
+      const sides = { A: await this.side({ ...host.user, crew: host.crew }), B: await this.side({ ...guest.user, crew: guest.crew }) };
+      const difficulty = isDifficulty(lobby.difficulty) ? lobby.difficulty : RANKED_DIFFICULTY;
+      await repos.v2Matches.create({ id: matchId, mapId: map.id, ranked: false, teamA: host.user.accountId, teamB: guest.user.accountId, crews: { A: crewRecords(sides.A), B: crewRecords(sides.B) }, difficulty });
+      if (!(await repos.lobbies.begin(lobby.id, matchId))) {
+        await repos.v2Matches.finish(matchId, { winner: null, reason: 'aborted' }).catch(() => undefined);
+        throw new V2HubError('lobby_closed', 'the lobby changed before the match could start');
+      }
+      this.lobbyMatches.add(matchId);
+      const forced = isLobbyTalkRule(lobby.talk) ? forcedTier(lobby.talk) : null;
+      const setup: V2Setup = { matchId, map, ranked: false, difficulty, sides, crewMax: lobby.crewSize, ...(forced ? { talk: forced } : {}) };
+      return this.newMatch(setup, { A: this.deps.brain, B: this.deps.brain }, (t, msg) => this.deps.send(sides[t].accountId, msg));
+    });
+  }
+
   /** The player is crew A; the bot (crew B) answers its own v2_found and v2_lockin. */
   private async startPractice(user: { accountId: string; handle: string }, entries: V2CrewEntry[], map: MapDefV2, difficulty: Difficulty): Promise<void> {
     const matchId = newId('mat');
@@ -518,6 +629,10 @@ export class V2Hub {
         ?.enqueue({ kind: 'v2_match', id: end.matchId })
         .catch((err: unknown) => log.warn(`v2 match ${end.matchId}: registry enqueue failed: ${(err as Error).message}`));
     }
+    // A lobby's match moves its lobby on (a rematch, or the next bracket round); the worker settles
+    // any lobby left unsettled.
+    if (this.lobbyMatches.delete(end.matchId))
+      await this.deps.repos.lobbies.settleMatch(end.matchId).catch((err: unknown) => log.warn(`v2 match ${end.matchId}: lobby not settled: ${(err as Error).message}`));
     // Frames are kept for replay in the background, so a slow store never holds up v2_end.
     if (this.deps.frames && match.framesOf('watch').length) {
       const views: FrameView[] = ['A', 'B', 'watch'];
@@ -560,6 +675,7 @@ export class V2Hub {
     this.closing = true;
     this.matchmaker.stop();
     this.matchmaker.clear();
+    for (const a of [...this.waitingIn.keys()]) this.unready(a);
     for (const m of this.matches.values()) m.abort('shutdown');
     await Promise.all([...this.running]);
   }

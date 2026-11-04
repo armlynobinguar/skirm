@@ -135,5 +135,34 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     "sql": [
       "ALTER TABLE \"accounts\" ADD COLUMN \"deleted_at\" timestamp with time zone;"
     ]
+  },
+  {
+    "tag": "0003_lobbies_tournaments",
+    "folderMillis": 1793770580665,
+    "bps": true,
+    "hash": "fd6860c56b82065369ee8a75722e306ff7e557000996b04d60a7f9a0aeb39ae1",
+    "sql": [
+      "ALTER TYPE \"public\".\"ledger_note\" ADD VALUE 'prize_pool';",
+      "\nALTER TYPE \"public\".\"ledger_note\" ADD VALUE 'prize';",
+      "\nCREATE TABLE \"lobbies\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"code\" text NOT NULL,\n\t\"host_id\" text NOT NULL,\n\t\"guest_id\" text,\n\t\"map_id\" text NOT NULL,\n\t\"difficulty\" text NOT NULL,\n\t\"talk\" text DEFAULT 'any' NOT NULL,\n\t\"crew_size\" integer DEFAULT 3 NOT NULL,\n\t\"status\" text DEFAULT 'open' NOT NULL,\n\t\"match_id\" text,\n\t\"winner_id\" text,\n\t\"tournament_id\" text,\n\t\"round\" integer,\n\t\"slot\" integer,\n\t\"host_ready_at\" timestamp with time zone,\n\t\"guest_ready_at\" timestamp with time zone,\n\t\"opened_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"lobbies_status_ck\" CHECK (\"lobbies\".\"status\" in ('open', 'playing', 'done', 'cancelled')),\n\tCONSTRAINT \"lobbies_talk_ck\" CHECK (\"lobbies\".\"talk\" in ('any', 'quiet', 'standard', 'open')),\n\tCONSTRAINT \"lobbies_crew_ck\" CHECK (\"lobbies\".\"crew_size\" between 1 and 3),\n\tCONSTRAINT \"lobbies_players_ck\" CHECK (\"lobbies\".\"guest_id\" is null or \"lobbies\".\"guest_id\" <> \"lobbies\".\"host_id\")\n);\n",
+      "\nCREATE TABLE \"tournament_entries\" (\n\t\"tournament_id\" text NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"seed\" integer,\n\t\"elo\" integer,\n\t\"place\" integer,\n\t\"prize\" integer DEFAULT 0 NOT NULL,\n\t\"joined_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"tournament_entries_tournament_id_account_id_pk\" PRIMARY KEY(\"tournament_id\",\"account_id\")\n);\n",
+      "\nCREATE TABLE \"tournaments\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"name\" text NOT NULL,\n\t\"creator_id\" text NOT NULL,\n\t\"size\" integer NOT NULL,\n\t\"map_id\" text NOT NULL,\n\t\"difficulty\" text NOT NULL,\n\t\"talk\" text DEFAULT 'any' NOT NULL,\n\t\"crew_size\" integer DEFAULT 3 NOT NULL,\n\t\"prize_pool\" integer DEFAULT 0 NOT NULL,\n\t\"status\" text DEFAULT 'open' NOT NULL,\n\t\"champion_id\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"started_at\" timestamp with time zone,\n\t\"ended_at\" timestamp with time zone,\n\tCONSTRAINT \"tournaments_status_ck\" CHECK (\"tournaments\".\"status\" in ('open', 'running', 'done', 'cancelled')),\n\tCONSTRAINT \"tournaments_size_ck\" CHECK (\"tournaments\".\"size\" in (4, 8, 16)),\n\tCONSTRAINT \"tournaments_talk_ck\" CHECK (\"tournaments\".\"talk\" in ('any', 'quiet', 'standard', 'open')),\n\tCONSTRAINT \"tournaments_crew_ck\" CHECK (\"tournaments\".\"crew_size\" between 1 and 3),\n\tCONSTRAINT \"tournaments_pool_ck\" CHECK (\"tournaments\".\"prize_pool\" >= 0)\n);\n",
+      "\nALTER TABLE \"lobbies\" ADD CONSTRAINT \"lobbies_host_id_accounts_id_fk\" FOREIGN KEY (\"host_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"lobbies\" ADD CONSTRAINT \"lobbies_guest_id_accounts_id_fk\" FOREIGN KEY (\"guest_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"lobbies\" ADD CONSTRAINT \"lobbies_winner_id_accounts_id_fk\" FOREIGN KEY (\"winner_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"lobbies\" ADD CONSTRAINT \"lobbies_tournament_id_tournaments_id_fk\" FOREIGN KEY (\"tournament_id\") REFERENCES \"public\".\"tournaments\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"tournament_entries\" ADD CONSTRAINT \"tournament_entries_tournament_id_tournaments_id_fk\" FOREIGN KEY (\"tournament_id\") REFERENCES \"public\".\"tournaments\"(\"id\") ON DELETE cascade ON UPDATE no action;",
+      "\nALTER TABLE \"tournament_entries\" ADD CONSTRAINT \"tournament_entries_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"tournaments\" ADD CONSTRAINT \"tournaments_creator_id_accounts_id_fk\" FOREIGN KEY (\"creator_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"tournaments\" ADD CONSTRAINT \"tournaments_champion_id_accounts_id_fk\" FOREIGN KEY (\"champion_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE UNIQUE INDEX \"lobbies_code_uq\" ON \"lobbies\" USING btree (\"code\");",
+      "\nCREATE UNIQUE INDEX \"lobbies_bracket_uq\" ON \"lobbies\" USING btree (\"tournament_id\",\"round\",\"slot\");",
+      "\nCREATE INDEX \"lobbies_host_idx\" ON \"lobbies\" USING btree (\"host_id\",\"created_at\");",
+      "\nCREATE INDEX \"lobbies_guest_idx\" ON \"lobbies\" USING btree (\"guest_id\",\"created_at\");",
+      "\nCREATE INDEX \"lobbies_match_idx\" ON \"lobbies\" USING btree (\"match_id\");",
+      "\nCREATE INDEX \"lobbies_status_idx\" ON \"lobbies\" USING btree (\"status\",\"updated_at\");",
+      "\nCREATE INDEX \"tournament_entries_account_idx\" ON \"tournament_entries\" USING btree (\"account_id\");",
+      "\nCREATE INDEX \"tournaments_status_idx\" ON \"tournaments\" USING btree (\"status\",\"created_at\");"
+    ]
   }
 ];

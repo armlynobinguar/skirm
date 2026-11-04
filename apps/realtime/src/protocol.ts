@@ -35,6 +35,7 @@ export type ErrorCode =
   | 'practice_unranked'
   | 'agent_busy'
   | 'not_found'
+  | 'lobby_closed'
   | 'too_many_subscriptions'
   | 'unavailable'
   | 'internal';
@@ -77,6 +78,7 @@ const TYPES = [
   'v2_watch',
   'v2_unwatch',
   'v2_replay',
+  'v2_lobby_ready',
 ] as const;
 const TIERS = ['quiet', 'standard', 'open'] as const;
 
@@ -176,6 +178,13 @@ export function parseClientMessage(raw: unknown): ParseResult {
         msg.crew = crew;
       }
       return { ok: true, msg };
+    }
+    case 'v2_lobby_ready': {
+      if (extraKeys(v, ['type', 'lobbyId', 'crew'])) return bad('v2_lobby_ready takes {lobbyId, crew}');
+      if (typeof v.lobbyId !== 'string' || !ID_RE.test(v.lobbyId)) return bad('v2_lobby_ready.lobbyId must be an id');
+      const crew = parseV2Crew(v.crew);
+      if (typeof crew === 'string') return bad(`v2_lobby_ready.${crew}`);
+      return { ok: true, msg: { type: 'v2_lobby_ready', lobbyId: v.lobbyId, crew } };
     }
   }
 }

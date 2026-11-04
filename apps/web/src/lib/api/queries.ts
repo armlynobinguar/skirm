@@ -52,6 +52,17 @@ export const qk = {
     all: ['leaderboards'] as const,
     players: (limit?: number) => ['leaderboards', 'players', limit ?? null] as const,
   },
+  lobbies: {
+    all: ['lobbies'] as const,
+    mine: ['lobbies', 'mine'] as const,
+    one: (lobbyId: string) => ['lobbies', 'one', lobbyId] as const,
+    code: (code: string) => ['lobbies', 'code', code] as const,
+  },
+  tournaments: {
+    all: ['tournaments'] as const,
+    list: ['tournaments', 'list'] as const,
+    one: (id: string) => ['tournaments', 'one', id] as const,
+  },
   matches: {
     all: ['matches'] as const,
     v2: (matchId: string) => ['matches', 'v2', matchId] as const,

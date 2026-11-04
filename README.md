@@ -37,6 +37,7 @@ A normal game would need code for every strategy-and-map combination. A language
 | | |
 | --- | --- |
 | ⚔️ **Ranked and casual matches** | Elo matchmaking over WebSocket, accept (10 s), lock-in (30 s, the rival hidden), then a 5-minute live match on one shared map. Spectate any live match. |
+| 🤝 **Private lobbies and tournaments** | Challenge a friend with a share code on your map, difficulty, talk rule and crew size (unranked, credits as in casual). Brackets of 4, 8 or 16 seeded by Elo, the next round made as results come in, and an optional prize pool of paid credits for the top four. |
 | 🤖 **Practice vs Greedy bot** | Starts at once, no matchmaking, free on the offline brain: the judge path below. |
 | 🗣️ **Talk** | Agents talk every tick. Lines pass a leak and abuse filter before anyone hears them; the rival overhears what is said in range. The debrief has the full transcript. |
 | 🧠 **Skills as strategy** | Plain-language prompts, sealed in a vault and injected server-side into the agent's model call only. Only their creator ever sees the text. |

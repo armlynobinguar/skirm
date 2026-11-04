@@ -123,6 +123,24 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/credits` | | `{ balance, held, allowanceLeft, allowanceResetAt, available, creditsPerNear, rows: {id, type, amount, source, note, matchId, txHash, createdAt}[] }` (latest 100) |
 | POST | `/credits/deposits` | `{ txHash }` | `{ credited, balance, amountYocto }`: a `deposits.deposit()` tx verified through RPC (dev mode: `dev:<yocto>`), credited once (`409 duplicate_receipt`) |
 
+### Lobbies and tournaments
+
+A **lobby** is a private match between two players: the host picks the map, difficulty, talk rule (`any`, or every agent on `quiet`, `standard` or `open`) and crew size (1-3, capped by the map) and shares a 6-character code (link `/lobbies/join/<code>`). It is unranked (no Elo, season or registry) and both crews hold and pay credits as in a casual match. Each player readies a crew over realtime (`v2_lobby_ready`); the match starts once both have, the host as crew A, then plays through the usual accept and lock-in. A friend lobby opens again after each match (`winnerId` is the last winner). A **tournament** is a single-elimination bracket of 4, 8 or 16 players built from lobbies: it starts by itself when full, seeded by Elo (best first, earlier joiner on a tie; 1 v N, seeds 1 and 2 only meet in the final), and each round's lobby is made once both of its feeders are decided. A bracket match always has a winner: a draw goes to the better seed, a void to the crew not at fault (a void nobody caused is played again), and a match nobody starts within 15 minutes of opening (`TOURNAMENT.noShowMs`) goes to the player who readied, else the better seed. The optional prize pool is the creator's paid credits, spent when the tournament is made (ledger `spend`, note `prize_pool`), paid at the end to the top four, 60 / 25 / 7.5 / 7.5 % with the dust to the champion (`topup`, note `prize`, each once), and returned to the creator if it is cancelled before it starts (`topup`, note `prize_pool`). All offchain.
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| POST | `/lobbies` | `{ mapId, difficulty?, talk?, crewSize? }` | `Lobby`: `{ id, code, host: {id, handle}, guest \| null, mapId, difficulty, talk, crewSize, status: 'open'\|'playing'\|'done'\|'cancelled', matchId, winnerId, tournamentId, round, slot, ready: {host, guest}, openedAt, createdAt }` |
+| GET | `/lobbies` | | the caller's lobbies still to play (open or playing), bracket matches included |
+| GET | `/lobbies/code/:code` | | the friend lobby with this code (the invite preview); 404 for a bracket match |
+| POST | `/lobbies/join` | `{ code }` | `Lobby` with the caller as guest (again: the same). `409 own_lobby`, `lobby_full`, `lobby_closed`, `tournament_match` |
+| GET | `/lobbies/:id` | | `Lobby`; 404 unless the caller is in it |
+| PATCH | `/lobbies/:id` | `{ mapId?, difficulty?, talk?, crewSize? }` | `Lobby`. Host only (`403`), friend lobbies only (`409 tournament_match`), while open and nobody has a crew readied (`409 lobby_ready`) |
+| DELETE | `/lobbies/:id` | | `Lobby`: a guest leaves (the seat opens), the host cancels it. `409 match_live`, `tournament_match` |
+| GET | `/tournaments` | `?status=open\|running\|done\|cancelled` | `TournamentSummary[]` newest first (public): `{ id, name, creator, size, entrants, mapId, difficulty, talk, crewSize, prizePool, status, champion \| null, createdAt, startedAt, endedAt, joined }` |
+| POST | `/tournaments` | `{ name (≤ 40), size: 4\|8\|16, mapId, difficulty?, talk?, crewSize?, prizePool? (paid credits, ≤ 100,000), join? (default true) }` | `TournamentDetail`. `402 insufficient_credits` (`need`, `have`) when the paid balance is short |
+| GET | `/tournaments/:id` | | `TournamentDetail` (public): the summary plus `rounds`, `entries: {account, seed, elo, place, prize}[]`, `matches: {lobbyId, code, round, slot, hostId, guestId, status, matchId, winnerId}[]` and, signed in, `you: {joined, creator, place, prize, lobbyId}` (`lobbyId`: the bracket match to play now) |
+| POST | `/tournaments/:id/join` · `/leave` · `/cancel` | | `TournamentDetail`. Join and leave while open (`409 not_open`, `tournament_full`); the last place starts the bracket. Cancel: the creator (`403`), while open; the pool comes back |
+
 ### Operations
 
 | Method | Path | Body / query | Returns |
@@ -138,7 +156,7 @@ Besides `bad_request` (400), `unauthenticated` / `no_session` (401), `forbidden`
 | --- | --- |
 | 402 | `insufficient_credits` (with `need`, `have`) |
 | 403 | `dev_disabled`, `cosmetic_not_owned` |
-| 409 | `agent_busy`, `match_live`, `mint_in_progress`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch` |
+| 409 | `agent_busy`, `match_live`, `mint_in_progress`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch`, `own_lobby`, `lobby_full`, `lobby_closed`, `lobby_ready`, `tournament_match`, `tournament_full`, `not_open` |
 | 422 | `near_account_required`, `near_proof_required`, `near_proof_invalid`, `not_minted`, `invalid_hash`, `underpaid`, `purchase_unverified` |
 | 429 | `trial_limit` |
 | 502 | `mint_failed` |
@@ -159,6 +177,7 @@ Client → server (`WsClientMessage`):
 | `{type:'v2_lock_in', matchId, tiers, crew?}` | lock the crew in (30 s): a talk tier per agent in slot order; `crew` swaps, removes or adds agents up to `crewLimit` and its tiers win |
 | `{type:'v2_watch', matchId}` / `{type:'v2_unwatch', matchId}` | spectate: the latest whole-board frame now, then every one after, and `v2_end`. Released on `v2_end`, unwatch or disconnect; at most 8 per socket |
 | `{type:'v2_replay', matchId}` | every stored frame of an ended match, for replay at another speed (kept 6 h) |
+| `{type:'v2_lobby_ready', lobbyId, crew: {agentId, tier}[]}` | ready a crew in a private lobby you are in (open, with a guest): at most its crew size, every agent on its tier when the talk rule forces one. The match starts once both players have; readying again replaces the crew, `v2_cancel_queue` (or the last socket closing) steps back. Both players must reach the same realtime instance |
 
 Server → client (`WsServerMessage`):
 
@@ -173,9 +192,10 @@ Server → client (`WsServerMessage`):
 | `{type:'v2_frame', matchId, frame}` | one tick: each crew gets its own fogged view (its own plans only), watchers the whole board |
 | `{type:'v2_end', matchId, result, reason, logHash, debrief?}` | the end. `result` is `{winner: 'A'\|'B'\|'draw', reason: 'goal'\|'time'\|'eliminated', decidedBy, score, ticks}` or null for a void match (`reason` `declined`, `accept_timeout`, `credits`, `error`, `aborted`); `logHash` is the sha256 chain head of the match log; `debrief` is this crew's (Elo delta, MVP, goals, talk counts, credits held / used / returned, registry line, per-agent tally) |
 | `{type:'v2_frames', matchId, frames}` | answer to `v2_replay` |
+| `{type:'v2_lobby', lobbyId, ready: {host, guest}}` | a lobby's player readied a crew or stepped back (sent to both players this instance serves) |
 | `{type:'error', code, message}` | see below |
 
-WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthenticated`, `auth_failed`, `already_authenticated`, `already_queued`, `not_queued`, `in_match`, `invalid_crew`, `not_in_lockin`, `practice_unranked`, `agent_busy`, `not_found`, `too_many_subscriptions`, `unavailable`, `internal`.
+WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthenticated`, `auth_failed`, `already_authenticated`, `already_queued`, `not_queued`, `in_match`, `invalid_crew`, `not_in_lockin`, `practice_unranked`, `agent_busy`, `not_found`, `lobby_closed`, `too_many_subscriptions`, `unavailable`, `internal`.
 
 `scripts/ws-v2.cjs` is a ready client: it signs in, queues, accepts, locks in and waits for `v2_end` (README of the script at its top).
 
@@ -185,6 +205,7 @@ WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthe
 - Each tick every agent's brain acts and may speak under a 1.5 s deadline (late, failed or illegal is a wait); the crew plan is rewritten every `V2_REPLAN_EVERY` (25) ticks. Speech passes the leak and abuse filter before anyone hears it, then goes by range (team, or overheard by the rival).
 - One `realtime` instance holds each match in memory and serves its players. A live row no instance holds (crash) is voided by the orphan sweep and its holds released; shutdown voids live matches with credits returned.
 - Practice: the player is crew A; crew B is `SYSTEM_ACCOUNT_ID` with a Standard crew the player's size on the greedy brain, accepting and locking in by itself. Casual only, no Elo, no registry write, `v2_matches.practice = true`.
+- Lobby: no matchmaking; the lobby's map, difficulty, talk rule (`V2Setup.talk`) and crew size (`V2Setup.crewMax`). Casual, no Elo, no registry. After the result is written the lobby is settled (`LobbiesRepo.settleMatch`), which moves a bracket on; the `tournaments` tick settles any lobby that was missed.
 - Settlement (`V2MatchesRepo.finish`, one transaction): the result, both players' Elo (ranked; start 1200, K 32 for the first 20 ranked matches then 16, floor 100), season points (ranked), the skill versions' ranked records, the delivered lines (`match_messages`), each crew's debrief. Then a ranked result is queued for the registry, and the frames are kept for replay.
 
 ## Queues (BullMQ, names in `@skirm/server`)
@@ -194,6 +215,7 @@ WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthe
 | `registry` | `{ kind: 'v2_match', id, seasonId? }` | `record_match` on the registry contract as a `MatchRecordV2` with per-player Elo and the season number, then the row's registry status and tx; retried 10 times |
 | `benchmarks` | `{ kind: 'mint', skillId, version }` or `{ kind: 'trial', trialId }` | the hidden gauntlet of a minted version, or one buyer's trial, on the headless match runner (`playHeadless`) against the greedy bot (below) |
 | `seasons` | `{ kind: 'tick' }`, repeatable every 10 min | opens the current season, locks ended ones, writes payouts, posts the top 10 to the seasons contract |
+| `tournaments` | `{ kind: 'tick' }`, repeatable every minute | settles lobbies whose match ended without realtime settling them; decides bracket matches nobody started within 15 minutes |
 
 **Benchmark.** 6 (map, difficulty) picks from `PRACTICE_MAPS` × Easy / Normal, drawn from HMAC-SHA256(`BENCH_SECRET`, `<skillId>:<version>`). The tested crew is one Standard agent carrying the skill; every second pick also feeds it hijack lines. score = wins / matches × (1 − share of matches with a leak). With the greedy brain (no model key) a benchmark or trial plays nothing and ends `needs_model` with no score: greedy ignores skills, so it would prove nothing. See [benchmarks.md](benchmarks.md).
 

@@ -48,6 +48,19 @@ const METHODS: (keyof ApiClient)[] = [
   'playerLadder',
   'v2Match',
   'v2LiveMatches',
+  'createLobby',
+  'myLobbies',
+  'lobby',
+  'lobbyByCode',
+  'joinLobby',
+  'updateLobby',
+  'leaveLobby',
+  'tournaments',
+  'tournament',
+  'createTournament',
+  'joinTournament',
+  'leaveTournament',
+  'cancelTournament',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {

@@ -24,13 +24,14 @@ import {
 } from '../src/index';
 
 describe('names (contract)', () => {
-  it('queues: registry, benchmarks and seasons only', () => {
+  it('queues: registry, benchmarks, seasons and tournaments only', () => {
     expect(QUEUE_NAMES).toEqual({
       registry: 'registry',
       benchmarks: 'benchmarks',
       seasons: 'seasons',
+      tournaments: 'tournaments',
     });
-    expect(Object.keys(DEFAULT_JOB_OPTIONS).sort()).toEqual(['benchmarks', 'registry', 'seasons']);
+    expect(Object.keys(DEFAULT_JOB_OPTIONS).sort()).toEqual(['benchmarks', 'registry', 'seasons', 'tournaments']);
   });
 
   it('benchmark, registry and season jobs', () => {

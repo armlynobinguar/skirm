@@ -6,6 +6,7 @@ import {
   QUEUE_BENCHMARKS,
   QUEUE_REGISTRY,
   QUEUE_SEASONS,
+  QUEUE_TOURNAMENTS,
   RedisCostStore,
   createNearAdapters,
   createQueue,
@@ -15,6 +16,7 @@ import {
   enqueueBenchmark,
   enqueueRegistry,
   scheduleSeasonTick,
+  scheduleTournamentTick,
   type ServerConfig,
 } from '@skirm/server';
 import { processBenchmark } from './benchmark-processor';
@@ -30,6 +32,7 @@ import {
 import { processRegistry } from './registry-processor';
 import { processSeasonTick } from './season-processor';
 import { seedOfficialSkills } from './seed';
+import { processTournamentTick } from './tournament-processor';
 
 type Redis = ReturnType<typeof createRedis>;
 
@@ -58,7 +61,7 @@ export function costMonitor(redis: Redis, dailyBudgetUsd: number, logger: Logger
   });
 }
 
-/** Starts the `registry`, `benchmarks` and `seasons` consumers over `deps`. */
+/** Starts the `registry`, `benchmarks`, `seasons` and `tournaments` consumers over `deps`. */
 export function startConsumers(
   deps: WorkerDeps,
   connection: Redis,
@@ -88,10 +91,12 @@ export function startConsumers(
     { ...(opts.benchmarksConcurrency ? { concurrency: opts.benchmarksConcurrency } : {}) },
   );
   const seasons = createWorker(QUEUE_SEASONS, () => processSeasonTick(deps), connection);
+  const tournaments = createWorker(QUEUE_TOURNAMENTS, () => processTournamentTick(deps), connection);
   for (const [name, w] of [
     ['registry', registry],
     ['benchmarks', benchmarks],
     ['seasons', seasons],
+    ['tournaments', tournaments],
   ] as const) {
     w.on('failed', (job, err) =>
       deps.logger.warn('job failed', { queue: name, jobId: job?.id, code: errorCode(err) }),
@@ -100,7 +105,7 @@ export function startConsumers(
       deps.logger.error('consumer error', { queue: name, code: errorCode(err) }),
     );
   }
-  return { registry, benchmarks, seasons };
+  return { registry, benchmarks, seasons, tournaments };
 }
 
 export interface WorkerApp {
@@ -121,9 +126,10 @@ export async function startWorkerApp(
   const registryQueue = createQueue(QUEUE_REGISTRY, redis);
   const benchmarkQueue = createQueue(QUEUE_BENCHMARKS, redis);
   const seasonQueue = createQueue(QUEUE_SEASONS, redis);
+  const tournamentQueue = createQueue(QUEUE_TOURNAMENTS, redis);
   const closeAll = async () => {
     await Promise.all(
-      [registryQueue, benchmarkQueue, seasonQueue].map((q) => q.close().catch(() => undefined)),
+      [registryQueue, benchmarkQueue, seasonQueue, tournamentQueue].map((q) => q.close().catch(() => undefined)),
     );
     await Promise.all([
       redis.quit().catch(() => redis.disconnect()),
@@ -163,10 +169,11 @@ export async function startWorkerApp(
     logger,
   };
   const consumers = startConsumers(deps, consumerConn);
-  const workers = [consumers.registry, consumers.benchmarks, consumers.seasons];
+  const workers = [consumers.registry, consumers.benchmarks, consumers.seasons, consumers.tournaments];
   await Promise.all(workers.map((w) => w.waitUntilReady()));
   // One schedule however many workers start it (an upsert keyed by SEASON_TICK_JOB_ID).
   await scheduleSeasonTick(seasonQueue);
+  await scheduleTournamentTick(tournamentQueue);
   if (brain.kind === 'greedy')
     logger.warn(
       'benchmarks and trials need a model key (OPENROUTER_API_KEY): they end needs_model',
