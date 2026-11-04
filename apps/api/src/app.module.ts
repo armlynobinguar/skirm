@@ -13,6 +13,7 @@ import { OnboardingController } from './controllers/onboarding.controller';
 import { RentalsController } from './controllers/rentals.controller';
 import { OpsController } from './controllers/ops.controller';
 import { PublicController } from './controllers/public.controller';
+import { RankedController } from './controllers/ranked.controller';
 import { SeasonsController } from './controllers/seasons.controller';
 import { SkillsController } from './controllers/skills.controller';
 import { DEPS, type ApiDeps } from './deps';
@@ -27,6 +28,7 @@ export class AppModule {
       controllers: [
         CoreController,
         PublicController,
+        RankedController,
         CreditsController,
         SkillsController,
         MarketController,

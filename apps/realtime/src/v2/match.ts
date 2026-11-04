@@ -13,7 +13,7 @@
 // has DEFAULTS.commands.perMatch, applied on the next tick, logged in the hash chain and shown only
 // to that crew.
 import { V2_ACTION_DEADLINE_MS, V2_PLANNER_DEADLINE_MS, filterSpeech, maySpeak, type V2AgentCommand, type V2Brain, type V2Decision } from '@skirm/decision-engine/v2';
-import { DEFAULTS, chargeDue } from '@skirm/shared';
+import { DEFAULTS, chargeDue, playerTier, type PlayerTier } from '@skirm/shared';
 import {
   commandOrder,
   dropTargets,
@@ -113,6 +113,8 @@ export interface V2SkillMeta {
 export interface V2Side extends V2Roster {
   accountId: string;
   handle: string;
+  /** The player's Elo and ranked matches when they queued (the tiers on a ranked v2_found). */
+  rank?: { elo: number; rankedMatches: number };
 }
 
 export interface V2Setup {
@@ -303,7 +305,17 @@ export class V2Match {
       difficulty: this.difficulty,
       ...(setup.practice ? { practice: true as const, rivalHandle: setup.sides[team === 'A' ? 'B' : 'A'].handle } : {}),
       ...(setup.free?.[team] ? { free: true as const } : {}),
+      ...this.foundTiers(team),
     };
+  }
+
+  /** Ranked: both players' tiers (as they queued) for v2_found. */
+  private foundTiers(team: Team): { tiers?: { you: PlayerTier; rival: PlayerTier } } {
+    const { setup } = this;
+    const you = setup.sides[team].rank;
+    const rival = setup.sides[team === 'A' ? 'B' : 'A'].rank;
+    if (!setup.ranked || setup.practice || !you || !rival) return {};
+    return { tiers: { you: playerTier(you.elo, you.rankedMatches), rival: playerTier(rival.elo, rival.rankedMatches) } };
   }
 
   /** Each crew's start hold with the crews as they stand, as the engine would set it. */

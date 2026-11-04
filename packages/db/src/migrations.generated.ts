@@ -147,8 +147,22 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     ]
   },
   {
-    "tag": "0004_skill_triggers",
-    "folderMillis": 1793774355379,
+    "tag": "0004_ranked_tiers",
+    "folderMillis": 1793771758405,
+    "bps": true,
+    "hash": "00b267d221aa9939b60536b4a5c711ac562b21b81ec71c46f76b2021f6ba0ad8",
+    "sql": [
+      "CREATE TABLE \"elo_decays\" (\n\t\"id\" bigserial PRIMARY KEY NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"elo_before\" integer NOT NULL,\n\t\"elo_after\" integer NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"elo_decays_lower_ck\" CHECK (\"elo_decays\".\"elo_after\" < \"elo_decays\".\"elo_before\")\n);\n",
+      "\nALTER TABLE \"accounts\" ADD COLUMN \"last_ranked_at\" timestamp with time zone;",
+      "\nALTER TABLE \"elo_decays\" ADD CONSTRAINT \"elo_decays_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"elo_decays_account_idx\" ON \"elo_decays\" USING btree (\"account_id\",\"created_at\");",
+      "\nCREATE INDEX \"v2_matches_map_idx\" ON \"v2_matches\" USING btree (\"map_id\",\"ended_at\");",
+      "\nUPDATE \"accounts\" SET \"last_ranked_at\" = r.\"at\" FROM (\n\tSELECT \"account_id\", max(\"ended_at\") AS \"at\" FROM (\n\t\tSELECT \"team_a_account_id\" AS \"account_id\", \"ended_at\" FROM \"v2_matches\" WHERE \"ranked\" AND \"status\" = 'ended'\n\t\tUNION ALL\n\t\tSELECT \"team_b_account_id\", \"ended_at\" FROM \"v2_matches\" WHERE \"ranked\" AND \"status\" = 'ended'\n\t) s GROUP BY \"account_id\"\n) r WHERE r.\"account_id\" = \"accounts\".\"id\";"
+    ]
+  },
+  {
+    "tag": "0006_skill_triggers",
+    "folderMillis": 1793775225182,
     "bps": true,
     "hash": "0ec50c90f3d147cd5d12266aa7ca4fde019078a08e98bbc76cf788af4a3b7171",
     "sql": [

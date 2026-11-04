@@ -49,14 +49,16 @@ describe('migrations', () => {
         'skill_trials',
         'cosmetics_owned',
         'onboarding_progress',
+        'elo_decays',
       ]),
     );
     const applied = await db.execute(
       sql`select count(*)::int as n from drizzle.__drizzle_migrations`,
     );
     expect(rowsOf<{ n: number }>(applied)[0]!.n).toBe(embeddedMigrations().length);
-    // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_onboarding, 0004_skill_triggers.
-    expect(embeddedMigrations()).toHaveLength(5);
+    // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_onboarding, 0004_ranked_tiers,
+    // 0006_skill_triggers (0005 is taken by an open PR).
+    expect(embeddedMigrations()).toHaveLength(6);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {

@@ -2,7 +2,7 @@
 // caller also gets their own rows.
 import { Controller, Get, Inject, Param, Query } from '@nestjs/common';
 import { MATCH_MESSAGES_MAX_LIMIT, type AccountRow, type PlayerLadderRow } from '@skirm/db';
-import { rankTitle } from '@skirm/shared';
+import { playerTier, rankTitle } from '@skirm/shared';
 import { z } from 'zod';
 import { CurrentAccount, Public } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
@@ -16,8 +16,8 @@ const messagesQuery = z.object({
   limit: intQuery(1, MATCH_MESSAGES_MAX_LIMIT, 200),
 });
 
-/** A v2 ladder row with its rank title (@skirm/shared rankTitle). */
-const playerView = (r: PlayerLadderRow) => ({ ...r, title: rankTitle(r.elo).title });
+/** A v2 ladder row with its rank title and ranked tier (@skirm/shared rankTitle, playerTier). */
+const playerView = (r: PlayerLadderRow) => ({ ...r, title: rankTitle(r.elo).title, tier: playerTier(r.elo, r.rankedMatches) });
 
 @Public()
 @Controller()
