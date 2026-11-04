@@ -1,11 +1,13 @@
 // What each side is shown of a live match after every tick. A crew sees the board through its own
 // fog, its own agents, the rivals in its sight, the talk its agents heard (rival team talk only when
-// overheard) and its own refusals; a watcher sees everything. Plans: own-crew plans only, never skills.
+// overheard) and its own refusals; a watcher sees everything. Plans: own-crew plans only; skills
+// only by public name and trigger (own crew), never their prompts.
 import type { FrameCommands } from './commands';
 import type { HazardKind, Team } from './map';
 import type { MatchEvent, MatchResult, MatchState, Role } from './match';
 import { rowsFor } from './observe';
 import type { Channel, TalkTier } from './talk';
+import type { SkillTrigger } from './triggers';
 
 export type FrameView = Team | 'watch';
 
@@ -42,6 +44,18 @@ export interface FrameAgent {
   thought?: string;
   /** The plan is withheld because the agent runs a bought (encrypted) skill. */
   planHidden?: boolean;
+  /**
+   * The agent's equipped skills this tick: public name and trigger, and whether the trigger held
+   * (the skill was in its prompt). Own crew only; never the prompt. Absent: no skills.
+   */
+  skills?: FrameSkill[];
+}
+
+/** One equipped skill in the mind panel: public metadata and whether it is active this tick. */
+export interface FrameSkill {
+  name: string;
+  trigger: SkillTrigger;
+  active: boolean;
 }
 
 export interface FrameMessage {

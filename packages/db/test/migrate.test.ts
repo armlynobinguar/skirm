@@ -58,8 +58,8 @@ describe('migrations', () => {
     );
     expect(rowsOf<{ n: number }>(applied)[0]!.n).toBe(embeddedMigrations().length);
     // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_onboarding, 0004_ranked_tiers,
-    // 0005_match_timelines, 0006_replay_shares.
-    expect(embeddedMigrations()).toHaveLength(7);
+    // 0005_match_timelines, 0006_skill_triggers, 0007_replay_shares.
+    expect(embeddedMigrations()).toHaveLength(8);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {

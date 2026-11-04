@@ -171,8 +171,17 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     ]
   },
   {
-    "tag": "0006_replay_shares",
-    "folderMillis": 1793777320108,
+    "tag": "0006_skill_triggers",
+    "folderMillis": 1793776907145,
+    "bps": true,
+    "hash": "0ec50c90f3d147cd5d12266aa7ca4fde019078a08e98bbc76cf788af4a3b7171",
+    "sql": [
+      "ALTER TABLE \"skill_versions\" ADD COLUMN \"trigger\" jsonb;"
+    ]
+  },
+  {
+    "tag": "0007_replay_shares",
+    "folderMillis": 1793782667055,
     "bps": true,
     "hash": "ca6e6f71c11743ca62281c8a0035efa06e9cd431f9b1ba3c2c01ebe31689c8bf",
     "sql": [
