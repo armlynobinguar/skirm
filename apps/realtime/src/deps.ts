@@ -39,12 +39,12 @@ export interface RealtimeDeps {
   /** Reports an unexpected error to Error Reporting (main: @skirm/server reportError; absent in tests). */
   report?: (err: unknown, where: string) => void;
   repos: Repos;
-  vault: Pick<Vault, 'encryptSkill' | 'decryptSkill'>;
+  vault: Pick<Vault, 'encryptSkill' | 'decryptSkill'> & Partial<Pick<Vault, 'decryptPlaybook'>>;
   pubsub: PubSub;
   registry: RegistryQueue;
   scheduler?: Scheduler;
   queueTiming?: Partial<QueueTiming>;
-  /** v2: the brain every agent uses (default: the offline greedy brain; production passes Haiku). */
+  /** v2: the brain every agent uses (default: the offline greedy brain; production passes the model brain). */
   v2Brain?: V2Brain;
   v2Timing?: Partial<V2Timing>;
   /** Bring your own agent: the pull relay shared with the api (Redis in production). */

@@ -1,5 +1,5 @@
 {
-  "id": "32aba2b5-c790-4f56-962e-df0650f2f7e4",
+  "id": "065a4e45-700b-4022-832c-0879082941c8",
   "prevId": "b1e2cd98-33b2-4197-aa0f-352e3c2832ff",
   "version": "7",
   "dialect": "postgresql",
@@ -162,96 +162,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.achievements_unlocked": {
-      "name": "achievements_unlocked",
-      "schema": "",
-      "columns": {
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "achievement_id": {
-          "name": "achievement_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "badge_status": {
-          "name": "badge_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "badge_token_id": {
-          "name": "badge_token_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "badge_tx": {
-          "name": "badge_tx",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "badge_owner": {
-          "name": "badge_owner",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "badge_at": {
-          "name": "badge_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "achievements_unlocked_account_id_accounts_id_fk": {
-          "name": "achievements_unlocked_account_id_accounts_id_fk",
-          "tableFrom": "achievements_unlocked",
-          "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "achievements_unlocked_account_id_achievement_id_pk": {
-          "name": "achievements_unlocked_account_id_achievement_id_pk",
-          "columns": [
-            "account_id",
-            "achievement_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "achievements_badge_status_ck": {
-          "name": "achievements_badge_status_ck",
-          "value": "\"achievements_unlocked\".\"badge_status\" in ('none', 'pending', 'minted', 'local', 'failed')"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.agent_skills": {
@@ -1974,6 +1884,140 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.playbooks": {
+      "name": "playbooks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text_sha256": {
+          "name": "text_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ciphertext": {
+          "name": "ciphertext",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "iv": {
+          "name": "iv",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth_tag": {
+          "name": "auth_tag",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wrapped_key": {
+          "name": "wrapped_key",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key_id": {
+          "name": "key_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "selected": {
+          "name": "selected",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "playbooks_owner_idx": {
+          "name": "playbooks_owner_idx",
+          "columns": [
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "playbooks_selected_uq": {
+          "name": "playbooks_selected_uq",
+          "columns": [
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"playbooks\".\"selected\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "playbooks_owner_id_accounts_id_fk": {
+          "name": "playbooks_owner_id_accounts_id_fk",
+          "tableFrom": "playbooks",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.prize_payouts": {
       "name": "prize_payouts",
       "schema": "",
@@ -2082,90 +2126,6 @@
         "prize_payouts_status_ck": {
           "name": "prize_payouts_status_ck",
           "value": "\"prize_payouts\".\"status\" in ('local', 'claimable', 'paid')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.quest_claims": {
-      "name": "quest_claims",
-      "schema": "",
-      "columns": {
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quest_id": {
-          "name": "quest_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period": {
-          "name": "period",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period_key": {
-          "name": "period_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reward_credits": {
-          "name": "reward_credits",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "credited": {
-          "name": "credited",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "quest_claims_account_id_accounts_id_fk": {
-          "name": "quest_claims_account_id_accounts_id_fk",
-          "tableFrom": "quest_claims",
-          "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "quest_claims_account_id_quest_id_period_key_pk": {
-          "name": "quest_claims_account_id_quest_id_period_key_pk",
-          "columns": [
-            "account_id",
-            "quest_id",
-            "period_key"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "quest_claims_period_ck": {
-          "name": "quest_claims_period_ck",
-          "value": "\"quest_claims\".\"period\" in ('daily', 'weekly')"
         }
       },
       "isRLSEnabled": false

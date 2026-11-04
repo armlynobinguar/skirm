@@ -26,6 +26,10 @@ describe('loadConfig', () => {
     });
     expect(c.kek.length).toBe(32);
     expect(c.OPENROUTER_API_KEY).toBeUndefined();
+    expect(c).toMatchObject({ LLM_BASE_URL: 'https://openrouter.ai/api/v1', LLM_MODEL: 'anthropic/claude-haiku-5.5', LLM_PLANNER_MODEL: 'anthropic/claude-haiku-5.5' });
+    expect(c.LLM_API_KEY).toBeUndefined();
+    expect(c.LLM_PRICE_INPUT_USD).toBeUndefined();
+    expect(c.LLM_PRICE_OUTPUT_USD).toBeUndefined();
     expect(c.nearRpcUrls).toEqual([
       'https://test.rpc.fastnear.com',
       'https://near-testnet.drpc.org',
@@ -58,7 +62,39 @@ describe('loadConfig', () => {
       nearOpsConfigured: true,
     });
     expect(c.OPENROUTER_API_KEY).toBe('k');
+    // The old key name still works.
+    expect(c.LLM_API_KEY).toBe('k');
     expect(Buffer.from(c.kek).equals(Buffer.alloc(32, 7))).toBe(true);
+  });
+
+  it('reads the model provider settings; LLM_API_KEY wins over OPENROUTER_API_KEY', () => {
+    const c = loadConfig({
+      LLM_BASE_URL: 'http://localhost:11434/v1/',
+      LLM_API_KEY: 'llm',
+      OPENROUTER_API_KEY: 'or',
+      LLM_MODEL: 'llama3.2',
+      LLM_PLANNER_MODEL: '',
+      LLM_PRICE_INPUT_USD: '0.2',
+      LLM_PRICE_OUTPUT_USD: '0',
+    });
+    expect(c).toMatchObject({
+      LLM_BASE_URL: 'http://localhost:11434/v1',
+      LLM_API_KEY: 'llm',
+      LLM_MODEL: 'llama3.2',
+      LLM_PLANNER_MODEL: 'llama3.2',
+      LLM_PRICE_INPUT_USD: 0.2,
+      LLM_PRICE_OUTPUT_USD: 0,
+    });
+    expect(loadConfig({ LLM_MODEL: 'a', LLM_PLANNER_MODEL: 'b' }).LLM_PLANNER_MODEL).toBe('b');
+  });
+
+  it('rejects a bad provider URL or price', () => {
+    try {
+      loadConfig({ LLM_BASE_URL: 'ftp://x', LLM_PRICE_INPUT_USD: '-1', LLM_PRICE_OUTPUT_USD: 'cheap' });
+      expect.unreachable();
+    } catch (err) {
+      expect((err as ConfigError).issues.map((i) => i.path)).toEqual(['LLM_BASE_URL', 'LLM_PRICE_INPUT_USD', 'LLM_PRICE_OUTPUT_USD']);
+    }
   });
 
   it('rejects bad values without echoing them', () => {

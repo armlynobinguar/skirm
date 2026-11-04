@@ -22,6 +22,9 @@ export const ENV_DEFAULTS = {
   /** One credit is priced off DEFAULTS.credits (priceUsd at an assumed $1 NEAR). */
   CREDITS_PER_NEAR: DEFAULTS.credits.perNear,
   COST_ALERT_DAILY_USD: 10,
+  /** The model provider: any OpenAI-compatible API (same defaults as @skirm/decision-engine's DEFAULT_LLM_*). */
+  LLM_BASE_URL: 'https://openrouter.ai/api/v1',
+  LLM_MODEL: 'anthropic/claude-haiku-5.5',
   API_PORT: 4000,
   REALTIME_PORT: 4001,
   PUBLIC_API_URL: 'http://localhost:4000',
@@ -57,6 +60,20 @@ const port = (d: number) =>
       }
       return n;
     });
+/** USD per million tokens, ≥ 0; unset stays undefined. */
+const usdPerMTok = () =>
+  z
+    .string()
+    .optional()
+    .transform((v, ctx) => {
+      if (v === undefined || v.trim() === '') return undefined;
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0) {
+        ctx.addIssue({ code: 'custom', message: 'must be a number of USD per million tokens ≥ 0' });
+        return z.NEVER;
+      }
+      return n;
+    });
 const nearAccount = (d: string) =>
   withDefault(d).refine((v) => /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/.test(v), {
     message: 'must be a NEAR account id',
@@ -87,7 +104,20 @@ export const envSchema = z
     ALLOW_DEV_IN_PRODUCTION: z.enum(['true', 'false']).optional(),
     PRIVY_APP_ID: optional(),
     PRIVY_VERIFICATION_KEY: optional(),
+    /**
+     * The model brain's provider (docs/backend-contract.md, Environment): any OpenAI-compatible
+     * chat-completions API. LLM_API_KEY unset → OPENROUTER_API_KEY (its old name); neither set →
+     * the offline greedy brain (unless V2_BRAIN=model with a keyless local LLM_BASE_URL).
+     */
+    LLM_BASE_URL: url(ENV_DEFAULTS.LLM_BASE_URL, ['https:', 'http:']),
+    LLM_API_KEY: optional(),
     OPENROUTER_API_KEY: optional(),
+    LLM_MODEL: withDefault(ENV_DEFAULTS.LLM_MODEL),
+    /** Unset → LLM_MODEL. */
+    LLM_PLANNER_MODEL: optional(),
+    /** Cost estimate when the provider returns no cost (OpenRouter returns one). */
+    LLM_PRICE_INPUT_USD: usdPerMTok(),
+    LLM_PRICE_OUTPUT_USD: usdPerMTok(),
     /** Unset → SKILL_KEK_KMS if set, else the built-in dev key. */
     SKILL_KEK: optional().refine((v) => v === undefined || decodeKek(v.trim()) !== undefined, {
       message: 'must be base64 of exactly 32 bytes',
@@ -236,6 +266,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     ...c,
     SKILL_KEK: skillKek,
     SKILL_KEK_KMS: c.SKILL_KEK_KMS?.trim(),
+    LLM_BASE_URL: c.LLM_BASE_URL.replace(/\/+$/, ''),
+    LLM_API_KEY: (c.LLM_API_KEY ?? c.OPENROUTER_API_KEY)?.trim(),
+    LLM_PLANNER_MODEL: c.LLM_PLANNER_MODEL?.trim() ?? c.LLM_MODEL,
     kek: decodeKek(skillKek ?? DEV_SKILL_KEK)!,
     kekMode,
     devKek,

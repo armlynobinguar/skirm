@@ -38,6 +38,7 @@ export const qk = {
     list: (tab: 'written' | 'owned') => ['skills', 'list', tab] as const,
     one: (skillId: string, version?: number) => ['skills', 'one', skillId, version ?? null] as const,
   },
+  playbooks: ['playbooks'] as const,
   market: {
     all: ['market'] as const,
     list: (q: MarketQuery = {}) => ['market', 'list', q.tag ?? null, q.sort ?? 'winrate'] as const,

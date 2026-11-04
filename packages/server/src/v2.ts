@@ -102,9 +102,10 @@ export type V2ClientMessage =
   | { type: 'v2_decline'; matchId: string }
   /**
    * `tiers` is per queued agent (slot order). `crew`, when sent, replaces the queued crew (swap,
-   * remove, or add up to `crewLimit`) and its tiers win over `tiers`.
+   * remove, or add up to `crewLimit`) and its tiers win over `tiers`. `playbookId` picks one of the
+   * player's crew playbooks for this match (null: none); absent keeps the one selected over REST.
    */
-  | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[] }
+  | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[]; playbookId?: string | null }
   /** Every stored frame of an ended match (answered with v2_frames), for replay at another speed. */
   | { type: 'v2_replay'; matchId: string }
   /**

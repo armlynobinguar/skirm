@@ -16,6 +16,7 @@ import {
   listings,
   matchMessages,
   onboardingProgress,
+  playbooks,
   prizePayouts,
   questClaims,
   rentalOffers,
@@ -86,7 +87,7 @@ export class AccountsRepo {
 
   /**
    * Deletes a player's account as the privacy policy says: the sign-in (Privy id), the NEAR link and
-   * the system prompts go, rental offers end, and the handle becomes `~deleted-<id>` (no sign-in can
+   * the system prompts and crew playbooks go, rental offers end, and the handle becomes `~deleted-<id>` (no sign-in can
    * match it). Agents, skills, match history, sales and the ledger stay, because other players' records
    * and paid rental passes depend on them; the account never signs in again (`deleted_at`).
    * The caller refuses a live match or an open listing first.
@@ -100,6 +101,7 @@ export class AccountsRepo {
         .returning();
       if (!row) throw new RepoError('not_found', 'account not found');
       await t.update(agents).set({ systemPrompt: null }).where(eq(agents.ownerId, accountId));
+      await t.delete(playbooks).where(eq(playbooks.ownerId, accountId));
       await t.update(rentalOffers).set({ active: false, updatedAt: now }).where(and(eq(rentalOffers.ownerId, accountId), eq(rentalOffers.active, true)));
       return row;
     });
@@ -116,7 +118,7 @@ export class AccountsRepo {
     const agentIds = myAgents.map((a) => a.id);
     const [
       agentSkillRows, unlockRows, skillRows, ownership, listingRows, saleRows, offers, rentalRows,
-      ledger, ledgerRowsOut, matches, standings, payouts, trials, cosmetics, onboarding, decays,
+      ledger, ledgerRowsOut, matches, standings, payouts, trials, cosmetics, onboarding, decays, playbookRows,
     ] = await Promise.all([
       this.db.select().from(agentSkills).where(agentIds.length ? inArray(agentSkills.agentId, agentIds) : sql`false`),
       this.db.select().from(unlockItems).where(eq(unlockItems.ownerId, accountId)),
@@ -138,6 +140,7 @@ export class AccountsRepo {
       this.db.select().from(cosmeticsOwned).where(eq(cosmeticsOwned.accountId, accountId)),
       this.db.select().from(onboardingProgress).where(eq(onboardingProgress.accountId, accountId)),
       this.db.select().from(eloDecays).where(eq(eloDecays.accountId, accountId)),
+      this.db.select().from(playbooks).where(eq(playbooks.ownerId, accountId)),
     ]);
     // A match's debriefs hold both crews' private numbers: keep only the player's own side.
     const ownMatches = matches.map((m) => {
@@ -170,6 +173,7 @@ export class AccountsRepo {
       achievements,
       onboarding,
       eloDecays: decays,
+      playbooks: playbookRows,
     };
   }
 

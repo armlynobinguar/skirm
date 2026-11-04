@@ -245,8 +245,20 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     ]
   },
   {
-    "tag": "0011_quests_achievements",
-    "folderMillis": 1793790455952,
+    "tag": "0011_crew_playbooks",
+    "folderMillis": 1793790406202,
+    "bps": true,
+    "hash": "5f2a12b33273b765a404d76d2ad05d1a0b6999ff2f0c6cade7c53921fc4197d6",
+    "sql": [
+      "CREATE TABLE \"playbooks\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"owner_id\" text NOT NULL,\n\t\"name\" text NOT NULL,\n\t\"text_sha256\" text NOT NULL,\n\t\"ciphertext\" \"bytea\" NOT NULL,\n\t\"iv\" \"bytea\" NOT NULL,\n\t\"auth_tag\" \"bytea\" NOT NULL,\n\t\"wrapped_key\" \"bytea\" NOT NULL,\n\t\"key_id\" text NOT NULL,\n\t\"selected\" boolean DEFAULT false NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL\n);\n",
+      "\nALTER TABLE \"playbooks\" ADD CONSTRAINT \"playbooks_owner_id_accounts_id_fk\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"playbooks_owner_idx\" ON \"playbooks\" USING btree (\"owner_id\");",
+      "\nCREATE UNIQUE INDEX \"playbooks_selected_uq\" ON \"playbooks\" USING btree (\"owner_id\") WHERE \"playbooks\".\"selected\";"
+    ]
+  },
+  {
+    "tag": "0012_quests_achievements",
+    "folderMillis": 1793798956631,
     "bps": true,
     "hash": "593479cdbca45782b2d776a3f5c3b4ff29257350a41aadcdf96e060beee9f1cd",
     "sql": [

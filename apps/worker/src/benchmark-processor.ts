@@ -180,7 +180,7 @@ async function benchmarkVersion(
 
   if (brain.kind === 'greedy') {
     await repos.proof.markNeedsModel(skillId, version, brain.kind);
-    logger.warn('benchmark needs a model: set OPENROUTER_API_KEY', { skillId, version });
+    logger.warn('benchmark needs a model: set LLM_API_KEY', { skillId, version });
     return out('needs_model');
   }
 
@@ -251,7 +251,7 @@ async function runTrial(
   if (brain.kind === 'greedy') {
     // Offline: nothing is played and the trial does not count against the buyer's three.
     await repos.proof.finishTrial(trialId, { status: 'needs_model' });
-    logger.warn('trial needs a model: set OPENROUTER_API_KEY', { trialId });
+    logger.warn('trial needs a model: set LLM_API_KEY', { trialId });
     return out('needs_model');
   }
 

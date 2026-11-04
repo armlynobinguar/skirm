@@ -67,7 +67,7 @@ export const NOTES = {
       "Up to 3 agents. The head-start rule shows live: each agent beyond the rival's costs 10 s.",
       'Talk tier per agent. Ranked locks every agent to Standard; practice unlocks Quiet and Open.',
       'The credit estimate is 150 ticks × the sum of tier rates.',
-      'Models are fixed for everyone: Haiku plans, Jev acts.',
+      'The model is fixed for everyone: the server picks one model to plan and act for every agent.',
     ],
   },
   match: {

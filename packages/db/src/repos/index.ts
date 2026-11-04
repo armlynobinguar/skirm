@@ -11,6 +11,7 @@ import { MatchMessagesRepo } from './match-messages';
 import { MatchTimelinesRepo } from './match-timelines';
 import { OnboardingRepo } from './onboarding';
 import { OpsRepo } from './ops';
+import { PlaybooksRepo } from './playbooks';
 import { ProofRepo } from './proof';
 import { QuestsRepo } from './quests';
 import { RankedRepo } from './ranked';
@@ -59,6 +60,8 @@ export interface Repos {
   onboarding: OnboardingRepo;
   /** Players' own programs bound to their agents (bring your own agent). */
   externalAgents: ExternalAgentsRepo;
+  /** Crew playbooks (sealed; owner-only). */
+  playbooks: PlaybooksRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -98,6 +101,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     replays: new ReplaysRepo(db),
     onboarding: new OnboardingRepo(db),
     externalAgents: new ExternalAgentsRepo(db),
+    playbooks: new PlaybooksRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -114,6 +118,7 @@ export * from './match-messages';
 export * from './match-timelines';
 export * from './onboarding';
 export * from './ops';
+export * from './playbooks';
 export * from './proof';
 export * from './quests';
 export * from './ranked';

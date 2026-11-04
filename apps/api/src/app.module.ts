@@ -15,6 +15,7 @@ import { LobbiesController } from './controllers/lobbies.controller';
 import { OnboardingController } from './controllers/onboarding.controller';
 import { RentalsController } from './controllers/rentals.controller';
 import { OpsController } from './controllers/ops.controller';
+import { PlaybooksController } from './controllers/playbooks.controller';
 import { PublicController } from './controllers/public.controller';
 import { QuestsController } from './controllers/quests.controller';
 import { ReplaysController } from './controllers/replays.controller';
@@ -48,6 +49,7 @@ export class AppModule {
         OnboardingController,
         ExternalAgentsController,
         AgentApiController,
+        PlaybooksController,
       ],
       providers: [
         { provide: DEPS, useValue: deps },

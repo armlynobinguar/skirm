@@ -87,7 +87,7 @@ export class ExternalBrain implements V2Brain {
     let say: V2Decision['say'] = null;
     let refusedSay: V2Decision['refusedSay'];
     if (reply.say) {
-      const secrets = ctx.instructions ? [...ctx.skills, ctx.instructions] : ctx.skills;
+      const secrets = [...ctx.skills, ...(ctx.instructions ? [ctx.instructions] : []), ...(ctx.playbook ? [ctx.playbook] : [])];
       const f = filterSpeech(reply.say.text, secrets);
       if (f.ok) say = { channel: reply.say.channel, text: f.text };
       else refusedSay = f.reason;

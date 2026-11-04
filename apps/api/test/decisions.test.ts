@@ -35,11 +35,11 @@ function crews() {
   };
 }
 
-function timelines(brainB = 'haiku'): MatchTimelineInput[] {
+function timelines(brainB = 'model'): MatchTimelineInput[] {
   return [
     {
       team: 'A',
-      brain: 'haiku',
+      brain: 'model',
       plans: [{ tick: 1, text: 'Wick dams the left gap.', why: 'Water comes from the left.' }],
       decisions: [
         { tick: 1, agentId: 'agt_w', observed: 'At 1,1 carrying 0/2.', action: 'move E', reason: 'chosen', skill: anaSkill, thought: 'Gap first.' },
@@ -58,7 +58,7 @@ function timelines(brainB = 'haiku'): MatchTimelineInput[] {
   ];
 }
 
-async function ended(practice = false, brainB = 'haiku') {
+async function ended(practice = false, brainB = 'model') {
   const m = await h.repos.v2Matches.create({ mapId: 'copper-hollow', ranked: false, practice, teamA: ana.accountId, teamB: ben.accountId, crews: crews() });
   await h.repos.v2Matches.finish(m.id, { winner: 'A', reason: 'goal', ticks: 3, score: { A: 3, B: 1 } });
   await h.repos.matchTimelines.put(m.id, timelines(brainB));
@@ -87,7 +87,7 @@ describe('GET /v2/matches/:id/decisions', () => {
     expect(a.body.you).toBe('A');
     expect(a.body.crews.map((c: { team: string }) => c.team)).toEqual(['A']);
     const crew = a.body.crews[0];
-    expect(crew).toMatchObject({ own: true, brain: 'haiku', agents: [{ id: 'agt_w', name: 'Wick', role: 'Builder', skills: [anaSkill] }] });
+    expect(crew).toMatchObject({ own: true, brain: 'model', agents: [{ id: 'agt_w', name: 'Wick', role: 'Builder', skills: [anaSkill] }] });
     expect(crew.plans[0]).toEqual({ tick: 1, text: 'Wick dams the left gap.', why: 'Water comes from the left.' });
     expect(crew.decisions.map((d: { skill: unknown }) => d.skill)).toEqual([{ ...anaSkill, by: 'model' }, { ...anaSkill, by: 'inferred' }, null]);
     expect(crew.moments).toEqual([{ tick: 2, kind: 'hazard_breach', team: 'A', agentId: 'agt_w', text: 'water reached Wick' }]);
