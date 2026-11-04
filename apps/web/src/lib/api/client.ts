@@ -18,6 +18,9 @@ import type {
   BenchRun,
   BenchRunDetail,
   BenchRunRequest,
+  DailyAttempt,
+  DailyBoard,
+  DailyToday,
   Cosmetics,
   CreditsWithRows,
   CurrentSeason,
@@ -135,6 +138,13 @@ export interface ApiClient {
   benchRun(runId: string): Promise<BenchRunDetail>;
   /** GET /bench/compare: two runs side by side and a word diff of their prompts. */
   compareBenchRuns(a: string, b: string): Promise<BenchCompare>;
+
+  /** GET /daily: today's challenge, your attempts and the time left. */
+  daily(): Promise<DailyToday>;
+  /** POST /daily/attempts: 202 queued with your crew (default: your first agents); 429 `daily_limit`. */
+  startDailyAttempt(agentIds?: string[]): Promise<DailyAttempt>;
+  /** GET /daily/leaderboard: a day's top attempts (today by default) and your rank. */
+  dailyBoard(date?: string): Promise<DailyBoard>;
 
   /** GET /seasons/current: the open season (opened on demand), its top 10 and the caller's row. */
   currentSeason(): Promise<CurrentSeason>;
@@ -336,6 +346,10 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     benchRuns: (skillId) => get('/bench/runs', { skillId }),
     benchRun: (id) => get(`/bench/runs/${enc(id)}`),
     compareBenchRuns: (a, b) => get('/bench/compare', { a, b }),
+
+    daily: () => get('/daily'),
+    startDailyAttempt: (agentIds) => json('POST', '/daily/attempts', { body: agentIds ? { agentIds } : {} }),
+    dailyBoard: (date) => get('/daily/leaderboard', { date }),
 
     currentSeason: () => get('/seasons/current'),
     seasonStandings: (id, page = {}) => get(`/seasons/${enc(id)}/standings`, { limit: page.limit, offset: page.offset }),

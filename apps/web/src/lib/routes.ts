@@ -16,6 +16,8 @@ export const routes = {
     `/maps/${e(mapId)}/crew?${difficulty ? `d=${difficulty}&` : ''}opponent=bot`,
   /** The guided first match: the briefing, then practice vs the bot with tips over the match screen. */
   tutorial: () => '/tutorial',
+  /** The daily challenge: today's seed against the bot, your attempts and the global board. */
+  daily: () => '/daily',
   skills: (tab?: 'written' | 'owned') => (tab === 'owned' ? '/skills?tab=owned' : '/skills'), // S07
   newSkill: () => '/skills/new', // S08 (blank)
   editSkill: (skillId: string) => `/skills/${e(skillId)}/edit`, // S08
@@ -49,7 +51,7 @@ export type NavGroup = 'play' | 'skills' | 'market' | 'pvp' | 'leaderboards' | '
 
 /** Which header item a path belongs to (TopBar.dc.html `active`). */
 export function navGroupOf(pathname: string): NavGroup | null {
-  if (/^\/(play|maps|agents|tutorial)(\/|$)/.test(pathname)) return 'play';
+  if (/^\/(play|maps|agents|tutorial|daily)(\/|$)/.test(pathname)) return 'play';
   if (/^\/skills(\/|$)/.test(pathname)) return 'skills';
   if (/^\/market(\/|$)/.test(pathname)) return 'market';
   if (/^\/(pvp|matches|lobbies|tournaments)(\/|$)/.test(pathname)) return 'pvp';
@@ -74,6 +76,7 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/play\/?$/, key: 'home', title: 'Command', sub: '// home', back: null },
   { re: /^\/maps\/[^/]+\/crew\/?$/, key: 'crew', title: 'Lock in', sub: '// crew + talk', back: routes.home() },
   { re: /^\/tutorial\/?$/, key: 'tutorial', title: 'Tutorial', sub: '// first match', back: routes.home() },
+  { re: /^\/daily\/?$/, key: 'daily', title: 'Daily', sub: '// one seed a day', back: routes.home() },
   { re: /^\/agents(\/|$)/, key: 'agent', title: 'Agent', sub: '// prompt + stats', back: routes.home() },
   { re: /^\/maps(\/|$)/, key: 'maps', title: 'Atlas', sub: '// maps', back: routes.home() },
   { re: /^\/pvp(\/|$)/, key: 'pvp', title: 'Skirmish', sub: '// ranked', back: routes.home() },

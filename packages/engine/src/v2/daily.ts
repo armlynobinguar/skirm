@@ -13,9 +13,9 @@
 // 2 000), one point of margin outweighs any speed bonus, and the bonus breaks ties between equal
 // wins. Board ties (equal points) go to fewer ticks, then to whoever finished first.
 import { DIFF_MODS, type Difficulty } from './difficulty';
-import type { MapDefV2 } from './map';
+import type { MapDefV2, Team } from './map';
 import { MAPS_V2 } from './maps';
-import type { MatchOptions, Team } from './match';
+import type { MatchOptions } from './match';
 import { PRACTICE_MAPS, practiceRival } from './practice';
 import type { TalkTier } from './talk';
 
