@@ -263,6 +263,41 @@ describe('NEAR Connect wallet', () => {
     await expect(wallet.connect()).rejects.toMatchObject({ code: 'wallet_rejected' });
   });
 
+  it('lists the wallets and connects the picked one in one approval with its signed message', async () => {
+    const once: Record<string, (e: unknown) => void> = {};
+    const signed = { accountId: 'bo.testnet', publicKey: 'ed25519:k', signature: 'sig' };
+    const { conn } = fakeConnector({
+      whenManifestLoaded: Promise.resolve(),
+      availableWallets: [
+        { manifest: { id: 'hot-wallet', name: 'HOT', icon: 'i.svg', features: { signInAndSignMessage: true } } },
+        { manifest: { id: 'mynearwallet', name: 'MyNearWallet', features: {} } },
+      ],
+      once: (e: string, cb: (e: unknown) => void) => {
+        once[e] = cb;
+      },
+      connect: vi.fn(async () => {
+        once['wallet:signInAndSignMessage']?.({ accounts: [{ accountId: 'bo.testnet', signedMessage: signed }] });
+        return {};
+      }),
+    });
+    const wallet = createNearConnectWallet({ network: 'testnet', factory: async () => conn as never });
+    expect(await wallet.wallets()).toEqual([
+      { id: 'hot-wallet', name: 'HOT', icon: 'i.svg', description: '', oneStep: true },
+      { id: 'mynearwallet', name: 'MyNearWallet', icon: '', description: '', oneStep: false },
+    ]);
+    const message = { message: 'skirm:link-near:acc_1', recipient: 'skirm', nonce: new Uint8Array(32) };
+    await expect(wallet.connectAndSign('hot-wallet', message)).resolves.toEqual({ accountId: 'bo.testnet', signed });
+    expect(conn.connect).toHaveBeenCalledWith({ walletId: 'hot-wallet', signMessageParams: message });
+    expect(wallet.accountId()).toBe('bo.testnet');
+  });
+
+  it('connects straight to a picked wallet without opening the picker', async () => {
+    const { conn } = fakeConnector();
+    const wallet = createNearConnectWallet({ network: 'testnet', factory: async () => conn as never });
+    await expect(wallet.connect('mynearwallet')).resolves.toBe('ada.testnet');
+    expect(conn.connect).toHaveBeenCalledWith({ walletId: 'mynearwallet' });
+  });
+
   it('fails a transaction NEAR reports as failed', () => {
     expect(() =>
       txHashOf({ transaction: { hash: 'H' }, status: { Failure: { ActionError: {} } } }),

@@ -20,7 +20,7 @@ import { CurrentAccount, Public, mustAccount } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
 import { ApiError } from '../errors';
 import { agentId, agentPatch, intQuery, parse, sessionBody } from '../validation';
-import { linkMessage, verifyNearSignature } from '../near-link';
+import { linkMessage, linkSignInMessage, verifyNearSignature } from '../near-link';
 import { accountView, myMatchView } from '../views';
 import { idOr404 } from './util';
 
@@ -107,14 +107,12 @@ export class CoreController {
             ...(proof.callbackUrl !== undefined ? { callbackUrl: proof.callbackUrl } : {}),
           }
         : undefined;
-    if (
-      !verifyNearSignature(
-        proof.publicKey,
-        linkMessage(accountId, nearAccountId),
-        proof.signature,
-        nep413,
-      )
-    )
+    // Either message: with the NEAR account id (sign after connect) or without it (signed during
+    // sign-in, one approval). The full-access-key check below binds both to nearAccountId.
+    const signedOne = [linkMessage(accountId, nearAccountId), linkSignInMessage(accountId)].some((m) =>
+      verifyNearSignature(proof.publicKey, m, proof.signature, nep413),
+    );
+    if (!signedOne)
       throw new ApiError(
         422,
         'near_proof_invalid',

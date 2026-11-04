@@ -11,7 +11,7 @@
 // Mint (S08) needs no wallet: the api mints with the ops key (Minter) to the linked account.
 import type { NearProof } from '../api/types';
 import type { NearConfig } from '../config';
-import type { FunctionCallAction, NearTransaction, NearWallet } from './types';
+import type { FunctionCallAction, NearTransaction, NearWallet, SignedMessage } from './types';
 
 const TGAS = 10n ** 12n;
 export const GAS = {
@@ -92,6 +92,21 @@ export function listTx(c: Contracts, tokenId: string, priceYocto: string): NearT
 export const linkMessage = (accountId: string, nearAccountId: string) =>
   `skirm:link-near:${accountId}:${nearAccountId}`;
 
+/** The link message signed during sign-in, before the NEAR account is known (api linkSignInMessage). */
+export const linkSignInMessage = (accountId: string) => `skirm:link-near:${accountId}`;
+
+/** 32 random bytes for a NEP-413 nonce. */
+export function newNonce(): Uint8Array {
+  const nonce = new Uint8Array(32);
+  crypto.getRandomValues(nonce);
+  return nonce;
+}
+
+/** The `nearProof` body for a NEP-413 signature. */
+export function proofOf(signed: SignedMessage, nonce: Uint8Array, recipient: string): NearProof {
+  return { publicKey: signed.publicKey, signature: normaliseSignature(signed.signature), nonce: base64(nonce), recipient };
+}
+
 function base64(bytes: Uint8Array): string {
   let s = '';
   for (const b of bytes) s += String.fromCharCode(b);
@@ -146,17 +161,11 @@ export async function signLinkProof(
   nearAccountId: string,
   recipient = linkRecipient(),
 ): Promise<NearProof> {
-  const nonce = new Uint8Array(32);
-  crypto.getRandomValues(nonce);
+  const nonce = newNonce();
   const signed = await wallet.signMessage({
     message: linkMessage(accountId, nearAccountId),
     recipient,
     nonce,
   });
-  return {
-    publicKey: signed.publicKey,
-    signature: normaliseSignature(signed.signature),
-    nonce: base64(nonce),
-    recipient,
-  };
+  return proofOf(signed, nonce, recipient);
 }
