@@ -111,7 +111,7 @@ export function marketDetailFixture(o: Partial<MarketDetail> = {}): MarketDetail
 export function benchmarkFixture(o: Partial<MarketBenchmark> = {}): MarketBenchmark {
   return {
     status: 'done',
-    brain: 'haiku',
+    brain: 'model',
     seeds: 6,
     matches: 6,
     wins: 4,

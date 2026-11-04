@@ -363,7 +363,7 @@ function V2Crew({ me, mapId, initialDifficulty, initialBot }: { me: Me; mapId: s
             </div>
           ) : null}
           <span className={c.headStart}>Fielding more agents than the rival gives them {HEAD_START_S_PER_AGENT} s per extra agent</span>
-          <span className={c.models}>Haiku 5.5 plans and acts · same for everyone</span>
+          <span className={c.models}>One model plans and acts · same for everyone</span>
           {searching ? (
             <div className={c.panel} aria-live="polite">
               <span className="sk-kick" data-testid="s04-searching">

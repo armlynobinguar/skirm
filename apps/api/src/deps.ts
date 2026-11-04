@@ -30,14 +30,27 @@ export interface BenchmarkQueue {
 
 /**
  * `V2_BRAIN` (not in ServerConfig) is read from the environment like the worker and realtime read
- * it: 'greedy' forces the offline brain even with an OpenRouter key. `rankedDecay` is the worker's
+ * it: 'greedy' forces the offline brain even with a model key (LLM_API_KEY). `rankedDecay` is the worker's
  * Elo decay setting (RANKED_DECAY_DAYS / _AMOUNT, rankedDecayFromEnv), DEFAULTS.ranked.decay unset.
  */
 export type ApiConfig = Pick<
   ServerConfig,
   'AUTH_MODE' | 'PRIVY_APP_ID' | 'PRIVY_VERIFICATION_KEY' | 'CREDITS_PER_NEAR'
 > &
-  Partial<Pick<ServerConfig, 'OPS_TOKEN' | 'COST_ALERT_DAILY_USD' | 'OPENROUTER_API_KEY'>> & {
+  Partial<
+    Pick<
+      ServerConfig,
+      | 'OPS_TOKEN'
+      | 'COST_ALERT_DAILY_USD'
+      | 'LLM_BASE_URL'
+      | 'LLM_API_KEY'
+      | 'OPENROUTER_API_KEY'
+      | 'LLM_MODEL'
+      | 'LLM_PLANNER_MODEL'
+      | 'LLM_PRICE_INPUT_USD'
+      | 'LLM_PRICE_OUTPUT_USD'
+    >
+  > & {
     V2_BRAIN?: string | undefined;
     rankedDecay?: RankedDecayConfig;
   };

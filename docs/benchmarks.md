@@ -21,12 +21,14 @@ nothing is played:
   shows `benchmarkScore: null`, the `benchmark` sort puts it last, and the skill drawer reads
   "Benchmarks need a model key; this server runs the offline bot brain".
 - A trial ends `needs_model` with no results and does not count against the buyer's three.
-- The worker logs `benchmark needs a model: set OPENROUTER_API_KEY` (or `trial needs a model`).
+- The worker logs `benchmark needs a model: set LLM_API_KEY` (or `trial needs a model`).
 
 The local stack and `deploy.yml` run greedy (`V2_BRAIN=greedy`), so every benchmark there is
-`needs_model`. The real gauntlet runs only when the worker boots a model brain: `OPENROUTER_API_KEY`
-set and `V2_BRAIN` not `greedy` (Haiku 5.5 as `anthropic/claude-haiku-5.5`, one call per agent per
-tick, the crew plan every `V2_REPLAN_EVERY` = 25 ticks). Its unit tests use a fake skill-aware brain.
+`needs_model`. The real gauntlet runs only when the worker boots a model brain: `LLM_API_KEY` (or
+`OPENROUTER_API_KEY`) set and `V2_BRAIN` not `greedy` (`LLM_MODEL` on `LLM_BASE_URL`, by default
+`anthropic/claude-haiku-5.5` on OpenRouter; one call per agent per tick, the crew plan every
+`V2_REPLAN_EVERY` = 25 ticks with `LLM_PLANNER_MODEL`). Scores are comparable only between runs on
+the same model. Its unit tests use a fake skill-aware brain.
 
 ## The gauntlet (benchmark at mint)
 
@@ -76,13 +78,15 @@ under **Try before you buy**.
 A benchmark is 6 matches of one model agent, a trial 3, each up to 150 ticks. At the modeled
 $0.000168 per agent-tick that is at most about $0.15 per benchmark and $0.08 per trial, paid by the
 platform (no credits are held). Every model call's cost goes to the daily total behind
-`cost_alert` (`COST_ALERT_DAILY_USD`); when OpenRouter returns `usage.cost`, that billed figure is
-used instead of the `PRICES` estimate.
+`cost_alert` (`COST_ALERT_DAILY_USD`); when the provider returns a cost (OpenRouter's `usage.cost`),
+that billed figure is used; otherwise the standard `usage.prompt_tokens` / `completion_tokens` are
+priced at `LLM_PRICE_INPUT_USD` / `LLM_PRICE_OUTPUT_USD` (the default model falls back to
+`DEFAULT_MODEL_PRICES`; any other unpriced model records cost 0 and logs that once).
 
 ## What still needs a model key
 
 - A real run of the gauntlet and trials, and a look at whether `score` separates good skills from
   bad ones.
-- Checking OpenRouter's billed `usage.cost` against `PRICES.haiku` before the talk rates are
+- Checking the provider's billed cost against `DEFAULT_MODEL_PRICES` (or the `LLM_PRICE_*` you set) before the talk rates are
   locked (README, Economy).
 - Tuning the mid-match scoring stalls seen on bigger maps.

@@ -173,6 +173,9 @@ describe('api caster choice', () => {
     expect(createApiCaster({}).kind).toBe('template');
     expect(createApiCaster({ OPENROUTER_API_KEY: 'k', V2_BRAIN: 'greedy' }).kind).toBe('template');
     expect(createApiCaster({ OPENROUTER_API_KEY: 'k' }).kind).toBe('model');
+    expect(createApiCaster({ LLM_API_KEY: 'k', LLM_BASE_URL: 'https://api.openai.com/v1' }).kind).toBe('model');
+    expect(createApiCaster({ V2_BRAIN: 'model', LLM_BASE_URL: 'http://localhost:11434/v1' }).kind).toBe('model');
+    expect(createApiCaster({ V2_BRAIN: 'model' }).kind).toBe('template');
   });
 
   it('falls back to template lines without a caster', async () => {

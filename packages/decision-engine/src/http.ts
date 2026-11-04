@@ -1,4 +1,4 @@
-// The only place that speaks HTTP for the OpenAI-compatible provider (OpenRouter).
+// The only place that speaks HTTP for the OpenAI-compatible provider (../llm builds the requests).
 
 import { HttpError } from './policy';
 

@@ -155,7 +155,7 @@ export function LockIn({ view }: { view: V2MatchView }) {
               {hs.text}
             </span>
           ) : null}
-          <span className={c.models}>Haiku 5.5 plans and acts · same for everyone</span>
+          <span className={c.models}>One model plans and acts · same for everyone</span>
           {locked ? (
             <span className="sk-kick">
               Locked · {rivalLocked ? 'starting…' : 'waiting for the rival'}

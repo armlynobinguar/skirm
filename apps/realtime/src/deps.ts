@@ -44,7 +44,7 @@ export interface RealtimeDeps {
   registry: RegistryQueue;
   scheduler?: Scheduler;
   queueTiming?: Partial<QueueTiming>;
-  /** v2: the brain every agent uses (default: the offline greedy brain; production passes Haiku). */
+  /** v2: the brain every agent uses (default: the offline greedy brain; production passes the model brain). */
   v2Brain?: V2Brain;
   v2Timing?: Partial<V2Timing>;
   /** Bring your own agent: the pull relay shared with the api (Redis in production). */

@@ -17,7 +17,7 @@ function fixture(over: Partial<MatchDecisions> = {}): MatchDecisions {
       {
         team: 'A',
         own: true,
-        brain: 'haiku',
+        brain: 'model',
         agents: [
           { id: 'agt_w', name: 'Wick', role: 'Builder', skills: [SKILL] },
           { id: 'agt_m', name: 'Moss', role: 'Digger', skills: [] },

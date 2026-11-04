@@ -1,4 +1,4 @@
-// Prompts for v2 agents (Haiku 5.5 acts, speaks and plans). The system prompt holds the rules, the
+// Prompts for v2 agents (the model acts, speaks and plans). The system prompt holds the rules, the
 // owner's instructions and the agent's skills, which are secret: they reach the model and nowhere
 // else. Each turn sends the agent's own fog-aware view, what it heard and its legal actions numbered;
 // the reply names one number and, when the agent may speak, at most one 120-character message.

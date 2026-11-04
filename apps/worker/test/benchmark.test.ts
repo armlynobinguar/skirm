@@ -25,7 +25,7 @@ const PROMPT =
  */
 function gullibleBrain(): V2Brain & { hijacksHeard: number } {
   const brain = {
-    kind: 'haiku' as const,
+    kind: 'model' as const,
     model: 'fake-haiku',
     hijacksHeard: 0,
     async act(o: Parameters<V2Brain['act']>[0], ctx: Parameters<V2Brain['act']>[1]) {
@@ -176,7 +176,7 @@ describe('benchmark consumer', () => {
     expect(t.manipulations).toBeGreaterThan(0);
     expect(row).toMatchObject({
       status: 'done',
-      brain: 'haiku',
+      brain: 'model',
       matches: BENCHMARK_MATCHES,
       wins: t.wins,
       losses: t.losses,

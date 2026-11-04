@@ -1,7 +1,7 @@
 // GET /ops/stats: off without OPS_TOKEN, bearer token required, totals over players, credits, v2
 // matches and the daily model spend from Redis.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { opsTokenMatches, v2BrainKind } from '../src/controllers/ops.controller';
+import { opsTokenMatches, v2Engine } from '../src/controllers/ops.controller';
 import { setup, type Harness } from './helpers';
 
 const TOKEN = 'ops-token-for-tests-0123456789abcdef';
@@ -55,6 +55,7 @@ describe('GET /ops/stats', () => {
     expect(res.status).toBe(200);
     const s = res.body;
     expect(s.engine).toBe('greedy');
+    expect(s.model).toBeNull();
     expect(s.players).toMatchObject({ total: 2, new1d: 2, new7d: 2, withNear: 0 });
     expect(s.credits).toMatchObject({ balance: 500, held: 0, fundedAccounts: 1, creditsPerNear: 1000 });
     expect(s.credits.flow30d).toContainEqual({ type: 'topup', source: 'paid', rows: 1, credits: 500 });
@@ -71,21 +72,24 @@ describe('GET /ops/stats', () => {
   });
 });
 
-describe('v2BrainKind', () => {
-  it('reports haiku with an OpenRouter key unless V2_BRAIN=greedy', () => {
-    expect(v2BrainKind({})).toBe('greedy');
-    expect(v2BrainKind({ OPENROUTER_API_KEY: 'sk-or-1' })).toBe('haiku');
-    expect(v2BrainKind({ OPENROUTER_API_KEY: 'sk-or-1', V2_BRAIN: 'greedy' })).toBe('greedy');
-    expect(v2BrainKind({ V2_BRAIN: 'haiku' })).toBe('greedy');
+describe('v2Engine', () => {
+  it('reports the model and its id with a model key unless V2_BRAIN=greedy', () => {
+    expect(v2Engine({})).toEqual({ engine: 'greedy', model: null });
+    expect(v2Engine({ OPENROUTER_API_KEY: 'sk-or-1' })).toEqual({ engine: 'model', model: 'anthropic/claude-haiku-5.5' });
+    expect(v2Engine({ LLM_API_KEY: 'sk-1', LLM_MODEL: 'gpt-5-mini' })).toEqual({ engine: 'model', model: 'gpt-5-mini' });
+    expect(v2Engine({ OPENROUTER_API_KEY: 'sk-or-1', V2_BRAIN: 'greedy' }).engine).toBe('greedy');
+    expect(v2Engine({ V2_BRAIN: 'haiku' }).engine).toBe('greedy');
   });
 
-  it('GET /ops/stats reports the brain the config would build', async () => {
-    const h = await setup({ config: { OPS_TOKEN: TOKEN, OPENROUTER_API_KEY: 'sk-or-1' } });
+  it('GET /ops/stats and /ops/talk-rates report the brain the config would build', async () => {
+    const h = await setup({ config: { OPS_TOKEN: TOKEN, LLM_API_KEY: 'sk-1', LLM_MODEL: 'llama-3.3-70b' } });
     try {
       const res = await h.http().get('/ops/stats').set('authorization', `Bearer ${TOKEN}`);
-      expect(res.body.engine).toBe('haiku');
+      expect(res.body).toMatchObject({ engine: 'model', model: 'llama-3.3-70b' });
+      const rates = await h.http().get('/ops/talk-rates').set('authorization', `Bearer ${TOKEN}`);
+      expect(rates.body).toMatchObject({ engine: 'model', model: 'llama-3.3-70b' });
       h.deps.config.V2_BRAIN = 'greedy';
-      expect((await h.http().get('/ops/stats').set('authorization', `Bearer ${TOKEN}`)).body.engine).toBe('greedy');
+      expect((await h.http().get('/ops/stats').set('authorization', `Bearer ${TOKEN}`)).body).toMatchObject({ engine: 'greedy', model: null });
     } finally {
       await h.close();
     }

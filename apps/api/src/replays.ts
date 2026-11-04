@@ -6,7 +6,7 @@
 // show more than a spectator saw. Frames live 6 h in Redis today (realtime replay.ts); the reader is
 // an interface so permanent storage can replace it without touching the routes.
 import type { ReplayCastRow, ReplayHighlightRecord, Repos, V2MatchRow } from '@skirm/db';
-import { createModelCaster, createTemplateCaster, type Caster } from '@skirm/decision-engine/v2';
+import { createModelCaster, createTemplateCaster, llmSettings, v2BrainKind, type Caster, type LlmEnv } from '@skirm/decision-engine/v2';
 import { PRACTICE_BOT_HANDLE } from './views';
 import { detectHighlights, mapV2, type V2Frame } from '@skirm/engine/v2';
 
@@ -41,13 +41,15 @@ export class RedisReplayFrames implements ReplayFrameReader {
 }
 
 /**
- * The caster the api runs: Haiku through OpenRouter when OPENROUTER_API_KEY is set and V2_BRAIN is
- * not `greedy` (which promises no model calls), else the offline template caster. Its spend is
+ * The caster the api runs: the configured model (LLM_BASE_URL, LLM_MODEL; v2BrainKind decides) when
+ * the environment selects the model brain, never with V2_BRAIN=greedy (which promises no model
+ * calls); else the offline template caster. Its spend is
  * platform spend, reported to `onCost` (the daily cost total), never charged to a player.
  */
-export function createApiCaster(env: { OPENROUTER_API_KEY?: string | undefined; V2_BRAIN?: string | undefined }, onCost?: (usd: number) => void): Caster {
-  if (!env.OPENROUTER_API_KEY || env.V2_BRAIN === 'greedy') return createTemplateCaster();
-  return createModelCaster({ apiKey: env.OPENROUTER_API_KEY, onUsage: (c) => onCost?.(c.costUsd) });
+export function createApiCaster(env: LlmEnv, onCost?: (usd: number) => void): Caster {
+  if (v2BrainKind(env) !== 'model') return createTemplateCaster();
+  const s = llmSettings(env);
+  return createModelCaster({ apiKey: s.apiKey, baseUrl: s.baseUrl, model: s.model, prices: s.prices, onUsage: (c) => onCost?.(c.costUsd) });
 }
 
 /** Frames held in memory (tests, local runs without Redis). */
