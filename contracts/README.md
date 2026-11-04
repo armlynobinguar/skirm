@@ -5,11 +5,11 @@ and the season prize pools. The stretch `pool` contract is not included.
 
 | Crate | Account (testnet) | What it does |
 | --- | --- | --- |
-| `skills` | `skills.playskirm.testnet` | NEP-171 skill NFTs (core, approval, enumeration, metadata), one token per skill version, NEP-199 royalty payouts |
-| `market` | `market.playskirm.testnet` | List through `nft_approve`, delist, reprice, buy with NEAR; pays the platform fee (30% of it to the season pool), creator royalty and seller; fee changes go through a 24 h timelock |
-| `registry` | `registry.playskirm.testnet` | Match records (`MatchRecordV2`), log hashes, Elo per player, per-season standings |
-| `deposits` | `deposits.playskirm.testnet` | `deposit()` top-ups with a NEP-297 event for the credits ledger; owner withdraws to the treasury |
-| `seasons` | `seasons.playskirm.testnet` | 14-day season prize pools: funded by market fees, standings posted by ops, prizes claimed by players |
+| `skills` | [`skills.playskirm.testnet`](https://testnet.nearblocks.io/address/skills.playskirm.testnet) | NEP-171 skill NFTs (core, approval, enumeration, metadata), one token per skill version, NEP-199 royalty payouts |
+| `market` | [`market.playskirm.testnet`](https://testnet.nearblocks.io/address/market.playskirm.testnet) | List through `nft_approve`, delist, reprice, buy with NEAR; pays the platform fee (30% of it to the season pool), creator royalty and seller; fee changes go through a 24 h timelock |
+| `registry` | [`registry.playskirm.testnet`](https://testnet.nearblocks.io/address/registry.playskirm.testnet) | Match records (`MatchRecordV2`), log hashes, Elo per player, per-season standings |
+| `deposits` | [`deposits.playskirm.testnet`](https://testnet.nearblocks.io/address/deposits.playskirm.testnet) | `deposit()` top-ups with a NEP-297 event for the credits ledger; owner withdraws to the treasury |
+| `seasons` | [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | 14-day season prize pools: funded by market fees, standings posted by ops, prizes claimed by players |
 
 Roles used below: `playskirm.testnet` is the owner (full-access keys kept offline), the treasury and
 the market's governance account. `ops.playskirm.testnet` is the platform signer.
@@ -67,17 +67,18 @@ or starts the sandbox.
 ## Deployed on testnet (2026-11-01)
 
 These contracts are live and initialized, built with `contracts/build.sh` and deployed with
-`scripts/deploy-testnet-contracts.ts`:
+`scripts/deploy-testnet-contracts.ts`. Each account links to its page on
+[NearBlocks testnet](https://testnet.nearblocks.io), with its code, transactions and state:
 
 | Account | Contract | Init |
 | --- | --- | --- |
-| `playskirm.testnet` | none (owner and treasury) | |
-| `skills.playskirm.testnet` | `skirm_skills.wasm` | owner `playskirm.testnet`, ops `ops.playskirm.testnet`, account-bound Flood Warden |
-| `market.playskirm.testnet` | `skirm_market.wasm` | NFT contract `skills.playskirm.testnet`, treasury and governance `playskirm.testnet`, fee 500 bps (max 1000, 24 h delay), 30% of fees to `seasons.playskirm.testnet` |
-| `registry.playskirm.testnet` | `skirm_registry.wasm` | owner `playskirm.testnet`, ops `ops.playskirm.testnet`, Elo start 1200, floor 100 |
-| `seasons.playskirm.testnet` | `skirm_seasons.wasm` | owner `playskirm.testnet`, ops `ops.playskirm.testnet` |
-| `deposits.playskirm.testnet` | `skirm_deposits.wasm` | treasury `playskirm.testnet`, default minimum deposit |
-| `ops.playskirm.testnet` | none (platform signer, 1 NEAR) | |
+| [`playskirm.testnet`](https://testnet.nearblocks.io/address/playskirm.testnet) | none (owner and treasury) | |
+| [`skills.playskirm.testnet`](https://testnet.nearblocks.io/address/skills.playskirm.testnet) | `skirm_skills.wasm` | owner `playskirm.testnet`, ops `ops.playskirm.testnet`, account-bound Flood Warden |
+| [`market.playskirm.testnet`](https://testnet.nearblocks.io/address/market.playskirm.testnet) | `skirm_market.wasm` | NFT contract `skills.playskirm.testnet`, treasury and governance `playskirm.testnet`, fee 500 bps (max 1000, 24 h delay), 30% of fees to `seasons.playskirm.testnet` |
+| [`registry.playskirm.testnet`](https://testnet.nearblocks.io/address/registry.playskirm.testnet) | `skirm_registry.wasm` | owner `playskirm.testnet`, ops `ops.playskirm.testnet`, Elo start 1200, floor 100 |
+| [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | `skirm_seasons.wasm` | owner `playskirm.testnet`, ops `ops.playskirm.testnet` |
+| [`deposits.playskirm.testnet`](https://testnet.nearblocks.io/address/deposits.playskirm.testnet) | `skirm_deposits.wasm` | treasury `playskirm.testnet`, default minimum deposit |
+| [`ops.playskirm.testnet`](https://testnet.nearblocks.io/address/ops.playskirm.testnet) | none (platform signer, 1 NEAR) | |
 
 The backend's season job opens each season onchain with the ops key. While no season is open,
 the market forwards the season share of each fee to the treasury.

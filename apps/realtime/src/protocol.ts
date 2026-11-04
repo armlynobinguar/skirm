@@ -34,6 +34,7 @@ export type ErrorCode =
   | 'invalid_crew'
   | 'not_in_lockin'
   | 'practice_unranked'
+  | 'external_unranked'
   | 'draft_casual'
   | 'not_your_turn'
   | 'invalid_ban'
@@ -125,8 +126,8 @@ export function parseClientMessage(raw: unknown): ParseResult {
 
   switch (type as (typeof TYPES)[number]) {
     case 'auth': {
-      const extra = extraKeys(v, ['type', 'token', 'devUser']);
-      if (extra) return bad('auth takes {token?, devUser?}');
+      const extra = extraKeys(v, ['type', 'token', 'devUser', 'agentToken']);
+      if (extra) return bad('auth takes {token?, devUser?, agentToken?}');
       const msg: WsClientMessage = { type: 'auth' };
       if (v.token !== undefined && v.token !== null) {
         if (typeof v.token !== 'string' || !v.token || v.token.length > 8192)
@@ -138,7 +139,13 @@ export function parseClientMessage(raw: unknown): ParseResult {
           return bad('auth.devUser must be a non-empty string');
         msg.devUser = v.devUser;
       }
-      if (!msg.token && !msg.devUser) return bad('auth needs token or devUser');
+      if (v.agentToken !== undefined && v.agentToken !== null) {
+        if (typeof v.agentToken !== 'string' || !v.agentToken || v.agentToken.length > 256)
+          return bad('auth.agentToken must be a non-empty string');
+        if (msg.token || msg.devUser) return bad('auth.agentToken signs in on its own');
+        msg.agentToken = v.agentToken;
+      }
+      if (!msg.token && !msg.devUser && !msg.agentToken) return bad('auth needs token, devUser or agentToken');
       return { ok: true, msg };
     }
     case 'v2_queue': {

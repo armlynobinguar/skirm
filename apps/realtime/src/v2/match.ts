@@ -104,6 +104,8 @@ export interface V2Roster {
   instructions?: (string | null)[];
   /** Per agent: the skill versions it plays with (recorded on v2_matches.crews, never in the log). */
   skillKeys?: { id: string; version: number }[][];
+  /** Per agent: a brain of its own (its player's external agent) instead of the crew's. Absent: none. */
+  brains?: (V2Brain | null)[];
   /** Per agent: the public names of `skillKeys`, in the same order (the draft's ban pool). */
   skillNames?: string[][];
   /**
@@ -310,6 +312,7 @@ export class V2Match {
       side.bought = roster.bought ?? [];
       side.instructions = roster.instructions ?? [];
       side.skillKeys = roster.skillKeys ?? [];
+      side.brains = roster.brains ?? [];
       side.skillMeta = roster.skillMeta ?? [];
     }
     const forced = this.setup.talk;
@@ -763,8 +766,13 @@ export class V2Match {
         resolve(d);
       };
       const h = sched.setTimeout(() => finish({ action: wait, reason: 'timeout', say: null }), this.timing.actionMs);
-      this.deps.brains[a.team].act(o, ctx).then(finish, () => finish({ action: wait, reason: 'error', say: null }));
+      this.brainOf(a.team, a.slot).act(o, ctx).then(finish, () => finish({ action: wait, reason: 'error', say: null }));
     });
+  }
+
+  /** The agent's own brain (its player's external agent) when it has one, else its crew's. */
+  private brainOf(team: Team, slot: number): V2Brain {
+    return this.setup.sides[team].brains?.[slot] ?? this.deps.brains[team];
   }
 
   private count(team: Team, d: V2Decision) {

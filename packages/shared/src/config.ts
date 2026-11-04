@@ -118,6 +118,17 @@ const defaults = {
     maxChars: 80,
   },
   /**
+   * Bring your own agent (docs/external-agents.md): a player's own program plays one of their
+   * agents in casual and practice matches. Each tick it has `timeoutMs` to answer (under the 1.5 s
+   * action deadline) or the greedy brain plays that tick; webhook replies over `maxResponseBytes`
+   * count as a miss. At most `perAccount` registered per player.
+   */
+  external: {
+    timeoutMs: 1200,
+    maxResponseBytes: 16_384,
+    perAccount: 5,
+  },
+  /**
    * Draft mode (a casual queue): after accept each crew in turn bans one of the rival's equipped
    * skills (by name and id), `bansPerSide` each, crew A first. A ban step lasts `stepMs`; one not
    * answered in time passes. A banned skill is unequipped from the rival crew for that match only.

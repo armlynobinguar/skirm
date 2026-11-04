@@ -1,7 +1,7 @@
 // Skills and their immutable versions (Spec §9). Only ciphertext is stored; the public view never
 // includes it, and `loadSealed` is for the vault (runner decrypt, creator read-back) only.
 import { and, desc, eq, inArray, isNotNull, isNull, lt, max, ne, or, sql } from 'drizzle-orm';
-import type { SkillTrigger, Tag } from '@skirm/shared';
+import { normalizeSkillRoles, type SkillRole, type SkillTrigger, type Tag } from '@skirm/shared';
 import type { Executor } from '../client';
 import { newId } from '../ids';
 import { accounts, agentSkills, agents, skillOwnership, skillVersions, skills } from '../schema';
@@ -16,6 +16,8 @@ export interface SkillMetaInput {
   summary?: string | null;
   requiresActions: RequiredAction[];
   handlesTags: Tag[];
+  /** Agent roles that may equip it; omitted or empty = any role. */
+  roles?: readonly SkillRole[];
   royaltyBps: number;
   /** null or absent: always (stored as null). */
   trigger?: SkillTrigger | null;
@@ -34,6 +36,8 @@ export interface SkillVersionView {
   royaltyBps: number;
   requiresActions: RequiredAction[];
   handlesTags: Tag[];
+  /** `['any']` or the agent roles that may equip this version. */
+  roles: SkillRole[];
   /** When the skill joins its agent's prompt; null is always. Public metadata. */
   trigger: SkillTrigger | null;
   promptSha256: string;
@@ -57,6 +61,7 @@ const versionColumns = {
   royaltyBps: skillVersions.royaltyBps,
   requiresActions: skillVersions.requiresActions,
   handlesTags: skillVersions.handlesTags,
+  roles: skillVersions.roles,
   trigger: skillVersions.trigger,
   promptSha256: skillVersions.promptSha256,
   status: skillVersions.status,
@@ -382,6 +387,7 @@ async function insertVersion(
     summary: meta.summary ?? null,
     requiresActions: [...meta.requiresActions],
     handlesTags: [...meta.handlesTags],
+    roles: normalizeSkillRoles(meta.roles),
     trigger: !meta.trigger || meta.trigger.kind === 'always' ? null : meta.trigger,
     royaltyBps: meta.royaltyBps,
     promptSha256: sealed.promptSha256,

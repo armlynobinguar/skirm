@@ -223,8 +223,30 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     ]
   },
   {
-    "tag": "0009_crew_playbooks",
-    "folderMillis": 1793786248683,
+    "tag": "0009_external_agents",
+    "folderMillis": 1793786157033,
+    "bps": true,
+    "hash": "caae6bd76fc7fcb4f6c037a22922416a3af584d8fcabea66c5f2acdf3406b9c9",
+    "sql": [
+      "CREATE TABLE \"external_agents\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"agent_id\" text,\n\t\"name\" text NOT NULL,\n\t\"webhook_url\" text,\n\t\"secret_sha256\" text NOT NULL,\n\t\"secret_ciphertext\" \"bytea\" NOT NULL,\n\t\"secret_iv\" \"bytea\" NOT NULL,\n\t\"secret_auth_tag\" \"bytea\" NOT NULL,\n\t\"secret_wrapped_key\" \"bytea\" NOT NULL,\n\t\"secret_key_id\" text NOT NULL,\n\t\"calls\" integer DEFAULT 0 NOT NULL,\n\t\"misses\" integer DEFAULT 0 NOT NULL,\n\t\"last_error\" text,\n\t\"last_seen_at\" timestamp with time zone,\n\t\"rotated_at\" timestamp with time zone,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"external_agents_name_ck\" CHECK (char_length(\"external_agents\".\"name\") between 1 and 40)\n);\n",
+      "\nALTER TABLE \"external_agents\" ADD CONSTRAINT \"external_agents_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"external_agents\" ADD CONSTRAINT \"external_agents_agent_id_agents_id_fk\" FOREIGN KEY (\"agent_id\") REFERENCES \"public\".\"agents\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"external_agents_account_idx\" ON \"external_agents\" USING btree (\"account_id\");",
+      "\nCREATE UNIQUE INDEX \"external_agents_agent_uq\" ON \"external_agents\" USING btree (\"agent_id\");"
+    ]
+  },
+  {
+    "tag": "0010_skill_roles",
+    "folderMillis": 1793789512440,
+    "bps": true,
+    "hash": "51cbfaa95df77c3aefb682be335cbcbc4a4fef7834ad7babc8da0f8070dfa95b",
+    "sql": [
+      "ALTER TABLE \"skill_versions\" ADD COLUMN \"roles\" jsonb DEFAULT '[\"any\"]'::jsonb NOT NULL;"
+    ]
+  },
+  {
+    "tag": "0011_crew_playbooks",
+    "folderMillis": 1793790406202,
     "bps": true,
     "hash": "5f2a12b33273b765a404d76d2ad05d1a0b6999ff2f0c6cade7c53921fc4197d6",
     "sql": [

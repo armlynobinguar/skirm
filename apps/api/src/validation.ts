@@ -10,7 +10,9 @@ import {
   PANTS_COLORS,
   SKILL_TRIGGER_LIMITS,
   SKIN_TONES,
+  SKILL_ROLES,
   TAGS,
+  type SkillRole,
 } from '@skirm/shared';
 import { z } from 'zod';
 import { ApiError } from './errors';
@@ -93,6 +95,13 @@ export const agentPatch = z.object({
     .optional(),
 });
 
+export const skillRoles = z
+  .array(z.enum(SKILL_ROLES as unknown as [SkillRole, ...SkillRole[]]))
+  .min(1)
+  .max(SKILL_ROLES.length)
+  .refine((a) => new Set(a).size === a.length, 'roles must be unique')
+  .refine((a) => !a.includes('any') || a.length === 1, 'roles: "any" stands alone');
+
 const triggerTiles = z.number().int().min(SKILL_TRIGGER_LIMITS.tiles.min).max(SKILL_TRIGGER_LIMITS.tiles.max);
 
 /** A skill trigger (@skirm/shared SkillTrigger): one of a small typed set, never free text. */
@@ -129,6 +138,8 @@ export const skillBody = z.object({
     .min(1)
     .max(10)
     .refine((a) => new Set(a).size === a.length, 'handles_tags must be unique'),
+  /** Agent roles that may equip it: `['any']` (the default) or 1-6 role names. */
+  roles: skillRoles.default(['any']),
   royalty_bps: z.number().int().min(0).max(1000).default(500),
   /** When the skill joins its agent's prompt; absent or null: always. Public, unlike the prompt. */
   trigger: skillTrigger.nullish(),

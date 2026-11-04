@@ -18,7 +18,7 @@
 // talk rule and crew size, host as crew A. It is casual (no Elo, no registry) and both crews hold
 // credits as usual. When it ends the lobby is settled (LobbiesRepo.settleMatch), which moves a
 // tournament bracket on.
-import { SYSTEM_ACCOUNT_ID, newId, type LobbyRow, type Repos, type V2CrewRecord, type V2MatchRow } from '@skirm/db';
+import { SYSTEM_ACCOUNT_ID, newId, sealedSecretOf, type LobbyRow, type Repos, type V2CrewRecord, type V2MatchRow } from '@skirm/db';
 import { forcedTier, isLobbyTalkRule } from '@skirm/shared';
 import { createGreedyBrain, type V2Brain } from '@skirm/decision-engine/v2';
 import {
@@ -37,14 +37,16 @@ import {
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
-import { V2_MATCH_LAST_TTL_S, v2MatchChannel, v2MatchLastKey, type V2CrewEntry, type V2EndReason, type V2ServerMessage, type Vault } from '@skirm/server';
+import { DEFAULTS, skillFitsRole } from '@skirm/shared';
+import { V2_MATCH_LAST_TTL_S, v2MatchChannel, v2MatchLastKey, type ExternalTurnStore, type V2CrewEntry, type V2EndReason, type V2ServerMessage, type Vault } from '@skirm/server';
 import type { Logger, RegistryQueue } from '../deps';
 import { Matchmaker, type Lane, type QueueEntry } from '../matchmaker';
 import type { WsServerMessage } from '../protocol';
 import type { PubSub, Unsubscribe } from '../pubsub';
 import type { QueueTiming, Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
-import { TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Playbook, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
+import { ExternalBrain, isExternalBrain, type WebhookPost } from './external';
+import { DEFAULT_V2_TIMING, TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Playbook, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
 import type { V2FrameStore } from './replay';
 
 export interface V2Search {
@@ -74,6 +76,12 @@ export interface V2QueueOptions {
   difficulty?: Difficulty;
   /** Draft mode: casual only. */
   draft?: boolean;
+}
+
+/** The match a roster is loaded for (its external agents' turns name it; ranked has none). */
+interface RosterMatch {
+  matchId: string;
+  ranked: boolean;
 }
 
 /**
@@ -109,6 +117,10 @@ export interface V2HubDeps {
   frames?: V2FrameStore;
   /** Relays watch-view messages between instances, so a match can be watched from any of them. */
   pubsub: PubSub;
+  /** The pull relay for external agents without a webhook (absent: they miss every tick). */
+  externalTurns?: ExternalTurnStore;
+  /** Tests only: the webhook transport (default: the SSRF-safe safePostJson). */
+  externalPost?: WebhookPost;
   log: Logger;
 }
 
@@ -123,6 +135,7 @@ export class V2HubError extends Error {
       | 'not_found'
       | 'unavailable'
       | 'not_in_lockin'
+      | 'external_unranked'
       | 'lobby_closed'
       | 'draft_casual'
       | V2BanError
@@ -185,6 +198,7 @@ export class V2Hub {
       if (crew.length > crewLimitOf(map)) throw new V2HubError('invalid_crew', `${map.name} takes at most ${crewLimitOf(map)} agents`);
     }
     await this.ownCrew(user.accountId, crew);
+    if (ranked) await this.noExternal(user.accountId, crew);
     if (!this.fitting(crew.length).length) throw new V2HubError('invalid_crew', 'no map takes a crew this size');
     const account = await this.deps.repos.accounts.get(user.accountId);
     check();
@@ -235,6 +249,12 @@ export class V2Hub {
     }
     const busy = await repos.agents.busyAgents(crew.map((c) => c.agentId), matchId !== undefined ? { exceptMatch: matchId } : {});
     if (busy.length) throw new V2HubError('agent_busy', 'an agent is in a match that has not ended');
+  }
+
+  /** Ranked is for the built-in brain only: no agent of the crew may be played by an external agent. */
+  private async noExternal(accountId: string, crew: V2CrewEntry[]): Promise<void> {
+    const bound = await this.deps.repos.externalAgents.boundTo(accountId, crew.map((c) => c.agentId));
+    if (bound.length) throw new V2HubError('external_unranked', 'an agent played by an external agent plays casual and practice only');
   }
 
   /**
@@ -359,7 +379,8 @@ export class V2Hub {
     if (match.phase !== 'lockin') throw missed();
     if (crew.length < 1 || crew.length > match.crewLimit) throw new V2HubError('invalid_crew', `this map takes 1 to ${match.crewLimit} agents`);
     await this.ownCrew(accountId, crew, matchId);
-    const roster = await this.roster(accountId, crew);
+    if (match.setup.ranked) await this.noExternal(accountId, crew);
+    const roster = await this.roster(accountId, crew, { matchId, ranked: match.setup.ranked });
     if (!match.lockIn(team, tiers, roster, playbook)) throw missed();
     this.deps.log.info(`v2 match ${matchId} ${team}: crew changed at lock-in (${roster.crew.length} agents)`);
   }
@@ -491,7 +512,7 @@ export class V2Hub {
     void p.finally(() => this.running.delete(p));
   }
 
-  private async side(s: Pick<V2Search, 'accountId' | 'handle' | 'crew' | 'rank'>): Promise<V2Side> {
+  private async side(s: Pick<V2Search, 'accountId' | 'handle' | 'crew' | 'rank'>, match: RosterMatch): Promise<V2Side> {
     const selected = await this.deps.repos.playbooks.selected(s.accountId);
     // A playbook that cannot be opened never holds up a match: the crew plays without one.
     const playbook = selected
@@ -500,7 +521,7 @@ export class V2Hub {
           return undefined;
         })
       : undefined;
-    return { accountId: s.accountId, handle: s.handle, ...(s.rank ? { rank: s.rank } : {}), ...(await this.roster(s.accountId, s.crew)), ...(playbook ? { playbook } : {}) };
+    return { accountId: s.accountId, handle: s.handle, ...(s.rank ? { rank: s.rank } : {}), ...(await this.roster(s.accountId, s.crew, match)), ...(playbook ? { playbook } : {}) };
   }
 
   /**
@@ -521,7 +542,7 @@ export class V2Hub {
    * rented agent plays with its owner's skills, and counts as bought: its plans are withheld from
    * the renter, who never reads another player's strategy.
    */
-  private async roster(accountId: string, entries: V2CrewEntry[]): Promise<V2Roster> {
+  private async roster(accountId: string, entries: V2CrewEntry[], match: RosterMatch): Promise<V2Roster> {
     const { repos, vault, log } = this.deps;
     const crew: AgentSpec[] = [];
     const skills: string[][] = [];
@@ -541,9 +562,15 @@ export class V2Hub {
       const ownerId = (await repos.agents.get(c.agentId))?.ownerId ?? accountId;
       const rented = ownerId !== accountId;
       const holder = ownerId;
+      // Role slots: the API refuses a skill for another role, so one here is stale; it sits out.
+      const roles = new Map((v.skills.length ? await repos.skills.getMany(v.skills) : []).map((m) => [`${m.id}:${m.version}`, m.roles]));
       for (const k of v.skills) {
         if (!(await repos.skills.owns(holder, k.id, k.version))) {
           log.warn(`v2: agent ${v.id} plays without skill ${k.id} v${k.version}: its player does not own it`);
+          continue;
+        }
+        if (!skillFitsRole(roles.get(`${k.id}:${k.version}`), v.role)) {
+          log.warn(`v2: agent ${v.id} plays without skill ${k.id} v${k.version}: it is not for a ${v.role}`);
           continue;
         }
         const sealed = await repos.skills.loadSealed(k.id, k.version);
@@ -566,7 +593,48 @@ export class V2Hub {
       bought.push(rented || meta.some((m) => m.creatorId !== accountId));
       instructions.push(v.systemPrompt ?? null);
     }
-    return { crew, skills, skillKeys, skillNames, skillMeta, bought, instructions };
+    const brains = await this.externalBrains(accountId, crew, bought, match);
+    return { crew, skills, skillKeys, skillNames, skillMeta, bought, instructions, ...(brains ? { brains } : {}) };
+  }
+
+  /**
+   * The brains of the agents their player's own program plays (bring your own agent), per slot, or
+   * undefined when none does. Never in ranked: a binding made after a ranked search started is
+   * ignored there and the agent plays the built-in brain.
+   */
+  private async externalBrains(accountId: string, crew: AgentSpec[], bought: boolean[], match: RosterMatch): Promise<(V2Brain | null)[] | undefined> {
+    if (match.ranked) return undefined;
+    const { repos, vault, log } = this.deps;
+    const rows = await repos.externalAgents.boundTo(accountId, crew.map((a) => a.id));
+    if (!rows.length) return undefined;
+    const t = { ...DEFAULT_V2_TIMING, ...this.deps.timing };
+    // Its answer must be back before the match's own action deadline gives up on the tick.
+    const timeoutMs = Math.max(50, Math.min(DEFAULTS.external.timeoutMs, t.actionMs - 100));
+    const hidePlan = bought.some(Boolean);
+    const brains: (V2Brain | null)[] = [];
+    for (const a of crew) {
+      const row = rows.find((r) => r.agentId === a.id);
+      if (!row) {
+        brains.push(null);
+        continue;
+      }
+      const secret = (await vault.decryptSkill(sealedSecretOf(row))).prompt;
+      brains.push(
+        new ExternalBrain({
+          agent: { id: row.id, webhookUrl: row.webhookUrl },
+          secret,
+          matchId: match.matchId,
+          timeoutMs,
+          ...(this.deps.externalTurns ? { turns: this.deps.externalTurns } : {}),
+          ...(this.deps.externalPost ? { post: this.deps.externalPost } : {}),
+          scheduler: this.deps.scheduler,
+          log,
+          hidePlan,
+        }),
+      );
+      log.info(`v2 match ${match.matchId}: agent ${a.id} is played by external agent ${row.id} (${row.webhookUrl ? 'webhook' : 'pull'})`);
+    }
+    return brains;
   }
 
   /** A V2Match wired to this hub: its credits on the ledger, its watchers, and finish(). */
@@ -604,7 +672,8 @@ export class V2Hub {
   private async start(a: QueueEntry<V2Search>, b: QueueEntry<V2Search>): Promise<void> {
     const matchId = newId('mat');
     await this.launch(matchId, [a.key, b.key], async () => {
-      const sides = { A: await this.side(a.payload), B: await this.side(b.payload) };
+      const at = { matchId, ranked: a.payload.ranked };
+      const sides = { A: await this.side(a.payload, at), B: await this.side(b.payload, at) };
       const fits = this.fitting(Math.max(sides.A.crew.length, sides.B.crew.length));
       // A casual pair picked the same map, or one of them takes any map (v2PoolsMatch).
       const pickedId = a.payload.mapId ?? b.payload.mapId;
@@ -627,7 +696,8 @@ export class V2Hub {
     await this.launch(matchId, [host.user.accountId, guest.user.accountId], async () => {
       const map = this.pool().find((m) => m.id === lobby.mapId);
       if (!map) throw new V2HubError('invalid_crew', 'no such map');
-      const sides = { A: await this.side({ ...host.user, crew: host.crew }), B: await this.side({ ...guest.user, crew: guest.crew }) };
+      const at = { matchId, ranked: false };
+      const sides = { A: await this.side({ ...host.user, crew: host.crew }, at), B: await this.side({ ...guest.user, crew: guest.crew }, at) };
       const difficulty = isDifficulty(lobby.difficulty) ? lobby.difficulty : RANKED_DIFFICULTY;
       await repos.v2Matches.create({ id: matchId, mapId: map.id, ranked: false, teamA: host.user.accountId, teamB: guest.user.accountId, crews: { A: crewRecords(sides.A), B: crewRecords(sides.B) }, difficulty });
       if (!(await repos.lobbies.begin(lobby.id, matchId))) {
@@ -649,7 +719,7 @@ export class V2Hub {
       const rival = practiceRival(difficulty, entries.length as 1 | 2 | 3, crewLimitOf(map));
       const botAgents = botCrew(rival.size, `bot_${matchId}`, rival.tier);
       const bot: V2Side = { accountId: SYSTEM_ACCOUNT_ID, handle: BOT_HANDLE, crew: botAgents, skills: botAgents.map(() => []) };
-      const sides = { A: await this.side({ ...user, crew: entries }), B: bot };
+      const sides = { A: await this.side({ ...user, crew: entries }, { matchId, ranked: false }), B: bot };
       // The greedy brain makes no model calls, so a player on it plays free; the bot always does.
       const free: V2Setup['free'] = this.deps.brain.kind === 'greedy' ? { A: true, B: true } : { B: true };
       await this.deps.repos.v2Matches.create({ id: matchId, mapId: map.id, ranked: false, practice: true, teamA: user.accountId, teamB: SYSTEM_ACCOUNT_ID, crews: { A: crewRecords(sides.A), B: crewRecords(bot) }, difficulty });
@@ -741,7 +811,20 @@ export class V2Hub {
         ),
       );
     }
+    await this.recordExternal(end.matchId, match);
     return out;
+  }
+
+  /** Each external agent's calls and misses in this match, added to its counters. */
+  private async recordExternal(matchId: string, match: V2Match): Promise<void> {
+    const { repos, log } = this.deps;
+    for (const t of TEAMS)
+      for (const b of match.setup.sides[t].brains ?? []) {
+        if (!isExternalBrain(b)) continue;
+        const u = b.usage;
+        if (u.calls) log.info(`v2 match ${matchId}: external agent ${b.id} answered ${u.calls - u.misses} of ${u.calls} ticks`);
+        await repos.externalAgents.recordUsage(b.id, u).catch((err: unknown) => log.warn(`v2 match ${matchId}: external agent usage not kept: ${(err as Error).message}`));
+      }
   }
 
   private async record(end: V2MatchEnd, match: V2Match) {
@@ -749,7 +832,7 @@ export class V2Hub {
     const { sides } = match.setup;
     // The crews as they played (lock-in changes included), even for a void with no log, with the
     // skill versions each agent ran (kept out of the hashed log header).
-    const played = (t: Team) => end.log!.header.crews[t].map((a) => ({ ...a, skills: skillsOf(sides[t], a.id) }));
+    const played = (t: Team) => end.log!.header.crews[t].map((a) => ({ ...a, skills: skillsOf(sides[t], a.id), ...externalOf(sides[t], a.id) }));
     const crews = end.log ? { A: played('A'), B: played('B') } : { A: crewRecords(sides.A), B: crewRecords(sides.B) };
     return this.deps.repos.v2Matches.finish(end.matchId, {
       winner: r?.winner ?? null,
@@ -824,5 +907,9 @@ const rec = (a: AgentSpec) => ({ id: a.id, name: a.name, role: a.role, vision: a
 /** The skill versions an agent of this crew runs. */
 const skillsOf = (side: V2Roster, agentId: string) => side.skillKeys?.[side.crew.findIndex((a) => a.id === agentId)] ?? [];
 
+/** `{ external: true }` when its player's own program plays the agent (bring your own agent). */
+const externalOf = (side: V2Roster, agentId: string): { external?: true } =>
+  isExternalBrain(side.brains?.[side.crew.findIndex((a) => a.id === agentId)]) ? { external: true } : {};
+
 /** A crew as v2_matches.crews records it. */
-const crewRecords = (side: V2Roster): V2CrewRecord[] => side.crew.map((a) => ({ ...rec(a), skills: skillsOf(side, a.id) }));
+const crewRecords = (side: V2Roster): V2CrewRecord[] => side.crew.map((a) => ({ ...rec(a), skills: skillsOf(side, a.id), ...externalOf(side, a.id) }));

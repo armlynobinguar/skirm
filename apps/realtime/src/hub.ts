@@ -1,7 +1,7 @@
 // Connection hub: per-socket state, sign-in and message handling. Every v2_* message goes to the
 // V2Hub (matchmaking, the matches this instance holds, watching and replay). Transport-free (sockets
 // are `ClientSocket`), so unit tests drive it directly and server.ts plugs in `ws`.
-import { AuthError, verifyCredentials } from '@skirm/server';
+import { AuthError, externalSecretMatches, parseExternalAgentToken, verifyCredentials } from '@skirm/server';
 import { createGreedyBrain } from '@skirm/decision-engine/v2';
 import { consoleLogger, type Logger, type RealtimeDeps } from './deps';
 import { V2Hub, V2HubError } from './v2/hub';
@@ -31,6 +31,11 @@ export interface Client {
   readonly id: number;
   readonly socket: ClientSocket;
   user?: ClientUser;
+  /**
+   * Signed in with an external agent's token (bring your own agent): this socket may only queue
+   * casual or practice with the one agent that external agent plays.
+   */
+  external?: { id: string; agentId: string | null };
   /** v2 matches this socket watches. */
   readonly matches: Map<string, Unsubscribe>;
   closed: boolean;
@@ -84,6 +89,8 @@ export class RealtimeHub {
       registry: deps.registry,
       frames: new PubSubV2FrameStore(deps.pubsub),
       pubsub: deps.pubsub,
+      ...(deps.externalTurns ? { externalTurns: deps.externalTurns } : {}),
+      ...(deps.externalPost ? { externalPost: deps.externalPost } : {}),
       log: this.log,
     });
     this.scheduleSweep(0);
@@ -206,6 +213,7 @@ export class RealtimeHub {
           ...(msg.difficulty !== undefined ? { difficulty: msg.difficulty } : {}),
           ...(msg.draft ? { draft: true } : {}),
         };
+        this.externalScope(c, msg.crew, msg.ranked);
         // The parser already refused a ranked practice (practice_unranked).
         if (msg.opponent === 'bot') return this.v2.practice(this.requireUser(c), msg.crew, opts);
         return this.v2.queue(this.requireUser(c), msg.crew, msg.ranked, opts);
@@ -221,6 +229,7 @@ export class RealtimeHub {
       case 'v2_ban':
         return this.v2.ban(this.requireUser(c).accountId, msg.matchId, msg.skillId);
       case 'v2_lock_in':
+        if (msg.crew) this.externalScope(c, msg.crew, false);
         return this.v2.lockIn(this.requireUser(c).accountId, msg.matchId, msg.tiers, msg.crew, msg.playbookId);
       case 'v2_command': {
         const r = this.v2.command(this.requireUser(c).accountId, msg.matchId, { agentId: msg.agentId, preset: msg.preset, text: msg.text });
@@ -263,8 +272,33 @@ export class RealtimeHub {
     c.matches.set(matchId, unsub);
   }
 
+  /** A socket signed in with an external agent's token plays casual or practice with its own agent only. */
+  private externalScope(c: Client, crew: { agentId: string }[], ranked: boolean): void {
+    if (!c.external) return;
+    if (ranked) throw new HubError('external_unranked', 'external agents play casual and practice only');
+    if (!c.external.agentId) throw new HubError('invalid_crew', 'bind this external agent to one of your agents first');
+    if (crew.some((e) => e.agentId !== c.external!.agentId)) throw new HubError('invalid_crew', 'an external agent queues with the agent it plays only');
+  }
+
+  /** Signs in as the player who owns an external agent (its `<id>.<secret>` token). */
+  private async authExternal(c: Client, token: string): Promise<void> {
+    const t = parseExternalAgentToken(token);
+    const row = t ? await this.deps.repos.externalAgents.get(t.id) : undefined;
+    if (!t || !row || !externalSecretMatches(t.secret, row.secretSha256)) throw new HubError('auth_failed', 'unknown or rotated agent token');
+    const account = await this.deps.repos.accounts.get(row.accountId);
+    if (!account || account.system || account.deletedAt) throw new HubError('auth_failed', 'unknown or rotated agent token');
+    if (c.closed) return;
+    c.user = { accountId: account.id, handle: account.handle };
+    c.external = { id: row.id, agentId: row.agentId };
+    let set = this.byAccount.get(account.id);
+    if (!set) this.byAccount.set(account.id, (set = new Set()));
+    set.add(c);
+    this.v2.resume(account.id, (m) => this.send(c, m));
+  }
+
   private async auth(c: Client, msg: Extract<WsClientMessage, { type: 'auth' }>): Promise<void> {
     if (c.user) throw new HubError('already_authenticated', 'this connection is already signed in');
+    if (msg.agentToken) return this.authExternal(c, msg.agentToken);
     let user;
     try {
       user = await verifyCredentials(this.deps.config, { token: msg.token, devUser: msg.devUser });
