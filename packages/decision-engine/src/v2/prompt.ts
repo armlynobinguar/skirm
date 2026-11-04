@@ -68,6 +68,7 @@ export function viewText(o: Observation): string {
     `Map ${o.map.name}, ${o.map.w}x${o.map.h}. Deliver ${o.map.goal} ${o.map.item} to ${o.map.deliverTo} at ${o.map.exit[0]},${o.map.exit[1]}.`,
     `Tick ${o.tick}, ${o.ticksLeft} left. Score: you ${o.score.mine}, rival ${o.score.rival}.`,
     `You: ${o.me.name} (${o.me.role}) at ${o.me.x},${o.me.y}, carrying ${o.me.carrying} of ${o.me.capacity}. Blocks left: ${o.blocksLeft}.`,
+    ...(o.me.traits?.length ? [`Your traits: ${o.me.traits.join('; ')}.`] : []),
     o.teammates.length ? `Crew: ${o.teammates.map(who).join('; ')}.` : 'Crew: none.',
     o.rivals.length ? `Rivals in sight: ${o.rivals.map(who).join('; ')}.` : 'Rivals in sight: none.',
     'Map (x across, y down, row 0 first):',

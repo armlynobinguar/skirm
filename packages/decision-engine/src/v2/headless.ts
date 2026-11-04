@@ -18,6 +18,7 @@ import {
   appendTick,
   clean,
   createMatch,
+  logAgent,
   logHash,
   observe,
   startLog,
@@ -100,7 +101,7 @@ export async function playHeadless(opts: HeadlessOptions): Promise<HeadlessResul
 
   // The engine applies the head start: a held crew's agents have only `wait` until it runs out.
   const s = createMatch(def, crews, { difficulty });
-  const header = (t: Team) => s.agents.filter((a) => a.team === t).map((a) => ({ id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier }));
+  const header = (t: Team) => s.agents.filter((a) => a.team === t).map(logAgent);
   const model = brains.A.model === brains.B.model ? brains.A.model : `A:${brains.A.model} B:${brains.B.model}`;
   const log = startLog({
     schema: 'skirm.match/v2',

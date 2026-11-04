@@ -22,6 +22,8 @@ const METHODS: (keyof ApiClient)[] = [
   'myMatches',
   'agents',
   'agentRecord',
+  'agentProgression',
+  'pickTrait',
   'rentalOffers',
   'myRentals',
   'setRentalOffer',

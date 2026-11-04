@@ -1,0 +1,22 @@
+/* Agent progression (Progression.tsx): level and XP bar, traits held, the trait picker. Tokens only. */
+.xp { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; }
+.xp[data-compact] { gap: 2px 6px; }
+.lv { font: 800 15px/1 var(--font-display); letter-spacing: .04em; color: var(--bone); white-space: nowrap; }
+.xp[data-compact] .lv { font-size: 12px; }
+.bar { display: block; height: 5px; min-width: 40px; background: rgba(236, 232, 225, .14); }
+.bar i { display: block; height: 100%; background: var(--you); }
+.num { font: 500 10px/1 var(--font-mono); letter-spacing: .06em; color: var(--faint); white-space: nowrap; }
+.ready { grid-column: 1 / -1; justify-self: start; padding: 2px 6px; font: 500 10px/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--bg); background: var(--amber); }
+.panel { display: grid; gap: 6px; }
+.held { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.held li { padding: 4px 8px; box-shadow: inset 2px 0 0 var(--you); overflow-wrap: anywhere; }
+.held b { font: 700 13px/1.2 var(--font-display); text-transform: uppercase; color: var(--bone); }
+.held small, .hint { font: 500 10.5px/14px var(--font-mono); color: var(--faint); }
+.picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; }
+.picker .hint { grid-column: 1 / -1; }
+.pick { display: grid; gap: 2px; padding: 6px 8px; text-align: left; font: inherit; color: var(--bone); background: transparent; border: 0; box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+.pick:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--amber); }
+.pick:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pick:disabled { opacity: .5; cursor: default; }
+.pick b { font: 700 13px/1.2 var(--font-display); text-transform: uppercase; }
+.pick small { font: 400 11px/14px var(--font-mono); color: var(--muted); }

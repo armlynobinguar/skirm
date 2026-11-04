@@ -15,6 +15,8 @@
 //   record         this season's record (all time when no season is open) from GET /agents/:id/record:
 //                  win rate, matches, deliveries per match, bluffs landed of told and rival bluffs seen
 //                  through; the agent's own counters with "Soon" until it loads or if it fails
+//   progression    level, XP bar and traits under the record, with the trait picker when a pick is
+//                  earned (./Progression.tsx, POST /agents/:id/traits)
 // `map` / `d` name the crew screen it was opened from, for "Back to crew".
 import { isDifficulty, type Difficulty, type TalkTier } from '@skirm/engine/v2';
 import { skillRolesLabel } from '@skirm/shared';
@@ -27,6 +29,7 @@ import { useArena } from '@/features/arena/store';
 import { MAPS, mapById, type V2Map } from '@/features/arena/world';
 import { SkillArt } from '@/features/skills/parts';
 import { RoleTag, roleBlockReason } from '@/features/skills/RoleTag';
+import { ProgressionPanel } from './Progression';
 import { RentOut } from './RentOut';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
@@ -409,6 +412,8 @@ function AgentEditor({
             </div>
           )}
         </section>
+
+        <ProgressionPanel agent={agent} />
 
         <div className={e.plate} data-rise style={{ '--rise-i': 2 } as CSSProperties}>
           <DisplayHeading level={1} className={e.plateName}>

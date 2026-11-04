@@ -64,6 +64,8 @@ export interface DebriefInput {
   registry: V2Debrief['registry'];
   /** Ranked: the season the result counted towards and its points (from the stored result). */
   season?: V2Debrief['season'];
+  /** XP the crew's agents earned (from the stored result). */
+  xp?: V2Debrief['xp'];
   /** The crew's own live commands as applied (tick order). */
   commands?: readonly FrameCommand[];
 }
@@ -85,6 +87,7 @@ export function buildDebrief(i: DebriefInput): V2Debrief {
     agents,
     difficulty: i.difficulty,
     ...(i.season ? { season: i.season } : {}),
+    ...(i.xp?.length ? { xp: i.xp } : {}),
     ...(i.commands?.length ? { commands: commandsOf(i.state, i.commands) } : {}),
   };
 }

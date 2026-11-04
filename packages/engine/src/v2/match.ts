@@ -15,7 +15,7 @@
 //
 // A difficulty level (difficulty.ts) rewrites the map's rules before the first tick. Each crew keeps
 // a running tally (middle items, verbs, switches, steals, knock-downs, talk) for goals and the debrief.
-import { talkHold } from '@skirm/shared';
+import { DEFAULTS, normalizeTraits, talkHold, type TraitId } from '@skirm/shared';
 import { avoidedTile, BLUFF_CAP, judgeBluffs, planBluffs } from './bluff';
 import type { Difficulty } from './difficulty';
 import { DIFF_MODS, RANKED_DIFFICULTY, withDifficulty } from './difficulty';
@@ -23,6 +23,7 @@ import type { ItemOrigin } from './frame';
 import type { Dir, EffectClass, HazardKind, MapDefV2, ParsedMap, Team, Tile } from './map';
 import { middleTiles, parseMapV2 } from './map';
 import { deliverTalk, TALK_TIERS, type HeardMessage, type SayInput, type TalkTier } from './talk';
+import { cooldownFor, digHitsFor, timerFor, visionOf } from './traits';
 
 export const TICK_MS = 2000;
 export const MATCH_TICKS = 150;
@@ -60,6 +61,8 @@ export interface AgentSpec {
   /** 1 to 5: how far its voice carries (2 + comms tiles). */
   comms: number;
   tier: TalkTier;
+  /** Progression traits (traits.ts): one small step on a stat each. Ignored in ranked unless DEFAULTS.progression.rankedTraits. */
+  traits?: readonly TraitId[];
 }
 
 export interface MatchOptions {
@@ -86,6 +89,8 @@ export interface AgentState {
   vision: number;
   comms: number;
   tier: TalkTier;
+  /** Traits in play (normalised; absent when none). vision and comms above are the base stats. */
+  traits?: TraitId[];
   x: number;
   y: number;
   start: [number, number];
@@ -223,6 +228,7 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
       if (ids.has(spec.id)) throw new Error(`agent ${spec.id} twice`);
       ids.add(spec.id);
       const [x, y] = def.starts[T][slot]!;
+      const traits = opts.ranked && !DEFAULTS.progression.rankedTraits ? [] : normalizeTraits(spec.traits);
       agents.push({
         id: spec.id,
         name: spec.name,
@@ -232,6 +238,7 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
         vision: clamp(spec.vision, 1, 5),
         comms: clamp(spec.comms, 1, 5),
         tier: opts.ranked ? 'standard' : spec.tier,
+        ...(traits.length ? { traits } : {}),
         x,
         y,
         start: [x, y],
@@ -354,7 +361,7 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
       const j = (a.y + dy) * w + a.x + dx;
       const t = s.grid[j];
       if (t === 'dirt') {
-        const hits = (s.dig[j] ?? 0) + (a.role === 'Digger' ? DIG_HITS : 1);
+        const hits = (s.dig[j] ?? 0) + (a.role === 'Digger' ? DIG_HITS : digHitsFor(1, a));
         const done = hits >= DIG_HITS;
         if (done) {
           s.grid[j] = null;
@@ -482,10 +489,10 @@ function useVerb(s: MatchState, a: AgentState, verbId: string, dir: Dir | undefi
   if (verb.effect === 'area_repel') {
     const hit = s.agents.filter((o) => o.team !== a.team && !o.out && !o.down && manhattan(o, a) <= REPEL_RADIUS);
     for (const o of hit) {
-      o.stun = STUN_TICKS;
+      o.stun = timerFor(STUN_TICKS, o, 'stun');
       ev.push({ kind: 'stunned', agent: o.id, by: a.id });
     }
-    a.cooldown[verb.id] = s.tick + REPEL_COOLDOWN;
+    a.cooldown[verb.id] = s.tick + cooldownFor(REPEL_COOLDOWN, a);
     ev.push({ kind: 'verb', agent: a.id, verb: verb.id, effect: verb.effect, at: [a.x, a.y] });
     return null;
   }
@@ -612,7 +619,7 @@ function spreadHazard(s: MatchState, kind: HazardKind, cap: number, ev: MatchEve
 
 function knockDown(s: MatchState, a: AgentState, by: HazardKind | 'switch', ev: MatchEvent[]) {
   const dropped = dropItems(s, a);
-  a.down = DOWN_TICKS;
+  a.down = timerFor(DOWN_TICKS, a, 'down');
   s.tally[a.team].swept++;
   ev.push({ kind: 'knocked_down', agent: a.id, by, dropped });
 }
@@ -647,7 +654,7 @@ function updateSight(s: MatchState) {
     if (s.map.def.fog)
       for (const a of s.agents) {
         if (a.team !== T || a.out || a.down) continue;
-        const r = Math.max(1, 1 + a.vision - (s.map.def.night ? 1 : 0));
+        const r = Math.max(1, 1 + visionOf(a) - (s.map.def.night ? 1 : 0));
         for (let dy = -r; dy <= r; dy++)
           for (let dx = -(r - Math.abs(dy)); dx <= r - Math.abs(dy); dx++) {
             const x = a.x + dx;

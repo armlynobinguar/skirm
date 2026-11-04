@@ -3,10 +3,20 @@
 // result, in the same transaction that closes the match; that transaction also adds the season
 // standings and the skill versions' ranked records, and stamps each player's last ranked result.
 import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
-import { seasonPoints, updateMatch, type EloResult } from '@skirm/shared';
+import { levelOf, matchXp, progressionOf, seasonPoints, updateMatch, type EloResult } from '@skirm/shared';
 import type { Executor } from '../client';
 import { newId } from '../ids';
-import { accounts, agents, matchMessages, v2Matches, type V2CrewRecord, type V2CrewStatsRecord, type V2DebriefRecord, type V2EloDeltaRecord } from '../schema';
+import {
+  accounts,
+  agents,
+  matchMessages,
+  v2Matches,
+  type V2CrewRecord,
+  type V2CrewStatsRecord,
+  type V2DebriefRecord,
+  type V2DebriefXpRecord,
+  type V2EloDeltaRecord,
+} from '../schema';
 import { RepoError, type RegistryState } from '../types';
 import { ProofRepo } from './proof';
 import { RentalsRepo } from './rentals';
@@ -227,6 +237,39 @@ export class V2MatchesRepo {
         for (const team of ['A', 'B'] as const) {
           const d = input.debriefs[team];
           if (d) debriefs[team] = { ...d, eloDelta: deltas.find((e) => e.team === team)?.delta ?? null, registry };
+        }
+      }
+      // Agent XP: every agent that played a match to the end (practice and void give none by
+      // default, as for the agents' records), written with the result and listed in its crew's debrief.
+      const playedCrews = input.crews ?? m.crews;
+      if (status === 'ended' && playedCrews) {
+        const kind = m.ranked ? 'ranked' : m.practice ? 'practice' : 'casual';
+        for (const team of ['A', 'B'] as const) {
+          const gains: V2DebriefXpRecord[] = [];
+          for (const a of playedCrews[team]) {
+            const outcome = input.winner === 'draw' ? 'draw' : input.winner === team ? 'win' : 'loss';
+            const delivered = input.debriefs?.[team]?.agents.find((x) => x.agentId === a.id)?.delivered ?? 0;
+            const gained = matchXp({ kind, outcome, delivered });
+            if (gained <= 0) continue;
+            const [after] = await t
+              .update(agents)
+              .set({ xp: sql`${agents.xp} + ${gained}` })
+              .where(eq(agents.id, a.id))
+              .returning({ id: agents.id, name: agents.name, xp: agents.xp, traits: agents.traits });
+            if (!after) continue;
+            const p = progressionOf(after.xp, after.traits);
+            gains.push({
+              agentId: after.id,
+              name: a.name,
+              gained,
+              xp: after.xp,
+              level: p.level,
+              leveledUp: p.level > levelOf(after.xp - gained),
+              traitReady: p.traits.length < p.traitSlots,
+            });
+          }
+          const d = debriefs?.[team];
+          if (d && gains.length) debriefs![team] = { ...d, xp: gains };
         }
       }
       const [row] = await t

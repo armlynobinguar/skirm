@@ -279,5 +279,15 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nALTER TABLE \"achievements_unlocked\" ADD CONSTRAINT \"achievements_unlocked_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
       "\nALTER TABLE \"quest_claims\" ADD CONSTRAINT \"quest_claims_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;"
     ]
+  },
+  {
+    "tag": "0014_agent_progression",
+    "folderMillis": 1793809824290,
+    "bps": true,
+    "hash": "f998158f7fa03cc306ff33bfcd5929a012f0e3a8d9aae7436d8b7140f73da043",
+    "sql": [
+      "ALTER TABLE \"agents\" ADD COLUMN \"xp\" integer DEFAULT 0 NOT NULL;",
+      "\nALTER TABLE \"agents\" ADD COLUMN \"traits\" jsonb DEFAULT '[]'::jsonb NOT NULL;"
+    ]
   }
 ];
