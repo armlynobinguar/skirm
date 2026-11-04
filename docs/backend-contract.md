@@ -60,7 +60,7 @@ Talk tiers are priced in whole credits per 100 agent-ticks (`DEFAULTS.talk.rateP
 
 ## REST (`apps/api`, JSON, no prefix)
 
-Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/*`, `GET /v2/matches/*` (but `/v2/matches/:id/shares` and `/v2/matches/:id/decisions`), `GET /replays/:shareId`, `GET /seasons*` and `GET /ops/stats` / `GET /ops/talk-rates` (their own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
+Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/*`, `GET /v2/matches/*` (but `/v2/matches/:id/shares` and `/v2/matches/:id/decisions`), `GET /replays/:shareId`, `GET /seasons*`, `GET /ops/stats` / `GET /ops/talk-rates` (their own token) and `/agent/v1/*` (an external agent token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
 
 ### Account
 
@@ -79,7 +79,7 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/me/export` | ✓ | Everything skirm holds about the caller, one table per key (account, agents, skills created, ownership, listings, sales, rental offers and passes, ledger, matches with only the caller's debrief side, messages their agents said, standings, prizes, trials, cosmetics, onboarding progress), plus `skillPrompts`: the caller's own skill prompts decrypted |
 | DELETE | `/me` | ✓ | `{ confirm }` (the current handle; 422 `confirm_mismatch`) → `{ deleted: true }`. 409 `agent_busy` mid-match, 409 `listing_active` with an open listing. Clears the Privy id, NEAR link and system prompts, ends rental offers, sets the handle to `~deleted-<id>` and `deleted_at`; the account never signs in again. Agents, match history, sales and the ledger stay (other players' records and paid rental passes depend on them); credits are forfeited |
 | GET | `/agents` | | `Agent[]`: `{ id, name, elo, matchesPlayed, wins, losses, draws, skills: [{id, version, name}], unlocks, role, vision, comms, tier, systemPrompt, appearance }` |
-| PATCH | `/agents/:id` | `{ name?, skills?: {id, version}[] (≤ 3, owned), unlocks?, role?, vision? (1-5), comms? (1-5), tier?, systemPrompt?: string \| null (≤ 600 characters; null or blank clears), appearance? }` | `Agent`. Gameplay fields are refused (`409 agent_busy`) while the agent is in a live match. `appearance` can change any time; a premium colour needs the cosmetic bought first (`403 cosmetic_not_owned`, `details.items`) |
+| PATCH | `/agents/:id` | `{ name?, skills?: {id, version}[] (≤ 3, owned), unlocks?, role?, vision? (1-5), comms? (1-5), tier?, systemPrompt?: string \| null (≤ 600 characters; null or blank clears), appearance? }` | `Agent`. Gameplay fields are refused (`409 agent_busy`) while the agent is in a live match. `appearance` can change any time; a premium colour needs the cosmetic bought first (`403 cosmetic_not_owned`, `details.items`). Every equipped skill must be for the agent's (new) role or `any`: an equip or role change that breaks this is `422 skill_role_mismatch` (`details: {skillId, version, roles, role}`) |
 
 ### Matches
 
@@ -125,13 +125,13 @@ The web page `/replays/<shareId>` sets Open Graph metadata and a generated previ
 | Method | Path | Body / query | Returns |
 | --- | --- | --- | --- |
 | GET | `/skills` | `?tab=written\|owned` | `SkillRow[]`: public fields, `status` (`Draft`, `Minted`, `Listed`, or `Starter` for the account-bound starter skill), `requiredUnlocks`; `written` rows add `royaltiesYocto` |
-| POST | `/skills` | `{ name, summary?, prompt (≤ 1200), reflexes? (≤ 400), requires_actions, handles_tags, royalty_bps, trigger? }` | `SkillPublic` (draft, version 1). The text goes encrypted into the vault. `trigger` (`@skirm/shared` `SkillTrigger`, null or absent: always) is one of `always`, `hazard_within {tiles 1-10}`, `behind_on_score`, `ahead_on_score`, `rival_near_switch {tiles 1-10}`, `carrying_item`, `time_left_under {seconds 10-300}`: the skill joins its agent's prompt only on ticks the condition holds on that agent's own view. Public on every `SkillPublic` (Exchange included); the prompt stays sealed |
+| POST | `/skills` | `{ name, summary?, prompt (≤ 1200), reflexes? (≤ 400), requires_actions, handles_tags, royalty_bps, trigger?, roles? }` | `SkillPublic` (draft, version 1). The text goes encrypted into the vault. `trigger` (`@skirm/shared` `SkillTrigger`, null or absent: always) is one of `always`, `hazard_within {tiles 1-10}`, `behind_on_score`, `ahead_on_score`, `rival_near_switch {tiles 1-10}`, `carrying_item`, `time_left_under {seconds 10-300}`: the skill joins its agent's prompt only on ticks the condition holds on that agent's own view. Public on every `SkillPublic` (Exchange included); the prompt stays sealed. `roles` (default `["any"]`): `["any"]` or 1-6 of Builder, Digger, Firefighter, Scout, Runner, Hauler, the agent roles that may equip the version; public on every `SkillPublic`; versions from before roles are `any` |
 | PUT | `/skills/:id` | same fields | the next version as a draft (minted versions are immutable). Creator only |
 | GET | `/skills/:id` | `?version=` | `SkillPublic`; the creator alone also gets `{ prompt, reflexes }` |
 | POST | `/skills/:id/mint` | `{ version? }` | `{ tokenId, status: 'minted'\|'pending', txHash?, benchmark: {status} }`. Never gated on a test: the hidden benchmark is queued first, then `nft_mint`. `409 mint_in_progress`, `422 near_account_required` (NEAR minter), `502 mint_failed`, `503 queue_unavailable` |
-| GET | `/market` | `?tag=&sort=winrate\|benchmark\|price\|new` | `MarketCard[]`: `{ skill, creator, priceYocto, listing?, rankedWinRate, rankedMatches, benchmarkScore, owned }`. `benchmarkScore` is null until a benchmark finished with a model (offline: `needs_model`); `benchmark` sorts nulls last |
+| GET | `/market` | `?tag=&role=&sort=winrate\|benchmark\|price\|new` | `MarketCard[]`: `{ skill, creator, priceYocto, listing?, rankedWinRate, rankedMatches, benchmarkScore, owned }`. `benchmarkScore` is null until a benchmark finished with a model (offline: `needs_model`); `benchmark` sorts nulls last. `role` keeps versions that agent role may equip (its role or `any`) |
 | GET | `/market/:skillId` | `?version=` | `{ skill, benchmark, ranked: {matches, wins, losses, draws, perMap[]}, counters: {vs: {skillId, version, matches, wins, losses, draws}[]}, trials: {used, left}, sales[], listing?, owned, pinned: {version, promptSha256, tokenId, mintedAt} }`. `benchmark` is `{ status: queued\|running\|done\|needs_model\|failed, brain, seeds, matches, wins, losses, draws, deliveries, leakRate, manipulationRate, score, needsModel }` or null |
-| POST | `/market/:skillId/trial` | `{ agentId, version? }` | `202 { trialId, status }`: a buyer's trial of the version with one of their agents. `409 skill_owned`, `429 trial_limit` (3 per version; `needs_model` trials do not count), `503 queue_unavailable` |
+| POST | `/market/:skillId/trial` | `{ agentId, version? }` | `202 { trialId, status }`: a buyer's trial of the version with one of their agents. `409 skill_owned`, `422 skill_role_mismatch` (the agent's role cannot equip it), `429 trial_limit` (3 per version; `needs_model` trials do not count), `503 queue_unavailable` |
 | GET | `/market/:skillId/trials` | `?version=` | the caller's trials, newest first: `{ id, skillId, version, agentId, status, needsModel, results, createdAt, finishedAt }` |
 | POST | `/market/:skillId/listing` | `{ priceYocto, txHash?, version? }` | the listing, with `split: {primary, feeYocto, royaltyYocto, sellerYocto}` (no royalty on a primary sale). `422 not_minted` |
 | POST | `/market/:skillId/purchase` | `{ txHash, version? }` | `{ owned: true, sale }` once the NEAR owner is the buyer (dev mode: `dev:<yocto>[:<nonce>]`). `409 not_listed`, `own_listing`, `duplicate_tx`; `422 underpaid`, `purchase_unverified`, `near_account_required`. A bought skill grants use, never its text; a sold skill is unequipped from the seller's agents |
@@ -185,6 +185,23 @@ The tips, checklist items and templates are static (`TUTORIAL_STEPS`, `FIRST_STE
 | GET | `/onboarding/templates` | | `{ id, name, summary, bestFor, lesson, prompt, reflexes, requires_actions, handles_tags }[]`: starter strategies, full text (they are examples, not secret) |
 | POST | `/onboarding/templates/:id/copy` | | `201 SkillPublic`: a new draft skill of the caller's (version 1, sealed into the vault like `POST /skills`). 404 for an unknown template |
 
+### External agents (bring your own agent)
+
+A player's own program plays one of their agents in casual and practice matches, by webhook or by pulling turns. The versioned contract (`skirm.agent/v1`), signatures, SSRF rules and the MCP server are in [external-agents.md](external-agents.md).
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| GET | `/external-agents` | | `ExternalAgent[]`: `{ id, name, agentId, mode: 'webhook'\|'pull', webhookUrl, calls, misses, lastError, lastSeenAt, rotatedAt, createdAt }` |
+| POST | `/external-agents` | `{ name (1-40), agentId?, webhookUrl? (https, public host) }` | `201 { externalAgent, secret, token }`, the secret and token shown this once. `409 agent_bound` (another external agent plays that agent), `409 external_limit` (`DEFAULTS.external.perAccount`, 5), `422 invalid_webhook` |
+| PATCH | `/external-agents/:id` | `{ name?, agentId? \| null, webhookUrl? \| null }` | `ExternalAgent` |
+| POST | `/external-agents/:id/rotate` | | `{ externalAgent, secret, token }`; the old secret and token stop working |
+| POST | `/external-agents/:id/ping` | | webhook: a signed `ping`, `{ ok: true, mode, status, latencyMs }` or `{ ok: false, mode, error, message }`; pull: `{ ok, mode, lastSeenAt }` |
+| DELETE | `/external-agents/:id` | | `{ deleted: true }` |
+| GET | `/agent/v1/me` | `Authorization: Bearer <token>` | the external agent, its player and the agent it plays |
+| GET | `/agent/v1/turn` | token; `?waitMs=&after=` | `{ contract, turn \| null }` (long poll ≤ 25 s) |
+| POST | `/agent/v1/action` | token; `{ turnId, action, say?, thought? }` | `{ accepted, turnId, action }`. `409 stale_turn`, `too_late`, `already_answered`; `422 invalid_action`; `503 relay_unavailable` |
+| GET | `/agent/v1/matches` | token; `?limit=` | `{ matches }` as `/me/matches` |
+
 ### Operations
 
 | Method | Path | Body / query | Returns |
@@ -194,17 +211,17 @@ The tips, checklist items and templates are static (`TUTORIAL_STEPS`, `FIRST_STE
 
 ### Error codes
 
-Besides `bad_request` (400), `unauthenticated` / `no_session` (401), `forbidden` (403), `not_found` (404) and `internal` (500):
+Besides `bad_request` (400), `unauthenticated` / `no_session` / `invalid_agent_token` (401), `forbidden` (403), `not_found` (404) and `internal` (500):
 
 | Status | Codes |
 | --- | --- |
 | 402 | `insufficient_credits` (with `need`, `have`) |
 | 403 | `dev_disabled`, `cosmetic_not_owned` |
-| 409 | `agent_busy`, `match_live`, `not_ended`, `replay_expired`, `share_limit`, `mint_in_progress`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch`, `own_lobby`, `lobby_full`, `lobby_closed`, `lobby_ready`, `tournament_match`, `tournament_full`, `not_open` |
-| 422 | `bad_clip`, `near_account_required`, `near_proof_required`, `near_proof_invalid`, `not_minted`, `invalid_hash`, `underpaid`, `purchase_unverified` |
+| 409 | `agent_busy`, `agent_bound`, `external_limit`, `stale_turn`, `too_late`, `already_answered`, `match_live`, `not_ended`, `replay_expired`, `share_limit`, `mint_in_progress`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch`, `own_lobby`, `lobby_full`, `lobby_closed`, `lobby_ready`, `tournament_match`, `tournament_full`, `not_open` |
+| 422 | `bad_clip`, `invalid_webhook`, `invalid_action`, `near_account_required`, `near_proof_required`, `near_proof_invalid`, `not_minted`, `invalid_hash`, `underpaid`, `purchase_unverified` |
 | 429 | `trial_limit`, `bench_limit` |
 | 502 | `mint_failed` |
-| 503 | `queue_unavailable`, `rpc_unavailable`, `near_unavailable`, `ownership_unavailable` |
+| 503 | `relay_unavailable`, `queue_unavailable`, `rpc_unavailable`, `near_unavailable`, `ownership_unavailable` |
 
 ## WebSocket (`apps/realtime`, path `/ws`)
 
@@ -214,7 +231,7 @@ Client → server (`WsClientMessage`):
 
 | Message | Meaning |
 | --- | --- |
-| `{type:'auth', token?, devUser?}` | sign in (dev: `devUser` is the handle). On reconnect during a match the server re-sends where it stands (found, lock-in or the latest frame) |
+| `{type:'auth', token?, devUser?, agentToken?}` | sign in (dev: `devUser` is the handle). On reconnect during a match the server re-sends where it stands (found, lock-in or the latest frame). `agentToken` (an external agent's token, alone) signs in as its player for casual and practice with the agent it plays only ([external-agents.md](external-agents.md)) |
 | `{type:'v2_queue', crew: {agentId, tier}[] (1-3), ranked, mapId?, difficulty?, opponent?: 'bot', draft?}` | search for a match. Casual pairs only with the same `mapId` (or any) and `difficulty`; ranked ignores both (any fitting map, Normal). `opponent: 'bot'` is practice: casual only (`practice_unranked`), no matchmaking, starts at once on `mapId`/`difficulty` or `DEFAULT_PRACTICE` (Copper Hollow, Easy). `draft: true` is draft mode: casual against a player only (`draft_casual`), pairs only with other draft searches, and adds a ban phase after accept |
 | `{type:'v2_cancel_queue'}` | stop searching |
 | `{type:'v2_accept', matchId}` / `{type:'v2_decline', matchId}` | answer `v2_found` (10 s) |
@@ -243,7 +260,7 @@ Server → client (`WsServerMessage`):
 | `{type:'v2_command_ok', matchId, tick, left}` | answer to `v2_command`: it lands on `tick`; `left` remain |
 | `{type:'error', code, message}` | see below |
 
-WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthenticated`, `auth_failed`, `already_authenticated`, `already_queued`, `not_queued`, `in_match`, `invalid_crew`, `not_in_lockin`, `practice_unranked`, `draft_casual`, `lobby_closed`, `not_your_turn`, `invalid_ban`, `agent_busy`, `not_found`, `not_live`, `no_commands`, `rate_limited`, `invalid_command`, `command_refused`, `too_many_subscriptions`, `unavailable`, `internal`.
+WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthenticated`, `auth_failed`, `already_authenticated`, `already_queued`, `not_queued`, `in_match`, `invalid_crew`, `not_in_lockin`, `practice_unranked`, `external_unranked`, `draft_casual`, `lobby_closed`, `not_your_turn`, `invalid_ban`, `agent_busy`, `not_found`, `not_live`, `no_commands`, `rate_limited`, `invalid_command`, `command_refused`, `too_many_subscriptions`, `unavailable`, `internal`.
 
 `scripts/ws-v2.cjs` is a ready client: it signs in, queues, accepts, locks in and waits for `v2_end` (README of the script at its top).
 
@@ -276,6 +293,7 @@ WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthe
 | key `v2match:<id>:last` | the latest of those, 120 s TTL: a watcher on another instance reads it first, then follows the channel |
 | key `v2:match:<id>:frames:<A\|B\|watch>` | the frames of an ended match per view, 6 h TTL, for `v2_replay`; the api reads the `watch` key for shared replays and highlights |
 | key `cost:usd:<UTC day>` | model spend across worker and realtime, for `cost_alert` and `/ops/stats` |
+| keys `ext:turn:<externalAgentId>` / `ext:reply:<turnId>` | an external agent's open turn (realtime writes, `/agent/v1/turn` reads) and its first answer (`/agent/v1/action` writes once, realtime reads) |
 
 Frames carry each crew's own plan text only to that crew, and never the plan of an agent running a bought (encrypted) skill. Skill text never leaves the vault except into the agent's model call.
 

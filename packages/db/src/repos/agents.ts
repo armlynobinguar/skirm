@@ -1,6 +1,15 @@
 // Agents, equipped skills and unlock items (Game Spec §8).
 import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
-import { appearanceOr, isAppearance, type AgentAppearance, type Tag, type Unlock } from '@skirm/shared';
+import {
+  appearanceOr,
+  isAppearance,
+  normalizeSkillRoles,
+  skillFitsRole,
+  skillRolesLabel,
+  type AgentAppearance,
+  type Tag,
+  type Unlock,
+} from '@skirm/shared';
 import type { Executor } from '../client';
 import {
   agentSkills,
@@ -242,6 +251,10 @@ export class AgentsRepo {
             .values(list.map((s, slot) => ({ agentId, slot, skillId: s.id, version: s.version })));
       }
 
+      // Role slots: every skill the agent ends up with must be for its (new) role or any role.
+      if (patch.skills !== undefined || (patch.role !== undefined && patch.role !== agent.role))
+        await assertSkillsFitRole(t, agentId, patch.role ?? agent.role);
+
       if (patch.unlocks !== undefined) {
         const want = new Set(patch.unlocks);
         if (want.size !== patch.unlocks.length)
@@ -345,6 +358,26 @@ export class AgentsRepo {
 const UNLOCK_ORDER: readonly Unlock[] = ['builder', 'digger', 'firefighter'];
 function sortUnlocks(list: Unlock[]): Unlock[] {
   return [...new Set(list)].sort((a, b) => UNLOCK_ORDER.indexOf(a) - UNLOCK_ORDER.indexOf(b));
+}
+
+/** Throws `skill_role_mismatch` when a skill equipped on the agent is not for `role` (nor any role). */
+async function assertSkillsFitRole(t: Executor, agentId: string, role: string): Promise<void> {
+  const rows = await t
+    .select({ id: skillVersions.skillId, version: skillVersions.version, name: skillVersions.name, roles: skillVersions.roles })
+    .from(agentSkills)
+    .innerJoin(
+      skillVersions,
+      and(eq(skillVersions.skillId, agentSkills.skillId), eq(skillVersions.version, agentSkills.version)),
+    )
+    .where(eq(agentSkills.agentId, agentId))
+    .orderBy(asc(agentSkills.slot));
+  const bad = rows.find((r) => !skillFitsRole(r.roles, role));
+  if (bad)
+    throw new RepoError(
+      'skill_role_mismatch',
+      `${bad.name} is for ${skillRolesLabel(bad.roles)}, not a ${role}`,
+      { skillId: bad.id, version: bad.version, roles: normalizeSkillRoles(bad.roles), role },
+    );
 }
 
 async function ownedVersionKeys(t: Executor, ownerId: string): Promise<Set<string>> {

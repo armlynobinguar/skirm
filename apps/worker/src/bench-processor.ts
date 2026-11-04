@@ -70,11 +70,16 @@ export interface BenchRunResult {
   debrief: CrewReport;
 }
 
-/** The role a skill wants: the unlock of its first required action, else Builder. */
-export function benchRole(v: Pick<SkillVersionView, 'requiresActions'>): Role {
+/**
+ * The role the tested agent plays: one the skill may be equipped on (its `roles`; `any` allows
+ * all), preferring the role of its first required action, else the first allowed one.
+ */
+export function benchRole(v: Pick<SkillVersionView, 'requiresActions'> & { roles?: readonly string[] }): Role {
   const want: Record<string, Role> = { place_block: 'Builder', dig: 'Digger', extinguish: 'Firefighter' };
-  for (const a of v.requiresActions) if (want[a]) return want[a]!;
-  return ROLES[0]!;
+  const named = (v.roles ?? []).filter((r): r is Role => (ROLES as readonly string[]).includes(r));
+  const allowed: readonly Role[] = named.length && !(v.roles ?? []).includes('any') ? named : ROLES;
+  for (const a of v.requiresActions) if (want[a] && allowed.includes(want[a]!)) return want[a]!;
+  return allowed[0]!;
 }
 
 /** One line per event a writer cares about; null for the rest (moves, hazard waves, speech). */

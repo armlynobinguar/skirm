@@ -130,6 +130,9 @@ describe('bench consumer', () => {
   it('roles and event lines', () => {
     expect(benchRole({ requiresActions: ['dig'] })).toBe('Digger');
     expect(benchRole({ requiresActions: [] })).toBe('Builder');
+    expect(benchRole({ requiresActions: ['dig'], roles: ['any'] })).toBe('Digger');
+    // A skill only Scouts may equip plays on a Scout, whatever it requires.
+    expect(benchRole({ requiresActions: ['dig'], roles: ['Scout'] })).toBe('Scout');
     const name = (id: string) => (id === 'bench-1' ? 'You' : 'Bot 1');
     expect(benchEventLine({ kind: 'delivered', agent: 'bench-1', team: 'A', count: 2, score: 3 }, name)).toEqual({ kind: 'delivered', text: 'You delivered 2 (score 3)' });
     expect(benchEventLine({ kind: 'said', agent: 'bench-1', channel: 'say', text: 'secret', heardBy: [], overheardBy: [] }, name)).toBeNull();

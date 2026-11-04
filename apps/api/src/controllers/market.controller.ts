@@ -9,7 +9,7 @@ import {
   type ListingRow,
   type SkillVersionView,
 } from '@skirm/db';
-import { TAGS, type Tag } from '@skirm/shared';
+import { AGENT_ROLES, TAGS, normalizeSkillRoles, skillFitsRole, skillRolesLabel, type Tag } from '@skirm/shared';
 import { z } from 'zod';
 import { CurrentAccount, mustAccount } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
@@ -22,6 +22,8 @@ const empty = (v: unknown) => (v === '' ? undefined : v);
 const marketQuery = z.object({
   tag: z.preprocess(empty, z.enum(TAGS as unknown as [Tag, ...Tag[]]).optional()),
   sort: z.preprocess(empty, z.enum(['winrate', 'benchmark', 'price', 'new']).default('winrate')),
+  /** Only versions an agent of this role may equip (its role or any). */
+  role: z.preprocess(empty, z.enum(AGENT_ROLES).optional()),
 });
 const versionQuery = z.object({ version: optIntQuery(1, 1_000_000) });
 const trialBody = z.object({ version: z.number().int().min(1).optional(), agentId });
@@ -43,6 +45,7 @@ export class MarketController {
     const { repos } = this.deps;
     let versions = await repos.skills.listPublic();
     if (q.tag) versions = versions.filter((v) => v.handlesTags.includes(q.tag!));
+    if (q.role) versions = versions.filter((v) => skillFitsRole(v.roles, q.role!));
     const [listings, owned, proof] = await Promise.all([
       repos.market.activeListings(),
       repos.skills.listOwned(account.id),
@@ -180,6 +183,11 @@ export class MarketController {
     if (!agent || agent.ownerId !== account.id) throw notFound('agent');
     if (await repos.skills.owns(account.id, v.id, v.version))
       throw new ApiError(409, 'skill_owned', 'you already own this version');
+    if (!skillFitsRole(v.roles, agent.role))
+      throw new ApiError(422, 'skill_role_mismatch', `this skill is for ${skillRolesLabel(v.roles)}, not a ${agent.role}`, {
+        roles: normalizeSkillRoles(v.roles),
+        role: agent.role,
+      });
     const trial = await repos.proof.createTrial({
       accountId: account.id,
       skillId: v.id,

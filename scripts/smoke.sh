@@ -390,7 +390,7 @@ checks "$TMP/pvp-match.json" "(() => {
   if (o.status !== 'ended') p.push('status ' + o.status + ', want ended');
   if (o.ranked !== true) p.push('ranked ' + o.ranked + ', want true');
   const d = Object.fromEntries((o.elo || []).map((e) => [e.team, e.delta]));
-  const want = w === 'draw' ? { A: 0, B: 0 } : w === 'A' ? { A: 16, B: -16 } : { A: -16, B: 16 };
+  const want = w === 'draw' ? { A: 0, B: 0 } : w === 'A' ? { A: 24, B: -24 } : { A: -24, B: 24 }; // placement K 48 between equals
   if (d.A !== want.A || d.B !== want.B) p.push('Elo deltas ' + JSON.stringify(d) + ', want ' + JSON.stringify(want) + ' (winner ' + w + ')');
   return p;
 })()" "GET /v2/matches/$PVP_MATCH: ranked, ended, Elo $(js "$TMP/pvp-match.json" '(o.elo || []).map((e) => `${e.team} ${e.before} -> ${e.after}`).join(", ")') (winner $WINNER)" || true

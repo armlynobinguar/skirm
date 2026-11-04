@@ -125,8 +125,8 @@ export const RANKED_DECAY_EVERY_MS = 60 * 60_000;
 
 // ---------- WebSocket (apps/realtime, path /ws) ----------
 
-/** What a client may send: sign in, then the v2_* messages. */
-export type WsClientMessage = { type: 'auth'; token?: string; devUser?: string } | V2ClientMessage;
+/** What a client may send: sign in, then the v2_* messages. `agentToken`: an external agent's token (`<id>.<secret>`), signing in as its player for casual and practice only. */
+export type WsClientMessage = { type: 'auth'; token?: string; devUser?: string; agentToken?: string } | V2ClientMessage;
 
 /** What realtime sends: queue_status while searching, errors, and the v2_* messages. */
 export type WsServerMessage =

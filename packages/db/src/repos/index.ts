@@ -3,6 +3,7 @@ import { AccountsRepo } from './accounts';
 import { AgentsRepo } from './agents';
 import { BenchRepo } from './bench';
 import { CosmeticsRepo } from './cosmetics';
+import { ExternalAgentsRepo } from './external-agents';
 import { LeaderboardsRepo } from './leaderboards';
 import { LedgerRepo, type LedgerRepoOptions } from './ledger';
 import { LobbiesRepo } from './lobbies';
@@ -56,6 +57,8 @@ export interface Repos {
   replays: ReplaysRepo;
   /** Tutorial progress and the home checklist. */
   onboarding: OnboardingRepo;
+  /** Players' own programs bound to their agents (bring your own agent). */
+  externalAgents: ExternalAgentsRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -89,6 +92,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     tournaments: new TournamentsRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
     replays: new ReplaysRepo(db),
     onboarding: new OnboardingRepo(db),
+    externalAgents: new ExternalAgentsRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -97,6 +101,7 @@ export * from './accounts';
 export * from './agents';
 export * from './bench';
 export * from './cosmetics';
+export * from './external-agents';
 export * from './leaderboards';
 export * from './ledger';
 export * from './lobbies';
