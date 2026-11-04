@@ -1,5 +1,6 @@
 // Skill proof consumer: `benchmarks` job `{ kind: 'mint' }` plays a minted version's hidden
-// gauntlet, `{ kind: 'trial' }` plays one buyer's trial. Both run on the headless v2 runner against
+// gauntlet, `{ kind: 'trial' }` plays one buyer's trial (`{ kind: 'bench' }`, a writer's test-bench
+// run, is in ./bench-processor). Both run on the headless v2 runner against
 // the greedy bot (botCrew), the same match loop as a live game.
 //
 // Offline honesty: the greedy brain never reads skills or what it hears, so with it a benchmark or a
@@ -25,6 +26,7 @@ import {
 import { MAPS_V2, PRACTICE_MAPS, botCrew, type AgentSpec, type Difficulty } from '@skirm/engine/v2';
 import type { BenchmarkJobData } from '@skirm/server';
 import { WorkerError, errorCode, type WorkerDeps } from './deps';
+import { processBenchRun } from './bench-processor';
 
 export type BenchmarkDeps = Pick<
   WorkerDeps,
@@ -40,9 +42,9 @@ export interface BenchmarkAttempt {
 
 export interface BenchmarkOutcome {
   kind: BenchmarkJobData['kind'];
-  /** `<skillId>:<version>` or the trial id. */
+  /** `<skillId>:<version>`, the trial id or the bench run id. */
   id: string;
-  status: 'done' | 'needs_model' | 'failed' | 'skipped';
+  status: 'done' | 'needs_model' | 'failed' | 'skipped' | 'insufficient_credits';
   reason?: string;
   score?: number;
 }
@@ -147,6 +149,7 @@ export async function processBenchmark(
   data: BenchmarkJobData,
   attempt: BenchmarkAttempt = { attemptsMade: 0, attempts: 1 },
 ): Promise<BenchmarkOutcome> {
+  if (data.kind === 'bench') return processBenchRun(deps, data.runId, attempt);
   return data.kind === 'mint'
     ? benchmarkVersion(deps, data.skillId, data.version, attempt)
     : runTrial(deps, data.trialId, attempt);

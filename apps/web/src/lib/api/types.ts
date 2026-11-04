@@ -715,3 +715,106 @@ export interface SkillTemplateView {
   requires_actions: ('place_block' | 'dig' | 'extinguish')[];
   handles_tags: Tag[];
 }
+
+// ---------- Skill test bench ----------
+
+/** GET /bench: what a run costs on this server and how many the caller has left this hour. */
+export interface BenchInfo {
+  brain: 'greedy' | 'haiku';
+  /** True on the offline greedy brain: runs cost nothing (and the prompt does not change play). */
+  free: boolean;
+  /** Credits one run holds with a model brain (0 when free). */
+  costCredits: number;
+  limit: { perHour: number; used: number; left: number };
+}
+
+export type BenchRunStatus = 'queued' | 'running' | 'done' | 'failed' | 'insufficient_credits';
+
+/** One key moment of a bench run (no speech text). */
+export interface BenchEvent {
+  tick: number;
+  side: 'you' | 'bot' | 'map';
+  kind: string;
+  text: string;
+}
+
+/** The engine's debrief of the tested crew (`crewReport`). */
+export interface BenchDebrief {
+  mvp: string | null;
+  goals: { title: string; met: boolean; available: boolean; progress: string | null }[];
+  talk: { sent: number; overheard: number };
+  verbs: number;
+  switches: { mine: number; rival: number };
+  steals: number;
+  agents: { agentId: string; name: string; delivered: number; used: number; picks: number }[];
+}
+
+export interface BenchRunResult {
+  /** `<mapId>:<difficulty>`. */
+  seed: string;
+  mapId: string;
+  difficulty: Difficulty;
+  role: string;
+  outcome: 'win' | 'loss' | 'draw';
+  reason: string;
+  decidedBy: string;
+  score: { you: number; bot: number };
+  ticks: number;
+  logHash: string;
+  talk: { says: number; leaks: number; abuse: number; empty: number };
+  calls: number;
+  events: BenchEvent[];
+  eventsDropped: number;
+  debrief: BenchDebrief;
+}
+
+/** GET /bench/runs rows. */
+export interface BenchRun {
+  id: string;
+  skillId: string;
+  version: number;
+  skillName: string | null;
+  mapId: string;
+  difficulty: Difficulty;
+  seed: string;
+  status: BenchRunStatus;
+  brain: string | null;
+  credits: number;
+  /** The run played an edited draft, not the version's own prompt. */
+  edited: boolean;
+  promptSha256: string | null;
+  result: BenchRunResult | null;
+  shortfall: { need: number; have: number } | null;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+/** GET /bench/runs/:id: the prompt that played, when it is the caller's own text. */
+export interface BenchRunDetail extends BenchRun {
+  prompt: string | null;
+  reflexes: string | null;
+  promptHidden: boolean;
+}
+
+export interface BenchRunRequest {
+  skillId: string;
+  version?: number;
+  mapId: string;
+  difficulty: Difficulty;
+  /** An edited draft to play instead of the version's prompt (your own skills only). */
+  prompt?: string;
+  reflexes?: string | null;
+}
+
+export interface DiffPart {
+  op: 'same' | 'del' | 'add';
+  text: string;
+}
+
+/** GET /bench/compare?a=&b=: two runs and a word diff of their prompts (a → b). */
+export interface BenchCompare {
+  a: BenchRun;
+  b: BenchRun;
+  prompt: { hidden: true; same: null; diff: null } | { hidden: false; same: boolean; diff: DiffPart[] };
+}

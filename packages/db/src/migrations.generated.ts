@@ -159,5 +159,17 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE INDEX \"v2_matches_map_idx\" ON \"v2_matches\" USING btree (\"map_id\",\"ended_at\");",
       "\nUPDATE \"accounts\" SET \"last_ranked_at\" = r.\"at\" FROM (\n\tSELECT \"account_id\", max(\"ended_at\") AS \"at\" FROM (\n\t\tSELECT \"team_a_account_id\" AS \"account_id\", \"ended_at\" FROM \"v2_matches\" WHERE \"ranked\" AND \"status\" = 'ended'\n\t\tUNION ALL\n\t\tSELECT \"team_b_account_id\", \"ended_at\" FROM \"v2_matches\" WHERE \"ranked\" AND \"status\" = 'ended'\n\t) s GROUP BY \"account_id\"\n) r WHERE r.\"account_id\" = \"accounts\".\"id\";"
     ]
+  },
+  {
+    "tag": "0006_skill_bench",
+    "folderMillis": 1793775359190,
+    "bps": true,
+    "hash": "dcc5cf5916644d49fd5b5dc36cff5899811f6914aabfaecd14498b52e084f56d",
+    "sql": [
+      "CREATE TABLE \"skill_bench_runs\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"skill_id\" text NOT NULL,\n\t\"version\" integer NOT NULL,\n\t\"map_id\" text NOT NULL,\n\t\"difficulty\" text NOT NULL,\n\t\"prompt_sha256\" text,\n\t\"ciphertext\" \"bytea\",\n\t\"iv\" \"bytea\",\n\t\"auth_tag\" \"bytea\",\n\t\"wrapped_key\" \"bytea\",\n\t\"key_id\" text,\n\t\"status\" text DEFAULT 'queued' NOT NULL,\n\t\"brain\" text,\n\t\"credits\" integer DEFAULT 0 NOT NULL,\n\t\"result\" jsonb,\n\t\"error\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"finished_at\" timestamp with time zone,\n\tCONSTRAINT \"skill_bench_runs_status_ck\" CHECK (\"skill_bench_runs\".\"status\" in ('queued', 'running', 'done', 'failed', 'insufficient_credits'))\n);\n",
+      "\nALTER TABLE \"skill_bench_runs\" ADD CONSTRAINT \"skill_bench_runs_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"skill_bench_runs\" ADD CONSTRAINT \"skill_bench_runs_skill_id_version_skill_versions_skill_id_version_fk\" FOREIGN KEY (\"skill_id\",\"version\") REFERENCES \"public\".\"skill_versions\"(\"skill_id\",\"version\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"skill_bench_runs_account_idx\" ON \"skill_bench_runs\" USING btree (\"account_id\",\"created_at\");"
+    ]
   }
 ];

@@ -85,7 +85,7 @@ describe('official skills seed', () => {
     const again = await seed(ctx);
     expect(again.skills.every((s) => !s.created && !s.minted && !s.listed)).toBe(true);
     expect(again.skills[0]!.benchmark).toBe('needs_model');
-    expect(ctx.benchmarkQueue.jobs.map((j) => (j.kind === 'mint' ? j.skillId : j.trialId))).toEqual(
+    expect(ctx.benchmarkQueue.jobs.map((j) => (j.kind === 'mint' ? j.skillId : j.kind))).toEqual(
       OFFICIAL_SKILLS.slice(1).map((d) => d.id),
     );
     expect(await ctx.repos.market.activeListings()).toHaveLength(OFFICIAL_SKILLS.length);

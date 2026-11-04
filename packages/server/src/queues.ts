@@ -37,9 +37,14 @@ export interface RegistryJobData {
   seasonId?: string | null;
 }
 
-/** `benchmarks` queue: a minted version's benchmark, or one buyer's trial (loaded from the DB). */
+/**
+ * `benchmarks` queue: a minted version's benchmark, one buyer's trial, or one writer's test-bench
+ * run (each loaded from the DB).
+ */
 export type BenchmarkJobData =
-  { kind: 'mint'; skillId: string; version: number } | { kind: 'trial'; trialId: string };
+  | { kind: 'mint'; skillId: string; version: number }
+  | { kind: 'trial'; trialId: string }
+  | { kind: 'bench'; runId: string };
 
 /** `seasons` queue: one repeatable tick. */
 export interface SeasonJobData {
@@ -89,7 +94,11 @@ export const DEFAULT_JOB_OPTIONS: Record<QueueName, JobsOptions> = {
 /** Stable job ids: one job per registry record / per benchmark or trial. */
 export const registryJobId = (d: RegistryJobData) => `registry-${d.kind}-${d.id}`;
 export const benchmarkJobId = (d: BenchmarkJobData) =>
-  d.kind === 'mint' ? `benchmark-${d.skillId}-v${d.version}` : `trial-${d.trialId}`;
+  d.kind === 'mint'
+    ? `benchmark-${d.skillId}-v${d.version}`
+    : d.kind === 'trial'
+      ? `trial-${d.trialId}`
+      : `bench-${d.runId}`;
 /** The season tick's job scheduler id: one schedule however many workers start it. */
 export const SEASON_TICK_JOB_ID = 'season-tick';
 export const SEASON_TICK_EVERY_MS = 10 * 60_000;
@@ -154,7 +163,7 @@ export async function enqueueBenchmark(
   queue: Queue<BenchmarkJobData>,
   data: BenchmarkJobData,
 ): Promise<void> {
-  await queue.add(data.kind === 'mint' ? 'benchmark' : 'trial', data, {
+  await queue.add(data.kind === 'mint' ? 'benchmark' : data.kind, data, {
     jobId: benchmarkJobId(data),
   });
 }

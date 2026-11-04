@@ -30,6 +30,7 @@ describe('config', () => {
   });
   it('carries exactly these blocks', () => {
     expect(Object.keys(DEFAULTS).sort()).toEqual([
+      'bench',
       'commands',
       'credits',
       'crew',

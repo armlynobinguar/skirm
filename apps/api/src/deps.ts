@@ -35,6 +35,8 @@ export type ApiConfig = Pick<
   Partial<Pick<ServerConfig, 'OPS_TOKEN' | 'COST_ALERT_DAILY_USD' | 'OPENROUTER_API_KEY'>> & {
     V2_BRAIN?: string | undefined;
     rankedDecay?: RankedDecayConfig;
+    /** Bench runs per account per rolling hour (default DEFAULTS.bench.runsPerHour). */
+    BENCH_RUNS_PER_HOUR?: number | undefined;
   };
 
 /** Model spend per UTC day as the worker and realtime sum it (Redis `cost:usd:<day>`, kept 3 days). */

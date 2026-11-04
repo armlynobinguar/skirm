@@ -8,6 +8,11 @@ import { ApiError, errorFromBody } from './errors';
 import type {
   Agent,
   AgentPatch,
+  BenchCompare,
+  BenchInfo,
+  BenchRun,
+  BenchRunDetail,
+  BenchRunRequest,
   Cosmetics,
   CreditsWithRows,
   CurrentSeason,
@@ -94,6 +99,17 @@ export interface ApiClient {
   startTrial(skillId: string, body: TrialRequest): Promise<StartTrialResponse>;
   /** GET /market/:id/trials: the caller's trials of the skill, newest first. */
   trials(skillId: string, version?: number): Promise<Trial[]>;
+
+  /** GET /bench: the test bench's cost here and the caller's runs left this hour. */
+  benchInfo(): Promise<BenchInfo>;
+  /** POST /bench/runs: 202 queued; 429 `bench_limit` past the hourly cap. */
+  startBenchRun(body: BenchRunRequest): Promise<BenchRun>;
+  /** GET /bench/runs: the caller's runs (of one skill, or all), newest first. */
+  benchRuns(skillId?: string): Promise<BenchRun[]>;
+  /** GET /bench/runs/:id: one run, with its prompt when it is the caller's own text. */
+  benchRun(runId: string): Promise<BenchRunDetail>;
+  /** GET /bench/compare: two runs side by side and a word diff of their prompts. */
+  compareBenchRuns(a: string, b: string): Promise<BenchCompare>;
 
   /** GET /seasons/current: the open season (opened on demand), its top 10 and the caller's row. */
   currentSeason(): Promise<CurrentSeason>;
@@ -228,6 +244,12 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     purchaseSkill: (id, body) => json('POST', `/market/${enc(id)}/purchase`, { body }),
     startTrial: (id, body) => json('POST', `/market/${enc(id)}/trial`, { body }),
     trials: (id, version) => get(`/market/${enc(id)}/trials`, { version }),
+
+    benchInfo: () => get('/bench'),
+    startBenchRun: (body) => json('POST', '/bench/runs', { body }),
+    benchRuns: (skillId) => get('/bench/runs', { skillId }),
+    benchRun: (id) => get(`/bench/runs/${enc(id)}`),
+    compareBenchRuns: (a, b) => get('/bench/compare', { a, b }),
 
     currentSeason: () => get('/seasons/current'),
     seasonStandings: (id, page = {}) => get(`/seasons/${enc(id)}/standings`, { limit: page.limit, offset: page.offset }),

@@ -19,6 +19,10 @@ export const routes = {
   skills: (tab?: 'written' | 'owned') => (tab === 'owned' ? '/skills?tab=owned' : '/skills'), // S07
   newSkill: () => '/skills/new', // S08 (blank)
   editSkill: (skillId: string) => `/skills/${e(skillId)}/edit`, // S08
+  /** Skill test bench: run a skill against the greedy bot (`?skill=&version=`). */
+  skillBench: (skillId?: string, version?: number) =>
+    `/skills/bench${skillId ? `?skill=${e(skillId)}${version ? `&version=${version}` : ''}` : ''}`,
+  benchRun: (runId: string) => `/skills/bench/${e(runId)}`, // a bench run's debrief
   market: () => '/market', // S09
   marketSkill: (skillId: string) => `/market/${e(skillId)}`, // S10
   pvp: () => '/pvp', // S11

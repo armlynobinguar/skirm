@@ -5,6 +5,7 @@ import { Module, type DynamicModule, type INestApplication } from '@nestjs/commo
 import { APP_FILTER, APP_GUARD, NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { SessionGuard } from './auth';
+import { BenchController } from './controllers/bench.controller';
 import { CoreController } from './controllers/core.controller';
 import { CosmeticsController } from './controllers/cosmetics.controller';
 import { CreditsController } from './controllers/credits.controller';
@@ -37,6 +38,7 @@ export class AppModule {
         CosmeticsController,
         OpsController,
         OnboardingController,
+        BenchController,
       ],
       providers: [
         { provide: DEPS, useValue: deps },

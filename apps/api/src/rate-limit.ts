@@ -55,6 +55,7 @@ const STRICT: readonly [string, RegExp][] = [
   ['POST', /^\/market\/[^/]+\/(purchase|listing|trial)$/],
   ['POST', /^\/skills\/[^/]+\/mint$/],
   ['POST', /^\/cosmetics\/[^/]+\/buy$/],
+  ['POST', /^\/bench\/runs$/],
 ];
 
 export function bucketOf(method: string, path: string): 'strict' | 'general' {

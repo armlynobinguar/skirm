@@ -36,6 +36,13 @@
       "when": 1793771758405,
       "tag": "0004_ranked_tiers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793775359190,
+      "tag": "0006_skill_bench",
+      "breakpoints": true
     }
   ]
 }

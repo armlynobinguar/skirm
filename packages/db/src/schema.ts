@@ -750,6 +750,57 @@ export const skillTrials = pgTable(
   ],
 );
 
+export type BenchRunStatus = 'queued' | 'running' | 'done' | 'failed' | 'insufficient_credits';
+
+/**
+ * A writer's test-bench run: one headless match of a skill version (a draft they wrote or a
+ * minted version they hold) on a chosen map and difficulty against the greedy bot. When the writer
+ * edited the prompt for the run, that draft is sealed here like a skill version (never plain text);
+ * otherwise the version's own prompt plays. Free on the greedy brain; with a model the run holds
+ * and pays one Standard agent's credits on the ledger (hold id `bench-<id>`).
+ */
+export const skillBenchRuns = pgTable(
+  'skill_bench_runs',
+  {
+    /** `bnr_` + ULID. */
+    id: text('id').primaryKey(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    skillId: text('skill_id').notNull(),
+    version: integer('version').notNull(),
+    mapId: text('map_id').notNull(),
+    difficulty: text('difficulty').notNull(),
+    /** The edited prompt draft, sealed (all null: the version's own prompt played). */
+    promptSha256: text('prompt_sha256'),
+    ciphertext: bytea('ciphertext'),
+    iv: bytea('iv'),
+    authTag: bytea('auth_tag'),
+    wrappedKey: bytea('wrapped_key'),
+    keyId: text('key_id'),
+    status: text('status').$type<BenchRunStatus>().notNull().default('queued'),
+    /** Brain kind that played the tested agent (greedy, haiku, ...). */
+    brain: text('brain'),
+    /** Credits the run cost (0 on the greedy brain). */
+    credits: integer('credits').notNull().default(0),
+    result: jsonb('result'),
+    error: text('error'),
+    createdAt: createdAt(),
+    finishedAt: ts('finished_at'),
+  },
+  (t) => [
+    index('skill_bench_runs_account_idx').on(t.accountId, t.createdAt),
+    foreignKey({
+      columns: [t.skillId, t.version],
+      foreignColumns: [skillVersions.skillId, skillVersions.version],
+    }),
+    check(
+      'skill_bench_runs_status_ck',
+      sql`${t.status} in ('queued', 'running', 'done', 'failed', 'insufficient_credits')`,
+    ),
+  ],
+);
+
 // ---------- Cosmetics ----------
 
 /** Premium cosmetics an account owns (item ids from @skirm/shared COSMETICS). */

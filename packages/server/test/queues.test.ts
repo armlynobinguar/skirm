@@ -38,6 +38,7 @@ describe('names (contract)', () => {
     const mint: BenchmarkJobData = { kind: 'mint', skillId: 'skl_1', version: 2 };
     expect(benchmarkJobId(mint)).toBe('benchmark-skl_1-v2');
     expect(benchmarkJobId({ kind: 'trial', trialId: 'trl_9' })).toBe('trial-trl_9');
+    expect(benchmarkJobId({ kind: 'bench', runId: 'bnr_3' })).toBe('bench-bnr_3');
     // The season a v2 result counted towards rides along; the job id stays one per match.
     const v2: RegistryJobData = { kind: 'v2_match', id: 'mat_1', seasonId: 'ssn_1' };
     expect(registryJobId(v2)).toBe('registry-v2_match-mat_1');

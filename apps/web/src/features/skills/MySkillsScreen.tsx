@@ -192,6 +192,11 @@ function SkillRowView({ row: r, tab }: { row: SkillRow; tab: Tab }) {
             {r.status === 'Draft' ? 'Edit' : 'New version'}
           </Link>
         ) : null}
+        {tab === 'owned' || r.status === 'Draft' ? (
+          <Link className={s.rowLink} href={routes.skillBench(r.id, r.version)} data-testid={`s07-bench-${r.id}`}>
+            Test
+          </Link>
+        ) : null}
         {isPublic ? (
           <Link className={s.rowLink} href={routes.marketSkill(r.id)} data-testid={`s07-view-${r.id}`}>
             View
