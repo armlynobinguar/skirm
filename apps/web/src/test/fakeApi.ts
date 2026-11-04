@@ -55,6 +55,7 @@ const METHODS: (keyof ApiClient)[] = [
   'skillLadder',
   'v2Match',
   'v2LiveMatches',
+  'v2MatchDecisions',
   'onboarding',
   'updateTutorial',
   'dismissChecklist',
