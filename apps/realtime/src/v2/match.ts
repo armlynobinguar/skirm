@@ -13,7 +13,7 @@
 // has DEFAULTS.commands.perMatch, applied on the next tick, logged in the hash chain and shown only
 // to that crew.
 import { V2_ACTION_DEADLINE_MS, V2_PLANNER_DEADLINE_MS, filterSpeech, maySpeak, type V2AgentCommand, type V2Brain, type V2Decision } from '@skirm/decision-engine/v2';
-import { DEFAULTS, chargeDue } from '@skirm/shared';
+import { DEFAULTS, chargeDue, playerTier, type PlayerTier } from '@skirm/shared';
 import {
   commandOrder,
   dropTargets,
@@ -46,11 +46,12 @@ import {
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
-import type { V2MatchMessageInput } from '@skirm/db';
+import type { MatchTimelineInput, V2MatchMessageInput } from '@skirm/db';
 import type { V2Debrief, V2EndReason, V2ServerMessage } from '@skirm/server';
 import type { Logger } from '../deps';
 import type { Scheduler } from '../timing';
 import { DebriefTally, buildDebrief } from './debrief';
+import { DecisionTimeline } from './timeline';
 
 export const TEAMS: readonly Team[] = ['A', 'B'];
 
@@ -101,6 +102,8 @@ export interface V2Roster {
 export interface V2Side extends V2Roster {
   accountId: string;
   handle: string;
+  /** The player's Elo and ranked matches when they queued (the tiers on a ranked v2_found). */
+  rank?: { elo: number; rankedMatches: number };
 }
 
 export interface V2Setup {
@@ -186,6 +189,8 @@ export class V2Match {
   private planWhys: Record<Team, string | null> = { A: null, B: null };
   /** Each agent's latest inner voice (its THINK line), by agent id. */
   private thoughts = new Map<string, string>();
+  /** Each crew's decision timeline for the debrief; set when the match goes live. */
+  private timeline: DecisionTimeline | null = null;
   /** Holds still open (released on a void). */
   private held = new Map<Team, number>();
   /** What each crew had held, kept for the debrief. */
@@ -289,7 +294,17 @@ export class V2Match {
       difficulty: this.difficulty,
       ...(setup.practice ? { practice: true as const, rivalHandle: setup.sides[team === 'A' ? 'B' : 'A'].handle } : {}),
       ...(setup.free?.[team] ? { free: true as const } : {}),
+      ...this.foundTiers(team),
     };
+  }
+
+  /** Ranked: both players' tiers (as they queued) for v2_found. */
+  private foundTiers(team: Team): { tiers?: { you: PlayerTier; rival: PlayerTier } } {
+    const { setup } = this;
+    const you = setup.sides[team].rank;
+    const rival = setup.sides[team === 'A' ? 'B' : 'A'].rank;
+    if (!setup.ranked || setup.practice || !you || !rival) return {};
+    return { tiers: { you: playerTier(you.elo, you.rankedMatches), rival: playerTier(rival.elo, rival.rankedMatches) } };
   }
 
   /** Each crew's start hold with the crews as they stand, as the engine would set it. */
@@ -313,6 +328,11 @@ export class V2Match {
   /** Every frame a view was sent; empty until the match went live. */
   framesOf(view: FrameView): readonly V2Frame[] {
     return this.frames[view];
+  }
+
+  /** Each crew's decision timeline (the debrief's "why did it do that?"); empty until the match went live. */
+  timelines(): MatchTimelineInput[] {
+    return this.timeline?.records() ?? [];
   }
 
   /** Stops the match at the next checkpoint; it ends void with every credit returned. */
@@ -482,6 +502,8 @@ export class V2Match {
     }
 
     this.state = s;
+    const crewOf = (t: Team) => ({ brain: this.deps.brains[t].kind, bought: setup.sides[t].bought ?? [], skillKeys: setup.sides[t].skillKeys ?? [] });
+    this.timeline = new DecisionTimeline({ A: crewOf('A'), B: crewOf('B') });
     // One model name when both crews share a brain, else each crew's (as the headless runner writes it).
     const { A: brainA, B: brainB } = this.deps.brains;
     const model = brainA.model === brainB.model ? brainA.model : `A:${brainA.model} B:${brainB.model}`;
@@ -523,10 +545,12 @@ export class V2Match {
         // The inner voice is never part of the match (not in the log, never heard); only its own crew's frames show it.
         if (d.thought) this.thoughts.set(a.id, d.thought);
         this.count(a.team, d);
+        this.timeline?.turn(a, d);
       });
       const ev = stepMatch(s, { actions, says });
       appendTick(log, { tick: s.tick, actions, says, ...(commands.length ? { commands } : {}) });
       this.tally.add(ev);
+      this.timeline?.resolve(s, ev);
       this.collect(s, ev);
       for (const t of pays) {
         cum100[t] += costPer100[t];
@@ -565,6 +589,7 @@ export class V2Match {
   private decide(s: MatchState, id: string): Promise<V2Decision> {
     const a = s.agents.find((x) => x.id === id)!;
     const o = observe(s, id);
+    this.timeline?.observe(id, o);
     const canSpeak = maySpeak(a.tier, s.tick + 1, a.lastSpoke);
     const wait: Action = { type: 'wait' };
     if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
@@ -615,6 +640,7 @@ export class V2Match {
       if (r.text) {
         this.plans[team] = r.text;
         this.planWhys[team] = r.why ?? null;
+        this.timeline?.plan(team, s.tick + 1, r.text, r.why ?? null);
       }
     }
   }

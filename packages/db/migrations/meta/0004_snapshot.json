@@ -1,5 +1,5 @@
 {
-  "id": "342fb61c-55a5-49d5-a43c-f99e51d68abd",
+  "id": "2a6e11de-23ee-4ad6-be7a-9749b1403c3f",
   "prevId": "04978272-2990-4846-afc5-73a34f373ddd",
   "version": "7",
   "dialect": "postgresql",
@@ -73,6 +73,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "last_ranked_at": {
+          "name": "last_ranked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -468,13 +474,13 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.external_agents": {
-      "name": "external_agents",
+    "public.elo_decays": {
+      "name": "elo_decays",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "bigserial",
           "primaryKey": true,
           "notNull": true
         },
@@ -484,91 +490,17 @@
           "primaryKey": false,
           "notNull": true
         },
-        "agent_id": {
-          "name": "agent_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "webhook_url": {
-          "name": "webhook_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "secret_sha256": {
-          "name": "secret_sha256",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "secret_ciphertext": {
-          "name": "secret_ciphertext",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "secret_iv": {
-          "name": "secret_iv",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "secret_auth_tag": {
-          "name": "secret_auth_tag",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "secret_wrapped_key": {
-          "name": "secret_wrapped_key",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "secret_key_id": {
-          "name": "secret_key_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "calls": {
-          "name": "calls",
+        "elo_before": {
+          "name": "elo_before",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
+          "notNull": true
         },
-        "misses": {
-          "name": "misses",
+        "elo_after": {
+          "name": "elo_after",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "last_error": {
-          "name": "last_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_seen_at": {
-          "name": "last_seen_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rotated_at": {
-          "name": "rotated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -579,11 +511,17 @@
         }
       },
       "indexes": {
-        "external_agents_account_idx": {
-          "name": "external_agents_account_idx",
+        "elo_decays_account_idx": {
+          "name": "elo_decays_account_idx",
           "columns": [
             {
               "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -593,43 +531,15 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "external_agents_agent_uq": {
-          "name": "external_agents_agent_uq",
-          "columns": [
-            {
-              "expression": "agent_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
-        "external_agents_account_id_accounts_id_fk": {
-          "name": "external_agents_account_id_accounts_id_fk",
-          "tableFrom": "external_agents",
+        "elo_decays_account_id_accounts_id_fk": {
+          "name": "elo_decays_account_id_accounts_id_fk",
+          "tableFrom": "elo_decays",
           "tableTo": "accounts",
           "columnsFrom": [
             "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "external_agents_agent_id_agents_id_fk": {
-          "name": "external_agents_agent_id_agents_id_fk",
-          "tableFrom": "external_agents",
-          "tableTo": "agents",
-          "columnsFrom": [
-            "agent_id"
           ],
           "columnsTo": [
             "id"
@@ -642,9 +552,9 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "external_agents_name_ck": {
-          "name": "external_agents_name_ck",
-          "value": "char_length(\"external_agents\".\"name\") between 1 and 40"
+        "elo_decays_lower_ck": {
+          "name": "elo_decays_lower_ck",
+          "value": "\"elo_decays\".\"elo_after\" < \"elo_decays\".\"elo_before\""
         }
       },
       "isRLSEnabled": false
@@ -3330,6 +3240,27 @@
             },
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "v2_matches_map_idx": {
+          "name": "v2_matches_map_idx",
+          "columns": [
+            {
+              "expression": "map_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ended_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

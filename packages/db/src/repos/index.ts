@@ -7,9 +7,11 @@ import { LeaderboardsRepo } from './leaderboards';
 import { LedgerRepo, type LedgerRepoOptions } from './ledger';
 import { MarketRepo } from './market';
 import { MatchMessagesRepo } from './match-messages';
+import { MatchTimelinesRepo } from './match-timelines';
 import { OnboardingRepo } from './onboarding';
 import { OpsRepo } from './ops';
 import { ProofRepo } from './proof';
+import { RankedRepo } from './ranked';
 import { RentalsRepo } from './rentals';
 import { SeasonsRepo } from './seasons';
 import { SkillsRepo } from './skills';
@@ -24,9 +26,13 @@ export interface Repos {
   market: MarketRepo;
   ledger: LedgerRepo;
   leaderboards: LeaderboardsRepo;
+  /** Ranked tiers: per-map and per-skill leaderboards, Elo decay of inactive players. */
+  ranked: RankedRepo;
   v2Matches: V2MatchesRepo;
   /** Lines delivered in v2 matches (GET /v2/matches/:id/messages). */
   matchMessages: MatchMessagesRepo;
+  /** Each crew's decision timeline of a v2 match (GET /v2/matches/:id/decisions). */
+  matchTimelines: MatchTimelinesRepo;
   /** Operator aggregates (GET /ops/stats). */
   ops: OpsRepo;
   /** v2 seasons: standings, pool, locked prizes. */
@@ -47,7 +53,7 @@ export interface Repos {
 
 export interface ReposOptions {
   ledger?: LedgerRepoOptions;
-  /** Clock for seasons (which season a ranked finish counts towards). */
+  /** Clock for seasons (which season a ranked finish counts towards) and the Elo decay. */
   clock?: Clock;
 }
 
@@ -60,8 +66,10 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     market: new MarketRepo(db),
     ledger: new LedgerRepo(db, opts.ledger),
     leaderboards: new LeaderboardsRepo(db),
+    ranked: new RankedRepo(db, opts.clock),
     v2Matches: new V2MatchesRepo(db, opts.clock),
     matchMessages: new MatchMessagesRepo(db),
+    matchTimelines: new MatchTimelinesRepo(db),
     ops: new OpsRepo(db),
     seasons: new SeasonsRepo(db, opts.clock),
     proof: new ProofRepo(db),
@@ -81,9 +89,11 @@ export * from './leaderboards';
 export * from './ledger';
 export * from './market';
 export * from './match-messages';
+export * from './match-timelines';
 export * from './onboarding';
 export * from './ops';
 export * from './proof';
+export * from './ranked';
 export * from './rentals';
 export * from './seasons';
 export * from './skills';

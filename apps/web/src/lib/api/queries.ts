@@ -51,11 +51,14 @@ export const qk = {
   leaderboards: {
     all: ['leaderboards'] as const,
     players: (limit?: number) => ['leaderboards', 'players', limit ?? null] as const,
+    map: (mapId: string, limit?: number) => ['leaderboards', 'map', mapId, limit ?? null] as const,
+    skills: (mapId?: string, limit?: number) => ['leaderboards', 'skills', mapId ?? null, limit ?? null] as const,
   },
   matches: {
     all: ['matches'] as const,
     v2: (matchId: string) => ['matches', 'v2', matchId] as const,
     v2Live: ['matches', 'v2-live'] as const,
+    v2Decisions: (matchId: string) => ['matches', 'v2', matchId, 'decisions'] as const,
   },
 };
 

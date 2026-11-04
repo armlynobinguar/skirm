@@ -48,6 +48,8 @@ export interface V2Search {
   mapId?: string;
   /** Ranked: always RANKED_DIFFICULTY. */
   difficulty: Difficulty;
+  /** The player's Elo and ranked matches as they queued (their tier on v2_found). */
+  rank?: { elo: number; rankedMatches: number };
 }
 
 /** Casual pick: a map (or any) and a difficulty. */
@@ -165,7 +167,14 @@ export class V2Hub {
     if (!this.fitting(crew.length).length) throw new V2HubError('invalid_crew', 'no map takes a crew this size');
     const account = await this.deps.repos.accounts.get(user.accountId);
     check();
-    const payload: V2Search = { ...user, crew, ranked, difficulty, ...(mapId !== undefined ? { mapId } : {}) };
+    const payload: V2Search = {
+      ...user,
+      crew,
+      ranked,
+      difficulty,
+      ...(mapId !== undefined ? { mapId } : {}),
+      ...(account ? { rank: { elo: account.elo, rankedMatches: account.rankedMatches } } : {}),
+    };
     const pool = v2Pool(payload);
     this.matchmaker.add({ key: user.accountId, lane: lane(ranked), ...(pool ? { pool } : {}), rating: account?.elo ?? 1200, payload });
   }
@@ -384,8 +393,8 @@ export class V2Hub {
     void p.finally(() => this.running.delete(p));
   }
 
-  private async side(s: Pick<V2Search, 'accountId' | 'handle' | 'crew'>, match: RosterMatch): Promise<V2Side> {
-    return { accountId: s.accountId, handle: s.handle, ...(await this.roster(s.accountId, s.crew, match)) };
+  private async side(s: Pick<V2Search, 'accountId' | 'handle' | 'crew' | 'rank'>, match: RosterMatch): Promise<V2Side> {
+    return { accountId: s.accountId, handle: s.handle, ...(s.rank ? { rank: s.rank } : {}), ...(await this.roster(s.accountId, s.crew, match)) };
   }
 
   /**
@@ -591,6 +600,11 @@ export class V2Hub {
       return null;
     });
     if (row) for (const d of row.eloDeltas ?? []) out.eloDelta[d.team] = d.delta;
+    // The decision timelines, before v2_end goes out, so the debrief can ask for them at once.
+    if (row?.status === 'ended')
+      await this.deps.repos.matchTimelines
+        .put(end.matchId, match.timelines())
+        .catch((err: unknown) => log.warn(`v2 match ${end.matchId}: decision timeline not kept: ${(err as Error).message}`));
     // The season points finish stored in each crew's debrief (ranked only).
     for (const t of TEAMS) {
       const season = row?.debriefs?.[t]?.season;

@@ -2,6 +2,7 @@
 // BullMQ `benchmarks` queue and the daily spend reader for /ops/stats, then HTTP on API_PORT.
 import 'reflect-metadata';
 import { closeDb, createDb, createRepos, migrate } from '@skirm/db';
+import { rankedDecayFromEnv } from '@skirm/shared';
 import {
   ConfigError,
   RedisExternalTurnStore,
@@ -37,7 +38,7 @@ async function main(): Promise<void> {
   const benchmarkQueue = new BullBenchmarkQueue(createQueue(QUEUE_BENCHMARKS, queueRedis));
 
   const deps: ApiDeps = {
-    config: { ...config, V2_BRAIN: process.env.V2_BRAIN },
+    config: { ...config, V2_BRAIN: process.env.V2_BRAIN, rankedDecay: rankedDecayFromEnv(process.env) },
     repos,
     vault: createVault(config),
     near: {

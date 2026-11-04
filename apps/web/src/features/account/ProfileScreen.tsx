@@ -19,6 +19,7 @@ import { ErrorCard } from '@/components/states/ErrorCard';
 import { Skeleton } from '@/components/states/Skeleton';
 import { useToast } from '@/components/toast/ToastProvider';
 import { ButtonLink } from '@/components/ButtonLink';
+import { TierBadge, tierFrom } from '@/components/TierBadge';
 import { qk, useMe, useMyMatches } from '@/lib/api/queries';
 import { errorCopy, isApiError } from '@/lib/api/errors';
 import type { Agent, AgentPatch, Me, MyMatch } from '@/lib/api/types';
@@ -252,9 +253,10 @@ function AgentsCard({ agents }: { agents: Agent[] }) {
 
 const TIER_LABEL: Record<Agent['tier'], string> = { quiet: 'Quiet', standard: 'Standard', open: 'Open' };
 
-/** The account's place on the v2 ladder: Elo, title, ranked record and ladder position. */
+/** The account's place on the v2 ladder: tier, Elo, title, ranked record, ladder position, decay. */
 function RankCard({ me }: { me: Me }) {
   const rank = me.rank;
+  const tier = tierFrom(rank);
   return (
     <section aria-labelledby="s16-rank" className={s.card} data-testid="s16-rank">
       <div className={s.headRow}>
@@ -264,6 +266,15 @@ function RankCard({ me }: { me: Me }) {
         <span className={s.note}>Ranked matches only</span>
       </div>
       <dl className={s.facts}>
+        <dt>Tier</dt>
+        <dd data-testid="s16-rank-tier">
+          <TierBadge tier={tier} />
+          {tier.tier === null ? (
+            <span className={s.note}>{` ${tier.placementMatches - tier.placementsPlayed} placement matches left`}</span>
+          ) : tier.nextAt !== null ? (
+            <span className={s.note}>{` next at ${fmt(tier.nextAt)}`}</span>
+          ) : null}
+        </dd>
         <dt>Elo</dt>
         <dd className="sk-mono" data-testid="s16-rank-elo">
           {fmt(rank.elo)}
@@ -278,6 +289,12 @@ function RankCard({ me }: { me: Me }) {
         <dd className="sk-mono" data-testid="s16-rank-position">
           {rank.position ? `#${fmt(rank.position)}` : 'Not placed yet'}
         </dd>
+        {rank.decayAt ? (
+          <>
+            <dt>Decay</dt>
+            <dd data-testid="s16-rank-decay">{`Play a ranked match by ${formatUtcDate(rank.decayAt)} to keep your Elo`}</dd>
+          </>
+        ) : null}
       </dl>
       <ButtonLink size="sm" href={routes.leaderboards()} className={s.selfStart}>
         Season standings
