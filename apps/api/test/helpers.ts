@@ -101,6 +101,9 @@ export async function setup(
     now?: string;
     /** Turn request rate limits on (off by default: the harness signs many players in a minute). */
     rateLimit?: ApiDeps['rateLimit'];
+    /** Stored frames for shared replays and the caster (default: none, template caster). */
+    replayFrames?: ApiDeps['replayFrames'];
+    caster?: ApiDeps['caster'];
   } = {},
 ): Promise<Harness> {
   const db = opts.db ?? (await createTestDb());
@@ -136,6 +139,8 @@ export async function setup(
     benchmarkQueue: benchmarks,
     costs,
     ...(opts.rateLimit ? { rateLimit: opts.rateLimit } : {}),
+    ...(opts.replayFrames ? { replayFrames: opts.replayFrames } : {}),
+    ...(opts.caster ? { caster: opts.caster } : {}),
   };
   const app = await createApp(deps, { logger: false });
   await app.init();

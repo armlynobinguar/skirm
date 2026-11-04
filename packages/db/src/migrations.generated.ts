@@ -178,5 +178,19 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     "sql": [
       "ALTER TABLE \"skill_versions\" ADD COLUMN \"trigger\" jsonb;"
     ]
+  },
+  {
+    "tag": "0007_replay_shares",
+    "folderMillis": 1793782667055,
+    "bps": true,
+    "hash": "ca6e6f71c11743ca62281c8a0035efa06e9cd431f9b1ba3c2c01ebe31689c8bf",
+    "sql": [
+      "CREATE TABLE \"replay_casts\" (\n\t\"match_id\" text PRIMARY KEY NOT NULL,\n\t\"highlights\" jsonb NOT NULL,\n\t\"caster\" text NOT NULL,\n\t\"model\" text,\n\t\"cost_usd\" real DEFAULT 0 NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL\n);\n",
+      "\nCREATE TABLE \"replay_shares\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"match_id\" text NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"start_tick\" integer,\n\t\"end_tick\" integer,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"revoked_at\" timestamp with time zone,\n\tCONSTRAINT \"replay_shares_clip_ck\" CHECK ((\"replay_shares\".\"start_tick\" is null and \"replay_shares\".\"end_tick\" is null) or (\"replay_shares\".\"start_tick\" >= 0 and \"replay_shares\".\"end_tick\" > \"replay_shares\".\"start_tick\"))\n);\n",
+      "\nALTER TABLE \"replay_casts\" ADD CONSTRAINT \"replay_casts_match_id_v2_matches_id_fk\" FOREIGN KEY (\"match_id\") REFERENCES \"public\".\"v2_matches\"(\"id\") ON DELETE cascade ON UPDATE no action;",
+      "\nALTER TABLE \"replay_shares\" ADD CONSTRAINT \"replay_shares_match_id_v2_matches_id_fk\" FOREIGN KEY (\"match_id\") REFERENCES \"public\".\"v2_matches\"(\"id\") ON DELETE cascade ON UPDATE no action;",
+      "\nALTER TABLE \"replay_shares\" ADD CONSTRAINT \"replay_shares_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"replay_shares_match_idx\" ON \"replay_shares\" USING btree (\"match_id\",\"account_id\");"
+    ]
   }
 ];

@@ -325,7 +325,7 @@ function bareView(matchId: string, last: V2Frame): V2MatchView {
 }
 
 /** An ended match known only from its stored frames (replay in a fresh tab). */
-function replayView(matchId: string, frames: V2Frame[]): V2MatchView {
+export function replayView(matchId: string, frames: V2Frame[]): V2MatchView {
   const last = frames[frames.length - 1]!;
   return {
     ...bareView(matchId, last),

@@ -835,6 +835,70 @@ export const cosmeticsOwned = pgTable(
   (t) => [primaryKey({ columns: [t.accountId, t.itemId] })],
 );
 
+// ---------- Replay shares ----------
+
+/**
+ * A public link to an ended match's replay, made by one of its players (opt-in). The link plays the
+ * whole-board (watch) frames only, so no crew plan, inner voice or live command is ever shown; an
+ * optional clip (`start_tick`..`end_tick`) narrows it to a moment. Revoking ends the link.
+ */
+export const replayShares = pgTable(
+  'replay_shares',
+  {
+    /** The public token: `rps_` + 16 random base64url characters (unguessable, never a ULID). */
+    id: text('id').primaryKey(),
+    matchId: text('match_id')
+      .notNull()
+      .references(() => v2Matches.id, { onDelete: 'cascade' }),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    startTick: integer('start_tick'),
+    endTick: integer('end_tick'),
+    createdAt: createdAt(),
+    revokedAt: ts('revoked_at'),
+  },
+  (t) => [
+    index('replay_shares_match_idx').on(t.matchId, t.accountId),
+    check(
+      'replay_shares_clip_ck',
+      sql`(${t.startTick} is null and ${t.endTick} is null) or (${t.startTick} >= 0 and ${t.endTick} > ${t.startTick})`,
+    ),
+  ],
+);
+
+/** A highlight as cached (engine ReplayHighlight plus its caster line). */
+export interface ReplayHighlightRecord {
+  id: string;
+  kind: 'goal' | 'switch_flood' | 'drop_fight' | 'lead_change';
+  tick: number;
+  start: number;
+  end: number;
+  team: 'A' | 'B' | null;
+  title: string;
+  facts: string;
+  weight: number;
+  score: Record<'A' | 'B', number>;
+  line: string;
+}
+
+/**
+ * The highlights of an ended match with their caster lines, worked out once from its stored frames
+ * and kept here, so the caster is called at most once per match and the highlights outlive the
+ * frames. `cost_usd` is platform model spend; no player is charged for it.
+ */
+export const replayCasts = pgTable('replay_casts', {
+  matchId: text('match_id')
+    .primaryKey()
+    .references(() => v2Matches.id, { onDelete: 'cascade' }),
+  highlights: jsonb('highlights').$type<ReplayHighlightRecord[]>().notNull(),
+  /** model | template */
+  caster: text('caster').$type<'model' | 'template'>().notNull(),
+  model: text('model'),
+  costUsd: real('cost_usd').notNull().default(0),
+  createdAt: createdAt(),
+});
+
 // ---------- Onboarding ----------
 
 /**
