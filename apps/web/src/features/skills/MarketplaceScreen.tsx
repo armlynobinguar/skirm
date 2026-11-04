@@ -1,7 +1,7 @@
 'use client';
 // S09 Marketplace (/market), styled as the v2 Exchange (the prototype's #s-market, P 2405-2478): tilt
 // cards with rarity art on the left, the skill's proof in a side drawer on the right (S10, in
-// SkillDetailScreen.tsx). Owner: skills builder. Design: .design-src/screens/S09-Marketplace.dc.html
+// SkillDetailScreen.tsx). Owner: skills builder.
 // Tabs: Exchange (GET /market?tag=&sort=, api default sort `winrate`: ranked v2 win rate, nulls
 // last) and My skills (GET /skills?tab=written + ?tab=owned, merged). Picking a card opens the drawer
 // and moves the URL to /market/[skillId] (history.replaceState, no navigation), so the link can be

@@ -11,3 +11,16 @@ target/
 .DS_Store
 .claude/
 dump.rdb
+
+# Local working notes and design sources (not part of the product)
+.design-src/
+HACKATHON.md
+CLAUDE.md
+AGENTS.md
+docs/HANDOFF.md
+
+# Tool output
+*.timestamp-*.mjs
+*.log
+playwright-report/
+test-results/

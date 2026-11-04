@@ -27,5 +27,10 @@
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "npm@11.19.1"
+  "packageManager": "npm@11.19.1",
+  "overrides": {
+    "ws@>=8.0.0 <8.21.0": "^8.22.1",
+    "decode-uri-component": "^0.5.1",
+    "uuid@<11.1.1": "^11.1.1"
+  }
 }

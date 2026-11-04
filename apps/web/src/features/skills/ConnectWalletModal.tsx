@@ -1,5 +1,5 @@
 'use client';
-// M01 Connect NEAR wallet. Owner: skills+market builder. Design: .design-src/screens/M01-Connect-wallet.dc.html
+// M01 Connect NEAR wallet. Owner: skills+market builder.
 // Opened from Top up (S15), Mint (S08), Buy and List for resale (S10), Connect (S16). The Account
 // builder uses it too, so keep these props stable; add optional props only.
 // Linking: POST /auth/session { nearAccountId, nearProof? } (apps/api/src/controllers/core.controller.ts).

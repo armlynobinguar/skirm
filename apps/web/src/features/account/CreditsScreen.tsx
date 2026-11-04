@@ -1,6 +1,5 @@
 'use client';
-// S15 Credits (/account/credits). Owner: account builder. Design: .design-src/screens/S15-Credits.dc.html
-// Spec: .design-src/docs/uiux.md (S15 row, Account states, flow (g) top up with NEAR).
+// S15 Credits (/account/credits). Owner: account builder.
 //
 // Balance (paid), held by matches, free allowance left with a countdown to 00:00 UTC, top-up packs
 // (amount → M01 if no wallet → M02 confirm → POST /credits/deposits), wallet state and the ledger.

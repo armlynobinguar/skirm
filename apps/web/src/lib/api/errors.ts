@@ -3,7 +3,7 @@
 // where `extra` is flattened next to code (402 insufficient_credits carries `need` and `have`,
 // 429 rate_limited carries `retryAfterS`). Network failures get status 0 and code `network`.
 
-/** Error codes the api sends (contract + docs/HANDOFF.md extras). Not exhaustive: `code` is a string. */
+/** Error codes the api sends (see docs/backend-contract.md). Not exhaustive: `code` is a string. */
 export type ApiErrorCode =
   | 'network'
   | 'bad_response'
