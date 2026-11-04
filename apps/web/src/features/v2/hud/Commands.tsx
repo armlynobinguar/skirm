@@ -56,6 +56,8 @@ export function CommandBar({ view, frame }: { view: V2MatchView; frame: V2Frame 
   const [target, setTarget] = useState<string>('');
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  // Collapsed to a small pill by default so the panel never covers the map; a click opens the orders.
+  const [open, setOpen] = useState(false);
   const st = commandState(frame, view.commandAck);
   const own = (frame?.agents ?? []).filter((a) => a.team === view.team && !a.out);
   const max = DEFAULTS.commands.maxChars;
@@ -104,11 +106,22 @@ export function CommandBar({ view, frame }: { view: V2MatchView; frame: V2Frame 
           : 'Ready';
 
   return (
-    <section className={`sk-panel ${k.bar}`} aria-label="Commands" data-testid="v2-commands">
+    <section
+      className={`sk-panel ${k.bar} ${open ? '' : k.closed}`}
+      aria-label="Commands"
+      data-testid="v2-commands"
+    >
       <div className={k.hd}>
-        <span className="sk-kick">
-          <b>Commands</b> · your crew only
-        </span>
+        <button
+          type="button"
+          className={`sk-kick ${k.toggle}`}
+          aria-expanded={open}
+          aria-controls="v2-commands-body"
+          onClick={() => setOpen((o) => !o)}
+          data-testid="v2-commands-toggle"
+        >
+          <b>Commands</b> · your crew only <span aria-hidden="true">{open ? '▾' : '▴'}</span>
+        </button>
         <span
           className={k.left}
           data-testid="v2-commands-left"
@@ -120,62 +133,66 @@ export function CommandBar({ view, frame }: { view: V2MatchView; frame: V2Frame 
           <span className={k.status}>{status}</span>
         </span>
       </div>
-      <div className={k.row}>
-        <select
-          className={k.target}
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          aria-label="Send to"
-          data-testid="v2-command-target"
-          disabled={blocked}
-        >
-          <option value="">Whole crew</option>
-          {own.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        {COMMAND_PRESET_IDS.map((p) => (
-          <Button
-            key={p}
-            size="sm"
-            onClick={() => send(p)}
-            disabled={blocked}
-            title={COMMAND_PRESETS[p].order}
-            data-testid={`v2-command-${p}`}
+      {open ? (
+        <div id="v2-commands-body" className={k.body}>
+          <div className={k.row}>
+            <select
+              className={k.target}
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              aria-label="Send to"
+              data-testid="v2-command-target"
+              disabled={blocked}
+            >
+              <option value="">Whole crew</option>
+              {own.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            {COMMAND_PRESET_IDS.map((p) => (
+              <Button
+                key={p}
+                size="sm"
+                onClick={() => send(p)}
+                disabled={blocked}
+                title={COMMAND_PRESETS[p].order}
+                data-testid={`v2-command-${p}`}
+              >
+                {COMMAND_PRESETS[p].label}
+              </Button>
+            ))}
+          </div>
+          <form
+            className={k.row}
+            onSubmit={(e) => {
+              e.preventDefault();
+              send();
+            }}
           >
-            {COMMAND_PRESETS[p].label}
-          </Button>
-        ))}
-      </div>
-      <form
-        className={k.row}
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-      >
-        <input
-          className={k.text}
-          value={text}
-          maxLength={max}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Add a few words (optional)"
-          aria-label="Command text"
-          data-testid="v2-command-text"
-          disabled={blocked}
-        />
-        <Button
-          size="sm"
-          type="submit"
-          variant="primary"
-          disabled={blocked || !text.trim()}
-          data-testid="v2-command-send"
-        >
-          Send
-        </Button>
-      </form>
+            <input
+              className={k.text}
+              value={text}
+              maxLength={max}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Add a few words (optional)"
+              aria-label="Command text"
+              data-testid="v2-command-text"
+              disabled={blocked}
+            />
+            <Button
+              size="sm"
+              type="submit"
+              variant="primary"
+              disabled={blocked || !text.trim()}
+              data-testid="v2-command-send"
+            >
+              Send
+            </Button>
+          </form>
+        </div>
+      ) : null}
     </section>
   );
 }
