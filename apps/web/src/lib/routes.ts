@@ -23,6 +23,8 @@ export const routes = {
   match: (matchId: string) => `/matches/${e(matchId)}`, // S12 v2 match: accept, lock-in, live, end
   matchResult: (matchId: string) => `/matches/${e(matchId)}/result`, // S13 v2 result: the debrief
   leaderboards: () => '/leaderboards', // S14
+  terms: () => '/terms',
+  privacy: () => '/privacy',
   credits: () => '/account/credits', // S15
   account: () => '/account', // S16
   agent: (agentId: string) => `/agents/${e(agentId)}`, // v2 agent editor
@@ -62,6 +64,8 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/matches\/[^/]+\/result\/?$/, key: 'match-result', title: 'Debrief', sub: '// replay hash on NEAR', back: routes.pvp() },
   { re: /^\/matches(\/|$)/, key: 'match', title: 'Live', sub: '// 2 s ticks', back: routes.pvp() },
   { re: /^\/leaderboards(\/|$)/, key: 'ladder', title: 'Ladder', sub: '// season', back: routes.home() },
+  { re: /^\/terms\/?$/, key: 'terms', title: 'Terms', sub: '// the rules', back: routes.home() },
+  { re: /^\/privacy\/?$/, key: 'privacy', title: 'Privacy', sub: '// your data', back: routes.home() },
   { re: /^\/market(\/|$)/, key: 'market', title: 'Exchange', sub: '// proof first', back: routes.home() },
   { re: /^\/skills(\/|$)/, key: 'skills', title: 'Skills', sub: '// your strategies', back: routes.home() },
   { re: /^\/account\/credits\/?$/, key: 'credits', title: 'Credits', sub: '// NEAR top-ups', back: routes.account() },

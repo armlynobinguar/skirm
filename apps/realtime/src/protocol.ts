@@ -20,6 +20,7 @@ export const MAX_CLIENT_MESSAGE_BYTES = 16 * 1024;
 
 export type ErrorCode =
   | 'bad_json'
+  | 'rate_limited'
   | 'bad_message'
   | 'unknown_type'
   | 'too_large'

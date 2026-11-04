@@ -2,6 +2,7 @@
 // queue, the spend reader and the NEAR adapters (docs/backend-contract.md).
 import type { Repos } from '@skirm/db';
 import type { NearKeyChecker } from './near-link';
+import type { RateLimitStore, RateLimits } from './rate-limit';
 import type {
   BenchmarkJobData,
   DepositVerifier,
@@ -59,4 +60,6 @@ export interface ApiDeps {
   costs?: DailyCostReader;
   /** Allowed CORS origins (default http://localhost:3000). */
   corsOrigins?: string[];
+  /** Request rate limits (./rate-limit.ts): Redis counters in production; absent, no limits (tests). */
+  rateLimit?: { store: RateLimitStore; limits?: Partial<RateLimits> };
 }

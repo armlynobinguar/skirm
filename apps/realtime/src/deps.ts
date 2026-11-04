@@ -35,6 +35,8 @@ export type RealtimeConfig = Pick<
 
 export interface RealtimeDeps {
   config: RealtimeConfig;
+  /** Reports an unexpected error to Error Reporting (main: @skirm/server reportError; absent in tests). */
+  report?: (err: unknown, where: string) => void;
   repos: Repos;
   vault: Pick<Vault, 'encryptSkill' | 'decryptSkill'>;
   pubsub: PubSub;

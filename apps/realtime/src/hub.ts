@@ -35,7 +35,13 @@ export interface Client {
   readonly matches: Map<string, Unsubscribe>;
   closed: boolean;
   chain: Promise<void>;
+  /** Messages in the current rate window (MESSAGES_PER_WINDOW per WINDOW_MS). */
+  window?: { start: number; n: number };
 }
+
+/** A client may send this many messages per window; more are refused (`rate_limited`) and dropped. */
+export const MESSAGES_PER_WINDOW = 30;
+export const MESSAGE_WINDOW_MS = 10_000;
 
 class HubError extends Error {
   constructor(
@@ -120,8 +126,18 @@ export class RealtimeHub {
     return c;
   }
 
-  /** Queues a raw frame for this client; messages of one client are handled in order. */
+  /**
+   * Queues a raw frame for this client; messages of one client are handled in order. A client over
+   * MESSAGES_PER_WINDOW in MESSAGE_WINDOW_MS is told so and the message is dropped before it queues,
+   * so a flood can never build a backlog.
+   */
   message(c: Client, raw: unknown): Promise<void> {
+    const now = Date.now();
+    if (!c.window || now - c.window.start >= MESSAGE_WINDOW_MS) c.window = { start: now, n: 0 };
+    if (++c.window.n > MESSAGES_PER_WINDOW) {
+      if (c.window.n === MESSAGES_PER_WINDOW + 1) this.send(c, errorMessage('rate_limited', 'too many messages, slow down'));
+      return c.chain;
+    }
     const run = async () => {
       if (c.closed) return;
       const parsed = parseClientMessage(raw);
@@ -133,6 +149,7 @@ export class RealtimeHub {
         else if (err instanceof V2HubError) this.send(c, errorMessage(err.code, err.message));
         else {
           this.log.error(`client ${c.id}: ${(err as Error).stack ?? String(err)}`);
+          this.deps.report?.(err, `client message ${parsed.msg.type}`);
           this.send(c, errorMessage('internal', 'something went wrong'));
         }
       }

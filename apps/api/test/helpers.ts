@@ -88,7 +88,7 @@ export interface UserClient {
   post: (path: string, body?: object) => request.Test;
   put: (path: string, body?: object) => request.Test;
   patch: (path: string, body?: object) => request.Test;
-  del: (path: string) => request.Test;
+  del: (path: string, body?: object) => request.Test;
 }
 
 export async function setup(
@@ -99,6 +99,8 @@ export async function setup(
     db?: Db;
     nearKeys?: NearKeyChecker;
     now?: string;
+    /** Turn request rate limits on (off by default: the harness signs many players in a minute). */
+    rateLimit?: ApiDeps['rateLimit'];
   } = {},
 ): Promise<Harness> {
   const db = opts.db ?? (await createTestDb());
@@ -133,6 +135,7 @@ export async function setup(
     },
     benchmarkQueue: benchmarks,
     costs,
+    ...(opts.rateLimit ? { rateLimit: opts.rateLimit } : {}),
   };
   const app = await createApp(deps, { logger: false });
   await app.init();
@@ -149,7 +152,7 @@ export async function setup(
       post: (p, b) => h(http().post(p)).send(b ?? {}),
       put: (p, b) => h(http().put(p)).send(b ?? {}),
       patch: (p, b) => h(http().patch(p)).send(b ?? {}),
-      del: (p) => h(http().delete(p)),
+      del: (p, b) => (b ? h(http().delete(p)).send(b) : h(http().delete(p))),
     };
   };
   return {

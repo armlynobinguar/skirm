@@ -1,6 +1,6 @@
 // Accounts and the new-account defaults (contract: 3 agents, starter unlocks, Flood Warden on Rook,
 // 60 free credits a day).
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { DEFAULTS } from '@skirm/shared';
 import type { Executor } from '../client';
 import { newId } from '../ids';
@@ -8,12 +8,26 @@ import {
   accounts,
   agentSkills,
   agents,
+  cosmeticsOwned,
   ledgerAccounts,
+  ledgerRows,
+  listings,
+  matchMessages,
+  prizePayouts,
+  rentalOffers,
+  rentals,
+  sales,
+  seasonStandings,
   skillOwnership,
+  skillTrials,
   skillVersions,
   skills,
   unlockItems,
+  v2Matches,
 } from '../schema';
+
+/** A deleted account's handle: no sign-in can match it (dev handles start with a letter or digit). */
+export const deletedHandle = (accountId: string) => `~deleted-${accountId.slice(-8).toLowerCase()}`;
 import {
   STARTER_AGENT_NAMES,
   STARTER_SKILL,
@@ -58,12 +72,93 @@ export class AccountsRepo {
     return row;
   }
 
-  /** Sign-in lookup. Never resolves to a platform (system) account. */
+  /** Sign-in lookup. Never resolves to a platform (system) account or a deleted one. */
   private async find(user: SignInUser): Promise<AccountRow | undefined> {
     const row = user.privyDid
       ? await this.byPrivyDid(user.privyDid)
       : await this.byHandle(user.handle);
-    return row && !row.system ? row : undefined;
+    return row && !row.system && !row.deletedAt ? row : undefined;
+  }
+
+  /**
+   * Deletes a player's account as the privacy policy says: the sign-in (Privy id), the NEAR link and
+   * the system prompts go, rental offers end, and the handle becomes `~deleted-<id>` (no sign-in can
+   * match it). Agents, skills, match history, sales and the ledger stay, because other players' records
+   * and paid rental passes depend on them; the account never signs in again (`deleted_at`).
+   * The caller refuses a live match or an open listing first.
+   */
+  async deleteAccount(accountId: string, now = new Date()): Promise<AccountRow> {
+    return tx(this.db, async (t) => {
+      const [row] = await t
+        .update(accounts)
+        .set({ handle: deletedHandle(accountId), privyDid: null, nearAccountId: null, deletedAt: now })
+        .where(and(eq(accounts.id, accountId), eq(accounts.system, false), isNull(accounts.deletedAt)))
+        .returning();
+      if (!row) throw new RepoError('not_found', 'account not found');
+      await t.update(agents).set({ systemPrompt: null }).where(eq(agents.ownerId, accountId));
+      await t.update(rentalOffers).set({ active: false, updatedAt: now }).where(and(eq(rentalOffers.ownerId, accountId), eq(rentalOffers.active, true)));
+      return row;
+    });
+  }
+
+  /**
+   * Everything skirm holds about a player, table by table (GET /me/export). Skill prompts stay sealed
+   * here; the api decrypts the player's own for the download.
+   */
+  async exportFor(accountId: string): Promise<Record<string, unknown[]>> {
+    const [account] = await this.db.select().from(accounts).where(eq(accounts.id, accountId));
+    if (!account) throw new RepoError('not_found', 'account not found');
+    const myAgents = await this.db.select().from(agents).where(eq(agents.ownerId, accountId));
+    const agentIds = myAgents.map((a) => a.id);
+    const [
+      agentSkillRows, unlockRows, skillRows, ownership, listingRows, saleRows, offers, rentalRows,
+      ledger, ledgerRowsOut, matches, standings, payouts, trials, cosmetics,
+    ] = await Promise.all([
+      this.db.select().from(agentSkills).where(agentIds.length ? inArray(agentSkills.agentId, agentIds) : sql`false`),
+      this.db.select().from(unlockItems).where(eq(unlockItems.ownerId, accountId)),
+      this.db.select().from(skills).where(eq(skills.creatorId, accountId)),
+      this.db.select().from(skillOwnership).where(eq(skillOwnership.ownerId, accountId)),
+      this.db.select().from(listings).where(eq(listings.sellerId, accountId)),
+      this.db.select().from(sales).where(or(eq(sales.sellerId, accountId), eq(sales.buyerId, accountId))),
+      this.db.select().from(rentalOffers).where(eq(rentalOffers.ownerId, accountId)),
+      this.db.select().from(rentals).where(or(eq(rentals.ownerId, accountId), eq(rentals.renterId, accountId))),
+      this.db.select().from(ledgerAccounts).where(eq(ledgerAccounts.accountId, accountId)),
+      this.db.select().from(ledgerRows).where(eq(ledgerRows.accountId, accountId)),
+      this.db
+        .select({ id: v2Matches.id, mapId: v2Matches.mapId, ranked: v2Matches.ranked, practice: v2Matches.practice, difficulty: v2Matches.difficulty, status: v2Matches.status, teamAAccountId: v2Matches.teamAAccountId, teamBAccountId: v2Matches.teamBAccountId, crews: v2Matches.crews, winner: v2Matches.winner, scoreA: v2Matches.scoreA, scoreB: v2Matches.scoreB, ticks: v2Matches.ticks, debriefs: v2Matches.debriefs, logHash: v2Matches.logHash, createdAt: v2Matches.createdAt, endedAt: v2Matches.endedAt })
+        .from(v2Matches)
+        .where(or(eq(v2Matches.teamAAccountId, accountId), eq(v2Matches.teamBAccountId, accountId))),
+      this.db.select().from(seasonStandings).where(eq(seasonStandings.accountId, accountId)),
+      this.db.select().from(prizePayouts).where(eq(prizePayouts.accountId, accountId)),
+      this.db.select().from(skillTrials).where(eq(skillTrials.accountId, accountId)),
+      this.db.select().from(cosmeticsOwned).where(eq(cosmeticsOwned.accountId, accountId)),
+    ]);
+    // A match's debriefs hold both crews' private numbers: keep only the player's own side.
+    const ownMatches = matches.map((m) => {
+      const side = m.teamAAccountId === accountId ? 'A' : 'B';
+      return { ...m, debriefs: m.debriefs?.[side] ? { [side]: m.debriefs[side] } : null };
+    });
+    const messages = agentIds.length ? await this.db.select().from(matchMessages).where(inArray(matchMessages.agentId, agentIds)) : [];
+    return {
+      account: [account],
+      agents: myAgents,
+      agentSkills: agentSkillRows,
+      unlockItems: unlockRows,
+      skillsCreated: skillRows,
+      skillOwnership: ownership,
+      listings: listingRows,
+      sales: saleRows,
+      rentalOffers: offers,
+      rentals: rentalRows,
+      ledgerAccount: ledger,
+      ledgerRows: ledgerRowsOut,
+      matches: ownMatches,
+      matchMessagesByYourAgents: messages,
+      seasonStandings: standings,
+      prizePayouts: payouts,
+      skillTrials: trials,
+      cosmetics,
+    };
   }
 
   /**

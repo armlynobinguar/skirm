@@ -16,6 +16,7 @@ import { SeasonsController } from './controllers/seasons.controller';
 import { SkillsController } from './controllers/skills.controller';
 import { DEPS, type ApiDeps } from './deps';
 import { ApiExceptionFilter } from './errors';
+import { DEFAULT_RATE_LIMITS, RateLimitGuard } from './rate-limit';
 
 @Module({})
 export class AppModule {
@@ -35,6 +36,10 @@ export class AppModule {
       ],
       providers: [
         { provide: DEPS, useValue: deps },
+        // Rate limits first, so a flood is turned away before any session work.
+        ...(deps.rateLimit
+          ? [{ provide: APP_GUARD, useValue: new RateLimitGuard(deps.rateLimit.store, { ...DEFAULT_RATE_LIMITS, ...deps.rateLimit.limits }) }]
+          : []),
         { provide: APP_GUARD, useClass: SessionGuard },
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
       ],

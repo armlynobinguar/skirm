@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
 import { FakePrivy } from '@/test/fakePrivy';
@@ -13,6 +13,13 @@ describe('S01 Sign in', () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/play'));
     expect(api.createSession).toHaveBeenCalledTimes(1);
     expect(credentials.get()).toEqual({ kind: 'dev', handle: 'tidecaller' });
+  });
+
+  it('links the terms and the privacy policy', async () => {
+    renderWithProviders(<SignInScreen />, { path: '/' });
+    const legal = await screen.findByTestId('s01-legal');
+    expect(within(legal).getByRole('link', { name: 'terms' })).toHaveAttribute('href', '/terms');
+    expect(within(legal).getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', '/privacy');
   });
 
   it('follows ?next= after sign-in', async () => {

@@ -55,9 +55,10 @@ export const systemClock: Clock = {
 
 /** One JSON line per entry on stdout/stderr. */
 export const jsonLogger: Logger = {
-  info: (msg, fields) => console.log(JSON.stringify({ level: 'info', msg, ...fields })),
-  warn: (msg, fields) => console.warn(JSON.stringify({ level: 'warn', msg, ...fields })),
-  error: (msg, fields) => console.error(JSON.stringify({ level: 'error', msg, ...fields })),
+  // `severity` is what Cloud Logging reads; `level` stays for anything already parsing it.
+  info: (msg, fields) => console.log(JSON.stringify({ severity: 'INFO', level: 'info', msg, ...fields })),
+  warn: (msg, fields) => console.warn(JSON.stringify({ severity: 'WARNING', level: 'warn', msg, ...fields })),
+  error: (msg, fields) => console.error(JSON.stringify({ severity: 'ERROR', level: 'error', msg, ...fields })),
 };
 
 /** Error class/code for logs and errorCode; never the message (it could quote provider output). */

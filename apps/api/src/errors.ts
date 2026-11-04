@@ -1,6 +1,7 @@
 // Global error shape `{ error: { code, message, details? } }` (docs/backend-contract.md).
 // Messages never carry skill text: repository, vault and NEAR errors are built without it, and
 // unexpected errors (which may embed SQL parameters) are reported as a bare `internal`.
+import { reportError } from '@skirm/server';
 import {
   Catch,
   HttpException,
@@ -36,6 +37,7 @@ const REPO_STATUS: Record<string, number> = {
   invalid_transition: 409,
   hold_mismatch: 409,
   trial_limit: 429,
+  rate_limited: 429,
 };
 
 const DEPOSIT_STATUS: Partial<Record<DepositError['code'], number>> = {
@@ -130,15 +132,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const res = host.switchToHttp().getResponse<Response>();
     const req = host.switchToHttp().getRequest<{ method?: string; path?: string }>();
     const body = toErrorBody(exception);
-    if (body.status >= 500) {
-      // Name and code only: messages of unexpected errors can embed query parameters.
-      const e = exception as { name?: string; code?: unknown };
-      console.error(
-        `[api] ${body.status} ${req.method ?? ''} ${req.path ?? ''} ${e?.name ?? 'Error'}${
-          typeof e?.code === 'string' ? ` ${e.code}` : ''
-        }`,
-      );
-    }
+    // Name, code and stack frames only (reportError): messages of unexpected errors can embed query
+    // parameters. One Error Reporting event per 5xx.
+    if (body.status >= 500) reportError('api', exception, { where: `${req.method ?? ''} ${req.path ?? ''}`.trim(), httpRequest: { method: req.method, url: req.path } });
     if (res.headersSent) {
       res.end();
       return;

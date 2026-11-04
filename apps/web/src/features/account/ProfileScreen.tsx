@@ -32,6 +32,7 @@ import { ConnectWalletModal } from '@/features/skills/ConnectWalletModal';
 import s from './account.module.css';
 import { formatUtc, formatUtcDate } from './format';
 import { SettingsCard } from './SettingsCard';
+import { DataCard } from './DataCard';
 import { SkillLoadout } from './SkillLoadout';
 import { LookEditor } from './LookEditor';
 
@@ -68,6 +69,7 @@ function ProfileBody() {
             <RankCard me={me.data} />
             <AgentsCard agents={me.data.agents} />
             <SettingsCard />
+            <DataCard handle={me.data.account.handle} />
             <RecentMatches />
           </div>
           <aside className={s.aside}>

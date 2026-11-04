@@ -11,7 +11,9 @@ import {
   createRedis,
   createVault,
   enqueueRegistry,
+  installCrashReporting,
   loadConfig,
+  reportError,
 } from '@skirm/server';
 import { RealtimeModule } from './app.module';
 import { consoleLogger, type RealtimeDeps } from './deps';
@@ -20,6 +22,7 @@ import { parseV2TickMs } from './timing';
 import { createRealtimeV2Brain } from './v2/brain';
 
 async function bootstrap(): Promise<void> {
+  installCrashReporting('realtime');
   const config = loadConfig(process.env);
   const log = consoleLogger;
   for (const w of config.warnings) log.warn(`WARNING: ${w}`);
@@ -49,6 +52,7 @@ async function bootstrap(): Promise<void> {
 
   const deps: RealtimeDeps = {
     config,
+    report: (err, where) => reportError('realtime', err, { where }),
     repos: createRepos(db),
     vault: createVault(config),
     pubsub,

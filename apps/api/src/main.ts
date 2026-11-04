@@ -9,14 +9,17 @@ import {
   createQueue,
   createRedis,
   createVault,
+  installCrashReporting,
   loadConfig,
 } from '@skirm/server';
 import { createApp } from './app.module';
 import type { ApiDeps } from './deps';
 import { BullBenchmarkQueue, RedisDailyCosts } from './infra';
 import { RpcNearKeyChecker } from './near-link';
+import { RedisRateLimitStore } from './rate-limit';
 
 async function main(): Promise<void> {
+  installCrashReporting('api');
   const config = loadConfig();
   for (const w of config.warnings) console.warn(`[api] WARNING: ${w}`);
 
@@ -45,6 +48,13 @@ async function main(): Promise<void> {
     },
     benchmarkQueue,
     costs: new RedisDailyCosts(readRedis),
+    rateLimit: {
+      store: new RedisRateLimitStore(readRedis),
+      limits: {
+        ...(process.env.RATE_LIMIT_STRICT ? { strict: Number(process.env.RATE_LIMIT_STRICT) } : {}),
+        ...(process.env.RATE_LIMIT_GENERAL ? { general: Number(process.env.RATE_LIMIT_GENERAL) } : {}),
+      },
+    },
     corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
       .split(',')
       .map((s) => s.trim())
