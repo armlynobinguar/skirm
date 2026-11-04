@@ -159,5 +159,15 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE INDEX \"v2_matches_map_idx\" ON \"v2_matches\" USING btree (\"map_id\",\"ended_at\");",
       "\nUPDATE \"accounts\" SET \"last_ranked_at\" = r.\"at\" FROM (\n\tSELECT \"account_id\", max(\"ended_at\") AS \"at\" FROM (\n\t\tSELECT \"team_a_account_id\" AS \"account_id\", \"ended_at\" FROM \"v2_matches\" WHERE \"ranked\" AND \"status\" = 'ended'\n\t\tUNION ALL\n\t\tSELECT \"team_b_account_id\", \"ended_at\" FROM \"v2_matches\" WHERE \"ranked\" AND \"status\" = 'ended'\n\t) s GROUP BY \"account_id\"\n) r WHERE r.\"account_id\" = \"accounts\".\"id\";"
     ]
+  },
+  {
+    "tag": "0005_match_timelines",
+    "folderMillis": 1793773723595,
+    "bps": true,
+    "hash": "0f33faffe826b5e3fb131b8adba4afe484b03884d00dc5956222ecf9be5a3a35",
+    "sql": [
+      "CREATE TABLE \"match_timelines\" (\n\t\"match_id\" text NOT NULL,\n\t\"team\" text NOT NULL,\n\t\"brain\" text NOT NULL,\n\t\"plans\" jsonb DEFAULT '[]'::jsonb NOT NULL,\n\t\"decisions\" jsonb DEFAULT '[]'::jsonb NOT NULL,\n\t\"moments\" jsonb DEFAULT '[]'::jsonb NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"match_timelines_match_id_team_pk\" PRIMARY KEY(\"match_id\",\"team\"),\n\tCONSTRAINT \"match_timelines_team_ck\" CHECK (\"match_timelines\".\"team\" in ('A', 'B'))\n);\n",
+      "\nALTER TABLE \"match_timelines\" ADD CONSTRAINT \"match_timelines_match_id_v2_matches_id_fk\" FOREIGN KEY (\"match_id\") REFERENCES \"public\".\"v2_matches\"(\"id\") ON DELETE cascade ON UPDATE no action;"
+    ]
   }
 ];

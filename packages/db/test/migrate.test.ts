@@ -41,6 +41,7 @@ describe('migrations', () => {
         'free_budget_days',
         'v2_matches',
         'match_messages',
+        'match_timelines',
         'seasons',
         'season_standings',
         'prize_payouts',
@@ -56,8 +57,9 @@ describe('migrations', () => {
       sql`select count(*)::int as n from drizzle.__drizzle_migrations`,
     );
     expect(rowsOf<{ n: number }>(applied)[0]!.n).toBe(embeddedMigrations().length);
-    // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_onboarding, 0004_ranked_tiers.
-    expect(embeddedMigrations()).toHaveLength(5);
+    // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_onboarding, 0004_ranked_tiers,
+    // 0005_match_timelines.
+    expect(embeddedMigrations()).toHaveLength(6);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {
