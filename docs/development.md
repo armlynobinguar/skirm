@@ -17,7 +17,7 @@ cd contracts && cargo test        # the five NEAR contracts
 
 `scripts/smoke.sh` prints PASS or FAIL per check: the web app (and with `WEB_BROWSER=1` a headless sign-in that sees **60 free** and the Practice tile), health and sign-in, the new-account defaults, a practice match against the greedy bot over WebSocket that ends with a log hash, the stored match (ended, practice, same hash), its messages, credits untouched, and a two-client ranked match with Elo +24 / −24 (placement K-factor) and both players in the current season.
 
-**CI** ([`ci.yml`](../.github/workflows/ci.yml)) runs on every pull request and every push to `main`: typecheck and unit tests for every workspace, and the contracts (`cargo test` and the wasm build). The pre-push hook runs the same checks locally; browser e2e and the full stack smoke are run by hand (table above). [`deploy.yml`](../.github/workflows/deploy.yml) deploys what changed to staging on every push to `main` without waiting for CI; the Cloud Build image build, which runs each app's build, is its only check.
+**CI** ([`ci.yml`](../.github/workflows/ci.yml)) runs on every push to `main` (pull requests are not checked in CI): typecheck and unit tests for every workspace, and the contracts (`cargo test` and the wasm build). The pre-push hook runs the same checks locally; browser e2e and the full stack smoke are run by hand (table above). [`deploy.yml`](../.github/workflows/deploy.yml) deploys what changed to staging on every push to `main` without waiting for CI; the Cloud Build image build, which runs each app's build, is its only check.
 
 ## Full stack smoke
 
