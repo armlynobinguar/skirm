@@ -1,6 +1,7 @@
 // What each side is shown of a live match after every tick. A crew sees the board through its own
 // fog, its own agents, the rivals in its sight, the talk its agents heard (rival team talk only when
 // overheard) and its own refusals; a watcher sees everything. Plans: own-crew plans only, never skills.
+import type { FrameCommands } from './commands';
 import type { HazardKind, Team } from './map';
 import type { MatchEvent, MatchResult, MatchState, Role } from './match';
 import { rowsFor } from './observe';
@@ -74,6 +75,8 @@ export interface V2Frame {
   switchReady?: number[];
   /** Each hazard's state: waves grown so far and whether it is receding. */
   hazards?: { kind: HazardKind; waves: number; receding: boolean }[];
+  /** The viewing crew's live commands (its own frames only; never the rival's or the watch view). */
+  commands?: FrameCommands;
 }
 
 /** What the server knows beside the match state: each agent's current plan. */

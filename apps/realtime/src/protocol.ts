@@ -1,6 +1,7 @@
 // WebSocket protocol on /ws (docs/backend-contract.md, WebSocket). Every client message is checked
 // here before the hub acts on it; anything else gets `{type:'error', code, message}`.
-import { isDifficulty } from '@skirm/engine/v2';
+import { isCommandPreset, isDifficulty } from '@skirm/engine/v2';
+import { DEFAULTS } from '@skirm/shared';
 import {
   isV2Opponent,
   type V2ClientMessage,
@@ -35,6 +36,10 @@ export type ErrorCode =
   | 'practice_unranked'
   | 'agent_busy'
   | 'not_found'
+  | 'not_live'
+  | 'no_commands'
+  | 'invalid_command'
+  | 'command_refused'
   | 'too_many_subscriptions'
   | 'unavailable'
   | 'internal';
@@ -77,6 +82,7 @@ const TYPES = [
   'v2_watch',
   'v2_unwatch',
   'v2_replay',
+  'v2_command',
 ] as const;
 const TIERS = ['quiet', 'standard', 'open'] as const;
 
@@ -163,6 +169,26 @@ export function parseClientMessage(raw: unknown): ParseResult {
       if (extraKeys(v, ['type', 'matchId'])) return bad(`${t} takes {matchId}`);
       if (typeof v.matchId !== 'string' || !ID_RE.test(v.matchId)) return bad(`${t}.matchId must be an id`);
       return { ok: true, msg: { type: t, matchId: v.matchId } };
+    }
+    case 'v2_command': {
+      if (extraKeys(v, ['type', 'matchId', 'agentId', 'preset', 'text'])) return bad('v2_command takes {matchId, agentId?, preset?, text?}');
+      if (typeof v.matchId !== 'string' || !ID_RE.test(v.matchId)) return bad('v2_command.matchId must be an id');
+      const msg: Extract<WsClientMessage, { type: 'v2_command' }> = { type: 'v2_command', matchId: v.matchId };
+      if (v.agentId !== undefined && v.agentId !== null) {
+        if (typeof v.agentId !== 'string' || !ID_RE.test(v.agentId)) return bad('v2_command.agentId must be an id');
+        msg.agentId = v.agentId;
+      }
+      if (v.preset !== undefined && v.preset !== null) {
+        if (!isCommandPreset(v.preset)) return bad('v2_command.preset must be hold_gate, go_drop, regroup or block_flow');
+        msg.preset = v.preset;
+      }
+      if (v.text !== undefined && v.text !== null) {
+        const max = DEFAULTS.commands.maxChars;
+        if (typeof v.text !== 'string' || [...v.text].length > max) return bad(`v2_command.text must be a string of at most ${max} characters`);
+        if (v.text.trim()) msg.text = v.text;
+      }
+      if (!msg.preset && !msg.text) return bad('v2_command needs a preset or text');
+      return { ok: true, msg };
     }
     case 'v2_lock_in': {
       if (extraKeys(v, ['type', 'matchId', 'tiers', 'crew'])) return bad('v2_lock_in takes {matchId, tiers, crew?}');

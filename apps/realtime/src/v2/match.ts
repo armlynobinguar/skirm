@@ -9,10 +9,14 @@
 // it newly crosses are charged, so charges never exceed the hold; the rest is returned at the end
 // (all of it on a void). A free crew (the practice bot, or a practice player on the greedy brain)
 // holds and pays nothing. The match log is hash-chained per tick. At the end each crew gets its
-// debrief, and every frame is kept for replay.
-import { V2_ACTION_DEADLINE_MS, V2_PLANNER_DEADLINE_MS, maySpeak, type V2Brain, type V2Decision } from '@skirm/decision-engine/v2';
-import { chargeDue } from '@skirm/shared';
+// debrief, and every frame is kept for replay. A player may send live commands (command()): each crew
+// has DEFAULTS.commands.perMatch, applied on the next tick, logged in the hash chain and shown only
+// to that crew.
+import { V2_ACTION_DEADLINE_MS, V2_PLANNER_DEADLINE_MS, filterSpeech, maySpeak, type V2AgentCommand, type V2Brain, type V2Decision } from '@skirm/decision-engine/v2';
+import { DEFAULTS, chargeDue } from '@skirm/shared';
 import {
+  commandOrder,
+  dropTargets,
   RANKED_DIFFICULTY,
   TICK_MS,
   V2_REPLAN_EVERY,
@@ -28,7 +32,10 @@ import {
   tickCostPer100,
   type Action,
   type AgentSpec,
+  type CommandPreset,
+  type CrewCommand,
   type Difficulty,
+  type FrameCommand,
   type FrameView,
   type MapDefV2,
   type MatchEvent,
@@ -148,6 +155,17 @@ export interface V2MatchDeps {
 
 type Phase = 'found' | 'lockin' | 'live' | 'ended';
 
+/** A live command as the player sends it: one agent (absent: the whole crew), a preset and/or free text. */
+export interface V2CommandInput {
+  agentId?: string;
+  preset?: CommandPreset;
+  text?: string;
+}
+
+export type V2CommandError = 'not_live' | 'no_commands' | 'rate_limited' | 'invalid_command' | 'command_refused';
+
+export type V2CommandResult = { ok: true; left: number; tick: number } | { ok: false; code: V2CommandError; message: string };
+
 export class V2Match {
   readonly matchId: string;
   readonly timing: V2Timing;
@@ -177,6 +195,18 @@ export class V2Match {
   /** Each agent's last actions with where it stood (the brain sees the last 4). */
   private recent = new Map<string, string[]>();
   private readonly messages: V2MatchMessageInput[] = [];
+  /** Live commands each crew can still send. */
+  private commandsLeft: Record<Team, number> = { A: DEFAULTS.commands.perMatch, B: DEFAULTS.commands.perMatch };
+  /** A command waiting for the next tick, per crew. */
+  private pendingCommand: Record<Team, CrewCommand | null> = { A: null, B: null };
+  /** Tick each crew last sent a command on (the cooldown runs from it). */
+  private commandAt: Record<Team, number> = { A: -Infinity, B: -Infinity };
+  /** The tick the next waiting command lands on (a tick already deciding has taken its commands). */
+  private nextCommandTick = 1;
+  /** Every command applied, per crew, for its frames and debrief. */
+  private readonly commandLog: Record<Team, FrameCommand[]> = { A: [], B: [] };
+  /** The order in force for each agent (by id), until its last tick. */
+  private readonly orders = new Map<string, { preset: CommandPreset | null; order: string; until: number }>();
   private stats: V2MatchEnd['stats'] = {
     A: { timeouts: 0, errors: 0, illegal: 0, refusedSays: 0, costUsd: 0, charged: 0 },
     B: { timeouts: 0, errors: 0, illegal: 0, refusedSays: 0, costUsd: 0, charged: 0 },
@@ -323,7 +353,78 @@ export class V2Match {
       eloDelta: end.result ? (fin.eloDelta[team] ?? null) : null,
       registry: end.result ? fin.registry : null,
       ...(end.result && fin.season?.[team] ? { season: fin.season[team] } : {}),
+      commands: this.commandLog[team],
     });
+  }
+
+  /** Commands a crew can still send. */
+  commandsLeftFor(team: Team): number {
+    return this.commandsLeft[team];
+  }
+
+  /**
+   * A live command from a crew's player, applied on the next tick. Refused when the match is not
+   * live, the crew has none left, one is already waiting or was sent within
+   * DEFAULTS.commands.cooldownTicks, the agent is not one of the crew's still playing, or the text is
+   * refused by the speech filter (it must keep the crew's skills secret like any line its agents say).
+   */
+  command(team: Team, input: V2CommandInput): V2CommandResult {
+    const s = this.state;
+    const cfg = DEFAULTS.commands;
+    if (this.phase !== 'live' || !s || s.result) return { ok: false, code: 'not_live', message: 'commands are sent during a live match' };
+    if (this.commandsLeft[team] <= 0) return { ok: false, code: 'no_commands', message: `no commands left (${cfg.perMatch} a match)` };
+    if (this.pendingCommand[team]) return { ok: false, code: 'rate_limited', message: 'a command is already on its way' };
+    const lands = this.nextCommandTick;
+    if (lands - 1 - this.commandAt[team] < cfg.cooldownTicks) return { ok: false, code: 'rate_limited', message: `one command every ${cfg.cooldownTicks} ticks` };
+    const playing = s.agents.filter((a) => a.team === team && !a.out);
+    let agents: string[];
+    if (input.agentId !== undefined) {
+      if (!playing.some((a) => a.id === input.agentId)) return { ok: false, code: 'invalid_command', message: 'that agent is not one of your crew in the match' };
+      agents = [input.agentId];
+    } else agents = playing.map((a) => a.id);
+    if (!agents.length) return { ok: false, code: 'invalid_command', message: 'nobody is left to command' };
+    let text: string | null = null;
+    if (input.text !== undefined) {
+      const raw = input.text.replace(/\s+/g, ' ').trim();
+      if ([...raw].length > cfg.maxChars) return { ok: false, code: 'invalid_command', message: `a command is at most ${cfg.maxChars} characters` };
+      if (raw) {
+        const side = this.setup.sides[team];
+        const secrets = [...side.skills.flat(), ...(side.instructions ?? []).filter((t): t is string => !!t)];
+        const f = filterSpeech(raw, secrets);
+        if (!f.ok) return { ok: false, code: 'command_refused', message: f.reason === 'leak' ? 'the command repeats a skill' : 'the command was refused by the filter' };
+        text = f.text;
+      }
+    }
+    const preset = input.preset ?? null;
+    if (!preset && !text) return { ok: false, code: 'invalid_command', message: 'a command needs a preset or text' };
+    this.pendingCommand[team] = { team, agents, preset, text };
+    this.commandsLeft[team]--;
+    this.commandAt[team] = lands - 1;
+    return { ok: true, left: this.commandsLeft[team], tick: lands };
+  }
+
+  /** The commands waiting for `tick` (the one about to be played), now in force. */
+  private applyCommands(tick: number): CrewCommand[] {
+    const out: CrewCommand[] = [];
+    const until = tick + DEFAULTS.commands.activeTicks - 1;
+    this.nextCommandTick = tick + 1;
+    for (const t of TEAMS) {
+      const c = this.pendingCommand[t];
+      if (!c) continue;
+      this.pendingCommand[t] = null;
+      out.push(c);
+      const order = commandOrder(c);
+      for (const id of c.agents) this.orders.set(id, { preset: c.preset, order, until });
+      this.commandLog[t].push({ tick, until, agents: [...c.agents], preset: c.preset, text: c.text });
+    }
+    return out;
+  }
+
+  /** The order an agent follows on `tick`, if one is still in force. */
+  private orderFor(s: MatchState, id: string, tick: number): V2AgentCommand | null {
+    const o = this.orders.get(id);
+    if (!o || o.until < tick) return null;
+    return { preset: o.preset, order: o.order, ticksLeft: o.until - tick + 1, ...(o.preset === 'go_drop' ? { targets: dropTargets(s) } : {}) };
   }
 
   private toAll(msg: V2ServerMessage) {
@@ -404,6 +505,7 @@ export class V2Match {
       const tickStart = sched.now();
       const costPer100 = { A: tickCostPer100(s, 'A'), B: tickCostPer100(s, 'B') };
       const live = s.agents.filter((a) => !a.out);
+      const commands = this.applyCommands(s.tick + 1);
       const decisions = await Promise.all(live.map((a) => this.decide(s, a.id)));
       if (this.stopReason) return this.voidMatch('aborted', undefined, log);
       const actions: Record<string, Action> = {};
@@ -420,7 +522,7 @@ export class V2Match {
         this.count(a.team, d);
       });
       const ev = stepMatch(s, { actions, says });
-      appendTick(log, { tick: s.tick, actions, says });
+      appendTick(log, { tick: s.tick, actions, says, ...(commands.length ? { commands } : {}) });
       this.tally.add(ev);
       this.collect(s, ev);
       for (const t of pays) {
@@ -464,7 +566,8 @@ export class V2Match {
     const wait: Action = { type: 'wait' };
     if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
     const side = this.setup.sides[a.team];
-    const ctx = { skills: side.skills[a.slot] ?? [], instructions: side.instructions?.[a.slot] ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [] };
+    const command = this.orderFor(s, id, s.tick + 1);
+    const ctx = { skills: side.skills[a.slot] ?? [], instructions: side.instructions?.[a.slot] ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [], command };
     const sched = this.deps.scheduler;
     return new Promise((resolve) => {
       let settled = false;
@@ -512,6 +615,8 @@ export class V2Match {
     const s = this.state!;
     for (const t of TEAMS) {
       let frame = withOwnCrew(frameFor(s, t, ev), s, t, ev, this.plans[t], this.setup.sides[t].bought ?? [], { why: this.planWhys[t], thoughts: this.thoughts });
+      // Its own live commands: the rival's frames and the watch view never carry them.
+      frame = { ...frame, commands: { left: this.commandsLeft[t], log: this.commandLog[t].map((c) => ({ ...c, agents: [...c.agents] })) } };
       // Practice shows all minds (the prototype): the player also sees the bot's plan, reason and inner voice.
       if (this.setup.practice) {
         const r: Team = t === 'A' ? 'B' : 'A';

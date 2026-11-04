@@ -489,6 +489,8 @@ export interface V2DebriefRecord {
   difficulty?: string;
   /** Ranked: the season this result counted towards and the standings points it gave (set by finish). */
   season?: { number: number; points: number };
+  /** The crew's own live commands (V2Debrief.commands); absent when none were sent. */
+  commands?: { tick: number; agents: { id: string; name: string }[]; preset: string | null; text: string | null }[];
 }
 
 /**

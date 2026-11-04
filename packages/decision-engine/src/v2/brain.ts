@@ -4,7 +4,7 @@
 //   the action and, when the agent may speak, its message, which then goes through the filter.
 // - greedy: deterministic and offline, for dev, tests and benchmarks without keys.
 // A brain that misses the deadline or answers with nothing legal waits that tick.
-import { TALK_TIERS, type Action, type Channel, type Observation } from '@skirm/engine/v2';
+import { TALK_TIERS, type Action, type Channel, type CommandPreset, type Observation } from '@skirm/engine/v2';
 import { HAIKU_OPENROUTER_MODEL, OPENROUTER_BASE_URL, PRICES } from '../config';
 import { defaultFetch, dig, num, postJson, type FetchLike } from '../http';
 import { runWithPolicy } from '../policy';
@@ -64,6 +64,19 @@ export interface V2AgentContext {
   canSpeak: boolean;
   /** Its last few actions with where it stood, oldest first. */
   recent?: string[];
+  /** A live command from its player still in force (DEFAULTS.commands.activeTicks), or none. */
+  command?: V2AgentCommand | null;
+}
+
+/** A player's live command as an agent receives it. */
+export interface V2AgentCommand {
+  preset: CommandPreset | null;
+  /** The whole order for the model: the preset's directive, then the player's words (commandOrder). */
+  order: string;
+  /** Ticks the order has left. */
+  ticksLeft: number;
+  /** go_drop: the tiles it points at (landed supply drops, else middle items); empty when none. */
+  targets?: [number, number][];
 }
 
 export interface V2Brain {
@@ -146,7 +159,7 @@ export function createHaikuBrain(opts: HaikuBrainOptions): V2Brain {
     model,
     async act(o, ctx) {
       const wait: Action = { type: 'wait' };
-      const r = await call('actor', systemPrompt(ctx.skills, ctx.instructions), turnPrompt(o, ctx.plan, ctx.canSpeak, ctx.recent ?? []), V2_ACTOR_MAX_TOKENS, opts.deadlineMs ?? V2_ACTION_DEADLINE_MS);
+      const r = await call('actor', systemPrompt(ctx.skills, ctx.instructions), turnPrompt(o, ctx.plan, ctx.canSpeak, ctx.recent ?? [], ctx.command ?? null), V2_ACTOR_MAX_TOKENS, opts.deadlineMs ?? V2_ACTION_DEADLINE_MS);
       if (r.text === null) return { action: wait, reason: r.reason === 'timeout' ? 'timeout' : 'error', say: null, call: r.call };
       const parsed = parseReply(r.text, o.legal, ctx.canSpeak);
       let say: V2Decision['say'] = null;
@@ -179,7 +192,7 @@ export function createGreedyBrain(): V2Brain {
     kind: 'greedy',
     model: 'greedy',
     async act(o, ctx) {
-      const action = greedyAct(o);
+      const action = greedyAct(o, ctx.command ?? null);
       const text = ctx.canSpeak ? greedySay(o, action) : null;
       return { action, reason: 'chosen', say: text ? { channel: 'team', text } : null, thought: greedyThought(o, action) };
     },

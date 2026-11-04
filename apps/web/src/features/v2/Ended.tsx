@@ -285,7 +285,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
   );
 }
 
-const CHANNEL: Record<string, string> = { team: 'Team', rteam: 'Team', say: 'Say', heard: 'Overheard' };
+const CHANNEL: Record<string, string> = { team: 'Team', rteam: 'Team', say: 'Say', heard: 'Overheard', order: 'Order' };
 
 /** Every line said in the match as this tab saw it delivered, oldest first. */
 function Transcript({ lines, team, watch }: { lines: V2CommsLine[]; team: DebriefData['team']; watch: boolean }) {
@@ -303,7 +303,7 @@ function Transcript({ lines, team, watch }: { lines: V2CommsLine[]; team: Debrie
                 <span className={v.tk}>{clock((l.tick * TICK_MS) / 1000)}</span>
                 <b>{l.fromName}</b>
                 <span className={v.ch}>{CHANNEL[tag] ?? tag}</span>
-                <span className={v.tx}>{l.text}</span>
+                <span className={v.tx}>{l.orderTo ? `${l.text} → ${l.orderTo}` : l.text}</span>
                 {l.overheardBy?.length ? <span className={v.heard}>overheard by {l.overheardBy.join(', ')}</span> : null}
               </li>
             );

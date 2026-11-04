@@ -159,6 +159,7 @@ Client → server (`WsClientMessage`):
 | `{type:'v2_lock_in', matchId, tiers, crew?}` | lock the crew in (30 s): a talk tier per agent in slot order; `crew` swaps, removes or adds agents up to `crewLimit` and its tiers win |
 | `{type:'v2_watch', matchId}` / `{type:'v2_unwatch', matchId}` | spectate: the latest whole-board frame now, then every one after, and `v2_end`. Released on `v2_end`, unwatch or disconnect; at most 8 per socket |
 | `{type:'v2_replay', matchId}` | every stored frame of an ended match, for replay at another speed (kept 6 h) |
+| `{type:'v2_command', matchId, agentId?, preset?, text?}` | a live command to the player's own crew (`agentId` absent: all of it): a preset (`hold_gate`, `go_drop`, `regroup`, `block_flow`) and/or free text (≤ `DEFAULTS.commands.maxChars`, through the leak and abuse filter). `DEFAULTS.commands.perMatch` (3) per crew, one every `cooldownTicks` (5), one waiting at a time. Applied on the next tick: in the targeted agents' prompts (and the greedy brain's moves) for `activeTicks` (10), in that tick's log entry (`commands`, hash-chained), in the crew's own frames (`frame.commands: {left, log}`) and debrief (`debrief.commands`); never in the rival's frames, the watch view or `/v2/matches/:id/messages` |
 
 Server → client (`WsServerMessage`):
 
@@ -173,9 +174,10 @@ Server → client (`WsServerMessage`):
 | `{type:'v2_frame', matchId, frame}` | one tick: each crew gets its own fogged view (its own plans only), watchers the whole board |
 | `{type:'v2_end', matchId, result, reason, logHash, debrief?}` | the end. `result` is `{winner: 'A'\|'B'\|'draw', reason: 'goal'\|'time'\|'eliminated', decidedBy, score, ticks}` or null for a void match (`reason` `declined`, `accept_timeout`, `credits`, `error`, `aborted`); `logHash` is the sha256 chain head of the match log; `debrief` is this crew's (Elo delta, MVP, goals, talk counts, credits held / used / returned, registry line, per-agent tally) |
 | `{type:'v2_frames', matchId, frames}` | answer to `v2_replay` |
+| `{type:'v2_command_ok', matchId, tick, left}` | answer to `v2_command`: it lands on `tick`; `left` remain |
 | `{type:'error', code, message}` | see below |
 
-WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthenticated`, `auth_failed`, `already_authenticated`, `already_queued`, `not_queued`, `in_match`, `invalid_crew`, `not_in_lockin`, `practice_unranked`, `agent_busy`, `not_found`, `too_many_subscriptions`, `unavailable`, `internal`.
+WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthenticated`, `auth_failed`, `already_authenticated`, `already_queued`, `not_queued`, `in_match`, `invalid_crew`, `not_in_lockin`, `practice_unranked`, `agent_busy`, `not_found`, `not_live`, `no_commands`, `rate_limited`, `invalid_command`, `command_refused`, `too_many_subscriptions`, `unavailable`, `internal`.
 
 `scripts/ws-v2.cjs` is a ready client: it signs in, queues, accepts, locks in and waits for `v2_end` (README of the script at its top).
 

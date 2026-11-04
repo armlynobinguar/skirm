@@ -1,10 +1,10 @@
 // WebSocket messages of apps/realtime (path /ws). Mirrors WsClientMessage / WsServerMessage in
 // packages/server/src/queues.ts and the parser in apps/realtime/src/protocol.ts; copied here because
 // @skirm/server is Node-only (bullmq, ioredis). Keep in sync.
-import type { Difficulty, FrameAgent, FrameItem, ItemOrigin, MatchResult, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
+import type { CommandPreset, Difficulty, FrameAgent, FrameCommand, FrameItem, ItemOrigin, MatchResult, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
 import type { Side } from '@skirm/shared';
 
-export type { Side, V2Frame, FrameAgent, FrameItem, ItemOrigin, TalkTier, Team, MatchResult, Difficulty };
+export type { Side, V2Frame, FrameAgent, FrameCommand, FrameItem, ItemOrigin, TalkTier, Team, MatchResult, Difficulty, CommandPreset };
 
 /** v2 (packages/server/src/v2.ts): found → accept (10 s) → lock-in (30 s) → live (2 s ticks) → end. */
 /** Who a v2_queue plays: absent for a matchmade rival, 'bot' for practice against the greedy bot. */
@@ -51,6 +51,16 @@ export interface V2Debrief {
   difficulty?: Difficulty;
   /** Ranked: the season this result counted towards and the standings points it gave; absent otherwise. */
   season?: { number: number; points: number };
+  /** The live commands this crew's player sent, as applied (tick order); absent when none. */
+  commands?: V2DebriefCommand[];
+}
+
+/** One live command in the debrief transcript. */
+export interface V2DebriefCommand {
+  tick: number;
+  agents: { id: string; name: string }[];
+  preset: CommandPreset | null;
+  text: string | null;
 }
 
 export type V2ClientMessage =
@@ -68,7 +78,9 @@ export type V2ClientMessage =
   /** `tiers` is per queued agent; `crew`, when sent, replaces the queued crew (up to `crewLimit`) and its tiers win. */
   | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[] }
   /** Every stored frame of an ended match (answered with v2_frames), for replay at another speed. */
-  | { type: 'v2_replay'; matchId: string };
+  | { type: 'v2_replay'; matchId: string }
+  /** A live command to your own crew: one agent or all of it, a preset and/or free text. Answered with v2_command_ok. */
+  | { type: 'v2_command'; matchId: string; agentId?: string; preset?: CommandPreset; text?: string };
 
 /** What practice adds to v2_found and v2_lockin. */
 export interface V2PracticeFlags {
@@ -90,7 +102,9 @@ export type V2ServerMessage =
   | { type: 'v2_frame'; matchId: string; frame: V2Frame }
   | { type: 'v2_end'; matchId: string; result: MatchResult | null; reason: V2EndReason; logHash: string | null; debrief?: V2Debrief }
   /** Answer to v2_replay: a player's own crew view (the whole board for anyone else), ascending tick. */
-  | { type: 'v2_frames'; matchId: string; frames: V2Frame[] };
+  | { type: 'v2_frames'; matchId: string; frames: V2Frame[] }
+  /** The command is applied on `tick`; `left` remain this match. */
+  | { type: 'v2_command_ok'; matchId: string; tick: number; left: number };
 
 export type WsClientMessage = { type: 'auth'; token?: string; devUser?: string } | V2ClientMessage;
 
@@ -117,6 +131,11 @@ export type WsErrorCode =
   | 'insufficient_credits'
   | 'match_void'
   | 'not_found'
+  | 'not_live'
+  | 'no_commands'
+  | 'rate_limited'
+  | 'invalid_command'
+  | 'command_refused'
   | 'too_many_subscriptions'
   | 'unavailable'
   | 'internal'
