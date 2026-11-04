@@ -13,6 +13,7 @@ import { OpsRepo } from './ops';
 import { ProofRepo } from './proof';
 import { RankedRepo } from './ranked';
 import { RentalsRepo } from './rentals';
+import { ReplaysRepo } from './replays';
 import { SeasonsRepo } from './seasons';
 import { SkillsRepo } from './skills';
 import { TournamentsRepo } from './tournaments';
@@ -48,6 +49,8 @@ export interface Repos {
   lobbies: LobbiesRepo;
   /** Single-elimination tournaments built from lobbies, with prize pools in paid credits. */
   tournaments: TournamentsRepo;
+  /** Public replay links and the per-match highlight cache. */
+  replays: ReplaysRepo;
   /** Tutorial progress and the home checklist. */
   onboarding: OnboardingRepo;
   /** Runs `fn` with repositories bound to one transaction. */
@@ -80,6 +83,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     rentals: new RentalsRepo(db),
     lobbies: new LobbiesRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
     tournaments: new TournamentsRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
+    replays: new ReplaysRepo(db),
     onboarding: new OnboardingRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
@@ -99,6 +103,7 @@ export * from './ops';
 export * from './proof';
 export * from './ranked';
 export * from './rentals';
+export * from './replays';
 export * from './seasons';
 export * from './skills';
 export * from './tournaments';

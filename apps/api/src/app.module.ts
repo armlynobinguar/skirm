@@ -15,6 +15,7 @@ import { OnboardingController } from './controllers/onboarding.controller';
 import { RentalsController } from './controllers/rentals.controller';
 import { OpsController } from './controllers/ops.controller';
 import { PublicController } from './controllers/public.controller';
+import { ReplaysController } from './controllers/replays.controller';
 import { RankedController } from './controllers/ranked.controller';
 import { SeasonsController } from './controllers/seasons.controller';
 import { SkillsController } from './controllers/skills.controller';
@@ -39,6 +40,7 @@ export class AppModule {
         SeasonsController,
         CosmeticsController,
         OpsController,
+        ReplaysController,
         DecisionsController,
         OnboardingController,
       ],

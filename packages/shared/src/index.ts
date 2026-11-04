@@ -12,3 +12,4 @@ export * from './rank';
 export * from './tournament';
 export * from './onboarding';
 export * from './tier';
+export * from './skill-trigger';

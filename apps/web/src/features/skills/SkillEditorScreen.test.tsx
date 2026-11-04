@@ -64,6 +64,7 @@ describe('S08 Skill editor', () => {
         requires_actions: ['place_block'],
         handles_tags: ['spreads', 'liquid'],
         royalty_bps: 500,
+        trigger: null,
       }),
     );
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/skills/${SKILL_ID}/edit`));

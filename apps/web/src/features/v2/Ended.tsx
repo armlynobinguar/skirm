@@ -22,6 +22,7 @@ import { qk } from '@/lib/api/queries';
 import { config } from '@/lib/config';
 import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
+import { ReplayPanel } from '../replays/ReplayPanel';
 import { PracticeBadge, other } from './common';
 import { BanList } from './Draft';
 import { Decisions } from './Decisions';
@@ -283,6 +284,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
           </div>
         ) : null}
       </section>
+      {data.status === 'ended' ? <ReplayPanel matchId={data.matchId} ticks={r.ticks} canShare={!watch} /> : null}
       {data.comms ? <Transcript lines={data.comms} team={me} watch={watch} /> : null}
       {!watch && data.status === 'ended' ? <Decisions matchId={data.matchId} /> : null}
     </div>

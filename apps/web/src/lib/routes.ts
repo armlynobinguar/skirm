@@ -24,6 +24,10 @@ export const routes = {
   pvp: () => '/pvp', // S11
   match: (matchId: string) => `/matches/${e(matchId)}`, // S12 v2 match: accept, lock-in, live, end
   matchResult: (matchId: string) => `/matches/${e(matchId)}/result`, // S13 v2 result: the debrief
+  /** The replay of an ended match, from `tick` when given (a highlight's jump). */
+  matchReplay: (matchId: string, tick?: number) => `/matches/${e(matchId)}${tick !== undefined ? `?t=${tick}` : ''}#replay`,
+  /** A shared replay link (public; the whole board only). */
+  replay: (shareId: string) => `/replays/${e(shareId)}`,
   leaderboards: () => '/leaderboards', // S14
   terms: () => '/terms',
   privacy: () => '/privacy',
@@ -73,6 +77,7 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/lobbies\//, key: 'lobby', title: 'Lobby', sub: '// friend challenge', back: routes.lobbies() },
   { re: /^\/tournaments\/?$/, key: 'tournaments', title: 'Tournaments', sub: '// brackets', back: routes.pvp() },
   { re: /^\/tournaments\//, key: 'tournament', title: 'Bracket', sub: '// single elimination', back: routes.tournaments() },
+  { re: /^\/replays\/[^/]+\/?$/, key: 'replay', title: 'Replay', sub: '// shared', back: routes.pvp() },
   { re: /^\/matches\/[^/]+\/result\/?$/, key: 'match-result', title: 'Debrief', sub: '// replay hash on NEAR', back: routes.pvp() },
   { re: /^\/matches(\/|$)/, key: 'match', title: 'Live', sub: '// 2 s ticks', back: routes.pvp() },
   { re: /^\/leaderboards(\/|$)/, key: 'ladder', title: 'Ladder', sub: '// season', back: routes.home() },
