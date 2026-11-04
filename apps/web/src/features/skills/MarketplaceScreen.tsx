@@ -14,7 +14,7 @@
 import { Badge, Button, TextField } from '@skirm/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import type { Tag } from '@skirm/shared';
+import { describeSkillTrigger, type Tag } from '@skirm/shared';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
 import { EmptyState } from '@/components/states/EmptyState';
@@ -430,6 +430,11 @@ function Card({ card: c, selected, onSelect }: { card: CardModel; selected: bool
       <span className={x.in}>
         <b className={x.name}>{sk.name}</b>
         <span className={x.by}>by {c.creator}</span>
+        {sk.trigger && sk.trigger.kind !== 'always' ? (
+          <span className={x.by} data-testid="s09-trigger">
+            Plays when: {describeSkillTrigger(sk.trigger).toLowerCase()}
+          </span>
+        ) : null}
         <span className={x.wr}>
           <span className={x.proof} data-testid="s09-proof">
             {c.v2 ? v2ProofLine(c.v2) : ROW_PROOF}

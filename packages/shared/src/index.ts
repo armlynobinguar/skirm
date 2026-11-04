@@ -11,3 +11,4 @@ export * from './season';
 export * from './rank';
 export * from './onboarding';
 export * from './tier';
+export * from './skill-trigger';

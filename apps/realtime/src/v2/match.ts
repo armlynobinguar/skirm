@@ -30,6 +30,7 @@ import {
   holdFor,
   logHash,
   observe,
+  skillActivity,
   startLog,
   stepMatch,
   tickCostPer100,
@@ -39,12 +40,14 @@ import {
   type CrewCommand,
   type Difficulty,
   type FrameCommand,
+  type FrameSkill,
   type FrameView,
   type MapDefV2,
   type MatchEvent,
   type MatchLog,
   type MatchState,
   type SayInput,
+  type SkillTrigger,
   type TalkTier,
   type Team,
   type V2Frame,
@@ -103,6 +106,17 @@ export interface V2Roster {
   skillKeys?: { id: string; version: number }[][];
   /** Per agent: the public names of `skillKeys`, in the same order (the draft's ban pool). */
   skillNames?: string[][];
+  /**
+   * Per agent, in skill order: each skill's public name and trigger (null: always). A skill joins
+   * its agent's prompt only on ticks its trigger holds. Absent: every skill always plays.
+   */
+  skillMeta?: V2SkillMeta[][];
+}
+
+/** A skill's public metadata as a match uses it. */
+export interface V2SkillMeta {
+  name: string;
+  trigger: SkillTrigger | null;
 }
 
 export interface V2Side extends V2Roster {
@@ -201,6 +215,8 @@ export class V2Match {
   private planWhys: Record<Team, string | null> = { A: null, B: null };
   /** Each agent's latest inner voice (its THINK line), by agent id. */
   private thoughts = new Map<string, string>();
+  /** Each agent's skills on its latest turn and whether their triggers held, by agent id (own crew's mind panel). */
+  private skillsActive = new Map<string, FrameSkill[]>();
   /** Each crew's decision timeline for the debrief; set when the match goes live. */
   private timeline: DecisionTimeline | null = null;
   /** Holds still open (released on a void). */
@@ -275,6 +291,7 @@ export class V2Match {
       side.bought = roster.bought ?? [];
       side.instructions = roster.instructions ?? [];
       side.skillKeys = roster.skillKeys ?? [];
+      side.skillMeta = roster.skillMeta ?? [];
     }
     this.locked.set(team, side.crew.map((a, i) => (roster ? a.tier : (tiers[i] ?? a.tier))));
     if (roster) for (const t of TEAMS) this.deps.send(t, this.lockinMessage(t));
@@ -349,7 +366,7 @@ export class V2Match {
     if (!banned.size || !r.skillKeys) return r;
     const keep = r.skillKeys.map((keys) => keys.map((k) => !banned.has(k.id)));
     const pick = <T,>(rows: T[][]) => rows.map((row, i) => row.filter((_, j) => keep[i]?.[j] ?? true));
-    return { ...r, skills: pick(r.skills), skillKeys: pick(r.skillKeys), ...(r.skillNames ? { skillNames: pick(r.skillNames) } : {}) };
+    return { ...r, skills: pick(r.skills), skillKeys: pick(r.skillKeys), ...(r.skillNames ? { skillNames: pick(r.skillNames) } : {}), ...(r.skillMeta ? { skillMeta: pick(r.skillMeta) } : {}) };
   }
 
   /** The ban phase: each step waits for its crew's ban, or passes when it runs out (or the crew has nothing to ban). */
@@ -707,10 +724,15 @@ export class V2Match {
     this.timeline?.observe(id, o);
     const canSpeak = maySpeak(a.tier, s.tick + 1, a.lastSpoke);
     const wait: Action = { type: 'wait' };
-    if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
     const side = this.setup.sides[a.team];
+    const skills = side.skills[a.slot] ?? [];
+    const meta = side.skillMeta?.[a.slot] ?? [];
+    const skillTriggers = skills.map((_, i) => meta[i]?.trigger ?? null);
+    const active = skillActivity(skillTriggers, o);
+    if (skills.length) this.skillsActive.set(id, skills.map((_, i) => ({ name: meta[i]?.name ?? `Skill ${i + 1}`, trigger: skillTriggers[i] ?? { kind: 'always' }, active: active[i]! })));
+    if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
     const command = this.orderFor(s, id, s.tick + 1);
-    const ctx = { skills: side.skills[a.slot] ?? [], instructions: side.instructions?.[a.slot] ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [], command };
+    const ctx = { skills, skillTriggers, instructions: side.instructions?.[a.slot] ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [], command };
     const sched = this.deps.scheduler;
     return new Promise((resolve) => {
       let settled = false;
@@ -739,11 +761,14 @@ export class V2Match {
     const s = this.state!;
     const lead = s.agents.find((a) => a.team === team && !a.out);
     if (!lead) return;
-    const skills = this.setup.sides[team].skills.flat();
+    const side = this.setup.sides[team];
+    const skills = side.skills.flat();
+    // The plan is written from the lead's view, so each skill joins it when its trigger holds there.
+    const skillTriggers = side.skills.flatMap((sk, slot) => sk.map((_, i) => side.skillMeta?.[slot]?.[i]?.trigger ?? null));
     const instructions = (this.setup.sides[team].instructions ?? []).filter((t): t is string => !!t).join('\n\n') || null;
     let timer: unknown;
     const late = new Promise<null>((r) => (timer = this.deps.scheduler.setTimeout(() => r(null), this.timing.planMs)));
-    const r = await Promise.race([this.deps.brains[team].plan(observe(s, lead.id), { skills, instructions }).catch(() => null), late]);
+    const r = await Promise.race([this.deps.brains[team].plan(observe(s, lead.id), { skills, skillTriggers, instructions }).catch(() => null), late]);
     this.deps.scheduler.clearTimeout(timer);
     if (r) {
       this.stats[team].costUsd += r.call?.costUsd ?? 0;
@@ -758,7 +783,7 @@ export class V2Match {
   private publish(ev: MatchEvent[]) {
     const s = this.state!;
     for (const t of TEAMS) {
-      let frame = withOwnCrew(frameFor(s, t, ev), s, t, ev, this.plans[t], this.setup.sides[t].bought ?? [], { why: this.planWhys[t], thoughts: this.thoughts });
+      let frame = withOwnCrew(frameFor(s, t, ev), s, t, ev, this.plans[t], this.setup.sides[t].bought ?? [], { why: this.planWhys[t], thoughts: this.thoughts, skills: this.skillsActive });
       // Its own live commands: the rival's frames and the watch view never carry them.
       frame = { ...frame, commands: { left: this.commandsLeft[t], log: this.commandLog[t].map((c) => ({ ...c, agents: [...c.agents] })) } };
       // Practice shows all minds (the prototype): the player also sees the bot's plan, reason and inner voice.
@@ -794,7 +819,8 @@ export class V2Match {
  * messages. The plan is one crew plan written with every equipped skill in its prompt, so when any
  * agent of the crew runs a bought skill the plan and its reason are withheld from the whole crew
  * (`planHidden`): a bought skill never leaks through plan text. An agent's inner voice comes from its
- * own prompt, so it is withheld when that agent runs a bought (or rented) skill.
+ * own prompt, so it is withheld when that agent runs a bought (or rented) skill. Each agent's skills
+ * show by name and trigger with whether the trigger held on its last turn (public metadata only).
  */
 export function withOwnCrew(
   frame: V2Frame,
@@ -803,14 +829,16 @@ export function withOwnCrew(
   ev: readonly MatchEvent[],
   plan: string | null,
   bought: readonly boolean[],
-  mind: { why?: string | null; thoughts?: ReadonlyMap<string, string> } = {},
+  mind: { why?: string | null; thoughts?: ReadonlyMap<string, string>; skills?: ReadonlyMap<string, FrameSkill[]> } = {},
 ): V2Frame {
   const hidden = bought.some(Boolean);
   const slotOf = (id: string) => s.agents.find((x) => x.id === id)?.slot ?? -1;
   const agents = frame.agents.map((a) => {
     if (a.team !== team) return a;
     const thought = bought[slotOf(a.id)] ? undefined : mind.thoughts?.get(a.id);
-    const own = thought ? { ...a, thought } : a;
+    // Skill names and triggers are public metadata, so they show even on a bought skill; never the prompt.
+    const skills = mind.skills?.get(a.id);
+    const own = { ...a, ...(thought ? { thought } : {}), ...(skills?.length ? { skills: skills.map((k) => ({ ...k })) } : {}) };
     if (hidden) return { ...own, planHidden: true };
     return plan ? { ...own, plan, ...(mind.why ? { planWhy: mind.why } : {}) } : own;
   });

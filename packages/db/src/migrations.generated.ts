@@ -169,5 +169,14 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "CREATE TABLE \"match_timelines\" (\n\t\"match_id\" text NOT NULL,\n\t\"team\" text NOT NULL,\n\t\"brain\" text NOT NULL,\n\t\"plans\" jsonb DEFAULT '[]'::jsonb NOT NULL,\n\t\"decisions\" jsonb DEFAULT '[]'::jsonb NOT NULL,\n\t\"moments\" jsonb DEFAULT '[]'::jsonb NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"match_timelines_match_id_team_pk\" PRIMARY KEY(\"match_id\",\"team\"),\n\tCONSTRAINT \"match_timelines_team_ck\" CHECK (\"match_timelines\".\"team\" in ('A', 'B'))\n);\n",
       "\nALTER TABLE \"match_timelines\" ADD CONSTRAINT \"match_timelines_match_id_v2_matches_id_fk\" FOREIGN KEY (\"match_id\") REFERENCES \"public\".\"v2_matches\"(\"id\") ON DELETE cascade ON UPDATE no action;"
     ]
+  },
+  {
+    "tag": "0006_skill_triggers",
+    "folderMillis": 1793776907145,
+    "bps": true,
+    "hash": "0ec50c90f3d147cd5d12266aa7ca4fde019078a08e98bbc76cf788af4a3b7171",
+    "sql": [
+      "ALTER TABLE \"skill_versions\" ADD COLUMN \"trigger\" jsonb;"
+    ]
   }
 ];
