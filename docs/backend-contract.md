@@ -27,7 +27,7 @@ The single reference for `apps/api`, `apps/worker`, `apps/realtime` and `apps/we
 | `NEAR_NETWORK` | `testnet` | |
 | `NEAR_RPC_URL`, `NEAR_RPC_FALLBACK_URL` | fastnear, then dRPC testnet | |
 | `NEAR_OPS_ACCOUNT`, `NEAR_OPS_KEY` | unset | the platform signer (set both or neither). Unset → `NoopRegistry` / `NoopMinter` / `NoopSeasons`: registry status `local`, season pools `local` |
-| `NEAR_CONTRACT_SKILLS` / `_MARKET` / `_REGISTRY` / `_DEPOSITS` / `_SEASONS` | `skills.playskirm.testnet` … `seasons.playskirm.testnet` | |
+| `NEAR_CONTRACT_SKILLS` / `_MARKET` / `_REGISTRY` / `_DEPOSITS` / `_SEASONS` / `_BADGES` | `skills.playskirm.testnet` … `badges.playskirm.testnet` | `badges` is not deployed yet |
 | `CREDITS_PER_NEAR` | `1000` (`DEFAULTS.credits.perNear`) | credits one NEAR buys: $0.001 a credit at an assumed $1 NEAR |
 | `API_PORT` / `REALTIME_PORT` | `4000` / `4001` | |
 | `PUBLIC_API_URL` / `PUBLIC_WS_URL` | `http://localhost:4000` / `ws://localhost:4001/ws` | web (inlined at build time) |
@@ -55,6 +55,7 @@ Talk tiers are priced in whole credits per 100 agent-ticks (`DEFAULTS.talk.rateP
 - **Free.** The greedy brain makes no model calls, so on a greedy server a practice crew holds and pays nothing (`v2_found.free`). The bot never holds. With a model brain the practice player pays the normal rates; ranked and casual always hold.
 - Ledger rows of a match are keyed by its hold `<matchId>-A` / `-B`; `/credits` rows carry that `matchId`.
 - The global free budget (`free_budget_days`) caps all free allowances on a day; it is 4,126 credits a day (`v2GlobalFreeBudget()`, `DEFAULT_LEDGER_CONFIG.globalFreeBudget`).
+- **Quest rewards** refill the day's free allowance, never past the daily 60 and only by free credits already charged today (credits still held by an open match come back on settle). They are not paid credits and never new budget: holds still draw free credits only while the global budget has room, so quests reshare G, they never raise it. A player who claims everything can use at most 60 + 3 × 10 + 2 × 25 = 140 free credits in a day, about 97 a day averaged over a week, so G covers about 42 such players instead of 68 (`questBudgetCost()` in `@skirm/shared`). A claim is stored in `quest_claims` (`credited`), not as a ledger row.
 
 ## REST (`apps/api`, JSON, no prefix)
 
@@ -123,6 +124,15 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/credits` | | `{ balance, held, allowanceLeft, allowanceResetAt, available, creditsPerNear, rows: {id, type, amount, source, note, matchId, txHash, createdAt}[] }` (latest 100) |
 | POST | `/credits/deposits` | `{ txHash }` | `{ credited, balance, amountYocto }`: a `deposits.deposit()` tx verified through RPC (dev mode: `dev:<yocto>`), credited once (`409 duplicate_receipt`) |
 
+### Quests and achievements
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| GET | `/quests` | | `{ daily, weekly: {key, endsAt, quests: Quest[]}, streak: {current, best, playedToday}, allowanceLeft }`. 3 daily quests per UTC day and 2 weekly per UTC week (Monday 00:00), drawn deterministically from the pools in `@skirm/shared` (`drawQuests`). `Quest` is `{ id, period, title, target, progress, done, claimed, claimable, rewardCredits, credited }`; progress counts ended (not void) matches that ended in the window. The streak counts consecutive UTC days with an ended match, up to today (or yesterday until today is played) |
+| POST | `/quests/:id/claim` | | `{ quest, credited, allowanceLeft }`: refills up to `rewardCredits` (daily 10, weekly 25) of the free credits spent today. 404 when the quest is not drawn now; 409 `quest_incomplete`, `already_claimed`, `allowance_full` (nothing spent today to refill: the claim stays open) |
+| GET | `/achievements` | | `{ streak, achievements: {id, title, detail, target, progress, unlocked, unlockedAt, cosmetic: {id, name} \| null, badge: {status: pending\|minted\|local\|failed, tokenId, txHash, owner, mintedAt} \| null}[] }`. Records achievements newly met (first seen = `unlockedAt`) and grants their premium cosmetic (`cosmetics_owned.source` `achievement:<id>`) |
+| POST | `/achievements/:id/badge` | | `{ badge }`: mints the unlocked achievement as a soulbound badge (`nft_mint` on `badges`, token `<achievementId>:<accountId>`) to the linked NEAR account. Without a signer it is `local` with a `noop:` hash. Once per player and achievement (a minted badge is returned as is; a failed one can be retried). 404, 409 `not_unlocked`, `mint_in_progress`, 422 `near_account_required` (NEAR signer only), 502 `mint_failed` |
+
 ### Operations
 
 | Method | Path | Body / query | Returns |
@@ -138,7 +148,7 @@ Besides `bad_request` (400), `unauthenticated` / `no_session` (401), `forbidden`
 | --- | --- |
 | 402 | `insufficient_credits` (with `need`, `have`) |
 | 403 | `dev_disabled`, `cosmetic_not_owned` |
-| 409 | `agent_busy`, `match_live`, `mint_in_progress`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch` |
+| 409 | `agent_busy`, `match_live`, `mint_in_progress`, `quest_incomplete`, `already_claimed`, `allowance_full`, `not_unlocked`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch` |
 | 422 | `near_account_required`, `near_proof_required`, `near_proof_invalid`, `not_minted`, `invalid_hash`, `underpaid`, `purchase_unverified` |
 | 429 | `trial_limit` |
 | 502 | `mint_failed` |
@@ -224,6 +234,7 @@ The ops writes are idempotent, so the worker's season tick can resend one whose 
 - `Registry.recordMatch(MatchRecordV2)`: `NoopRegistry` stores `local` with a `noop:` hash; `NearRegistry` calls `registry` with the ops function-call key.
 - `Minter.mint(skillVersion)`: `nft_mint` on `skills` (one token per version, NEP-171 + NEP-199 royalties).
 - `SeasonsChain`: the seasons calls above.
+- `BadgeMinter.mint(badge)`: `nft_mint` on `badges` (soulbound, one token per player and achievement); `NoopBadges` stores `local` with a `noop:` hash.
 - `DepositVerifier.verify(txHash)`: reads the tx through RPC and checks the receiver (`deposits`), the amount and that the receipt is new. Dev accepts `dev:<yocto>`.
 - `OwnershipReader.ownerOf(tokenId)`: purchases and the mint fallback.
 - Market fee governance (contract side): a `governance_id` (defaults to the owner) proposes a fee and applies it after 24 h, capped at 10 %; every setter emits a NEP-297 event.
