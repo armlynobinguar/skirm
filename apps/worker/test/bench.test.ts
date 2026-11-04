@@ -15,14 +15,17 @@ afterEach(async () => {
 });
 
 /** Plays like greedy and counts the skill text it was handed (stands in for a model brain). */
-function readingBrain(): V2Brain & { seen: Set<string> } {
+function readingBrain(): V2Brain & { seen: Set<string>; triggers: Set<string> } {
   const seen = new Set<string>();
+  const triggers = new Set<string>();
   return {
     kind: 'haiku' as const,
     model: 'fake-haiku',
     seen,
+    triggers,
     async act(o, c) {
       for (const s of c.skills) seen.add(s);
+      triggers.add(JSON.stringify(c.skillTriggers ?? null));
       return { action: greedyAct(o), reason: 'chosen' as const, say: null };
     },
     async plan() {
@@ -35,7 +38,13 @@ async function draft(c: Ctx, handle = 'writer') {
   const { account } = await c.repos.accounts.getOrCreate({ handle }, c.vault);
   const v = await c.repos.skills.create(
     account.id,
-    { name: 'Crate Digger', requiresActions: ['dig'], handlesTags: [], royaltyBps: 500 },
+    {
+      name: 'Crate Digger',
+      requiresActions: ['dig'],
+      handlesTags: [],
+      royaltyBps: 500,
+      trigger: { kind: 'hazard_within', tiles: 3 },
+    },
     await c.vault.encryptSkill(PROMPT),
   );
   return { account, v };
@@ -81,6 +90,8 @@ describe('bench consumer', () => {
     const before = await ctx.repos.ledger.balance(account.id);
     expect((await processBenchmark(ctx.deps, { kind: 'bench', runId: run.id })).status).toBe('done');
     expect([...brain.seen]).toEqual(['EDITED: wall off the flood first.']);
+    // The version's trigger rides along, as in a match.
+    expect([...brain.triggers]).toEqual([JSON.stringify([{ kind: 'hazard_within', tiles: 3 }])]);
     const row = (await ctx.repos.bench.get(run.id))!;
     const ticks = (row.result as BenchRunResult).ticks;
     expect(row.brain).toBe('haiku');

@@ -5,11 +5,11 @@
 //
 // Game types (SkillPublic, Tag, …) come from @skirm/shared (type-only imports,
 // browser-safe).
-import type { ActionKind, AgentAppearance, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, Tag, Unlock } from '@skirm/shared';
+import type { ActionKind, AgentAppearance, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, SkillTrigger, Tag, Unlock } from '@skirm/shared';
 
-import type { Difficulty, V2Debrief } from '../realtime/protocol';
+import type { Difficulty, V2Debrief, V2Frame } from '../realtime/protocol';
 
-export type { AgentAppearance, CosmeticItem, SkillPublic, Tag, Unlock };
+export type { AgentAppearance, CosmeticItem, SkillPublic, SkillTrigger, Tag, Unlock };
 
 /** Skill version reference used everywhere a crew or agent names a skill. */
 export interface SkillRef {
@@ -173,7 +173,7 @@ export interface LedgerRow {
   type: LedgerRowType;
   amount: number;
   source: 'paid' | 'free';
-  note: 'entry_fee' | 'reversal' | 'expired' | 'cosmetic' | null;
+  note: 'entry_fee' | 'reversal' | 'expired' | 'cosmetic' | 'prize_pool' | 'prize' | null;
   /** The v2 match a hold, charge or refund belongs to; null for top-ups, free grants and spends. */
   matchId: string | null;
   txHash: string | null;
@@ -230,6 +230,8 @@ export interface SkillBody {
   handles_tags: Tag[];
   /** 0–1,000 (default 500). */
   royalty_bps?: number;
+  /** When the skill joins its agent's prompt; null or absent: always. Public, unlike the prompt. */
+  trigger?: SkillTrigger | null;
 }
 
 export interface MintResponse {
@@ -673,6 +675,55 @@ export interface SeasonStandings {
 export interface Cosmetics {
   items: CosmeticItem[];
   owned: string[];
+}
+
+// ---------- Replays ----------
+
+/** A highlight moment of an ended match (engine detectHighlights) with its caster line. */
+export interface ReplayHighlight {
+  id: string;
+  kind: 'goal' | 'switch_flood' | 'drop_fight' | 'lead_change';
+  tick: number;
+  /** The suggested clip around it. */
+  start: number;
+  end: number;
+  team: Side | null;
+  title: string;
+  facts: string;
+  weight: number;
+  score: Record<Side, number>;
+  /** The caster's line: the model's when a key is set, else the template's. */
+  line: string;
+}
+
+/** GET /v2/matches/:id/highlights. */
+export interface V2Highlights {
+  matchId: string;
+  highlights: ReplayHighlight[];
+  caster: 'model' | 'template' | null;
+  /** Whether the frames are still stored, so the replay can be played. */
+  framesKept: boolean;
+}
+
+/** A public replay link (POST/GET /v2/matches/:id/shares). */
+export interface ReplayShare {
+  id: string;
+  matchId: string;
+  clip: { start: number; end: number } | null;
+  createdAt: string;
+  /** Site path of the link, e.g. /replays/rps_… */
+  path: string;
+}
+
+/** GET /replays/:shareId: what anyone with the link sees (the whole board, never a crew's minds). */
+export interface SharedReplay {
+  share: ReplayShare & { by: string | null };
+  match: V2MatchRecord;
+  highlights: ReplayHighlight[];
+  caster: 'model' | 'template' | null;
+  framesKept: boolean;
+  /** The clip's whole-board frames; null once they are no longer kept; absent with ?frames=0. */
+  frames?: V2Frame[] | null;
 }
 
 // ---------- Onboarding ----------

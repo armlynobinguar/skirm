@@ -151,6 +151,8 @@ export function ledgerDisplay(
   const tone: LedgerDisplay['tone'] = dir === 0 ? 'neutral' : signed >= 0 ? 'in' : 'out';
   switch (row.type) {
     case 'topup': {
+      if (row.note === 'prize') return { type: 'Prize', detail: 'Tournament prize', from, amount, tone };
+      if (row.note === 'prize_pool') return { type: 'Refund', detail: 'Tournament cancelled · prize pool returned', from, amount, tone };
       const y = yoctoFromDevHash(row.txHash);
       // Rates can change between deposits: only quote today's rate when it matches what was credited.
       const detail = y
@@ -194,7 +196,13 @@ export function ledgerDisplay(
         tone,
       };
     case 'spend':
-      return { type: 'Purchase', detail: row.note === 'cosmetic' ? 'Premium look' : 'Paid credits spent', from, amount, tone };
+      return {
+        type: 'Purchase',
+        detail: row.note === 'cosmetic' ? 'Premium look' : row.note === 'prize_pool' ? 'Tournament prize pool' : 'Paid credits spent',
+        from,
+        amount,
+        tone,
+      };
     default:
       return { type: String(row.type), detail: match, from, amount, tone };
   }

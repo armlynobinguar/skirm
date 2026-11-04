@@ -8,6 +8,7 @@ import {
   HEADGEAR,
   OUTFIT_COLORS,
   PANTS_COLORS,
+  SKILL_TRIGGER_LIMITS,
   SKIN_TONES,
   TAGS,
 } from '@skirm/shared';
@@ -92,6 +93,24 @@ export const agentPatch = z.object({
     .optional(),
 });
 
+const triggerTiles = z.number().int().min(SKILL_TRIGGER_LIMITS.tiles.min).max(SKILL_TRIGGER_LIMITS.tiles.max);
+
+/** A skill trigger (@skirm/shared SkillTrigger): one of a small typed set, never free text. */
+export const skillTrigger = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('always') }).strict(),
+  z.object({ kind: z.literal('hazard_within'), tiles: triggerTiles }).strict(),
+  z.object({ kind: z.literal('behind_on_score') }).strict(),
+  z.object({ kind: z.literal('ahead_on_score') }).strict(),
+  z.object({ kind: z.literal('rival_near_switch'), tiles: triggerTiles }).strict(),
+  z.object({ kind: z.literal('carrying_item') }).strict(),
+  z
+    .object({
+      kind: z.literal('time_left_under'),
+      seconds: z.number().int().min(SKILL_TRIGGER_LIMITS.seconds.min).max(SKILL_TRIGGER_LIMITS.seconds.max),
+    })
+    .strict(),
+]);
+
 /** Spec §9 skill format limits. */
 export const skillBody = z.object({
   name: z
@@ -111,6 +130,8 @@ export const skillBody = z.object({
     .max(10)
     .refine((a) => new Set(a).size === a.length, 'handles_tags must be unique'),
   royalty_bps: z.number().int().min(0).max(1000).default(500),
+  /** When the skill joins its agent's prompt; absent or null: always. Public, unlike the prompt. */
+  trigger: skillTrigger.nullish(),
 });
 
 export const listingBody = z.object({

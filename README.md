@@ -37,9 +37,17 @@ A normal game would need code for every strategy-and-map combination. A language
 | | |
 | --- | --- |
 | ⚔️ **Ranked and casual matches** | Elo matchmaking over WebSocket, accept (10 s), lock-in (30 s, the rival hidden), then a 5-minute live match on one shared map. Spectate any live match. |
+| 🤝 **Private lobbies and tournaments** | Challenge a friend with a share code on your map, difficulty, talk rule and crew size (unranked, credits as in casual). Brackets of 4, 8 or 16 seeded by Elo, the next round made as results come in, and an optional prize pool of paid credits for the top four. |
+| 🎯 **Live commands** | Three orders a match (hold the gate, go for the drop, regroup, block the flow, or a short filtered line) to one agent or the whole crew. They land on the next tick, are written into the hash-chained log, and only your crew sees them. |
+| 🥇 **Ranked tiers** | Bronze to Master from Elo after 5 placement matches, Elo decay for inactive Diamond and Master players, and leaderboards overall, per map and per skill. |
+| 🚫 **Draft mode** | A casual queue where each crew bans one of the rival's equipped skills (by public name, never its prompt) before lock-in. Bans show in the debrief. |
 | 🤖 **Practice vs Greedy bot** | Starts at once, no matchmaking, free on the offline brain: the judge path below. |
 | 🗣️ **Talk** | Agents talk every tick. Lines pass a leak and abuse filter before anyone hears them; the rival overhears what is said in range. The debrief has the full transcript. |
 | 🧠 **Skills as strategy** | Plain-language prompts, sealed in a vault and injected server-side into the agent's model call only. Only their creator ever sees the text. |
+| ⏱️ **Skill triggers** | A skill can play only when its condition holds: a hazard within N tiles, behind or ahead on score, the rival near a switch, carrying an item, or under N seconds left. Triggers are public on the Exchange; the prompt stays sealed. |
+| 🔍 **"Why did it do that?"** | After a match, a per-agent, per-tick timeline: what the agent saw, the crew plan, what it did and which skill drove it, with key moments on a scrubber. Players see only their own crew. |
+| 🎬 **Shareable replays** | A revocable public link to a replay or a clip, highlight moments with jump buttons, a one-line caster per highlight and a link preview image. Shared replays never show plans, inner voice or crew commands. |
+| 🧭 **Onboarding** | A guided first match against the bot with tips at each phase, six starter strategies to copy into a draft, and a first-steps checklist on Home. |
 | 🧪 **Exchange proof** | Every minted version gets a hidden benchmark (6 seeded matches, half with hijack lines) with win, leak and manipulation rates, ranked stats per map, head-to-head counters and 3 free trials for buyers. |
 | 🏆 **Seasons** | 14-day ladders from ranked matches (win 25, draw 12, loss 5 points). The top 10 split a NEAR pool: 30 / 20 / 15 % then 5 % × 7. |
 | 🎨 **Cosmetics** | Premium outfit and hair colours, bought with paid credits. Purely visual. |
@@ -190,8 +198,7 @@ contracts/          NEAR contracts: skills, market, registry, deposits, seasons
 spec/               The ten v2 maps (maps/v2/*.json), written by scripts/export-v2-maps.ts
 docker/             One Dockerfile for every service (--build-arg APP=api|worker|realtime|migrate|web)
 scripts/            smoke.sh end-to-end check, ws-v2.cjs match client, v2 map export, GCP deploy, testnet contract deploy
-docs/               Walkthrough, backend contract, deploy guide, benchmarks, handoff notes
-.design-src/        Design docs and screen artboards (working title "Promptlings")
+docs/               Walkthrough, backend contract, deploy guide, benchmarks
 ```
 
 ## Testing
@@ -211,9 +218,9 @@ cd contracts && cargo test        # the five NEAR contracts
 | Browser e2e | `V2_TICK_MS=200 apps/web/scripts/dev-backend.sh start`, then `npm run e2e -w @skirm/web` |
 | Full stack smoke | `npm run smoke` (Docker; builds and starts the stack, runs `scripts/smoke.sh`, tears it down). Against a stack you started yourself: `V2_TICK_MS=200 docker compose up -d --build && scripts/smoke.sh` |
 
-`scripts/smoke.sh` prints PASS or FAIL per check: the web app (and with `WEB_BROWSER=1` a headless sign-in that sees **60 free** and the Practice tile), health and sign-in, the new-account defaults, a practice match against the greedy bot over WebSocket that ends with a log hash, the stored match (ended, practice, same hash), its messages, credits untouched, and a two-client ranked match with Elo +16 / −16 and both players in the current season.
+`scripts/smoke.sh` prints PASS or FAIL per check: the web app (and with `WEB_BROWSER=1` a headless sign-in that sees **60 free** and the Practice tile), health and sign-in, the new-account defaults, a practice match against the greedy bot over WebSocket that ends with a log hash, the stored match (ended, practice, same hash), its messages, credits untouched, and a two-client ranked match with Elo +24 / −24 (placement K-factor) and both players in the current season.
 
-**CI** ([`ci.yml`](.github/workflows/ci.yml)) runs one job on `main`: the contracts (`cargo test` and the wasm build). Typecheck and unit tests run in the pre-push hook on each machine, and browser e2e and the full stack smoke are run by hand (table above). [`deploy.yml`](.github/workflows/deploy.yml) deploys what changed to staging on every push to `main` without waiting for CI; the Cloud Build image build, which runs each app's build, is its only check.
+**CI** ([`ci.yml`](.github/workflows/ci.yml)) runs on every pull request and every push to `main`: typecheck and unit tests for every workspace, and the contracts (`cargo test` and the wasm build). The pre-push hook runs the same checks locally; browser e2e and the full stack smoke are run by hand (table above). [`deploy.yml`](.github/workflows/deploy.yml) deploys what changed to staging on every push to `main` without waiting for CI; the Cloud Build image build, which runs each app's build, is its only check.
 
 ### Full stack smoke
 
@@ -236,6 +243,5 @@ To run it on every push from your machine, opt in once with `git config skirm.sm
 | [docs/backend-contract.md](docs/backend-contract.md) | REST routes, WebSocket messages, queues, pub/sub, credits rule, environment |
 | [docs/deploy.md](docs/deploy.md) | Docker Compose and GCP Cloud Run deployment |
 | [docs/benchmarks.md](docs/benchmarks.md) | The skill benchmark gauntlet and trials |
-| [docs/HANDOFF.md](docs/HANDOFF.md) | Status and what needs the user |
 | [contracts/README.md](contracts/README.md) | Contract build, tests, deploy and sandbox integration tests |
 | [apps/web/README.md](apps/web/README.md) | Web app development and e2e |

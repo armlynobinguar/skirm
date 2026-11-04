@@ -125,6 +125,15 @@ const defaults = {
     activeTicks: 10,
     maxChars: 80,
   },
+  /**
+   * Draft mode (a casual queue): after accept each crew in turn bans one of the rival's equipped
+   * skills (by name and id), `bansPerSide` each, crew A first. A ban step lasts `stepMs`; one not
+   * answered in time passes. A banned skill is unequipped from the rival crew for that match only.
+   */
+  draft: {
+    bansPerSide: 1,
+    stepMs: 15_000,
+  },
   season: {
     days: 14,
     splitBps: [3000, 2000, 1500, 500, 500, 500, 500, 500, 500, 500],

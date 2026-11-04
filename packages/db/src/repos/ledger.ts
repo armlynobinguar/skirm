@@ -23,6 +23,7 @@ import {
   type RunHold,
   type SettleResult,
   type SpendKind,
+  type TopUpKind,
   type TurnOutcome,
 } from '@skirm/ledger';
 import { holdCredits } from '@skirm/shared';
@@ -151,6 +152,8 @@ export class LedgerRepo {
     accountId: string;
     credits: number;
     receipt?: string;
+    /** Not a deposit: a tournament prize or a returned prize pool. */
+    note?: TopUpKind;
   }): Promise<LedgerOpResult> {
     if (input.receipt !== undefined && (await this.receiptCredited(input.receipt)))
       return { ok: false, error: 'duplicate_topup', message: `receipt already credited` };
@@ -173,6 +176,7 @@ export class LedgerRepo {
             player: input.accountId,
             credits: input.credits,
             ...(input.receipt !== undefined ? { ref: input.receipt } : {}),
+            ...(input.note ? { note: input.note } : {}),
           },
           now,
         );

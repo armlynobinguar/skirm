@@ -44,8 +44,8 @@ export interface HeadlessOptions {
   difficulty: Difficulty;
   crews: Record<Team, AgentSpec[]>;
   brains: Record<Team, V2Brain>;
-  /** Per agent id: its skill prompts and the owner's instructions (none when absent). */
-  contexts?: Partial<Record<string, Pick<V2AgentContext, 'skills' | 'instructions'>>>;
+  /** Per agent id: its skill prompts, their triggers and the owner's instructions (none when absent). */
+  contexts?: Partial<Record<string, Pick<V2AgentContext, 'skills' | 'skillTriggers' | 'instructions'>>>;
   /** A label for the run, echoed in the result (the engine itself is deterministic). */
   seed?: string;
   /** Action deadline per agent per tick. Default V2_ACTION_DEADLINE_MS. */
@@ -146,7 +146,7 @@ export async function playHeadless(opts: HeadlessOptions): Promise<HeadlessResul
       stats[a.team].injected += extra.length;
     }
     const c = ctxOf(id);
-    const ctx: V2AgentContext = { skills: c.skills, instructions: c.instructions ?? null, plan: plans[a.team], canSpeak, recent: recent.get(id) ?? [] };
+    const ctx: V2AgentContext = { skills: c.skills, ...(c.skillTriggers ? { skillTriggers: c.skillTriggers } : {}), instructions: c.instructions ?? null, plan: plans[a.team], canSpeak, recent: recent.get(id) ?? [] };
     const timeout: V2Decision = { action: wait, reason: 'timeout', say: null };
     return withDeadline(
       brains[a.team].act(o, ctx).catch((): V2Decision => ({ action: wait, reason: 'error', say: null })),

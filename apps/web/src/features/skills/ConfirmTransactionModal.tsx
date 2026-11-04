@@ -1,5 +1,5 @@
 'use client';
-// M02 Confirm transaction. Owner: skills+market builder. Design: .design-src/screens/M02-Confirm-transaction.dc.html
+// M02 Confirm transaction. Owner: skills+market builder.
 // Shows the full sum before any signature: item, price, creator royalty, platform fee, network fee,
 // total in NEAR (never converted to credits); then pending, done or failed. Used by S10 (buy, list)
 // and S15 (top-up), so keep these props stable; add optional props only.

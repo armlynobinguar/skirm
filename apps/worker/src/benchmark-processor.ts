@@ -188,8 +188,8 @@ async function benchmarkVersion(
   }
 
   try {
-    const prompt = await skillPrompt(deps, skillId, version);
-    if (prompt === undefined) {
+    const skill = await skillContext(deps, skillId, version);
+    if (skill === undefined) {
       await repos.proof.failBenchmark(skillId, version, 'skill_not_found');
       return out('failed', { reason: 'skill_not_found' });
     }
@@ -200,7 +200,7 @@ async function benchmarkVersion(
     const results: ProofMatch[] = [];
     for (const pick of picks)
       results.push(
-        await playProof(deps, pick, crew, { skills: [prompt] }, pick.hijack ? HIJACK_LINES : null),
+        await playProof(deps, pick, crew, skill, pick.hijack ? HIJACK_LINES : null),
       );
     const t = tallyProof(results);
     await repos.proof.finishBenchmark(skillId, version, {
@@ -260,8 +260,8 @@ async function runTrial(
 
   try {
     const agent = await repos.agents.view(trial.agentId);
-    const prompt = await skillPrompt(deps, trial.skillId, trial.version);
-    if (!agent || prompt === undefined) {
+    const skill = await skillContext(deps, trial.skillId, trial.version);
+    if (!agent || skill === undefined) {
       const reason = agent ? 'skill_not_found' : 'agent_not_found';
       await repos.proof.finishTrial(trialId, { status: 'failed' });
       logger.warn('trial failed', { trialId, code: reason });
@@ -271,7 +271,7 @@ async function runTrial(
     for (const pick of trialPicks(deps.benchSecret || DEFAULT_BENCH_SECRET, trialId))
       results.push(
         await playProof(deps, { ...pick, hijack: false }, specOf(agent), {
-          skills: [prompt],
+          ...skill,
           instructions: agent.systemPrompt,
         }),
       );
@@ -292,14 +292,20 @@ function specOf(a: AgentView): AgentSpec {
   return { id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier };
 }
 
-/** The version's prompt, decrypted as realtime's roster does; undefined when it does not exist. */
-async function skillPrompt(
+/**
+ * The version as an agent context: its prompt, decrypted as realtime's roster does, and its trigger
+ * (proof plays the skill as matches do, only on ticks its trigger holds); undefined when it does not
+ * exist.
+ */
+async function skillContext(
   deps: BenchmarkDeps,
   skillId: string,
   version: number,
-): Promise<string | undefined> {
+): Promise<Pick<V2AgentContext, 'skills' | 'skillTriggers'> | undefined> {
   const sealed = await deps.repos.skills.loadSealed(skillId, version);
-  return sealed ? (await deps.vault.decryptSkill(sealed)).prompt : undefined;
+  if (!sealed) return undefined;
+  const v = await deps.repos.skills.get(skillId, version);
+  return { skills: [(await deps.vault.decryptSkill(sealed)).prompt], skillTriggers: [v?.trigger ?? null] };
 }
 
 /** One headless match: `crew` on team A with the model brain against the greedy bot. */
@@ -307,7 +313,7 @@ async function playProof(
   deps: BenchmarkDeps,
   pick: ProofPick & { hijack: boolean },
   crew: AgentSpec,
-  context: Pick<V2AgentContext, 'skills' | 'instructions'>,
+  context: Pick<V2AgentContext, 'skills' | 'skillTriggers' | 'instructions'>,
   hijackLines: readonly string[] | null = null,
 ): Promise<ProofMatch> {
   const def = MAPS_V2.find((m) => m.id === pick.mapId);

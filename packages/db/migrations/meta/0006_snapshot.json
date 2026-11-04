@@ -1,5 +1,5 @@
 {
-  "id": "04fbcaad-9569-48c3-8310-77e32fa5a900",
+  "id": "2d7c95fe-1163-47ad-a74e-6500d55a1752",
   "prevId": "d8298f4e-86e5-4378-82e4-6db0545b88a6",
   "version": "7",
   "dialect": "postgresql",
@@ -2345,192 +2345,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.skill_bench_runs": {
-      "name": "skill_bench_runs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "skill_id": {
-          "name": "skill_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "map_id": {
-          "name": "map_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "difficulty": {
-          "name": "difficulty",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "prompt_sha256": {
-          "name": "prompt_sha256",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ciphertext": {
-          "name": "ciphertext",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "iv": {
-          "name": "iv",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "auth_tag": {
-          "name": "auth_tag",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "wrapped_key": {
-          "name": "wrapped_key",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "key_id": {
-          "name": "key_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'queued'"
-        },
-        "brain": {
-          "name": "brain",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "credits": {
-          "name": "credits",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "result": {
-          "name": "result",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error": {
-          "name": "error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "finished_at": {
-          "name": "finished_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "skill_bench_runs_account_idx": {
-          "name": "skill_bench_runs_account_idx",
-          "columns": [
-            {
-              "expression": "account_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "skill_bench_runs_account_id_accounts_id_fk": {
-          "name": "skill_bench_runs_account_id_accounts_id_fk",
-          "tableFrom": "skill_bench_runs",
-          "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "skill_bench_runs_skill_id_version_skill_versions_skill_id_version_fk": {
-          "name": "skill_bench_runs_skill_id_version_skill_versions_skill_id_version_fk",
-          "tableFrom": "skill_bench_runs",
-          "tableTo": "skill_versions",
-          "columnsFrom": [
-            "skill_id",
-            "version"
-          ],
-          "columnsTo": [
-            "skill_id",
-            "version"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "skill_bench_runs_status_ck": {
-          "name": "skill_bench_runs_status_ck",
-          "value": "\"skill_bench_runs\".\"status\" in ('queued', 'running', 'done', 'failed', 'insufficient_credits')"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.skill_benchmarks": {
       "name": "skill_benchmarks",
       "schema": "",
@@ -2967,6 +2781,12 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "trigger": {
+          "name": "trigger",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "royalty_bps": {
           "name": "royalty_bps",

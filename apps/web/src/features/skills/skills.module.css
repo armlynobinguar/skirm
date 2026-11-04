@@ -1,4 +1,4 @@
-/* Skills + Market (S07-S10, M01, M02). Tokens only; artboards in .design-src/screens. */
+/* Skills + Market (S07-S10, M01, M02). Tokens only. */
 
 .page { display: flex; flex-direction: column; gap: var(--space-6, 24px); }
 .head { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between; }

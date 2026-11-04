@@ -166,7 +166,9 @@ export async function processBenchRun(
     const sealed = repos.bench.sealedOf(run) ?? (await repos.skills.loadSealed(run.skillId, run.version));
     if (!sealed) return await fail('skill_not_found');
     const text = await deps.vault.decryptSkill(sealed);
-    const skills = text.reflexes ? [text.prompt, text.reflexes] : [text.prompt];
+    // As matches play it (realtime's roster, the benchmark): the prompt, only on ticks the
+    // version's trigger holds.
+    const context = { skills: [text.prompt], skillTriggers: [version.trigger ?? null] };
 
     if (!free) {
       const amount = holdFor([tested], false);
@@ -198,7 +200,7 @@ export async function processBenchRun(
       difficulty,
       crews: { A: [tested], B: bot },
       brains: { A: brain, B: createGreedyBrain() },
-      contexts: { [tested.id]: { skills } },
+      contexts: { [tested.id]: context },
       seed: `${def.id}:${difficulty}`,
       onTick: (ev, s) => {
         last = s as MatchState;

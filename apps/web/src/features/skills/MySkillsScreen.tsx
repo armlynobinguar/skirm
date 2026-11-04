@@ -1,5 +1,5 @@
 'use client';
-// S07 My skills (/skills, ?tab=owned). Owner: skills builder. Design: .design-src/screens/S07-My-skills.dc.html
+// S07 My skills (/skills, ?tab=owned). Owner: skills builder.
 // Tabs "Written by me" (GET /skills?tab=written: latest version of each skill I wrote) and "Owned"
 // (?tab=owned: versions I hold). Rows carry public fields + status only.
 import { Icon, Tabs, TagChip, UnlockChip } from '@skirm/ui';

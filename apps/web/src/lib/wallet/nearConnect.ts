@@ -9,6 +9,7 @@ import {
   type NearWallet,
   type SignedMessage,
   type SignMessageInput,
+  type WalletOption,
 } from './types';
 
 // The library's own types reference @near-js/* packages it does not install, so the connector is
@@ -27,8 +28,16 @@ interface ConnectorWallet {
     signerId?: string;
   }): Promise<unknown[]>;
 }
+interface ManifestFeatures {
+  signInAndSignMessage?: boolean;
+}
+interface ConnectorWalletEntry {
+  manifest: { id: string; name: string; icon?: string; description?: string; features?: ManifestFeatures };
+}
 interface Connector {
-  connect(): Promise<ConnectorWallet>;
+  readonly whenManifestLoaded: Promise<void>;
+  readonly availableWallets: ConnectorWalletEntry[];
+  connect(input?: { walletId?: string; signMessageParams?: SignMessageInput }): Promise<ConnectorWallet>;
   disconnect(): Promise<void>;
   wallet(): Promise<ConnectorWallet>;
   getConnectedWallet(): Promise<{
@@ -37,6 +46,10 @@ interface Connector {
   }>;
   on(event: 'wallet:signIn', cb: (e: { accounts: Array<{ accountId: string }> }) => void): void;
   on(event: 'wallet:signOut', cb: () => void): void;
+  once(
+    event: 'wallet:signInAndSignMessage',
+    cb: (e: { accounts: Array<{ accountId: string; signedMessage?: SignedMessage }> }) => void,
+  ): void;
 }
 
 export type ConnectorFactory = (network: NearNetwork) => Promise<Connector>;
@@ -140,10 +153,41 @@ export function createNearConnectWallet(opts: {
       }
       return current;
     },
-    async connect() {
+    async wallets(): Promise<WalletOption[]> {
+      const c = await load();
+      await c.whenManifestLoaded.catch(() => undefined);
+      return c.availableWallets.map(({ manifest: m }) => ({
+        id: m.id,
+        name: m.name,
+        icon: m.icon ?? '',
+        description: m.description ?? '',
+        oneStep: Boolean(m.features?.signInAndSignMessage),
+      }));
+    },
+    async connectAndSign(walletId, message) {
+      const c = await load();
+      // The connector reports the signed message through an event fired during connect().
+      let signed: SignedMessage | undefined;
+      let account: string | undefined;
+      c.once('wallet:signInAndSignMessage', (e) => {
+        account = e.accounts[0]?.accountId;
+        signed = e.accounts[0]?.signedMessage;
+      });
+      try {
+        await c.connect({ walletId, signMessageParams: message });
+      } catch (err) {
+        throw walletError(err);
+      }
+      if (!account)
+        throw new WalletError('wallet_no_account', 'The wallet has no account on this network.');
+      setAccount(account);
+      if (!signed) throw new WalletError('wallet_failed', 'The wallet signed in but did not sign the message.');
+      return { accountId: account, signed };
+    },
+    async connect(walletId) {
       const c = await load();
       try {
-        const w = await c.connect();
+        const w = await c.connect(walletId ? { walletId } : undefined);
         const accounts = await w.getAccounts({ network: opts.network });
         const id = accounts[0]?.accountId;
         if (!id)

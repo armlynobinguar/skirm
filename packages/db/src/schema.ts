@@ -21,6 +21,7 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
+import type { SkillTrigger } from '@skirm/shared';
 
 /** bytea column mapped to Uint8Array. */
 export const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | Buffer | string }>({
@@ -57,7 +58,14 @@ export const ledgerRowType = pgEnum('ledger_row_type', [
   'spend',
 ]);
 export const creditSource = pgEnum('credit_source', ['paid', 'free']);
-export const ledgerNote = pgEnum('ledger_note', ['entry_fee', 'reversal', 'expired', 'cosmetic']);
+export const ledgerNote = pgEnum('ledger_note', [
+  'entry_fee',
+  'reversal',
+  'expired',
+  'cosmetic',
+  'prize_pool',
+  'prize',
+]);
 export const holdStatus = pgEnum('hold_status', ['held', 'settled', 'aborted']);
 /** `local`: recorded by the NoopRegistry only (NEAR is off in local mode); never onchain. */
 export const registryStatus = pgEnum('registry_status', [
@@ -187,6 +195,8 @@ export const skillVersions = pgTable(
     summary: text('summary'),
     requiresActions: jsonb('requires_actions').$type<string[]>().notNull(),
     handlesTags: jsonb('handles_tags').$type<string[]>().notNull(),
+    /** When the skill joins its agent's prompt (public, @skirm/shared SkillTrigger); null is always. */
+    trigger: jsonb('trigger').$type<SkillTrigger>(),
     royaltyBps: integer('royalty_bps').notNull().default(500),
     promptSha256: text('prompt_sha256').notNull(),
     ciphertext: bytea('ciphertext').notNull(),
@@ -493,6 +503,8 @@ export interface V2DebriefRecord {
   season?: { number: number; points: number };
   /** The crew's own live commands (V2Debrief.commands); absent when none were sent. */
   commands?: { tick: number; agents: { id: string; name: string }[]; preset: string | null; text: string | null }[];
+  /** Draft mode: every ban step, both crews' (V2Debrief.draft); absent outside draft mode. */
+  draft?: { bans: { team: 'A' | 'B'; step: number; skillId: string | null; name: string | null; timedOut?: true }[] };
 }
 
 /**
@@ -880,6 +892,188 @@ export const cosmeticsOwned = pgTable(
   },
   (t) => [primaryKey({ columns: [t.accountId, t.itemId] })],
 );
+
+// ---------- Private lobbies and tournaments ----------
+
+/**
+ * A single-elimination bracket of 4, 8 or 16 players, made of private lobbies. `prize_pool` paid
+ * credits were spent by the creator when it was made; they go to the top finishers when it ends, or
+ * back to the creator when it is cancelled before it starts.
+ */
+export const tournaments = pgTable(
+  'tournaments',
+  {
+    /** `trn_` + ULID. */
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    creatorId: text('creator_id')
+      .notNull()
+      .references(() => accounts.id),
+    size: integer('size').notNull(),
+    mapId: text('map_id').notNull(),
+    difficulty: text('difficulty').notNull(),
+    talk: text('talk').notNull().default('any'),
+    crewSize: integer('crew_size').notNull().default(3),
+    prizePool: integer('prize_pool').notNull().default(0),
+    /** open (taking players) | running | done | cancelled. */
+    status: text('status').notNull().default('open'),
+    championId: text('champion_id').references(() => accounts.id),
+    createdAt: createdAt(),
+    startedAt: ts('started_at'),
+    endedAt: ts('ended_at'),
+  },
+  (t) => [
+    index('tournaments_status_idx').on(t.status, t.createdAt),
+    check('tournaments_status_ck', sql`${t.status} in ('open', 'running', 'done', 'cancelled')`),
+    check('tournaments_size_ck', sql`${t.size} in (4, 8, 16)`),
+    check('tournaments_talk_ck', sql`${t.talk} in ('any', 'quiet', 'standard', 'open')`),
+    check('tournaments_crew_ck', sql`${t.crewSize} between 1 and 3`),
+    check('tournaments_pool_ck', sql`${t.prizePool} >= 0`),
+  ],
+);
+
+/** A player in a tournament: seed (by Elo at the start), where they finished and what they won. */
+export const tournamentEntries = pgTable(
+  'tournament_entries',
+  {
+    tournamentId: text('tournament_id')
+      .notNull()
+      .references(() => tournaments.id, { onDelete: 'cascade' }),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    /** 1 = best Elo; set when the bracket starts. */
+    seed: integer('seed'),
+    /** Elo when seeded. */
+    elo: integer('elo'),
+    /** 1 champion, 2 runner-up, 3 semi-final losers, 5 quarter-final losers, …; null while in. */
+    place: integer('place'),
+    prize: integer('prize').notNull().default(0),
+    joinedAt: ts('joined_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tournamentId, t.accountId] }),
+    index('tournament_entries_account_idx').on(t.accountId),
+  ],
+);
+
+/**
+ * A private casual match between two players: the host shares `code`, a guest joins, both ready
+ * a crew on realtime and play through the usual accept and lock-in. Unranked: no Elo, season or
+ * registry; credits are held and charged as in any casual match. A friend lobby goes back to `open`
+ * after each match (a rematch is one ready away); a tournament lobby is one bracket match
+ * (`tournament_id`, `round`, `slot`) and is `done` once it has a winner.
+ */
+export const lobbies = pgTable(
+  'lobbies',
+  {
+    /** `lby_` + ULID. */
+    id: text('id').primaryKey(),
+    /** Share code (LOBBY_CODE_ALPHABET). */
+    code: text('code').notNull(),
+    hostId: text('host_id')
+      .notNull()
+      .references(() => accounts.id),
+    guestId: text('guest_id').references(() => accounts.id),
+    mapId: text('map_id').notNull(),
+    difficulty: text('difficulty').notNull(),
+    /** LobbyTalkRule: any, or every agent on quiet, standard or open. */
+    talk: text('talk').notNull().default('any'),
+    /** Most agents a crew may field (also capped by the map). */
+    crewSize: integer('crew_size').notNull().default(3),
+    /** open | playing | done | cancelled. */
+    status: text('status').notNull().default('open'),
+    /** The match being played, or the last one. */
+    matchId: text('match_id'),
+    /** The last match's winner (null for a draw or a void). */
+    winnerId: text('winner_id').references(() => accounts.id),
+    tournamentId: text('tournament_id').references(() => tournaments.id),
+    round: integer('round'),
+    slot: integer('slot'),
+    /** When each player last readied a crew on realtime (cleared when they step back). */
+    hostReadyAt: ts('host_ready_at'),
+    guestReadyAt: ts('guest_ready_at'),
+    /** When the lobby last opened for a match (made, or back after a match that has to be replayed). */
+    openedAt: ts('opened_at').notNull().defaultNow(),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('lobbies_code_uq').on(t.code),
+    uniqueIndex('lobbies_bracket_uq').on(t.tournamentId, t.round, t.slot),
+    index('lobbies_host_idx').on(t.hostId, t.createdAt),
+    index('lobbies_guest_idx').on(t.guestId, t.createdAt),
+    index('lobbies_match_idx').on(t.matchId),
+    index('lobbies_status_idx').on(t.status, t.updatedAt),
+    check('lobbies_status_ck', sql`${t.status} in ('open', 'playing', 'done', 'cancelled')`),
+    check('lobbies_talk_ck', sql`${t.talk} in ('any', 'quiet', 'standard', 'open')`),
+    check('lobbies_crew_ck', sql`${t.crewSize} between 1 and 3`),
+    check('lobbies_players_ck', sql`${t.guestId} is null or ${t.guestId} <> ${t.hostId}`),
+  ],
+);
+// ---------- Replay shares ----------
+
+/**
+ * A public link to an ended match's replay, made by one of its players (opt-in). The link plays the
+ * whole-board (watch) frames only, so no crew plan, inner voice or live command is ever shown; an
+ * optional clip (`start_tick`..`end_tick`) narrows it to a moment. Revoking ends the link.
+ */
+export const replayShares = pgTable(
+  'replay_shares',
+  {
+    /** The public token: `rps_` + 16 random base64url characters (unguessable, never a ULID). */
+    id: text('id').primaryKey(),
+    matchId: text('match_id')
+      .notNull()
+      .references(() => v2Matches.id, { onDelete: 'cascade' }),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    startTick: integer('start_tick'),
+    endTick: integer('end_tick'),
+    createdAt: createdAt(),
+    revokedAt: ts('revoked_at'),
+  },
+  (t) => [
+    index('replay_shares_match_idx').on(t.matchId, t.accountId),
+    check(
+      'replay_shares_clip_ck',
+      sql`(${t.startTick} is null and ${t.endTick} is null) or (${t.startTick} >= 0 and ${t.endTick} > ${t.startTick})`,
+    ),
+  ],
+);
+
+/** A highlight as cached (engine ReplayHighlight plus its caster line). */
+export interface ReplayHighlightRecord {
+  id: string;
+  kind: 'goal' | 'switch_flood' | 'drop_fight' | 'lead_change';
+  tick: number;
+  start: number;
+  end: number;
+  team: 'A' | 'B' | null;
+  title: string;
+  facts: string;
+  weight: number;
+  score: Record<'A' | 'B', number>;
+  line: string;
+}
+
+/**
+ * The highlights of an ended match with their caster lines, worked out once from its stored frames
+ * and kept here, so the caster is called at most once per match and the highlights outlive the
+ * frames. `cost_usd` is platform model spend; no player is charged for it.
+ */
+export const replayCasts = pgTable('replay_casts', {
+  matchId: text('match_id')
+    .primaryKey()
+    .references(() => v2Matches.id, { onDelete: 'cascade' }),
+  highlights: jsonb('highlights').$type<ReplayHighlightRecord[]>().notNull(),
+  /** model | template */
+  caster: text('caster').$type<'model' | 'template'>().notNull(),
+  model: text('model'),
+  costUsd: real('cost_usd').notNull().default(0),
+  createdAt: createdAt(),
+});
 
 // ---------- Onboarding ----------
 
