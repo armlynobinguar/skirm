@@ -88,6 +88,8 @@ export const accounts = pgTable(
     wins: integer('wins').notNull().default(0),
     losses: integer('losses').notNull().default(0),
     draws: integer('draws').notNull().default(0),
+    /** When the player's last ranked v2 result was written (the Elo decay's inactivity clock). */
+    lastRankedAt: ts('last_ranked_at'),
     createdAt: createdAt(),
     /** Set when the player deleted the account: it never signs in again (AccountsRepo.deleteAccount). */
     deletedAt: ts('deleted_at'),
@@ -542,6 +544,8 @@ export const v2Matches = pgTable(
     index('v2_matches_status_idx').on(t.status, t.createdAt),
     index('v2_matches_team_a_idx').on(t.teamAAccountId, t.createdAt),
     index('v2_matches_team_b_idx').on(t.teamBAccountId, t.createdAt),
+    /** The per-map ranked leaderboard. */
+    index('v2_matches_map_idx').on(t.mapId, t.endedAt),
   ],
 );
 
@@ -780,3 +784,27 @@ export const onboardingProgress = pgTable('onboarding_progress', {
   checklistDismissedAt: ts('checklist_dismissed_at'),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });
+
+// ---------- Ranked ----------
+
+/**
+ * Elo lost to inactivity (the worker's `ranked` decay job, @skirm/shared decayedElo): one row per
+ * step, so the next step waits `DEFAULTS.ranked.decay.days` from the later of this and the player's
+ * last ranked result.
+ */
+export const eloDecays = pgTable(
+  'elo_decays',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    eloBefore: integer('elo_before').notNull(),
+    eloAfter: integer('elo_after').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('elo_decays_account_idx').on(t.accountId, t.createdAt),
+    check('elo_decays_lower_ck', sql`${t.eloAfter} < ${t.eloBefore}`),
+  ],
+);

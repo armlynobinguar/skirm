@@ -2,6 +2,7 @@
 // both crews) → lock-in (30 s: talk tiers and crew changes, the rival hidden) → live (2 s ticks) →
 // end. Each crew gets its own frame through its own fog; watchers get the whole board.
 import type { CommandPreset, Difficulty, MatchResult, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
+import type { PlayerTier } from '@skirm/shared';
 
 export interface V2CrewEntry {
   agentId: string;
@@ -90,9 +91,10 @@ export type V2ClientMessage =
 export type V2ServerMessage =
   /**
    * `practice`: against the greedy bot, whose handle (`rivalHandle`) is known at once. `free`: this
-   * crew holds and pays nothing (the bot, or a player on the offline greedy brain).
+   * crew holds and pays nothing (the bot, or a player on the offline greedy brain). `tiers`: ranked
+   * only, both players' ranked tiers as they queued (the rival stays unnamed).
    */
-  | { type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty; practice?: true; free?: true; rivalHandle?: string }
+  | { type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty; practice?: true; free?: true; rivalHandle?: string; tiers?: { you: PlayerTier; rival: PlayerTier } }
   | { type: 'v2_accepted'; matchId: string; team: Team }
   /** `crewLimit`: most agents this map takes; `headStartTicks`: the hold each crew gets with the crews as they stand. */
   /** `free`: as on v2_found, this crew is not held for the match. */

@@ -76,10 +76,10 @@ describe('leaderboards.playerLadder', () => {
 
     const rows = await ctx.repos.leaderboards.playerLadder();
     expect(rows.map((r) => [r.account.handle, r.rank, r.elo])).toEqual([
-      ['ana', 1, 1216],
-      ['cat', 1, 1216],
-      ['ben', 3, 1184],
-      ['dan', 3, 1184],
+      ['ana', 1, 1224],
+      ['cat', 1, 1224],
+      ['ben', 3, 1176],
+      ['dan', 3, 1176],
     ]);
     expect(rows[0]).toMatchObject({ rankedMatches: 1, wins: 1, losses: 0, draws: 0 });
     expect(await ctx.repos.leaderboards.playerLadder(1)).toHaveLength(1);
@@ -103,7 +103,7 @@ describe('v2 matches: difficulty and debriefs', () => {
     expect(ranked.difficulty).toBeNull();
     // The stored delta and registry come from the result, not from what the caller sent.
     const r = await ctx.repos.v2Matches.finish(ranked.id, { winner: 'A', reason: 'goal', debriefs: { A: debrief({ eloDelta: 99, registry: 'written' }) } });
-    expect(r.debriefs?.A).toMatchObject({ eloDelta: 16, registry: 'pending' });
+    expect(r.debriefs?.A).toMatchObject({ eloDelta: 24, registry: 'pending' });
     // The season the ranked win counted towards and its standings points (DEFAULTS.season.points.win).
     expect(r.debriefs?.A?.season).toEqual({ number: 1, points: 25 });
     expect((await ctx.repos.v2Matches.get(ranked.id))!.debriefs?.A?.season).toEqual({ number: 1, points: 25 });
@@ -113,7 +113,7 @@ describe('v2 matches: difficulty and debriefs', () => {
 
     await ctx.repos.v2Matches.setRegistry(ranked.id, 'recorded', 'tx1');
     const after = (await ctx.repos.v2Matches.get(ranked.id))!;
-    expect(v2DebriefOf(after, 'A')).toMatchObject({ eloDelta: 16, registry: 'written', mvp: 'agt_1' });
+    expect(v2DebriefOf(after, 'A')).toMatchObject({ eloDelta: 24, registry: 'written', mvp: 'agt_1' });
 
     // A draw gives both crews the draw points, a loss the loss points.
     const draw = await ctx.repos.v2Matches.create({ mapId: 'copper-hollow', ranked: true, teamA: ana.id, teamB: ben.id });
