@@ -109,6 +109,7 @@ describe('S15 top-up with a NEAR wallet', () => {
     await screen.findByTestId('s15-balance-available');
     await user.click(screen.getByRole('button', { name: 'Top up 1 NEAR' }));
     expect(await screen.findByTestId('m01-connect-wallet')).toBeInTheDocument();
-    expect(screen.getByTestId('m01-connect')).toHaveTextContent('Choose a wallet');
+    // The picker lists the wallets it found (the fake has two), so there is no fallback button.
+    expect(await screen.findByTestId('m01-wallets')).toBeInTheDocument();
   });
 });
