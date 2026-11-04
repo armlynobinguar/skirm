@@ -10,6 +10,7 @@
 // version plays, but its text and its diff stay hidden.
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
 import type { AccountRow, SkillBenchRunRow, SkillVersionView } from '@skirm/db';
+import { v2BrainKind } from '@skirm/decision-engine/v2';
 import { DIFFICULTIES, MAPS_V2, holdFor, type Difficulty } from '@skirm/engine/v2';
 import { DEFAULTS } from '@skirm/shared';
 import { z } from 'zod';
@@ -18,7 +19,6 @@ import { DEPS, type ApiDeps } from '../deps';
 import { ApiError, notFound } from '../errors';
 import { diffWords } from '../text-diff';
 import { parse, skillId } from '../validation';
-import { v2BrainKind } from './ops.controller';
 import { idOr404 } from './util';
 
 const runId = z.string().regex(/^bnr_[0-9A-HJKMNP-TV-Z]{26}$/);
