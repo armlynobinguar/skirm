@@ -137,8 +137,32 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     ]
   },
   {
-    "tag": "0003_lobbies_tournaments",
-    "folderMillis": 1793770580665,
+    "tag": "0003_onboarding",
+    "folderMillis": 1793764247015,
+    "bps": true,
+    "hash": "8e6b71722ffcbfb3dd0a5fbb31b38c49696e505fcb41b56812723f632c843de9",
+    "sql": [
+      "CREATE TABLE \"onboarding_progress\" (\n\t\"account_id\" text PRIMARY KEY NOT NULL,\n\t\"tutorial_step\" integer DEFAULT 0 NOT NULL,\n\t\"tutorial_completed_at\" timestamp with time zone,\n\t\"tutorial_skipped_at\" timestamp with time zone,\n\t\"checklist_dismissed_at\" timestamp with time zone,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL\n);\n",
+      "\nALTER TABLE \"onboarding_progress\" ADD CONSTRAINT \"onboarding_progress_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;"
+    ]
+  },
+  {
+    "tag": "0004_ranked_tiers",
+    "folderMillis": 1793771758405,
+    "bps": true,
+    "hash": "00b267d221aa9939b60536b4a5c711ac562b21b81ec71c46f76b2021f6ba0ad8",
+    "sql": [
+      "CREATE TABLE \"elo_decays\" (\n\t\"id\" bigserial PRIMARY KEY NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"elo_before\" integer NOT NULL,\n\t\"elo_after\" integer NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"elo_decays_lower_ck\" CHECK (\"elo_decays\".\"elo_after\" < \"elo_decays\".\"elo_before\")\n);\n",
+      "\nALTER TABLE \"accounts\" ADD COLUMN \"last_ranked_at\" timestamp with time zone;",
+      "\nALTER TABLE \"elo_decays\" ADD CONSTRAINT \"elo_decays_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"elo_decays_account_idx\" ON \"elo_decays\" USING btree (\"account_id\",\"created_at\");",
+      "\nCREATE INDEX \"v2_matches_map_idx\" ON \"v2_matches\" USING btree (\"map_id\",\"ended_at\");",
+      "\nUPDATE \"accounts\" SET \"last_ranked_at\" = r.\"at\" FROM (\n\tSELECT \"account_id\", max(\"ended_at\") AS \"at\" FROM (\n\t\tSELECT \"team_a_account_id\" AS \"account_id\", \"ended_at\" FROM \"v2_matches\" WHERE \"ranked\" AND \"status\" = 'ended'\n\t\tUNION ALL\n\t\tSELECT \"team_b_account_id\", \"ended_at\" FROM \"v2_matches\" WHERE \"ranked\" AND \"status\" = 'ended'\n\t) s GROUP BY \"account_id\"\n) r WHERE r.\"account_id\" = \"accounts\".\"id\";"
+    ]
+  },
+  {
+    "tag": "0006_lobbies_tournaments",
+    "folderMillis": 1793775865349,
     "bps": true,
     "hash": "fd6860c56b82065369ee8a75722e306ff7e557000996b04d60a7f9a0aeb39ae1",
     "sql": [

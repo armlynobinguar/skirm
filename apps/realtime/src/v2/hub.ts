@@ -42,7 +42,7 @@ import type { WsServerMessage } from '../protocol';
 import type { PubSub, Unsubscribe } from '../pubsub';
 import type { QueueTiming, Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
-import { TEAMS, V2Match, crewLimitOf, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Roster, type V2Setup, type V2Side, type V2Timing } from './match';
+import { TEAMS, V2Match, crewLimitOf, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Roster, type V2Setup, type V2Side, type V2Timing } from './match';
 import type { V2FrameStore } from './replay';
 
 export interface V2Search {
@@ -54,6 +54,8 @@ export interface V2Search {
   mapId?: string;
   /** Ranked: always RANKED_DIFFICULTY. */
   difficulty: Difficulty;
+  /** The player's Elo and ranked matches as they queued (their tier on v2_found). */
+  rank?: { elo: number; rankedMatches: number };
 }
 
 /** A crew readied in a private lobby. */
@@ -102,7 +104,17 @@ export interface V2HubDeps {
 
 export class V2HubError extends Error {
   constructor(
-    readonly code: 'invalid_crew' | 'agent_busy' | 'already_queued' | 'in_match' | 'not_queued' | 'not_found' | 'unavailable' | 'not_in_lockin' | 'lobby_closed',
+    readonly code:
+      | 'invalid_crew'
+      | 'agent_busy'
+      | 'already_queued'
+      | 'in_match'
+      | 'not_queued'
+      | 'not_found'
+      | 'unavailable'
+      | 'not_in_lockin'
+      | 'lobby_closed'
+      | V2CommandError,
     message: string,
   ) {
     super(message);
@@ -163,7 +175,14 @@ export class V2Hub {
     if (!this.fitting(crew.length).length) throw new V2HubError('invalid_crew', 'no map takes a crew this size');
     const account = await this.deps.repos.accounts.get(user.accountId);
     check();
-    const payload: V2Search = { ...user, crew, ranked, difficulty, ...(mapId !== undefined ? { mapId } : {}) };
+    const payload: V2Search = {
+      ...user,
+      crew,
+      ranked,
+      difficulty,
+      ...(mapId !== undefined ? { mapId } : {}),
+      ...(account ? { rank: { elo: account.elo, rankedMatches: account.rankedMatches } } : {}),
+    };
     const pool = v2Pool(payload);
     this.matchmaker.add({ key: user.accountId, lane: lane(ranked), ...(pool ? { pool } : {}), rating: account?.elo ?? 1200, payload });
   }
@@ -322,6 +341,18 @@ export class V2Hub {
   }
 
   /**
+   * A live command to the player's own crew in a match on this instance (V2Match.command): applied
+   * on the next tick, seen by that crew only. Throws the reason it was refused.
+   */
+  command(accountId: string, matchId: string, input: V2CommandInput): { tick: number; left: number } {
+    const { match, team } = this.mine(accountId, matchId);
+    const r = match.command(team, input);
+    if (!r.ok) throw new V2HubError(r.code, r.message);
+    this.deps.log.info(`v2 match ${matchId} ${team}: command ${input.preset ?? 'text'}${input.agentId ? ` to ${input.agentId}` : ' to the crew'} (${r.left} left)`);
+    return { tick: r.tick, left: r.left };
+  }
+
+  /**
    * Every stored frame of an ended match, through the asker's own view (its crew's fog and plans);
    * anyone who did not play it gets the whole board. A live match is never replayed.
    */
@@ -432,8 +463,8 @@ export class V2Hub {
     void p.finally(() => this.running.delete(p));
   }
 
-  private async side(s: Pick<V2Search, 'accountId' | 'handle' | 'crew'>): Promise<V2Side> {
-    return { accountId: s.accountId, handle: s.handle, ...(await this.roster(s.accountId, s.crew)) };
+  private async side(s: Pick<V2Search, 'accountId' | 'handle' | 'crew' | 'rank'>): Promise<V2Side> {
+    return { accountId: s.accountId, handle: s.handle, ...(s.rank ? { rank: s.rank } : {}), ...(await this.roster(s.accountId, s.crew)) };
   }
 
   /**

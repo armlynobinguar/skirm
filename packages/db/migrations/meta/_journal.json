@@ -26,8 +26,22 @@
     {
       "idx": 3,
       "version": "7",
-      "when": 1793770580665,
-      "tag": "0003_lobbies_tournaments",
+      "when": 1793764247015,
+      "tag": "0003_onboarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793771758405,
+      "tag": "0004_ranked_tiers",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793775865349,
+      "tag": "0006_lobbies_tournaments",
       "breakpoints": true
     }
   ]

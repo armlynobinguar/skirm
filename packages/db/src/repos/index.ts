@@ -7,8 +7,10 @@ import { LedgerRepo, type LedgerRepoOptions } from './ledger';
 import { LobbiesRepo } from './lobbies';
 import { MarketRepo } from './market';
 import { MatchMessagesRepo } from './match-messages';
+import { OnboardingRepo } from './onboarding';
 import { OpsRepo } from './ops';
 import { ProofRepo } from './proof';
+import { RankedRepo } from './ranked';
 import { RentalsRepo } from './rentals';
 import { SeasonsRepo } from './seasons';
 import { SkillsRepo } from './skills';
@@ -24,6 +26,8 @@ export interface Repos {
   market: MarketRepo;
   ledger: LedgerRepo;
   leaderboards: LeaderboardsRepo;
+  /** Ranked tiers: per-map and per-skill leaderboards, Elo decay of inactive players. */
+  ranked: RankedRepo;
   v2Matches: V2MatchesRepo;
   /** Lines delivered in v2 matches (GET /v2/matches/:id/messages). */
   matchMessages: MatchMessagesRepo;
@@ -41,13 +45,15 @@ export interface Repos {
   lobbies: LobbiesRepo;
   /** Single-elimination tournaments built from lobbies, with prize pools in paid credits. */
   tournaments: TournamentsRepo;
+  /** Tutorial progress and the home checklist. */
+  onboarding: OnboardingRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
 
 export interface ReposOptions {
   ledger?: LedgerRepoOptions;
-  /** Clock for seasons (which season a ranked finish counts towards). */
+  /** Clock for seasons (which season a ranked finish counts towards) and the Elo decay. */
   clock?: Clock;
 }
 
@@ -60,6 +66,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     market: new MarketRepo(db),
     ledger: new LedgerRepo(db, opts.ledger),
     leaderboards: new LeaderboardsRepo(db),
+    ranked: new RankedRepo(db, opts.clock),
     v2Matches: new V2MatchesRepo(db, opts.clock),
     matchMessages: new MatchMessagesRepo(db),
     ops: new OpsRepo(db),
@@ -69,6 +76,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     rentals: new RentalsRepo(db),
     lobbies: new LobbiesRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
     tournaments: new TournamentsRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
+    onboarding: new OnboardingRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -81,8 +89,10 @@ export * from './ledger';
 export * from './lobbies';
 export * from './market';
 export * from './match-messages';
+export * from './onboarding';
 export * from './ops';
 export * from './proof';
+export * from './ranked';
 export * from './rentals';
 export * from './seasons';
 export * from './skills';

@@ -51,6 +51,8 @@ export const qk = {
   leaderboards: {
     all: ['leaderboards'] as const,
     players: (limit?: number) => ['leaderboards', 'players', limit ?? null] as const,
+    map: (mapId: string, limit?: number) => ['leaderboards', 'map', mapId, limit ?? null] as const,
+    skills: (mapId?: string, limit?: number) => ['leaderboards', 'skills', mapId ?? null, limit ?? null] as const,
   },
   lobbies: {
     all: ['lobbies'] as const,

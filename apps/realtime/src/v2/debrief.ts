@@ -1,7 +1,8 @@
 // The debrief each crew gets with v2_end (its own numbers only): per-agent counts from the engine's
 // agent state (MVP = delivered × 3 + used + picks), messages sent and rival team talk overheard from
-// the tick events, the goal report, credits held / used / returned, the Elo change and the registry line.
-import { evaluateGoals, seenThrough, type Difficulty, type MatchEvent, type MatchState, type Team } from '@skirm/engine/v2';
+// the tick events, the goal report, credits held / used / returned, the Elo change, the registry
+// line and the crew's own live commands (never the rival's).
+import { evaluateGoals, seenThrough, type Difficulty, type FrameCommand, type MatchEvent, type MatchState, type Team } from '@skirm/engine/v2';
 import type { V2Debrief, V2DebriefAgent } from '@skirm/server';
 
 /** Counts the talk the debrief needs from each tick's events (agent counts live in the engine). */
@@ -63,6 +64,8 @@ export interface DebriefInput {
   registry: V2Debrief['registry'];
   /** Ranked: the season the result counted towards and its points (from the stored result). */
   season?: V2Debrief['season'];
+  /** The crew's own live commands as applied (tick order). */
+  commands?: readonly FrameCommand[];
 }
 
 export function buildDebrief(i: DebriefInput): V2Debrief {
@@ -82,5 +85,12 @@ export function buildDebrief(i: DebriefInput): V2Debrief {
     agents,
     difficulty: i.difficulty,
     ...(i.season ? { season: i.season } : {}),
+    ...(i.commands?.length ? { commands: commandsOf(i.state, i.commands) } : {}),
   };
+}
+
+/** The crew's commands for its debrief, with the agents named. */
+export function commandsOf(s: MatchState | null, cmds: readonly FrameCommand[]): NonNullable<V2Debrief['commands']> {
+  const name = (id: string) => s?.agents.find((a) => a.id === id)?.name ?? id;
+  return cmds.map((c) => ({ tick: c.tick, agents: c.agents.map((id) => ({ id, name: name(id) })), preset: c.preset, text: c.text }));
 }

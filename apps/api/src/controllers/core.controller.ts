@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import type { AccountRow } from '@skirm/db';
 import { verifyCredentials } from '@skirm/server';
-import { premiumItemsIn, rankTitle } from '@skirm/shared';
+import { DEFAULTS, playerTier, premiumItemsIn, rankTitle } from '@skirm/shared';
 import { z } from 'zod';
 import { CurrentAccount, Public, mustAccount } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
@@ -140,17 +140,23 @@ export class CoreController {
   async me(@CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
     const { repos } = this.deps;
-    const [credits, agents, unlocks, royalties, ladderRow, cosmetics] = await Promise.all([
+    const decay = this.deps.config.rankedDecay ?? DEFAULTS.ranked.decay;
+    const [credits, agents, unlocks, royalties, ladderRow, cosmetics, decayAt] = await Promise.all([
       repos.ledger.balance(account.id),
       repos.agents.listByOwner(account.id),
       repos.agents.unlocksOf(account.id),
       repos.market.royaltiesByCreator(account.id),
       repos.leaderboards.playerRowFor(account.id),
       repos.cosmetics.owned(account.id),
+      decay.days > 0 && decay.amount > 0 ? repos.ranked.nextDecayAt(account, decay.days) : Promise.resolve(null),
     ]);
     return {
       account: accountView(account),
-      /** v2: the player's own Elo, ranked record, rank title and place on the player ladder. */
+      /**
+       * v2: the player's own Elo, ranked record, rank title, place on the player ladder, ranked tier
+       * (null until the placement matches are played) and when inactivity next costs Elo (null when
+       * decay does not apply to them).
+       */
       rank: {
         elo: account.elo,
         rankedMatches: account.rankedMatches,
@@ -159,6 +165,8 @@ export class CoreController {
         draws: account.draws,
         title: rankTitle(account.elo).title,
         position: ladderRow?.rank ?? null,
+        tier: playerTier(account.elo, account.rankedMatches),
+        decayAt: decayAt?.toISOString() ?? null,
       },
       credits,
       agents,

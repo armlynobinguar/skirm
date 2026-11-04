@@ -4,12 +4,16 @@
 // lava (the next wave takes them, and lava removes an agent) when it can. With nothing to do it never
 // idles on the delivery point or next to another agent, where it would block a corridor someone needs. It never speaks except a callout when it delivers.
 // Its plan, reason and inner voice are read off what it does (greedyPlan, greedyThought), for the mind panel.
+// A live command from its player bends it where that is plain to read off the board (greedyCommanded).
 import { CALLOUTS, type Action, type Observation } from '@skirm/engine/v2';
+import type { V2AgentCommand } from './brain';
 import { distancesFrom } from './route';
 
 const STEP: Record<'N' | 'E' | 'S' | 'W', [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
 
-export function greedyAct(o: Observation): Action {
+export function greedyAct(o: Observation, command: Pick<V2AgentCommand, 'preset' | 'targets'> | null = null): Action {
+  const ordered = command ? greedyCommanded(o, command) : null;
+  if (ordered) return ordered;
   const sw = o.legal.find((a) => a.type === 'switch');
   if (sw && o.tick % 7 === 0) return sw;
   const need = o.map.goal - o.score.mine;
@@ -33,6 +37,54 @@ export function greedyAct(o: Observation): Action {
   // A high bit of the hash: its lowest bit only follows the parity of the characters, so two ids
   // like "a-2" and "b-1" would always yield together and never get past each other.
   return crowded && ((hash(`${o.me.id}:${o.tick}`) >>> 16) & 1) === 1 ? { type: 'wait' } : move;
+}
+
+const dist = (a: { x: number; y: number }, x: number, y: number) => Math.abs(a.x - x) + Math.abs(a.y - y);
+const moveTo = (o: Observation, dir: 'N' | 'E' | 'S' | 'W' | null) => (dir ? o.legal.find((a) => a.type === 'move' && a.dir === dir) : undefined);
+const WAIT: Action = { type: 'wait' };
+
+/**
+ * What a preset order makes the greedy brain do this tick, or null to play as usual. A full agent
+ * always goes to deliver. hold_gate: stand next to the delivery point. go_drop: walk to the nearest
+ * target (landed drop, else middle item). regroup: walk back next to the nearest crew mate and stay
+ * there. block_flow: use a building or extinguishing verb toward a hazard next to it. Free text alone
+ * means nothing to greedy.
+ */
+export function greedyCommanded(o: Observation, c: Pick<V2AgentCommand, 'preset' | 'targets'>): Action | null {
+  if (!c.preset || o.me.carrying >= o.me.capacity) return null;
+  const [ex, ey] = o.map.exit;
+  switch (c.preset) {
+    case 'hold_gate': {
+      const d = dist(o.me, ex, ey);
+      if (d === 0) return standAside(o) ?? WAIT;
+      if (d <= 2 && !o.me.carrying) return WAIT;
+      if (o.me.carrying) return null;
+      return moveTo(o, firstStep(o, (_c, x, y) => Math.abs(x - ex) + Math.abs(y - ey) === 1)) ?? null;
+    }
+    case 'go_drop': {
+      const t = c.targets ?? [];
+      if (!t.length) return null;
+      return moveTo(o, firstStep(o, (_c, x, y) => t.some(([tx, ty]) => tx === x && ty === y))) ?? null;
+    }
+    case 'regroup': {
+      const mates = o.teammates.filter((m) => !m.down);
+      if (!mates.length) return null;
+      if (mates.some((m) => dist(m, o.me.x, o.me.y) <= 2)) return WAIT;
+      return moveTo(o, firstStep(o, (_c, x, y) => mates.some((m) => dist(m, x, y) === 1))) ?? null;
+    }
+    case 'block_flow': {
+      const effect = new Map(o.verbs.map((v) => [v.id, v.effect]));
+      const hazard = (x: number, y: number) => '~^L'.includes(o.rows[y]?.[x] ?? '#');
+      const nearHazard = (x: number, y: number) => hazard(x, y) || Object.values(STEP).some(([dx, dy]) => hazard(x + dx, y + dy));
+      const verb = o.legal.find((a) => {
+        if (a.type !== 'verb' || !a.dir) return false;
+        const e = effect.get(a.verb);
+        if (e !== 'add_solid' && e !== 'extinguish') return false;
+        return nearHazard(o.me.x + STEP[a.dir][0], o.me.y + STEP[a.dir][1]);
+      });
+      return verb ?? null;
+    }
+  }
 }
 
 function hash(s: string): number {

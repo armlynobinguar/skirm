@@ -4,6 +4,7 @@ import { createV2Brain } from '@skirm/decision-engine/v2';
 import {
   CostMonitor,
   QUEUE_BENCHMARKS,
+  QUEUE_RANKED,
   QUEUE_REGISTRY,
   QUEUE_SEASONS,
   QUEUE_TOURNAMENTS,
@@ -15,6 +16,7 @@ import {
   createWorker,
   enqueueBenchmark,
   enqueueRegistry,
+  scheduleRankedDecay,
   scheduleSeasonTick,
   scheduleTournamentTick,
   type ServerConfig,
@@ -29,6 +31,7 @@ import {
   type RegistryQueue,
   type WorkerDeps,
 } from './deps';
+import { decayConfigFrom, processRankedDecay, type DecayConfig } from './ranked-processor';
 import { processRegistry } from './registry-processor';
 import { processSeasonTick } from './season-processor';
 import { seedOfficialSkills } from './seed';
@@ -61,13 +64,15 @@ export function costMonitor(redis: Redis, dailyBudgetUsd: number, logger: Logger
   });
 }
 
-/** Starts the `registry`, `benchmarks`, `seasons` and `tournaments` consumers over `deps`. */
+/** Starts the `registry`, `benchmarks`, `seasons`, `ranked` and `tournaments` consumers over `deps`. */
 export function startConsumers(
   deps: WorkerDeps,
   connection: Redis,
   opts: {
     registryConcurrency?: number;
     benchmarksConcurrency?: number;
+    /** The Elo decay's days and amount (RANKED_DECAY_DAYS / RANKED_DECAY_AMOUNT). */
+    decay?: DecayConfig;
   } = {},
 ) {
   const registry = createWorker(
@@ -92,11 +97,13 @@ export function startConsumers(
   );
   const seasons = createWorker(QUEUE_SEASONS, () => processSeasonTick(deps), connection);
   const tournaments = createWorker(QUEUE_TOURNAMENTS, () => processTournamentTick(deps), connection);
+  const ranked = createWorker(QUEUE_RANKED, () => processRankedDecay(deps, opts.decay), connection);
   for (const [name, w] of [
     ['registry', registry],
     ['benchmarks', benchmarks],
     ['seasons', seasons],
     ['tournaments', tournaments],
+    ['ranked', ranked],
   ] as const) {
     w.on('failed', (job, err) =>
       deps.logger.warn('job failed', { queue: name, jobId: job?.id, code: errorCode(err) }),
@@ -105,7 +112,7 @@ export function startConsumers(
       deps.logger.error('consumer error', { queue: name, code: errorCode(err) }),
     );
   }
-  return { registry, benchmarks, seasons, tournaments };
+  return { registry, benchmarks, seasons, ranked, tournaments };
 }
 
 export interface WorkerApp {
@@ -126,10 +133,11 @@ export async function startWorkerApp(
   const registryQueue = createQueue(QUEUE_REGISTRY, redis);
   const benchmarkQueue = createQueue(QUEUE_BENCHMARKS, redis);
   const seasonQueue = createQueue(QUEUE_SEASONS, redis);
+  const rankedQueue = createQueue(QUEUE_RANKED, redis);
   const tournamentQueue = createQueue(QUEUE_TOURNAMENTS, redis);
   const closeAll = async () => {
     await Promise.all(
-      [registryQueue, benchmarkQueue, seasonQueue, tournamentQueue].map((q) => q.close().catch(() => undefined)),
+      [registryQueue, benchmarkQueue, seasonQueue, rankedQueue, tournamentQueue].map((q) => q.close().catch(() => undefined)),
     );
     await Promise.all([
       redis.quit().catch(() => redis.disconnect()),
@@ -137,7 +145,9 @@ export async function startWorkerApp(
     ]);
     await closeDb(db).catch(() => undefined);
   };
+  let decay: DecayConfig;
   try {
+    decay = decayConfigFrom(env);
     await db.execute('select 1');
     await redis.ping();
   } catch (err) {
@@ -168,11 +178,12 @@ export async function startWorkerApp(
     clock: systemClock,
     logger,
   };
-  const consumers = startConsumers(deps, consumerConn);
-  const workers = [consumers.registry, consumers.benchmarks, consumers.seasons, consumers.tournaments];
+  const consumers = startConsumers(deps, consumerConn, { decay });
+  const workers = [consumers.registry, consumers.benchmarks, consumers.seasons, consumers.ranked, consumers.tournaments];
   await Promise.all(workers.map((w) => w.waitUntilReady()));
   // One schedule however many workers start it (an upsert keyed by SEASON_TICK_JOB_ID).
   await scheduleSeasonTick(seasonQueue);
+  await scheduleRankedDecay(rankedQueue);
   await scheduleTournamentTick(tournamentQueue);
   if (brain.kind === 'greedy')
     logger.warn(
@@ -182,6 +193,7 @@ export async function startWorkerApp(
     v2Brain: brain.kind,
     registry: near.registry.kind,
     seasons: near.seasons.kind,
+    eloDecay: decay,
   });
 
   // Official starter skills for the market (idempotent, advisory-locked across workers). In the

@@ -51,14 +51,16 @@ describe('migrations', () => {
         'tournaments',
         'tournament_entries',
         'lobbies',
+        'onboarding_progress',
+        'elo_decays',
       ]),
     );
     const applied = await db.execute(
       sql`select count(*)::int as n from drizzle.__drizzle_migrations`,
     );
     expect(rowsOf<{ n: number }>(applied)[0]!.n).toBe(embeddedMigrations().length);
-    // 0000_init, 0001_agent_rentals, 0002_account_deletion, 0003_lobbies_tournaments.
-    expect(embeddedMigrations()).toHaveLength(4);
+    // 0000_init … 0004_ranked_tiers, then 0006_lobbies_tournaments (0005 is taken by match timelines).
+    expect(embeddedMigrations()).toHaveLength(6);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {
