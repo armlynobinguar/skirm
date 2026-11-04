@@ -1,0 +1,19 @@
+/* Crew playbooks (Playbooks.tsx): the section on the crew screen and the lock-in picker. Tokens only. */
+.box { display: grid; gap: 10px; padding: 14px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; box-shadow: inset 0 0 0 1px var(--line); }
+.item[data-selected] { box-shadow: inset 0 0 0 1px var(--amber); }
+.name { flex: 1 1 140px; min-width: 0; overflow-wrap: anywhere; color: var(--bone); }
+.tag { font: 500 11px/1 var(--font-mono); color: var(--amber); text-transform: uppercase; letter-spacing: .06em; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { padding: 5px 10px; font: inherit; font-size: 12px; color: var(--bone); background: transparent; border: 0; box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+.btn:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--bone); }
+.btn:disabled { opacity: .5; cursor: default; }
+.primary { color: var(--bg); background: var(--amber); box-shadow: none; }
+.form { display: grid; gap: 8px; }
+.input, .text, .select { width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--bone); background: var(--panel); border: 0; box-shadow: inset 0 0 0 1px var(--line); }
+.text { min-height: 110px; resize: vertical; font: 400 13px/19px var(--font-mono); }
+.count { font: 400 11px/1 var(--font-mono); color: var(--muted); text-align: right; }
+.count[data-over] { color: var(--critical); }
+.note { margin: 0; font-size: 12px; color: var(--muted); }

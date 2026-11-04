@@ -259,6 +259,39 @@ export const agentSkills = pgTable(
   ],
 );
 
+/**
+ * Crew playbooks: a player's crew-level strategy (who hauls, who scouts, when to regroup, goal or
+ * deny), sealed like a skill prompt (only the owner reads it back; the match runner decrypts it for
+ * the planner). A player keeps up to DEFAULTS.playbooks.maxSaved; `selected` marks the one lock-in
+ * starts with (at most one per player).
+ */
+export const playbooks = pgTable(
+  'playbooks',
+  {
+    /** `pbk_` + ULID. */
+    id: text('id').primaryKey(),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => accounts.id),
+    /** The player's own label (shown in their mind panel); never sent to the rival. */
+    name: text('name').notNull(),
+    /** sha256 of the text, bound into the ciphertext's AAD. */
+    textSha256: text('text_sha256').notNull(),
+    ciphertext: bytea('ciphertext').notNull(),
+    iv: bytea('iv').notNull(),
+    authTag: bytea('auth_tag').notNull(),
+    wrappedKey: bytea('wrapped_key').notNull(),
+    keyId: text('key_id').notNull(),
+    selected: boolean('selected').notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('playbooks_owner_idx').on(t.ownerId),
+    uniqueIndex('playbooks_selected_uq').on(t.ownerId).where(sql`${t.selected}`),
+  ],
+);
+
 export const listings = pgTable(
   'listings',
   {

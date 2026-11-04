@@ -313,6 +313,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
           limit={frame?.limit ?? 150}
           tickMs={view.tickMs}
           lines={comms}
+          playbook={frame?.playbook ?? null}
           story={story}
           onHeld={setHeld}
           onExit={exitTpv}

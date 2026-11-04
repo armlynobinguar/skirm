@@ -2,7 +2,7 @@
 // keeps them), its highlights and caster lines (worked out once and cached in replay_casts).
 //
 // Only the watch view is ever read here, and every frame is stripped again of anything a crew
-// alone may see (plans, planner reasons, inner voice, live commands), so a share link can never
+// alone may see (plans, planner reasons, inner voice, live commands, the playbook name), so a share link can never
 // show more than a spectator saw. Frames live 6 h in Redis today (realtime replay.ts); the reader is
 // an interface so permanent storage can replace it without touching the routes.
 import type { ReplayCastRow, ReplayHighlightRecord, Repos, V2MatchRow } from '@skirm/db';
@@ -62,7 +62,7 @@ export class MemoryReplayFrames implements ReplayFrameReader {
 
 /** A frame as anyone may see it: the watch view, with every crew-only field dropped. */
 export function publicFrame(f: V2Frame): V2Frame {
-  const { commands: _commands, ...rest } = f;
+  const { commands: _commands, playbook: _playbook, ...rest } = f;
   return {
     ...rest,
     view: 'watch',

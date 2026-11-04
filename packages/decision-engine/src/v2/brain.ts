@@ -68,6 +68,11 @@ export interface V2AgentContext {
   skillTriggers?: (SkillTrigger | null)[];
   /** The owner's instructions (agents.system_prompt), put ahead of the skills; private like them. */
   instructions?: string | null;
+  /**
+   * The player's crew playbook for this match (whole for the planner, one line for an actor); private
+   * like the skills, and guarded by the speech filter the same way.
+   */
+  playbook?: string | null;
   /** The crew's current plan, if any. */
   plan: string | null;
   /** Whether its talk tier lets it speak this tick. */
@@ -95,7 +100,7 @@ export interface V2Brain {
   readonly model: string;
   act(o: Observation, ctx: V2AgentContext): Promise<V2Decision>;
   /** A short crew plan (null when the brain does not plan). */
-  plan(o: Observation, ctx: Pick<V2AgentContext, 'skills' | 'skillTriggers' | 'instructions'>): Promise<V2Plan>;
+  plan(o: Observation, ctx: Pick<V2AgentContext, 'skills' | 'skillTriggers' | 'instructions' | 'playbook'>): Promise<V2Plan>;
 }
 
 /** The skills whose triggers hold on this observation, in order (skills without a trigger always do). */
@@ -171,14 +176,14 @@ export function createModelBrain(opts: ModelBrainOptions = {}): V2Brain {
       // The system prompt numbers the non-blank skills whose trigger holds this tick; a SKILL line maps
       // back to ctx.skills.
       const numbered = ctx.skills.flatMap((t, i) => (t.trim() && skillTriggerHolds(ctx.skillTriggers?.[i], o) ? [i] : []));
-      const r = await call('actor', systemPrompt(numbered.map((i) => ctx.skills[i]!), ctx.instructions), turnPrompt(o, ctx.plan, ctx.canSpeak, ctx.recent ?? [], ctx.command ?? null, numbered.length), V2_ACTOR_MAX_TOKENS, opts.deadlineMs ?? V2_ACTION_DEADLINE_MS);
+      const r = await call('actor', systemPrompt(numbered.map((i) => ctx.skills[i]!), ctx.instructions, { text: ctx.playbook ?? null, short: true }), turnPrompt(o, ctx.plan, ctx.canSpeak, ctx.recent ?? [], ctx.command ?? null, numbered.length), V2_ACTOR_MAX_TOKENS, opts.deadlineMs ?? V2_ACTION_DEADLINE_MS);
       if (r.text === null) return { action: wait, reason: r.reason === 'timeout' ? 'timeout' : 'error', say: null, call: r.call };
       const parsed = parseReply(r.text, o.legal, ctx.canSpeak, numbered.length);
       const skill = parsed.action && parsed.skill ? numbered[parsed.skill - 1] : undefined;
       let say: V2Decision['say'] = null;
       let refusedSay: V2Decision['refusedSay'];
       if (parsed.say) {
-        const f = filterSpeech(parsed.say.text, ctx.instructions ? [...ctx.skills, ctx.instructions] : ctx.skills);
+        const f = filterSpeech(parsed.say.text, [...ctx.skills, ...(ctx.instructions ? [ctx.instructions] : []), ...(ctx.playbook ? [ctx.playbook] : [])]);
         if (f.ok) say = { channel: parsed.say.channel, text: f.text };
         else refusedSay = f.reason;
       }
@@ -193,7 +198,7 @@ export function createModelBrain(opts: ModelBrainOptions = {}): V2Brain {
       };
     },
     async plan(o, ctx) {
-      const r = await call('planner', systemPrompt(activeSkills(o, ctx), ctx.instructions), planPrompt(o), V2_PLANNER_MAX_TOKENS, V2_PLANNER_DEADLINE_MS);
+      const r = await call('planner', systemPrompt(activeSkills(o, ctx), ctx.instructions, { text: ctx.playbook ?? null }), planPrompt(o), V2_PLANNER_MAX_TOKENS, V2_PLANNER_DEADLINE_MS);
       if (!r.text) return { text: null, why: null, call: r.call };
       const { plan, why } = parsePlan(r.text);
       return { text: plan, why, call: r.call };

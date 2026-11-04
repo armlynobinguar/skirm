@@ -80,8 +80,8 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/rentals/mine` | ✓ | `{ offers, passes }`: the caller's active offers and unused one-match passes (each with the rented agent's public stats and owner handle) |
 | POST | `/rentals/:offerId` | ✓ | `{ txHash }` → `{ pass }`. A `market.rent` transaction from the caller's linked account whose `rental` event names this offer (`rental_id` = `<offerId>:<nonce>`), pays the owner's linked account and covers the price (422 `wrong_rental`, `wrong_owner`, `underpaid`, `wrong_sender`; 409 `own_agent`, `duplicate_tx`). Dev mode: `dev:<yocto>[:<nonce>]`. A replay returns the same pass. The pass is used up when a match with that agent ends (a void match keeps it); the agent plays with its owner's skills and its plans are withheld from the renter |
 | DELETE | `/me/near` | | `{ account }` with `nearAccountId: null`. `409 listing_active` while the player has an active listing |
-| GET | `/me/export` | ✓ | Everything skirm holds about the caller, one table per key (account, agents, skills created, ownership, listings, sales, rental offers and passes, ledger, matches with only the caller's debrief side, messages their agents said, standings, prizes, trials, cosmetics, onboarding progress), plus `skillPrompts`: the caller's own skill prompts decrypted |
-| DELETE | `/me` | ✓ | `{ confirm }` (the current handle; 422 `confirm_mismatch`) → `{ deleted: true }`. 409 `agent_busy` mid-match, 409 `listing_active` with an open listing. Clears the Privy id, NEAR link and system prompts, ends rental offers, sets the handle to `~deleted-<id>` and `deleted_at`; the account never signs in again. Agents, match history, sales and the ledger stay (other players' records and paid rental passes depend on them); credits are forfeited |
+| GET | `/me/export` | ✓ | Everything skirm holds about the caller, one table per key (account, agents, skills created, ownership, listings, sales, rental offers and passes, ledger, matches with only the caller's debrief side, messages their agents said, standings, prizes, trials, cosmetics, onboarding progress), plus `skillPrompts`: the caller's own skill prompts decrypted, and `playbookTexts`: their crew playbooks decrypted |
+| DELETE | `/me` | ✓ | `{ confirm }` (the current handle; 422 `confirm_mismatch`) → `{ deleted: true }`. 409 `agent_busy` mid-match, 409 `listing_active` with an open listing. Clears the Privy id, NEAR link, system prompts and crew playbooks, ends rental offers, sets the handle to `~deleted-<id>` and `deleted_at`; the account never signs in again. Agents, match history, sales and the ledger stay (other players' records and paid rental passes depend on them); credits are forfeited |
 | GET | `/agents` | | `Agent[]`: `{ id, name, elo, matchesPlayed, wins, losses, draws, skills: [{id, version, name}], unlocks, role, vision, comms, tier, systemPrompt, appearance }` |
 | PATCH | `/agents/:id` | `{ name?, skills?: {id, version}[] (≤ 3, owned), unlocks?, role?, vision? (1-5), comms? (1-5), tier?, systemPrompt?: string \| null (≤ 600 characters; null or blank clears), appearance? }` | `Agent`. Gameplay fields are refused (`409 agent_busy`) while the agent is in a live match. `appearance` can change any time; a premium colour needs the cosmetic bought first (`403 cosmetic_not_owned`, `details.items`). Every equipped skill must be for the agent's (new) role or `any`: an equip or role change that breaks this is `422 skill_role_mismatch` (`details: {skillId, version, roles, role}`) |
 
@@ -139,6 +139,19 @@ The web page `/replays/<shareId>` sets Open Graph metadata and a generated previ
 | GET | `/market/:skillId/trials` | `?version=` | the caller's trials, newest first: `{ id, skillId, version, agentId, status, needsModel, results, createdAt, finishedAt }` |
 | POST | `/market/:skillId/listing` | `{ priceYocto, txHash?, version? }` | the listing, with `split: {primary, feeYocto, royaltyYocto, sellerYocto}` (no royalty on a primary sale). `422 not_minted` |
 | POST | `/market/:skillId/purchase` | `{ txHash, version? }` | `{ owned: true, sale }` once the NEAR owner is the buyer (dev mode: `dev:<yocto>[:<nonce>]`). `409 not_listed`, `own_listing`, `duplicate_tx`; `422 underpaid`, `purchase_unverified`, `near_account_required`. A bought skill grants use, never its text; a sold skill is unequipped from the seller's agents |
+
+### Crew playbooks
+
+A player's crew-level strategy (who hauls, who scouts and calls hazards, who blocks; when to regroup; the goal or denying the rival), separate from any agent's skills. Sealed in the vault like a skill prompt (its own AAD); only the owner reads it back. Limits in `DEFAULTS.playbooks`: text ≤ 800 characters, name ≤ 32, at most 5 kept. Realtime puts the one selected (or picked at lock-in) into the crew planner's prompt whole and each actor's as one line (≤ 160), adds it to the speech filter's secrets, and names it (never the text) on the player's own frames (`V2Frame.playbook`); the rival, spectators, the match log and shared replays never see it. The greedy brain ignores it.
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| GET | `/playbooks` | | `{ playbooks: { id, name, selected, createdAt, updatedAt }[], max, maxChars }` (never the text) |
+| POST | `/playbooks` | `{ name, text }` | the playbook (the first one is selected). `422 playbook_limit` at the cap, `422 playbook_refused` when the speech filter calls the text abusive |
+| GET | `/playbooks/:id` | | the playbook with `text`, owner only (404 otherwise) |
+| PUT | `/playbooks/:id` | `{ name?, text? }` | the playbook. Owner only |
+| DELETE | `/playbooks/:id` | | `{ deleted: true }`. Owner only |
+| POST | `/playbooks/select` | `{ id \| null }` | `{ selected }`: the playbook lock-in starts with (null: none) |
 
 ### Cosmetics and credits
 
@@ -230,7 +243,7 @@ Client → server (`WsClientMessage`):
 | `{type:'v2_cancel_queue'}` | stop searching |
 | `{type:'v2_accept', matchId}` / `{type:'v2_decline', matchId}` | answer `v2_found` (10 s) |
 | `{type:'v2_ban', matchId, skillId}` | draft mode, on your step: ban one skill from your `v2_draft` pool, or pass with `skillId: null` (`not_your_turn`, `invalid_ban`) |
-| `{type:'v2_lock_in', matchId, tiers, crew?}` | lock the crew in (30 s): a talk tier per agent in slot order; `crew` swaps, removes or adds agents up to `crewLimit` and its tiers win |
+| `{type:'v2_lock_in', matchId, tiers, crew?, playbookId?}` | lock the crew in (30 s): a talk tier per agent in slot order; `crew` swaps, removes or adds agents up to `crewLimit` and its tiers win; `playbookId` plays one of the player's crew playbooks this match (null: none; absent: the selected one; another player's: `not_found`) |
 | `{type:'v2_watch', matchId}` / `{type:'v2_unwatch', matchId}` | spectate: the latest whole-board frame now, then every one after, and `v2_end`. Released on `v2_end`, unwatch or disconnect; at most 8 per socket |
 | `{type:'v2_replay', matchId}` | every stored frame of an ended match, for replay at another speed (kept 6 h) |
 | `{type:'v2_lobby_ready', lobbyId, crew: {agentId, tier}[]}` | ready a crew in a private lobby you are in (open, with a guest): at most its crew size, every agent on its tier when the talk rule forces one. The match starts once both players have; readying again replaces the crew, `v2_cancel_queue` (or the last socket closing) steps back. Both players must reach the same realtime instance |

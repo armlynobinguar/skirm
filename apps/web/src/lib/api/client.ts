@@ -6,6 +6,7 @@ import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
 import { ApiError, errorFromBody } from './errors';
+import type { Playbook, PlaybookList, PlaybookWithText } from './playbookTypes';
 import type { CreateTournament, Lobby, LobbySettings, TournamentDetail, TournamentStatus, TournamentSummary } from './lobbyTypes';
 import type {
   Agent,
@@ -93,6 +94,17 @@ export interface ApiClient {
   /** The creator also gets `{ prompt, reflexes }`; check with `'prompt' in skill`. */
   skill(skillId: string, version?: number): Promise<SkillRow | SkillWithText>;
   mintSkill(skillId: string, version?: number): Promise<MintResponse>;
+
+  /** GET /playbooks: the caller's crew playbooks (names only), the cap and the text limit. */
+  playbooks(): Promise<PlaybookList>;
+  /** GET /playbooks/:id: the owner's read-back, with the text. */
+  playbook(playbookId: string): Promise<PlaybookWithText>;
+  /** POST /playbooks (422 `playbook_limit` at the cap, `playbook_refused` by the filter). */
+  createPlaybook(body: { name: string; text: string }): Promise<Playbook>;
+  updatePlaybook(playbookId: string, body: { name?: string; text?: string }): Promise<Playbook>;
+  deletePlaybook(playbookId: string): Promise<{ deleted: true }>;
+  /** POST /playbooks/select: the one lock-in starts with (null: none). */
+  selectPlaybook(playbookId: string | null): Promise<{ selected: string | null }>;
 
   market(query?: MarketQuery): Promise<MarketCard[]>;
   marketSkill(skillId: string, version?: number): Promise<MarketDetail>;
@@ -275,6 +287,13 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     skill: (id, version) => get(`/skills/${enc(id)}`, { version }),
     mintSkill: (id, version) =>
       json('POST', `/skills/${enc(id)}/mint`, { body: version !== undefined ? { version } : {} }),
+
+    playbooks: () => get('/playbooks'),
+    playbook: (id) => get(`/playbooks/${enc(id)}`),
+    createPlaybook: (body) => json('POST', '/playbooks', { body }),
+    updatePlaybook: (id, body) => json('PUT', `/playbooks/${enc(id)}`, { body }),
+    deletePlaybook: (id) => json('DELETE', `/playbooks/${enc(id)}`),
+    selectPlaybook: (id) => json('POST', '/playbooks/select', { body: { id } }),
 
     market: (q = {}) => get('/market', { tag: q.tag, sort: q.sort }),
     marketSkill: (id, version) => get(`/market/${enc(id)}`, { version }),

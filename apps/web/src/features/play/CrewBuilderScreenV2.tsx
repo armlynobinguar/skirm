@@ -19,6 +19,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CreditEstimate, CrewCard, DifficultyPicker, EmptySlot, GoalBox, RosterStrip } from '@/features/agents/CrewParts';
 import { HEAD_START_S_PER_AGENT, TIER_INFO, agentEditorHref, clock } from '@/features/agents/agentView';
+import { PlaybooksSection } from '@/features/agents/Playbooks';
 import c from '@/features/agents/crew.module.css';
 import { arenaStore } from '@/features/arena/store';
 import { DIFFS, MAPS, diffIndex, mapById } from '@/features/arena/world';
@@ -278,6 +279,7 @@ function V2Crew({ me, mapId, initialDifficulty, initialBot }: { me: Me; mapId: s
         </div>
         <RosterStrip agents={me.agents} picked={crew} onToggle={toggle} disabled={busy} testPrefix="s04" />
         <RentShelf passes={passes} picked={crew} onToggle={toggle} disabled={busy} nearId={me.account.nearAccountId} />
+        <PlaybooksSection />
       </div>
 
       <aside className={c.side}>
