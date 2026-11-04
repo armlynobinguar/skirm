@@ -172,9 +172,10 @@ Client → server (`WsClientMessage`):
 | Message | Meaning |
 | --- | --- |
 | `{type:'auth', token?, devUser?}` | sign in (dev: `devUser` is the handle). On reconnect during a match the server re-sends where it stands (found, lock-in or the latest frame) |
-| `{type:'v2_queue', crew: {agentId, tier}[] (1-3), ranked, mapId?, difficulty?, opponent?: 'bot'}` | search for a match. Casual pairs only with the same `mapId` (or any) and `difficulty`; ranked ignores both (any fitting map, Normal). `opponent: 'bot'` is practice: casual only (`practice_unranked`), no matchmaking, starts at once on `mapId`/`difficulty` or `DEFAULT_PRACTICE` (Copper Hollow, Easy) |
+| `{type:'v2_queue', crew: {agentId, tier}[] (1-3), ranked, mapId?, difficulty?, opponent?: 'bot', draft?}` | search for a match. Casual pairs only with the same `mapId` (or any) and `difficulty`; ranked ignores both (any fitting map, Normal). `opponent: 'bot'` is practice: casual only (`practice_unranked`), no matchmaking, starts at once on `mapId`/`difficulty` or `DEFAULT_PRACTICE` (Copper Hollow, Easy). `draft: true` is draft mode: casual against a player only (`draft_casual`), pairs only with other draft searches, and adds a ban phase after accept |
 | `{type:'v2_cancel_queue'}` | stop searching |
 | `{type:'v2_accept', matchId}` / `{type:'v2_decline', matchId}` | answer `v2_found` (10 s) |
+| `{type:'v2_ban', matchId, skillId}` | draft mode, on your step: ban one skill from your `v2_draft` pool, or pass with `skillId: null` (`not_your_turn`, `invalid_ban`) |
 | `{type:'v2_lock_in', matchId, tiers, crew?}` | lock the crew in (30 s): a talk tier per agent in slot order; `crew` swaps, removes or adds agents up to `crewLimit` and its tiers win |
 | `{type:'v2_watch', matchId}` / `{type:'v2_unwatch', matchId}` | spectate: the latest whole-board frame now, then every one after, and `v2_end`. Released on `v2_end`, unwatch or disconnect; at most 8 per socket |
 | `{type:'v2_replay', matchId}` | every stored frame of an ended match, for replay at another speed (kept 6 h) |
@@ -187,6 +188,7 @@ Server → client (`WsServerMessage`):
 | `{type:'queue_status', searchingMs, eloRange}` | every second while searching; the Elo window widens from ±100 by 50 every 5 s up to ±1000 |
 | `{type:'v2_found', matchId, team, mapId, ranked, acceptMs, difficulty, practice?, free?, rivalHandle?, tiers?}` | a match: accept within `acceptMs`. `practice` and `rivalHandle` ('Greedy bot') for practice; `free` when this crew holds nothing; `tiers: {you, rival}` (`PlayerTier`) on ranked matches, as both players queued |
 | `{type:'v2_accepted', matchId, team}` | a crew accepted |
+| `{type:'v2_draft', matchId, turn, step, steps, stepMs, pool: {skillId, name, agents}[], bans: {team, step, skillId, name, timedOut?}[]}` | draft mode (`v2_found` carries `draft: true`): after accept, crews ban in turn, A first, `DEFAULTS.draft.bansPerSide` each; `turn` bans within `stepMs` (`DEFAULTS.draft.stepMs`, 15 s) or the step passes (`timedOut`). `pool` is the rival's equipped skills you may still ban, by id and public name only (never the prompt). Sent at each step and once more with `turn: null` when the draft is over; then `v2_lockin`. A banned skill is unequipped from the rival crew for that match (also from a crew swapped in at lock-in) and every ban is in both debriefs (`debrief.draft.bans`) |
 | `{type:'v2_lockin', matchId, lockMs, rival: {agents}, crewLimit, headStartTicks, free?}` | lock-in started (the rival's crew size only). Re-sent when a crew changes its roster |
 | `{type:'v2_locked', matchId, team}` | a crew locked in |
 | `{type:'v2_start', matchId, team, rival: {handle}, tickMs, holdTicks}` | live: the rival is named, holds are placed |
@@ -196,7 +198,7 @@ Server → client (`WsServerMessage`):
 | `{type:'v2_command_ok', matchId, tick, left}` | answer to `v2_command`: it lands on `tick`; `left` remain |
 | `{type:'error', code, message}` | see below |
 
-WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthenticated`, `auth_failed`, `already_authenticated`, `already_queued`, `not_queued`, `in_match`, `invalid_crew`, `not_in_lockin`, `practice_unranked`, `agent_busy`, `not_found`, `not_live`, `no_commands`, `rate_limited`, `invalid_command`, `command_refused`, `too_many_subscriptions`, `unavailable`, `internal`.
+WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthenticated`, `auth_failed`, `already_authenticated`, `already_queued`, `not_queued`, `in_match`, `invalid_crew`, `not_in_lockin`, `practice_unranked`, `draft_casual`, `not_your_turn`, `invalid_ban`, `agent_busy`, `not_found`, `not_live`, `no_commands`, `rate_limited`, `invalid_command`, `command_refused`, `too_many_subscriptions`, `unavailable`, `internal`.
 
 `scripts/ws-v2.cjs` is a ready client: it signs in, queues, accepts, locks in and waits for `v2_end` (README of the script at its top).
 

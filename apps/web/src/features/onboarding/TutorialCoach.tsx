@@ -14,7 +14,7 @@ import { routes } from '@/lib/routes';
 import { tutorialMatch, useUpdateTutorial } from './hooks';
 import o from './onboarding.module.css';
 
-const PHASE_OF: Record<V2Phase, TutorialPhase> = { found: 'lockin', lockin: 'lockin', live: 'live', ended: 'ended' };
+const PHASE_OF: Record<V2Phase, TutorialPhase> = { found: 'lockin', draft: 'lockin', lockin: 'lockin', live: 'live', ended: 'ended' };
 
 export interface TutorialCoachProps {
   matchId: string;

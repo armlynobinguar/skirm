@@ -5,6 +5,8 @@
 // result is written to `v2_matches` (Elo moves in the same transaction), a ranked result is queued
 // for the registry, and the frames are kept a while for replay. Practice skips matchmaking: the
 // player meets the greedy bot (SYSTEM_ACCOUNT_ID) at once, casual, with no Elo and no registry job.
+// Draft mode is a casual search with `draft`: it pairs only with draft searches, and its match bans
+// skills between accept and lock-in (V2Match.ban).
 //
 // Players are served only by the instance running their match (their sockets are routed to it).
 // Watchers can be anywhere: the running instance publishes every watch-view message on
@@ -34,7 +36,7 @@ import type { WsServerMessage } from '../protocol';
 import type { PubSub, Unsubscribe } from '../pubsub';
 import type { QueueTiming, Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
-import { TEAMS, V2Match, crewLimitOf, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
+import { TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
 import type { V2FrameStore } from './replay';
 
 export interface V2Search {
@@ -46,6 +48,8 @@ export interface V2Search {
   mapId?: string;
   /** Ranked: always RANKED_DIFFICULTY. */
   difficulty: Difficulty;
+  /** Casual only: draft mode (a ban phase before lock-in). */
+  draft?: boolean;
   /** The player's Elo and ranked matches as they queued (their tier on v2_found). */
   rank?: { elo: number; rankedMatches: number };
 }
@@ -54,18 +58,23 @@ export interface V2Search {
 export interface V2QueueOptions {
   mapId?: string;
   difficulty?: Difficulty;
+  /** Draft mode: casual only. */
+  draft?: boolean;
 }
 
-/** Casual searches pair within one difficulty, on one picked map (or any, '*'); ranked has a single pool. */
-export const v2Pool = (s: Pick<V2Search, 'ranked' | 'mapId' | 'difficulty'>) => (s.ranked ? undefined : `${s.mapId ?? '*'}|${s.difficulty}`);
+/**
+ * Casual searches pair within one difficulty, on one picked map (or any, '*'), and draft only with
+ * draft (a third `|draft` part); ranked has a single pool.
+ */
+export const v2Pool = (s: Pick<V2Search, 'ranked' | 'mapId' | 'difficulty' | 'draft'>) => (s.ranked ? undefined : `${s.mapId ?? '*'}|${s.difficulty}${s.draft ? '|draft' : ''}`);
 
-/** Two pools pair when they are equal, or at one difficulty when either search takes any map. */
+/** Two pools pair when they are equal, or at one difficulty and mode when either search takes any map. */
 export function v2PoolsMatch(a: string | undefined, b: string | undefined): boolean {
   if (a === b) return true;
   if (a === undefined || b === undefined) return false;
-  const [mapA, diffA] = a.split('|');
-  const [mapB, diffB] = b.split('|');
-  return diffA === diffB && (mapA === '*' || mapB === '*');
+  const [mapA, diffA, modeA] = a.split('|');
+  const [mapB, diffB, modeB] = b.split('|');
+  return diffA === diffB && modeA === modeB && (mapA === '*' || mapB === '*');
 }
 
 export interface V2HubDeps {
@@ -99,6 +108,8 @@ export class V2HubError extends Error {
       | 'not_found'
       | 'unavailable'
       | 'not_in_lockin'
+      | 'draft_casual'
+      | V2BanError
       | V2CommandError,
     message: string,
   ) {
@@ -137,9 +148,10 @@ export class V2Hub {
     if (this.playing.has(accountId)) throw new V2HubError('in_match', 'already in a match');
   }
 
-  /** Ranked ignores `opts`: any fitting map, at RANKED_DIFFICULTY. */
+  /** Ranked ignores `opts` (any fitting map, at RANKED_DIFFICULTY) and refuses draft mode. */
   async queue(user: { accountId: string; handle: string }, crew: V2CrewEntry[], ranked: boolean, opts: V2QueueOptions = {}): Promise<void> {
     if (this.closing) throw new V2HubError('unavailable', 'server is shutting down');
+    if (ranked && opts.draft) throw new V2HubError('draft_casual', 'draft mode is casual only');
     const check = () => this.free(user.accountId);
     check();
     const mapId = ranked ? undefined : opts.mapId;
@@ -159,6 +171,7 @@ export class V2Hub {
       ranked,
       difficulty,
       ...(mapId !== undefined ? { mapId } : {}),
+      ...(opts.draft ? { draft: true } : {}),
       ...(account ? { rank: { elo: account.elo, rankedMatches: account.rankedMatches } } : {}),
     };
     const pool = v2Pool(payload);
@@ -227,6 +240,13 @@ export class V2Hub {
   decline(accountId: string, matchId: string): void {
     const { match, team } = this.mine(accountId, matchId);
     match.decline(team);
+  }
+
+  /** Draft mode: the player's ban (or pass, `skillId` null) on their crew's step. */
+  ban(accountId: string, matchId: string, skillId: string | null): void {
+    const { match, team } = this.mine(accountId, matchId);
+    const r = match.ban(team, skillId);
+    if (!r.ok) throw new V2HubError(r.code, r.message);
   }
 
   /**
@@ -352,6 +372,10 @@ export class V2Hub {
     if (!match || match.phase === 'ended') return;
     const team = TEAMS.find((t) => match.setup.sides[t].accountId === accountId)!;
     if (match.phase === 'found') send(match.foundMessage(team));
+    else if (match.phase === 'draft') {
+      send(match.foundMessage(team));
+      send(match.draftMessage(team));
+    }
     else if (match.phase === 'lockin') send(match.lockinMessage(team));
     else {
       const frame = match.lastFrames[team];
@@ -388,6 +412,7 @@ export class V2Hub {
     const skills: string[][] = [];
     const skillKeys: { id: string; version: number }[][] = [];
     const skillMeta: V2SkillMeta[][] = [];
+    const skillNames: string[][] = [];
     const bought: boolean[] = [];
     const instructions: (string | null)[] = [];
     for (const c of entries) {
@@ -396,6 +421,7 @@ export class V2Hub {
       crew.push({ id: v.id, name: v.name, role: v.role, vision: v.vision, comms: v.comms, tier: c.tier });
       const prompts: string[] = [];
       const keys: { id: string; version: number }[] = [];
+      const names: string[] = [];
       // A rented agent (ownCrew checked the pass) plays with the skills its owner holds.
       const ownerId = (await repos.agents.get(c.agentId))?.ownerId ?? accountId;
       const rented = ownerId !== accountId;
@@ -409,9 +435,11 @@ export class V2Hub {
         if (!sealed) continue;
         prompts.push((await vault.decryptSkill(sealed)).prompt);
         keys.push({ id: k.id, version: k.version });
+        names.push(k.name);
       }
       skills.push(prompts);
       skillKeys.push(keys);
+      skillNames.push(names);
       const meta = keys.length ? await repos.skills.getMany(keys) : [];
       // Public name and trigger per skill, in prompt order (a version missing here plays always).
       skillMeta.push(
@@ -423,7 +451,7 @@ export class V2Hub {
       bought.push(rented || meta.some((m) => m.creatorId !== accountId));
       instructions.push(v.systemPrompt ?? null);
     }
-    return { crew, skills, skillKeys, skillMeta, bought, instructions };
+    return { crew, skills, skillKeys, skillNames, skillMeta, bought, instructions };
   }
 
   /** A V2Match wired to this hub: its credits on the ledger, its watchers, and finish(). */
@@ -470,8 +498,10 @@ export class V2Hub {
       const map = picked ?? (this.deps.pickMap ?? ((f) => f[Math.floor(Math.random() * f.length)]!))(fits);
       const ranked = a.payload.ranked;
       const difficulty = ranked ? RANKED_DIFFICULTY : a.payload.difficulty;
+      // Draft searches pair only with draft searches (v2PoolsMatch).
+      const draft = !ranked && !!a.payload.draft;
       await this.deps.repos.v2Matches.create({ id: matchId, mapId: map.id, ranked, teamA: a.key, teamB: b.key, crews: { A: crewRecords(sides.A), B: crewRecords(sides.B) }, ...(ranked ? {} : { difficulty }) });
-      return this.newMatch({ matchId, map, ranked, difficulty, sides }, { A: this.deps.brain, B: this.deps.brain }, (t, msg) => this.deps.send(sides[t].accountId, msg));
+      return this.newMatch({ matchId, map, ranked, difficulty, sides, ...(draft ? { draft } : {}) }, { A: this.deps.brain, B: this.deps.brain }, (t, msg) => this.deps.send(sides[t].accountId, msg));
     });
   }
 
@@ -521,7 +551,7 @@ export class V2Hub {
     this.matches.set(matchId, match);
     for (const k of keys) this.playing.set(k, match);
     const { setup } = match;
-    const mode = setup.ranked ? 'ranked' : `${setup.practice ? 'practice' : 'casual'}, ${match.difficulty}`;
+    const mode = setup.ranked ? 'ranked' : `${setup.practice ? 'practice' : setup.draft ? 'draft' : 'casual'}, ${match.difficulty}`;
     log.info(`v2 match ${matchId} on ${setup.map.id} (${mode}): ${setup.sides.A.handle} vs ${setup.sides.B.handle}`);
     try {
       const end = await match.play();
