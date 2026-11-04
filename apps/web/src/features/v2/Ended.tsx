@@ -5,7 +5,7 @@
 // stats and season points are designed but not live, so they show "Soon", never a number. Under
 // both, the Comms transcript: every line said that this tab saw delivered. A spectator gets the
 // result by crew ("ada wins"), no stars and no report of their own; practice carries its badge and
-// queues practice again.
+// queues practice again. Last, a player's decision timeline (Decisions: "why did it do that?").
 //   Ended          → on the match screen (a void match, or after the banner when the route did not move).
 //   V2ResultScreen → /matches/[id]/result: this tab's v2 store, else GET /v2/matches/:id.
 import { DIFF_MODS, TICK_MS, mapV2 } from '@skirm/engine/v2';
@@ -24,6 +24,7 @@ import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
 import { ReplayPanel } from '../replays/ReplayPanel';
 import { PracticeBadge, other } from './common';
+import { Decisions } from './Decisions';
 import { debriefOf, mvpOf, type DebriefData } from './hud/debrief';
 import { clock, feedTag } from './hud/model';
 import v from './v2.module.css';
@@ -283,6 +284,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
       </section>
       {data.status === 'ended' ? <ReplayPanel matchId={data.matchId} ticks={r.ticks} canShare={!watch} /> : null}
       {data.comms ? <Transcript lines={data.comms} team={me} watch={watch} /> : null}
+      {!watch && data.status === 'ended' ? <Decisions matchId={data.matchId} /> : null}
     </div>
   );
 }

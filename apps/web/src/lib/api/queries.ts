@@ -61,6 +61,7 @@ export const qk = {
     highlights: (matchId: string) => ['matches', 'v2', matchId, 'highlights'] as const,
     shares: (matchId: string) => ['matches', 'v2', matchId, 'shares'] as const,
     shared: (shareId: string) => ['matches', 'shared', shareId] as const,
+    v2Decisions: (matchId: string) => ['matches', 'v2', matchId, 'decisions'] as const,
   },
 };
 

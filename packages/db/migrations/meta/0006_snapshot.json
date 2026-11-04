@@ -1,6 +1,6 @@
 {
-  "id": "3ddef187-7d81-40e1-800f-8bd0245f57fc",
-  "prevId": "2a6e11de-23ee-4ad6-be7a-9749b1403c3f",
+  "id": "274889d8-0912-4178-aa99-ccc0f71e6030",
+  "prevId": "d8298f4e-86e5-4378-82e4-6db0545b88a6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1224,6 +1224,92 @@
         "match_skill_stats_outcome_ck": {
           "name": "match_skill_stats_outcome_ck",
           "value": "\"match_skill_stats\".\"outcome\" in ('win', 'loss', 'draw')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.match_timelines": {
+      "name": "match_timelines",
+      "schema": "",
+      "columns": {
+        "match_id": {
+          "name": "match_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "team": {
+          "name": "team",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "brain": {
+          "name": "brain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "plans": {
+          "name": "plans",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "decisions": {
+          "name": "decisions",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "moments": {
+          "name": "moments",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "match_timelines_match_id_v2_matches_id_fk": {
+          "name": "match_timelines_match_id_v2_matches_id_fk",
+          "tableFrom": "match_timelines",
+          "tableTo": "v2_matches",
+          "columnsFrom": [
+            "match_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "match_timelines_match_id_team_pk": {
+          "name": "match_timelines_match_id_team_pk",
+          "columns": [
+            "match_id",
+            "team"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "match_timelines_team_ck": {
+          "name": "match_timelines_team_ck",
+          "value": "\"match_timelines\".\"team\" in ('A', 'B')"
         }
       },
       "isRLSEnabled": false

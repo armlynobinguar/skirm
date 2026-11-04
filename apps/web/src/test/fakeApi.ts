@@ -55,6 +55,7 @@ const METHODS: (keyof ApiClient)[] = [
   'replayShares',
   'sharedReplay',
   'revokeReplayShare',
+  'v2MatchDecisions',
   'onboarding',
   'updateTutorial',
   'dismissChecklist',

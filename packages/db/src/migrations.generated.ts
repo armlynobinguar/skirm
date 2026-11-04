@@ -161,8 +161,18 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     ]
   },
   {
+    "tag": "0005_match_timelines",
+    "folderMillis": 1793773723595,
+    "bps": true,
+    "hash": "0f33faffe826b5e3fb131b8adba4afe484b03884d00dc5956222ecf9be5a3a35",
+    "sql": [
+      "CREATE TABLE \"match_timelines\" (\n\t\"match_id\" text NOT NULL,\n\t\"team\" text NOT NULL,\n\t\"brain\" text NOT NULL,\n\t\"plans\" jsonb DEFAULT '[]'::jsonb NOT NULL,\n\t\"decisions\" jsonb DEFAULT '[]'::jsonb NOT NULL,\n\t\"moments\" jsonb DEFAULT '[]'::jsonb NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"match_timelines_match_id_team_pk\" PRIMARY KEY(\"match_id\",\"team\"),\n\tCONSTRAINT \"match_timelines_team_ck\" CHECK (\"match_timelines\".\"team\" in ('A', 'B'))\n);\n",
+      "\nALTER TABLE \"match_timelines\" ADD CONSTRAINT \"match_timelines_match_id_v2_matches_id_fk\" FOREIGN KEY (\"match_id\") REFERENCES \"public\".\"v2_matches\"(\"id\") ON DELETE cascade ON UPDATE no action;"
+    ]
+  },
+  {
     "tag": "0006_replay_shares",
-    "folderMillis": 1793775348996,
+    "folderMillis": 1793777320108,
     "bps": true,
     "hash": "ca6e6f71c11743ca62281c8a0035efa06e9cd431f9b1ba3c2c01ebe31689c8bf",
     "sql": [

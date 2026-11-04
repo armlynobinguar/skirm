@@ -4,6 +4,7 @@
 // client. In components use `useApi()` (src/lib/providers.tsx), never construct one.
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
+import type { MatchDecisions } from './decisions';
 import { ApiError, errorFromBody } from './errors';
 import type {
   Agent,
@@ -133,6 +134,8 @@ export interface ApiClient {
   sharedReplay(shareId: string, opts?: { frames?: boolean }): Promise<SharedReplay>;
   /** DELETE /replays/:shareId: its creator ends the link. */
   revokeReplayShare(shareId: string): Promise<{ revoked: true }>;
+  /** GET /v2/matches/:id/decisions: the caller's crew's decision timeline (players only, once ended). */
+  v2MatchDecisions(matchId: string): Promise<MatchDecisions>;
 
   /** GET /onboarding: tutorial progress and the home checklist. */
   onboarding(): Promise<Onboarding>;
@@ -262,6 +265,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     replayShares: (id) => get(`/v2/matches/${enc(id)}/shares`),
     sharedReplay: (id, opts = {}) => get(`/replays/${enc(id)}`, opts.frames === false ? { frames: 0 } : undefined),
     revokeReplayShare: (id) => json('DELETE', `/replays/${enc(id)}`),
+    v2MatchDecisions: (id) => get(`/v2/matches/${enc(id)}/decisions`),
 
     onboarding: () => get('/onboarding'),
     updateTutorial: (body) => json('PUT', '/onboarding/tutorial', { body }),
