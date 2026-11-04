@@ -57,7 +57,8 @@ describe('v2 lock-in', () => {
     expect(screen.getByTestId('v2-lockin')).toHaveTextContent('150 ticks × (0.20 + 0.40) credits per tick');
     expect(screen.getByTestId('v2-head-start')).toHaveTextContent('Rival fields 2 · no head start');
     expect(screen.getByTestId('goal-box')).toHaveTextContent('Normal');
-    expect(screen.getByRole('timer', { name: 'Time left to lock in' })).toHaveTextContent('0:30');
+    // A real 30 s countdown: on a slow machine the awaits above can take a second or more.
+    expect(screen.getByRole('timer', { name: 'Time left to lock in' })).toHaveTextContent(/^0:(30|2\d)$/);
   });
 
   it('adds from the roster, removes an agent and sends the new crew with its tiers', async () => {

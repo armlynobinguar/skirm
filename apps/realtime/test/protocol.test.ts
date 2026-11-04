@@ -118,6 +118,14 @@ describe('parseClientMessage', () => {
     expect(err({ type: 'v2_replay', matchId: 'mat_1', speed: 2 })).toBe('bad_message');
   });
 
+  it('accepts a lobby ready with a crew, and nothing else', () => {
+    const crew = [{ agentId: 'agt_1', tier: 'quiet' }];
+    expect(ok({ type: 'v2_lobby_ready', lobbyId: 'lby_1', crew })).toEqual({ type: 'v2_lobby_ready', lobbyId: 'lby_1', crew });
+    expect(err({ type: 'v2_lobby_ready', lobbyId: 'lby 1', crew })).toBe('bad_message');
+    expect(err({ type: 'v2_lobby_ready', lobbyId: 'lby_1', crew: [] })).toBe('bad_message');
+    expect(err({ type: 'v2_lobby_ready', lobbyId: 'lby_1', crew, ranked: true })).toBe('bad_message');
+  });
+
   it('accepts Buffer frames as ws delivers them', () => {
     expect(parseClientMessage(Buffer.from('{"type":"v2_cancel_queue"}'))).toEqual({
       ok: true,

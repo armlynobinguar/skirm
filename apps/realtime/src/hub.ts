@@ -212,6 +212,8 @@ export class RealtimeHub {
       }
       case 'v2_cancel_queue':
         return this.v2.cancel(this.requireUser(c).accountId);
+      case 'v2_lobby_ready':
+        return this.v2.lobbyReady(this.requireUser(c), msg.lobbyId, msg.crew);
       case 'v2_accept':
         return this.v2.accept(this.requireUser(c).accountId, msg.matchId);
       case 'v2_decline':

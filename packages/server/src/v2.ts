@@ -108,6 +108,11 @@ export type V2ClientMessage =
   /** Every stored frame of an ended match (answered with v2_frames), for replay at another speed. */
   | { type: 'v2_replay'; matchId: string }
   /**
+   * Readies a crew in a private lobby (made and joined over REST). The match starts, through the
+   * usual accept and lock-in, once both players have readied; v2_cancel_queue steps back out.
+   */
+  | { type: 'v2_lobby_ready'; lobbyId: string; crew: V2CrewEntry[] }
+  /**
    * A live command to the player's own crew: one agent (`agentId`) or all of it, a preset and/or free
    * text (at most DEFAULTS.commands.maxChars, through the speech filter). Answered with v2_command_ok.
    */
@@ -138,5 +143,7 @@ export type V2ServerMessage =
   | { type: 'v2_end'; matchId: string; result: MatchResult | null; reason: V2EndReason; logHash: string | null; debrief?: V2Debrief }
   /** Answer to v2_replay: a player's own crew view (the whole board for anyone else), ascending tick. */
   | { type: 'v2_frames'; matchId: string; frames: V2Frame[] }
+  /** A private lobby's players readied or stepped back (sent to both). */
+  | { type: 'v2_lobby'; lobbyId: string; ready: { host: boolean; guest: boolean } }
   /** Answer to v2_command, to the sender's crew only: the command is applied on `tick`; `left` remain. */
   | { type: 'v2_command_ok'; matchId: string; tick: number; left: number };

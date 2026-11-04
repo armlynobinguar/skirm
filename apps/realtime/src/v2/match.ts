@@ -141,6 +141,10 @@ export interface V2Setup {
   hold?: Partial<Record<Team, number>>;
   /** Bluffs a crew may tell when not BLUFF_CAP (the practice bot, practiceRival). */
   lieCap?: Partial<Record<Team, number>>;
+  /** A private lobby's talk rule: every agent of both crews plays this tier. */
+  talk?: TalkTier;
+  /** A private lobby's crew size: at most this many agents a crew (the map may allow fewer). */
+  crewMax?: number;
   /** Draft mode (casual): a ban phase between accept and lock-in. */
   draft?: boolean;
 }
@@ -258,7 +262,7 @@ export class V2Match {
     this.matchId = setup.matchId;
     this.timing = { ...DEFAULT_V2_TIMING, ...deps.timing };
     this.difficulty = setup.ranked ? RANKED_DIFFICULTY : (setup.difficulty ?? RANKED_DIFFICULTY);
-    this.crewLimit = crewLimitOf(setup.map);
+    this.crewLimit = Math.min(crewLimitOf(setup.map), setup.crewMax ?? 3);
     this.tally = new DebriefTally((id) => this.state?.agents.find((a) => a.id === id)?.team);
   }
 
@@ -293,7 +297,8 @@ export class V2Match {
       side.skillKeys = roster.skillKeys ?? [];
       side.skillMeta = roster.skillMeta ?? [];
     }
-    this.locked.set(team, side.crew.map((a, i) => (roster ? a.tier : (tiers[i] ?? a.tier))));
+    const forced = this.setup.talk;
+    this.locked.set(team, side.crew.map((a, i) => forced ?? (roster ? a.tier : (tiers[i] ?? a.tier))));
     if (roster) for (const t of TEAMS) this.deps.send(t, this.lockinMessage(t));
     this.toAll({ type: 'v2_locked', matchId: this.matchId, team });
     this.poke?.();

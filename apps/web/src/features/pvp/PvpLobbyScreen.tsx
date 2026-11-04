@@ -496,7 +496,11 @@ function Lobby() {
               'Ranked always plays Normal.'
             ) : (
               <>
-                Casual plays Normal here; pick a map and difficulty in the <Link href={routes.atlas()}>atlas</Link>.
+                Casual plays Normal here; pick a map and difficulty in the <Link href={routes.atlas()}>atlas</Link>, challenge a friend in a{' '}
+                <Link href={routes.lobbies()} data-testid="s11-lobbies">
+                  private lobby
+                </Link>{' '}
+                or enter a <Link href={routes.tournaments()}>tournament</Link>.
               </>
             )}
           </dd>

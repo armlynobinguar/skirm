@@ -34,6 +34,11 @@ export const routes = {
   credits: () => '/account/credits', // S15
   account: () => '/account', // S16
   agent: (agentId: string) => `/agents/${e(agentId)}`, // v2 agent editor
+  lobbies: () => '/lobbies', // private lobbies: make one, join by code
+  lobby: (lobbyId: string) => `/lobbies/${e(lobbyId)}`, // a lobby: settings, crew, ready
+  joinLobby: (code: string) => `/lobbies/join/${e(code)}`, // the share link of a lobby
+  tournaments: () => '/tournaments', // tournaments: list and make one
+  tournament: (id: string) => `/tournaments/${e(id)}`, // a bracket
 } as const;
 
 export type NavGroup = 'play' | 'skills' | 'market' | 'pvp' | 'leaderboards' | 'account';
@@ -43,7 +48,7 @@ export function navGroupOf(pathname: string): NavGroup | null {
   if (/^\/(play|maps|agents|tutorial)(\/|$)/.test(pathname)) return 'play';
   if (/^\/skills(\/|$)/.test(pathname)) return 'skills';
   if (/^\/market(\/|$)/.test(pathname)) return 'market';
-  if (/^\/(pvp|matches)(\/|$)/.test(pathname)) return 'pvp';
+  if (/^\/(pvp|matches|lobbies|tournaments)(\/|$)/.test(pathname)) return 'pvp';
   if (/^\/leaderboards(\/|$)/.test(pathname)) return 'leaderboards';
   if (/^\/account(\/|$)/.test(pathname)) return 'account';
   return null;
@@ -68,6 +73,10 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/agents(\/|$)/, key: 'agent', title: 'Agent', sub: '// prompt + stats', back: routes.home() },
   { re: /^\/maps(\/|$)/, key: 'maps', title: 'Atlas', sub: '// maps', back: routes.home() },
   { re: /^\/pvp(\/|$)/, key: 'pvp', title: 'Skirmish', sub: '// ranked', back: routes.home() },
+  { re: /^\/lobbies\/?$/, key: 'lobbies', title: 'Lobbies', sub: '// private matches', back: routes.pvp() },
+  { re: /^\/lobbies\//, key: 'lobby', title: 'Lobby', sub: '// friend challenge', back: routes.lobbies() },
+  { re: /^\/tournaments\/?$/, key: 'tournaments', title: 'Tournaments', sub: '// brackets', back: routes.pvp() },
+  { re: /^\/tournaments\//, key: 'tournament', title: 'Bracket', sub: '// single elimination', back: routes.tournaments() },
   { re: /^\/replays\/[^/]+\/?$/, key: 'replay', title: 'Replay', sub: '// shared', back: routes.pvp() },
   { re: /^\/matches\/[^/]+\/result\/?$/, key: 'match-result', title: 'Debrief', sub: '// replay hash on NEAR', back: routes.pvp() },
   { re: /^\/matches(\/|$)/, key: 'match', title: 'Live', sub: '// 2 s ticks', back: routes.pvp() },

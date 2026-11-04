@@ -98,6 +98,8 @@ export type V2ClientMessage =
   | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[] }
   /** Every stored frame of an ended match (answered with v2_frames), for replay at another speed. */
   | { type: 'v2_replay'; matchId: string }
+  /** Readies a crew in a private lobby; the match starts once both players have. v2_cancel_queue steps back. */
+  | { type: 'v2_lobby_ready'; lobbyId: string; crew: V2CrewEntry[] }
   /** A live command to your own crew: one agent or all of it, a preset and/or free text. Answered with v2_command_ok. */
   | { type: 'v2_command'; matchId: string; agentId?: string; preset?: CommandPreset; text?: string }
   /** Draft mode, on your turn: ban one of the rival's skills from the v2_draft pool, or pass (null). */
@@ -131,6 +133,8 @@ export type V2ServerMessage =
   | { type: 'v2_end'; matchId: string; result: MatchResult | null; reason: V2EndReason; logHash: string | null; debrief?: V2Debrief }
   /** Answer to v2_replay: a player's own crew view (the whole board for anyone else), ascending tick. */
   | { type: 'v2_frames'; matchId: string; frames: V2Frame[] }
+  /** A private lobby's players readied or stepped back. */
+  | { type: 'v2_lobby'; lobbyId: string; ready: { host: boolean; guest: boolean } }
   /** The command is applied on `tick`; `left` remain this match. */
   | { type: 'v2_command_ok'; matchId: string; tick: number; left: number };
 
@@ -162,6 +166,7 @@ export type WsErrorCode =
   | 'insufficient_credits'
   | 'match_void'
   | 'not_found'
+  | 'lobby_closed'
   | 'not_live'
   | 'no_commands'
   | 'rate_limited'
