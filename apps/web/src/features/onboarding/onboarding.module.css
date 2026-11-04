@@ -1,0 +1,84 @@
+/* Onboarding: the "first steps" checklist on home, the tutorial briefing (/tutorial), the coach over
+ * the guided match and the starter templates on My skills. Tokens only; nothing scrolls the page
+ * sideways at 360 px. */
+
+.card, .steps, .briefCard, .coach, .tpl {
+  background: var(--panel);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+  border-radius: var(--radius-3);
+  box-shadow: var(--elev-1);
+}
+
+/* ---------- First steps (home) ---------- */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  max-width: 560px;
+  min-width: 0;
+}
+.stepsHead { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--space-4); }
+.stepsTitle { margin: 2px 0 0; font: 700 20px/26px var(--font-sans); }
+.count { font: 600 15px/22px var(--font-mono); color: var(--ink-muted); }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.item { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.check {
+  flex: 0 0 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  border-radius: var(--radius-0);
+  font: 700 14px/1 var(--font-sans);
+  color: var(--good);
+}
+.item[data-done] .check { box-shadow: inset 0 0 0 1px var(--good); }
+.item[data-done] .itemTitle { color: var(--ink-muted); text-decoration: line-through; }
+.itemText { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.itemTitle { font: 700 15px/22px var(--font-sans); color: var(--ink); }
+.itemHint { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.go { flex: 0 0 auto; font: 700 13px/18px var(--font-sans); min-height: 44px; display: inline-flex; align-items: center; }
+
+/* ---------- Tutorial briefing (/tutorial) ---------- */
+.brief { display: flex; flex-direction: column; gap: var(--space-6); max-width: 760px; min-width: 0; }
+.briefCard { padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.briefTitle { margin: 0; font: 700 28px/34px var(--font-sans); }
+.briefBody { margin: 0; font-size: 17px; line-height: 26px; max-width: 640px; }
+.dots { display: flex; gap: 6px; flex-wrap: wrap; }
+.dot { width: 22px; height: 4px; background: var(--line-strong); }
+.dot[data-on] { background: var(--ink); }
+.row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.spacer { flex: 1 1 auto; }
+.facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; font-size: 15px; line-height: 22px; }
+.facts dt { color: var(--ink-muted); }
+.facts dd { margin: 0; min-width: 0; }
+
+/* ---------- Coach over the guided match ---------- */
+.coach {
+  position: fixed;
+  z-index: 40;
+  right: 16px;
+  bottom: 16px;
+  width: min(380px, calc(100vw - 32px));
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-shadow: var(--elev-2, var(--elev-1));
+}
+.coachHead { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.coachTitle { margin: 0; font: 700 17px/24px var(--font-sans); }
+.coachBody { margin: 0; font-size: 15px; line-height: 22px; }
+.coachStep { font: 500 13px/18px var(--font-mono); color: var(--ink-muted); }
+
+/* ---------- Starter templates (My skills) ---------- */
+.templates { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.tplGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: var(--space-4); }
+.tpl { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.tplName { margin: 0; font: 700 17px/24px var(--font-sans); }
+.tplSummary { margin: 0; font-size: 15px; line-height: 22px; }
+.tplMeta { margin: 0;  font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.tplText { margin: 0; font: 400 13px/19px var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.tplFoot { margin-top: auto; display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }

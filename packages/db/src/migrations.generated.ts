@@ -135,5 +135,15 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     "sql": [
       "ALTER TABLE \"accounts\" ADD COLUMN \"deleted_at\" timestamp with time zone;"
     ]
+  },
+  {
+    "tag": "0003_onboarding",
+    "folderMillis": 1793764247015,
+    "bps": true,
+    "hash": "8e6b71722ffcbfb3dd0a5fbb31b38c49696e505fcb41b56812723f632c843de9",
+    "sql": [
+      "CREATE TABLE \"onboarding_progress\" (\n\t\"account_id\" text PRIMARY KEY NOT NULL,\n\t\"tutorial_step\" integer DEFAULT 0 NOT NULL,\n\t\"tutorial_completed_at\" timestamp with time zone,\n\t\"tutorial_skipped_at\" timestamp with time zone,\n\t\"checklist_dismissed_at\" timestamp with time zone,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL\n);\n",
+      "\nALTER TABLE \"onboarding_progress\" ADD CONSTRAINT \"onboarding_progress_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;"
+    ]
   }
 ];

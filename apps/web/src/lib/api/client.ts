@@ -22,6 +22,9 @@ import type {
   AgentRecord,
   MyMatch,
   MyRentalOffer,
+  Onboarding,
+  SkillTemplateView,
+  TutorialUpdate,
   RentalOffer,
   RentalPass,
   MintResponse,
@@ -111,6 +114,17 @@ export interface ApiClient {
   v2Match(matchId: string): Promise<V2MatchRecord>;
   /** GET /v2/matches/live: v2 matches being played now, crews hidden. */
   v2LiveMatches(): Promise<V2LiveMatch[]>;
+
+  /** GET /onboarding: tutorial progress and the home checklist. */
+  onboarding(): Promise<Onboarding>;
+  /** PUT /onboarding/tutorial: tips seen (only grows), or `done` / `skipped` / `restart`. */
+  updateTutorial(body: TutorialUpdate): Promise<Onboarding>;
+  /** POST /onboarding/checklist/dismiss: hides the home checklist for good. */
+  dismissChecklist(): Promise<Onboarding>;
+  /** GET /onboarding/templates: the starter skill templates, full text. */
+  skillTemplates(): Promise<SkillTemplateView[]>;
+  /** POST /onboarding/templates/:id/copy: a new draft skill of the caller's from the template. */
+  copyTemplate(templateId: string): Promise<SkillView>;
 }
 
 export interface ApiClientOptions {
@@ -222,5 +236,11 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     playerLadder: (limit) => get('/leaderboards/players', { limit }),
     v2Match: (id) => get(`/v2/matches/${enc(id)}`),
     v2LiveMatches: () => get('/v2/matches/live'),
+
+    onboarding: () => get('/onboarding'),
+    updateTutorial: (body) => json('PUT', '/onboarding/tutorial', { body }),
+    dismissChecklist: () => json('POST', '/onboarding/checklist/dismiss'),
+    skillTemplates: () => get('/onboarding/templates'),
+    copyTemplate: (id) => json('POST', `/onboarding/templates/${enc(id)}/copy`),
   };
 }

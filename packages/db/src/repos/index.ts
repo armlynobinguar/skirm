@@ -6,6 +6,7 @@ import { LeaderboardsRepo } from './leaderboards';
 import { LedgerRepo, type LedgerRepoOptions } from './ledger';
 import { MarketRepo } from './market';
 import { MatchMessagesRepo } from './match-messages';
+import { OnboardingRepo } from './onboarding';
 import { OpsRepo } from './ops';
 import { ProofRepo } from './proof';
 import { RentalsRepo } from './rentals';
@@ -35,6 +36,8 @@ export interface Repos {
   cosmetics: CosmeticsRepo;
   /** Agent rental offers and one-match passes. */
   rentals: RentalsRepo;
+  /** Tutorial progress and the home checklist. */
+  onboarding: OnboardingRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -61,6 +64,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     proof: new ProofRepo(db),
     cosmetics: new CosmeticsRepo(db, opts.ledger),
     rentals: new RentalsRepo(db),
+    onboarding: new OnboardingRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -72,6 +76,7 @@ export * from './leaderboards';
 export * from './ledger';
 export * from './market';
 export * from './match-messages';
+export * from './onboarding';
 export * from './ops';
 export * from './proof';
 export * from './rentals';
