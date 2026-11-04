@@ -642,7 +642,7 @@ export const matchTimelines = pgTable(
       .notNull()
       .references(() => v2Matches.id, { onDelete: 'cascade' }),
     team: text('team').$type<'A' | 'B'>().notNull(),
-    /** The brain that played this crew ('haiku' or 'greedy'); greedy plays without skills. */
+    /** The brain that played this crew ('model' or 'greedy'; 'haiku' on rows from before the provider became config); greedy plays without skills. */
     brain: text('brain').notNull(),
     plans: jsonb('plans').$type<V2PlanRecord[]>().notNull().default([]),
     decisions: jsonb('decisions').$type<V2DecisionRecord[]>().notNull().default([]),
@@ -742,7 +742,7 @@ export const skillBenchmarks = pgTable(
     skillId: text('skill_id').notNull(),
     version: integer('version').notNull(),
     status: text('status').$type<ProofJobStatus>().notNull().default('queued'),
-    /** Brain kind that played (greedy, haiku, ...). */
+    /** Brain kind that played (greedy, model; 'haiku' on older rows). */
     brain: text('brain'),
     seeds: jsonb('seeds'),
     matches: integer('matches').notNull().default(0),

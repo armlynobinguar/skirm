@@ -24,8 +24,9 @@ x-node-env: &node-env
   # This stack runs NODE_ENV=production with dev auth and the dev SKILL_KEK on purpose (local only);
   # without this, a production server refuses both (packages/server config).
   ALLOW_DEV_IN_PRODUCTION: "true"
-  # v2 brain: greedy plays offline (no model calls, no spend). Set V2_BRAIN=haiku and
-  # OPENROUTER_API_KEY in .env to play Haiku through OpenRouter.
+  # v2 brain: greedy plays offline (no model calls, no spend). Set V2_BRAIN=model and LLM_API_KEY
+  # in .env to play a model (OpenRouter by default; LLM_BASE_URL and LLM_MODEL pick any
+  # OpenAI-compatible provider and model, .env.example lists them).
   V2_BRAIN: ${V2_BRAIN:-greedy}
   # v2 tick in milliseconds (minimum 50); unset or empty means the game's 2000.
   V2_TICK_MS: ${V2_TICK_MS:-}

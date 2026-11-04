@@ -1,6 +1,6 @@
 import { MAPS_V2, createMatch, observe, stepMatch, type AgentSpec, type Observation } from '@skirm/engine/v2';
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_THOUGHT_CHARS, createGreedyBrain, greedyThought, createHaikuBrain, createV2Brain, filterSpeech, maySpeak, parsePlan, parseReply, planPrompt, systemPrompt, turnPrompt } from '../src/v2';
+import { MAX_THOUGHT_CHARS, createGreedyBrain, greedyThought, createModelBrain, createV2Brain, filterSpeech, maySpeak, parsePlan, parseReply, planPrompt, systemPrompt, turnPrompt } from '../src/v2';
 
 const map = MAPS_V2.find((m) => m.id === 'copper-hollow')!;
 const spec = (id: string, role: AgentSpec['role']): AgentSpec => ({ id, name: id, role, vision: 3, comms: 3, tier: 'standard' });
@@ -101,10 +101,10 @@ describe('speech filter', () => {
   });
 });
 
-describe('Haiku brain (OpenRouter)', () => {
+describe('model brain (OpenRouter default)', () => {
   it('sends the model, parses the reply and reports the call', async () => {
     const fetch = fakeFetch('ACTION: 1\nSAY: team Going middle.');
-    const brain = createHaikuBrain({ apiKey: 'k', fetch });
+    const brain = createModelBrain({ apiKey: 'k', fetch });
     const o = observe(match(), 'wick');
     const d = await brain.act(o, { skills: ['Dam first.'], plan: null, canSpeak: true });
     expect(d).toMatchObject({ action: o.legal[0], reason: 'chosen', say: { channel: 'team', text: 'Going middle.' } });
@@ -116,14 +116,14 @@ describe('Haiku brain (OpenRouter)', () => {
   });
 
   it('waits when the reply names nothing legal, and drops speech that leaks a skill', async () => {
-    const brain = createHaikuBrain({ apiKey: 'k', fetch: fakeFetch('ACTION: 400\nSAY: team dam the left tunnel before the pump starts') });
+    const brain = createModelBrain({ apiKey: 'k', fetch: fakeFetch('ACTION: 400\nSAY: team dam the left tunnel before the pump starts') });
     const d = await brain.act(observe(match(), 'wick'), { skills: ['Dam the left tunnel before the pump starts.'], plan: null, canSpeak: true });
     expect(d).toMatchObject({ action: { type: 'wait' }, reason: 'illegal', say: null, refusedSay: 'leak' });
   });
 
   it("sends the owner's instructions to the model and drops speech that repeats them", async () => {
     const fetch = fakeFetch('ACTION: 1\nSAY: team always hug the north wall when fire spreads');
-    const brain = createHaikuBrain({ apiKey: 'k', fetch });
+    const brain = createModelBrain({ apiKey: 'k', fetch });
     const d = await brain.act(observe(match(), 'wick'), { skills: [], instructions: 'Always hug the north wall when fire spreads.', plan: null, canSpeak: true });
     expect(d).toMatchObject({ say: null, refusedSay: 'leak' });
     const body = JSON.parse(String(fetch.mock.calls[0]![1].body));
@@ -131,22 +131,22 @@ describe('Haiku brain (OpenRouter)', () => {
   });
 
   it('returns the inner voice with the action, and the planner reason with the plan', async () => {
-    const actor = createHaikuBrain({ apiKey: 'k', fetch: fakeFetch('ACTION: 1\nTHINK: Nobody near the lift. Go now.') });
+    const actor = createModelBrain({ apiKey: 'k', fetch: fakeFetch('ACTION: 1\nTHINK: Nobody near the lift. Go now.') });
     const d = await actor.act(observe(match(), 'wick'), { skills: [], plan: null, canSpeak: false });
     expect(d).toMatchObject({ reason: 'chosen', thought: 'Nobody near the lift. Go now.' });
-    const planner = createHaikuBrain({ apiKey: 'k', fetch: fakeFetch('Wick shores, Moss digs.\nWHY: the pump floods our side first.') });
+    const planner = createModelBrain({ apiKey: 'k', fetch: fakeFetch('Wick shores, Moss digs.\nWHY: the pump floods our side first.') });
     expect(await planner.plan(observe(match(), 'wick'), { skills: [] })).toMatchObject({ text: 'Wick shores, Moss digs.', why: 'the pump floods our side first.' });
   });
 
   it('waits when the provider fails or misses the deadline', async () => {
-    const brain = createHaikuBrain({ apiKey: 'k', fetch: fakeFetch(() => Promise.reject(new TypeError('network'))), deadlineMs: 50 });
+    const brain = createModelBrain({ apiKey: 'k', fetch: fakeFetch(() => Promise.reject(new TypeError('network'))), deadlineMs: 50 });
     const d = await brain.act(observe(match(), 'wick'), { skills: [], plan: null, canSpeak: false });
     expect(d.action).toEqual({ type: 'wait' });
     expect(['error', 'timeout']).toContain(d.reason);
   });
 
-  it('is chosen when OPENROUTER_API_KEY is set, else the greedy brain', () => {
-    expect(createV2Brain({ OPENROUTER_API_KEY: 'k' }, fakeFetch('1')).kind).toBe('haiku');
+  it('is chosen when a model key (OPENROUTER_API_KEY alias) is set, else the greedy brain', () => {
+    expect(createV2Brain({ OPENROUTER_API_KEY: 'k' }, fakeFetch('1')).kind).toBe('model');
     expect(createV2Brain({}).kind).toBe('greedy');
     expect(createV2Brain({ OPENROUTER_API_KEY: 'k', V2_BRAIN: 'greedy' }).kind).toBe('greedy');
   });

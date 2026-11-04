@@ -2,7 +2,7 @@
 // move) and the one-line observation summary.
 import { MAPS_V2, createMatch, observe, type AgentSpec } from '@skirm/engine/v2';
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_OBSERVED_CHARS, createGreedyBrain, createHaikuBrain, observedSummary, parseReply, turnPrompt } from '../src/v2';
+import { MAX_OBSERVED_CHARS, createGreedyBrain, createModelBrain, observedSummary, parseReply, turnPrompt } from '../src/v2';
 
 const map = MAPS_V2.find((m) => m.id === 'copper-hollow')!;
 const spec = (id: string, role: AgentSpec['role']): AgentSpec => ({ id, name: id, role, vision: 3, comms: 3, tier: 'standard' });
@@ -28,11 +28,11 @@ describe('v2 skill attribution', () => {
 
   it('maps the SKILL number back to the context skills, skipping blank ones', async () => {
     const o = observe(match(), 'wick');
-    const brain = createHaikuBrain({ apiKey: 'k', fetch: reply('ACTION: 1\nTHINK: Dam it.\nSKILL: 2') });
+    const brain = createModelBrain({ apiKey: 'k', fetch: reply('ACTION: 1\nTHINK: Dam it.\nSKILL: 2') });
     // The system prompt numbers "Dam first." 1 and "Dig later." 2; the blank one is not numbered.
     const d = await brain.act(o, { skills: ['Dam first.', '  ', 'Dig later.'], plan: null, canSpeak: false });
     expect(d.skill).toBe(2);
-    const none = await createHaikuBrain({ apiKey: 'k', fetch: reply('ACTION: 400\nSKILL: 1') }).act(o, { skills: ['Dam first.'], plan: null, canSpeak: false });
+    const none = await createModelBrain({ apiKey: 'k', fetch: reply('ACTION: 400\nSKILL: 1') }).act(o, { skills: ['Dam first.'], plan: null, canSpeak: false });
     expect(none.reason).toBe('illegal');
     expect(none.skill).toBeUndefined();
   });

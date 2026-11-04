@@ -436,7 +436,7 @@ function AgentEditor({
           </div>
           <div className={e.lvBar}>
             <small>Planner · actor</small>
-            <b>Claude Haiku 5.5</b>
+            <b>Same model for all</b>
             <span className={e.max}>LIVE</span>
           </div>
         </div>

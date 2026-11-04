@@ -36,7 +36,7 @@ async function bootstrap(): Promise<void> {
         `cost_alert ${JSON.stringify({ day: a.day, level: a.level, spentUsd: a.spentUsd, budgetUsd: a.budgetUsd })}`,
       ),
   });
-  // v2: Haiku 5.5 through OpenRouter when OPENROUTER_API_KEY is set (V2_BRAIN=greedy forces the
+  // v2: the configured model (LLM_*) when a model key is set (V2_BRAIN=greedy forces the
   // offline brain), else the greedy brain; its spend goes to the same CostMonitor.
   const v2Brain = createRealtimeV2Brain(process.env, costs, log);
   log.info(`v2 brain: ${v2Brain.kind} (${v2Brain.model})`);

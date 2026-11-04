@@ -1,12 +1,14 @@
 // v2 brains: what decides an agent's action (and speech) each tick from its Observation.
-// - haiku: Claude Haiku 5.5 through OpenRouter acts, speaks and plans (the pinned model for every
-//   agent in every mode, so no player can buy a smarter one). One call per agent per tick returns
-//   the action and, when the agent may speak, its message, which then goes through the filter.
+// - model: the operator's model (LLM_MODEL on any OpenAI-compatible provider, ../llm) acts, speaks
+//   and plans (one model for every agent in every mode, so no player can buy a smarter one). One
+//   call per agent per tick returns the action and, when the agent may speak, its message, which
+//   then goes through the filter.
 // - greedy: deterministic and offline, for dev, tests and benchmarks without keys.
 // A brain that misses the deadline or answers with nothing legal waits that tick.
 import { TALK_TIERS, skillTriggerHolds, type Action, type Channel, type CommandPreset, type Observation, type SkillTrigger } from '@skirm/engine/v2';
-import { HAIKU_OPENROUTER_MODEL, OPENROUTER_BASE_URL, PRICES } from '../config';
-import { defaultFetch, dig, num, postJson, type FetchLike } from '../http';
+import { DEFAULT_LLM_BASE_URL, DEFAULT_LLM_MODEL } from '../config';
+import { defaultFetch, dig, postJson, type FetchLike } from '../http';
+import { chatRequest, llmSettings, pricesFor, usageCost, v2BrainKind, type LlmEnv, type LlmPrices } from '../llm';
 import { runWithPolicy } from '../policy';
 import { nowMs } from '../usage';
 import { filterSpeech } from './filter';
@@ -29,7 +31,7 @@ export interface V2Call {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
-  /** costUsd is OpenRouter's own bill for the call (usage.cost), not the PRICES estimate. */
+  /** costUsd is the provider's own bill for the call (OpenRouter's usage.cost), not a price estimate. */
   billed?: boolean;
   error?: string;
 }
@@ -88,7 +90,7 @@ export interface V2AgentCommand {
 }
 
 export interface V2Brain {
-  readonly kind: 'haiku' | 'greedy';
+  readonly kind: 'model' | 'greedy';
   readonly model: string;
   act(o: Observation, ctx: V2AgentContext): Promise<V2Decision>;
   /** A short crew plan (null when the brain does not plan). */
@@ -106,24 +108,34 @@ export function maySpeak(tier: keyof typeof TALK_TIERS, tick: number, lastSpoke:
   return t.freeText && tick - lastSpoke >= t.every;
 }
 
-export interface HaikuBrainOptions {
-  apiKey: string;
+export interface ModelBrainOptions {
+  /** Bearer token; null or empty sends no Authorization header (a keyless local server). */
+  apiKey?: string | null;
   fetch?: FetchLike;
+  /** The actor's model (default DEFAULT_LLM_MODEL). */
   model?: string;
+  /** The planner's model (default `model`). */
+  plannerModel?: string;
+  /** An OpenAI-compatible API root (default DEFAULT_LLM_BASE_URL, OpenRouter). */
   baseUrl?: string;
+  /** USD per 1M tokens when the provider returns no cost (default: DEFAULT_MODEL_PRICES for the default model). */
+  prices?: LlmPrices | null;
   deadlineMs?: number;
+  /** Where the once-per-model "no price" warning goes (default console.warn). */
+  warn?: (msg: string) => void;
   /**
-   * Hears every OpenRouter call once it completes, ok or not, even when the caller stopped waiting
+   * Hears every model call once it completes, ok or not, even when the caller stopped waiting
    * (a late actor reply still cost money). Errors it throws are swallowed.
    */
   onUsage?: (c: V2Call) => void;
 }
 
-export function createHaikuBrain(opts: HaikuBrainOptions): V2Brain {
+export function createModelBrain(opts: ModelBrainOptions = {}): V2Brain {
   const fetch = opts.fetch ?? defaultFetch();
-  const model = opts.model ?? HAIKU_OPENROUTER_MODEL;
-  const url = `${opts.baseUrl ?? OPENROUTER_BASE_URL}/chat/completions`;
-  const headers = { Authorization: `Bearer ${opts.apiKey}`, 'X-Title': 'skirm' };
+  const actorModel = opts.model ?? DEFAULT_LLM_MODEL;
+  const plannerModel = opts.plannerModel ?? actorModel;
+  const baseUrl = opts.baseUrl ?? DEFAULT_LLM_BASE_URL;
+  const apiKey = opts.apiKey || null;
 
   const report = (c: V2Call) => {
     try {
@@ -134,21 +146,10 @@ export function createHaikuBrain(opts: HaikuBrainOptions): V2Brain {
   };
 
   const call = async (role: V2Call['role'], system: string, user: string, maxTokens: number, deadline: number) => {
+    const model = role === 'planner' ? plannerModel : actorModel;
+    const req = chatRequest({ baseUrl, apiKey, model, maxTokens, temperature: 0.4, system, user });
     const started = nowMs();
-    const out = await runWithPolicy(
-      (signal) =>
-        postJson({
-          fetch,
-          url,
-          headers,
-          signal,
-          // Reasoning off: Haiku 5.5 on OpenRouter reasons by default, and with a short token cap
-          // the whole budget goes to reasoning and the reply comes back empty. usage.include asks
-          // OpenRouter for the call's real cost.
-          body: { model, max_tokens: maxTokens, temperature: 0.4, reasoning: { enabled: false }, usage: { include: true }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] },
-        }),
-      { timeLimitMs: deadline },
-    );
+    const out = await runWithPolicy((signal) => postJson({ fetch, url: req.url, headers: req.headers, signal, body: req.body }), { timeLimitMs: deadline });
     const latencyMs = nowMs() - started;
     if (!out.ok) {
       const c: V2Call = { role, model, ok: false, latencyMs, inputTokens: 0, outputTokens: 0, costUsd: 0, error: out.reason };
@@ -156,20 +157,14 @@ export function createHaikuBrain(opts: HaikuBrainOptions): V2Brain {
       return { text: null, reason: out.reason, call: c };
     }
     const text = String(dig(out.value, 'choices', 0, 'message', 'content') ?? '');
-    const inputTokens = num(dig(out.value, 'usage', 'prompt_tokens'));
-    const outputTokens = num(dig(out.value, 'usage', 'completion_tokens'));
-    const billed = dig(out.value, 'usage', 'cost');
-    const c: V2Call =
-      typeof billed === 'number' && Number.isFinite(billed)
-        ? { role, model, ok: true, latencyMs, inputTokens, outputTokens, costUsd: billed, billed: true }
-        : { role, model, ok: true, latencyMs, inputTokens, outputTokens, costUsd: (inputTokens * PRICES.haiku.input + outputTokens * PRICES.haiku.output) / 1e6 };
+    const c: V2Call = { role, model, ok: true, latencyMs, ...usageCost(out.value, model, pricesFor(model, opts.prices), opts.warn) };
     report(c);
     return { text, reason: null, call: c };
   };
 
   return {
-    kind: 'haiku',
-    model,
+    kind: 'model',
+    model: actorModel,
     async act(o, ctx) {
       const wait: Action = { type: 'wait' };
       // The system prompt numbers the non-blank skills whose trigger holds this tick; a SKILL line maps
@@ -221,18 +216,32 @@ export function createGreedyBrain(): V2Brain {
 }
 
 export interface V2BrainOptions {
-  /** See HaikuBrainOptions.onUsage; the greedy brain makes no calls. */
+  /** See ModelBrainOptions.onUsage; the greedy brain makes no calls. */
   onUsage?: (c: V2Call) => void;
+  /** See ModelBrainOptions.warn. */
+  warn?: (msg: string) => void;
 }
 
 /**
- * Haiku when OPENROUTER_API_KEY is set, else the offline greedy brain. The second argument is a
- * fetch (tests) or the options; `createV2Brain(env, fetch, opts)` takes both.
+ * The model brain when the environment selects it (v2BrainKind: LLM_API_KEY or OPENROUTER_API_KEY
+ * set, or V2_BRAIN=model with a local LLM_BASE_URL; V2_BRAIN=greedy forces greedy), configured from
+ * LLM_BASE_URL, LLM_MODEL, LLM_PLANNER_MODEL and the LLM_PRICE_* settings; else the offline greedy
+ * brain. The second argument is a fetch (tests) or the options; `createV2Brain(env, fetch, opts)`
+ * takes both.
  */
-export function createV2Brain(env: { OPENROUTER_API_KEY?: string; V2_BRAIN?: string }, extra?: FetchLike | V2BrainOptions, opts: V2BrainOptions = {}): V2Brain {
+export function createV2Brain(env: LlmEnv, extra?: FetchLike | V2BrainOptions, opts: V2BrainOptions = {}): V2Brain {
   const fetch = typeof extra === 'function' ? extra : undefined;
   const o = typeof extra === 'object' ? { ...extra, ...opts } : opts;
-  if (env.V2_BRAIN !== 'greedy' && env.OPENROUTER_API_KEY)
-    return createHaikuBrain({ apiKey: env.OPENROUTER_API_KEY, ...(fetch ? { fetch } : {}), ...(o.onUsage ? { onUsage: o.onUsage } : {}) });
-  return createGreedyBrain();
+  if (v2BrainKind(env) !== 'model') return createGreedyBrain();
+  const s = llmSettings(env);
+  return createModelBrain({
+    apiKey: s.apiKey,
+    baseUrl: s.baseUrl,
+    model: s.model,
+    plannerModel: s.plannerModel,
+    prices: s.prices,
+    ...(fetch ? { fetch } : {}),
+    ...(o.onUsage ? { onUsage: o.onUsage } : {}),
+    ...(o.warn ? { warn: o.warn } : {}),
+  });
 }

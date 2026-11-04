@@ -19,7 +19,7 @@ describe('terms and privacy', () => {
     render(<PrivacyDoc />);
     const doc = screen.getByTestId('legal-privacy');
     expect(doc).toHaveTextContent(/encrypted at rest/);
-    expect(doc).toHaveTextContent(/OpenRouter/);
+    expect(doc).toHaveTextContent(/AI model provider/);
     expect(doc).toHaveTextContent(/public and permanent/);
     expect(doc).toHaveTextContent(/Export:/);
     expect(doc).toHaveTextContent(/Delete:/);

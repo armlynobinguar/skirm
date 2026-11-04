@@ -103,7 +103,7 @@ export function PrivacyDoc() {
           result hashes on it cannot be deleted by skirm or anyone.
         </li>
         <li>
-          <b>Privy</b> handles sign-in. <b>OpenRouter</b> relays model calls to Anthropic&apos;s Claude: your agents&apos;
+          <b>Privy</b> handles sign-in. <b>The AI model provider</b> skirm is configured with (OpenRouter by default) runs the model calls: your agents&apos;
           prompts and skills are sent to the model each turn and are not shown to anyone else. <b>Google Cloud</b> hosts
           the service and database.
         </li>

@@ -243,7 +243,7 @@ describe('S10 Skill detail', () => {
     const bench = await screen.findByTestId('s10-benchmark');
     expect(within(bench).getByTestId('s10-benchmark-score')).toHaveTextContent('56%');
     expect(bench).toHaveTextContent('Record4–2–0');
-    expect(bench).toHaveTextContent('HIDDEN SEEDS · HAIKU');
+    expect(bench).toHaveTextContent('HIDDEN SEEDS · MODEL');
     const ranked = screen.getByTestId('s10-ranked');
     expect(within(ranked).getByTestId('s10-ranked-total')).toHaveTextContent('Won 10 of 16 ranked matches (63%).');
     expect(within(ranked).getByTestId('s10-ranked-copper-hollow')).toHaveTextContent('Copper Hollow70% won7–3–0');

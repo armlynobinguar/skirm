@@ -43,7 +43,7 @@ export interface RealtimeDeps {
   registry: RegistryQueue;
   scheduler?: Scheduler;
   queueTiming?: Partial<QueueTiming>;
-  /** v2: the brain every agent uses (default: the offline greedy brain; production passes Haiku). */
+  /** v2: the brain every agent uses (default: the offline greedy brain; production passes the model brain). */
   v2Brain?: V2Brain;
   v2Timing?: Partial<V2Timing>;
   /** v2 map pool (default: MAPS_V2). */

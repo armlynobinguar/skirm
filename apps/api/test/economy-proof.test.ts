@@ -78,7 +78,7 @@ afterAll(() => h.close());
 describe('market proof', () => {
   it('cards carry the ranked record and benchmark score from one grouped query', async () => {
     await h.repos.proof.finishBenchmark(X, 1, {
-      brain: 'haiku',
+      brain: 'model',
       seeds: GAUNTLET.map(({ mapId, difficulty, hijack }) => ({ mapId, difficulty, hijack })),
       matches: 6,
       wins: 4,
@@ -119,7 +119,7 @@ describe('market proof', () => {
     const x = (await buyer.get(`/market/${X}`)).body;
     expect(x.benchmark).toEqual({
       status: 'done',
-      brain: 'haiku',
+      brain: 'model',
       seeds: GAUNTLET.map(({ mapId, difficulty, hijack }) => ({ mapId, difficulty, hijack })),
       matches: 6,
       wins: 4,

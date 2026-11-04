@@ -95,7 +95,7 @@ describe('skill benchmarks', () => {
     expect(
       await proof.finishBenchmark(model.id, 1, {
         ...result,
-        brain: 'haiku',
+        brain: 'model',
         leaks: 1,
         score: 0.5,
         results: [{ map: 'copper-hollow' }],
@@ -201,7 +201,7 @@ describe('ranked records', () => {
     }
     await ctx.repos.proof.enqueueBenchmark(gem.id, 1);
     await ctx.repos.proof.finishBenchmark(gem.id, 1, {
-      brain: 'haiku',
+      brain: 'model',
       matches: 6,
       wins: 3,
       losses: 3,
