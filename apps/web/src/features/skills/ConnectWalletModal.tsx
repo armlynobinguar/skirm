@@ -6,9 +6,11 @@
 // Esc / Cancel returns focus to the trigger (Modal does it).
 //
 // dev auth mode: picking a wallet asks for the testnet account id and links it directly (the api
-// trusts it). Otherwise "Choose a wallet" opens NEAR Connect (src/lib/wallet), the wallet signs the
-// NEP-413 link message `skirm:link-near:<skirm account id>:<near account id>`, and the proof goes
-// with the link request.
+// trusts it). Otherwise the modal lists the NEAR Connect wallets (src/lib/wallet) and one click on a
+// wallet connects it: wallets that support it sign in and sign the NEP-413 link message in a single
+// approval (`skirm:link-near:<skirm account id>`), the others sign in and then sign
+// `skirm:link-near:<skirm account id>:<near account id>`. The proof goes with the link request and
+// the modal reports the linked account to the caller.
 import { Badge, Button, Icon, Modal, TextField } from '@skirm/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -16,7 +18,8 @@ import { errorCopy, isApiError } from '@/lib/api/errors';
 import { qk, useMe } from '@/lib/api/queries';
 import { useSession } from '@/lib/auth/session';
 import { useApi } from '@/lib/services';
-import { useNearSigner } from '@/lib/wallet/hooks';
+import { useNearSigner, useWallet } from '@/lib/wallet/hooks';
+import type { WalletOption } from '@/lib/wallet/types';
 import s from './skills.module.css';
 
 export interface ConnectWalletModalProps {
@@ -70,6 +73,10 @@ export function ConnectWalletModal({ open, reason = 'connect', onClose, onConnec
   const qc = useQueryClient();
   const me = useMe();
   const signer = useNearSigner();
+  const nearWallet = useWallet();
+  /** Non-dev: NEAR Connect's wallets, loaded when the modal opens (null: loading, []: none). */
+  const [options, setOptions] = useState<WalletOption[] | null>(null);
+  const [listFailed, setListFailed] = useState(false);
   const { mode, handle } = useSession();
   const [wallet, setWallet] = useState<string | null>(null);
   const [accountId, setAccountId] = useState('');
@@ -87,14 +94,35 @@ export function ConnectWalletModal({ open, reason = 'connect', onClose, onConnec
     setAccountId(handle ? `${handle.replace(/[^a-z\d_-]/g, '')}.testnet` : '');
   }, [open, handle]);
 
-  /** Non-dev: connect through NEAR Connect, sign the link message, link with the proof. */
-  const connectWallet = async () => {
+  // Load the connector and its wallet list as soon as the modal opens, so a click on a wallet goes
+  // straight to it (and stays a user gesture, which wallet popups need).
+  const devMode = mode === 'dev';
+  useEffect(() => {
+    if (!open || devMode) return;
+    let live = true;
+    setListFailed(false);
+    nearWallet
+      .wallets()
+      .then((w) => live && setOptions(w))
+      .catch(() => {
+        if (!live) return;
+        setOptions([]);
+        setListFailed(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [open, devMode, nearWallet]);
+
+  /** Non-dev: connect the picked wallet (or open NEAR Connect's picker), sign, link with the proof. */
+  const connectWallet = async (picked?: WalletOption) => {
     setBusy(true);
     setError(null);
+    setWallet(picked?.id ?? null);
     setStep('wallet');
     try {
       const skirmId = me.data?.account.id ?? (await api.me()).account.id;
-      const { nearAccountId, nearProof } = await signer.connectAndProve(skirmId);
+      const { nearAccountId, nearProof } = await signer.connectAndProve(skirmId, picked);
       setStep('linking');
       const res = await api.createSession({ nearAccountId, nearProof });
       await qc.invalidateQueries({ queryKey: qk.me });
@@ -137,7 +165,7 @@ export function ConnectWalletModal({ open, reason = 'connect', onClose, onConnec
           Connect wallet
         </Button>
       ) : null}
-      {!dev ? (
+      {!dev && (listFailed || options?.length === 0) ? (
         <Button variant="primary" icon="wallet" loading={busy} onClick={() => void connectWallet()} data-testid="m01-connect">
           {error ? 'Try again' : 'Choose a wallet'}
         </Button>
@@ -183,6 +211,43 @@ export function ConnectWalletModal({ open, reason = 'connect', onClose, onConnec
               </li>
             ))}
           </ul>
+        ) : options === null ? (
+          <p className="sk-muted app-small" role="status" style={{ margin: 0 }} data-testid="m01-wallets-loading">
+            Loading wallets...
+          </p>
+        ) : options.length ? (
+          <>
+            <ul className={s.walletList} aria-label="Wallets" data-testid="m01-wallets">
+              {options.map((w) => (
+                <li key={w.id}>
+                  <button
+                    type="button"
+                    className={s.walletBtn}
+                    aria-pressed={wallet === w.id}
+                    aria-busy={busy && wallet === w.id}
+                    disabled={busy}
+                    onClick={() => void connectWallet(w)}
+                    data-testid={`m01-wallet-${w.id}`}
+                  >
+                    <span className={s.walletLeft}>
+                      <span className={s.walletIcon}>
+                        {w.icon ? <img src={w.icon} alt="" width={20} height={20} /> : <Icon name="wallet" />}
+                      </span>
+                      <span className={s.walletText}>
+                        <span className={s.walletName}>{w.name}</span>
+                        <span className={s.walletKind}>{w.oneStep ? 'One approval' : 'Sign in, then sign'}</span>
+                      </span>
+                    </span>
+                    <Icon name="step_fwd" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="sk-muted app-small" style={{ margin: 0 }} data-testid="m01-wallets-note">
+              Pick your wallet. It asks you to approve a short message that proves the account is yours and moves no
+              NEAR.
+            </p>
+          </>
         ) : (
           <p className="sk-muted app-small" style={{ margin: 0 }} data-testid="m01-wallets-note">
             HOT, Meteor, MyNearWallet, Intear and other NEAR wallets. The wallet then asks you to sign a short
@@ -208,7 +273,7 @@ export function ConnectWalletModal({ open, reason = 'connect', onClose, onConnec
         {step ? (
           <p className={s.note} role="status" data-testid="m01-pending">
             {step === 'wallet'
-              ? 'Pick a wallet, then sign the link message in it. Keep this tab open.'
+              ? 'Approve in your wallet. Keep this tab open.'
               : 'Checking the signature with NEAR...'}
           </p>
         ) : null}
