@@ -216,6 +216,8 @@ describe('secrecy', () => {
       `/market/${skillId}`,
       '/me/matches',
       '/leaderboards/players',
+      '/bench',
+      '/bench/runs',
     ];
     for (const p of paths) {
       const res = await buyer.get(p);

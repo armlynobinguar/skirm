@@ -27,6 +27,7 @@ import {
   type Difficulty,
   type HeardMessage,
   type MapDefV2,
+  type MatchEvent,
   type MatchLog,
   type MatchResult,
   type MatchState,
@@ -55,6 +56,8 @@ export interface HeadlessOptions {
   onCall?: (team: Team, c: V2Call) => void;
   /** Scripted rival lines: every `every` ticks the next line reaches each agent of `team` that asks its brain. */
   inject?: { team: Team; every: number; lines: string[] };
+  /** Every stepped tick: the engine's events and the state after it (read only; for timelines and debriefs). */
+  onTick?: (events: readonly MatchEvent[], s: Readonly<MatchState>) => void;
 }
 
 export interface HeadlessStats {
@@ -174,6 +177,7 @@ export async function playHeadless(opts: HeadlessOptions): Promise<HeadlessResul
     });
     const ev = stepMatch(s, { actions, says });
     appendTick(log, { tick: s.tick, actions, says });
+    opts.onTick?.(ev, s);
     // The brain's own messages; bluffs the engine told for an agent are not its speech.
     for (const e of ev) if (e.kind === 'said' && !e.bluff) stats[teamOf(s, e.agent)].says++;
     if (s.result) break;

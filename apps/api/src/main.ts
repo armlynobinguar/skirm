@@ -49,7 +49,14 @@ async function main(): Promise<void> {
   });
 
   const deps: ApiDeps = {
-    config: { ...config, V2_BRAIN: process.env.V2_BRAIN, rankedDecay: rankedDecayFromEnv(process.env) },
+    config: {
+      ...config,
+      V2_BRAIN: process.env.V2_BRAIN,
+      rankedDecay: rankedDecayFromEnv(process.env),
+      ...(Number(process.env.BENCH_RUNS_PER_HOUR) > 0
+        ? { BENCH_RUNS_PER_HOUR: Math.floor(Number(process.env.BENCH_RUNS_PER_HOUR)) }
+        : {}),
+    },
     repos,
     vault: createVault(config),
     near: {

@@ -1,0 +1,32 @@
+/* Skill test bench. Tokens only. */
+
+.controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+.controls > * { min-width: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.runs { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.run { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.run:last-child { border-bottom: 0; }
+.runMeta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.runSub { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.pick { display: inline-flex; gap: 6px; align-items: center; min-height: 44px; font: 700 13px/18px var(--font-sans); cursor: pointer; }
+.pick input { accent-color: var(--chalk); }
+.link { font: 700 13px/18px var(--font-sans); display: inline-flex; min-height: 44px; align-items: center; }
+
+.side { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.events { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 18px; max-height: 360px; overflow-y: auto; }
+.event { display: flex; gap: 8px; }
+.event[data-side='bot'] { color: var(--ink-muted); }
+.tick { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink-muted); min-width: 40px; }
+
+.debrief { display: flex; flex-direction: column; gap: 12px; }
+.stats { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.stats div { display: flex; flex-direction: column; gap: 2px; }
+.stats dt { font: 700 12px/16px var(--font-sans); color: var(--ink-muted); }
+.stats dd { margin: 0; font: 700 17px/24px var(--font-mono); font-variant-numeric: tabular-nums; }
+.goals { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 18px; }
+
+.diff { margin: 0; padding: 12px; background: var(--surface-sunken); border-radius: 4px; font: 400 13px/20px var(--font-mono); white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow-y: auto; }
+.del { background: var(--critical-soft, rgba(220, 60, 60, .18)); color: var(--critical); text-decoration: line-through; }
+.ins { background: var(--good-soft, rgba(60, 180, 120, .18)); color: var(--good); text-decoration: none; }

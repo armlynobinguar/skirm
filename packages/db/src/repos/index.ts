@@ -1,6 +1,7 @@
 import type { Executor } from '../client';
 import { AccountsRepo } from './accounts';
 import { AgentsRepo } from './agents';
+import { BenchRepo } from './bench';
 import { CosmeticsRepo } from './cosmetics';
 import { ExternalAgentsRepo } from './external-agents';
 import { LeaderboardsRepo } from './leaderboards';
@@ -43,6 +44,8 @@ export interface Repos {
   seasons: SeasonsRepo;
   /** Skill proof: benchmarks, ranked records per version, counters, trials. */
   proof: ProofRepo;
+  /** Writers' skill test-bench runs. */
+  bench: BenchRepo;
   /** Premium cosmetics (paid credits only). */
   cosmetics: CosmeticsRepo;
   /** Agent rental offers and one-match passes. */
@@ -85,6 +88,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     ops: new OpsRepo(db),
     seasons: new SeasonsRepo(db, opts.clock),
     proof: new ProofRepo(db),
+    bench: new BenchRepo(db),
     cosmetics: new CosmeticsRepo(db, opts.ledger),
     rentals: new RentalsRepo(db),
     lobbies: new LobbiesRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
@@ -99,6 +103,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
 
 export * from './accounts';
 export * from './agents';
+export * from './bench';
 export * from './cosmetics';
 export * from './external-agents';
 export * from './leaderboards';

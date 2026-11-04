@@ -33,6 +33,7 @@ export type ApiErrorCode =
   | 'listing_active'
   | 'rate_limited'
   | 'trial_limit'
+  | 'bench_limit'
   | 'cosmetic_not_owned'
   | 'queue_unavailable'
   | 'rpc_unavailable'
@@ -126,6 +127,8 @@ export function errorCopy(e: unknown): { title: string; message: string; code?: 
       return { title: 'Slow down', message: 'Too many requests. Wait a moment and try again.', code: e.code };
     case 'trial_limit':
       return { title: 'Trial limit reached', message: 'Three trials per skill version. Buy it to keep playing it.', code: e.code };
+    case 'bench_limit':
+      return { title: 'Bench limit reached', message: 'You have used this hour’s bench runs. Try again later.', code: e.code };
     case 'cosmetic_not_owned':
       return { title: 'Look not owned', message: 'Buy the premium colour first, or pick a free one.', code: e.code };
     case 'queue_unavailable':

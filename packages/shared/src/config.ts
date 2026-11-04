@@ -103,6 +103,14 @@ const defaults = {
     ratePer100: { quiet: 20, standard: 20, open: 40 },
   },
   /**
+   * Writers' skill test bench: headless runs against the greedy bot, free on the greedy brain (with a
+   * model a run pays one Standard agent at the talk rate). At most this many runs per account per
+   * rolling hour (the api's BENCH_RUNS_PER_HOUR overrides it).
+   */
+  bench: {
+    runsPerHour: 20,
+  },
+  /**
    * v2 seasons: 14 days, standings from ranked v2 matches only, top 10 paid 30/20/15 then 5 × 7
    * (bps, the seasons contract's SPLIT_BPS). The pool is funded NEAR plus this share of market fees.
    */
