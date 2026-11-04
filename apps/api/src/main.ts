@@ -64,6 +64,7 @@ async function main(): Promise<void> {
       deposits: near.deposits,
       rentals: near.rentals,
       ownership: near.ownership,
+      badges: near.badges,
       keys: new RpcNearKeyChecker(near.rpc),
     },
     benchmarkQueue,

@@ -10,6 +10,7 @@ and the season prize pools. The stretch `pool` contract is not included.
 | `registry` | [`registry.playskirm.testnet`](https://testnet.nearblocks.io/address/registry.playskirm.testnet) | Match records (`MatchRecordV2`), log hashes, Elo per player, per-season standings |
 | `deposits` | [`deposits.playskirm.testnet`](https://testnet.nearblocks.io/address/deposits.playskirm.testnet) | `deposit()` top-ups with a NEP-297 event for the credits ledger; owner withdraws to the treasury |
 | `seasons` | [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | 14-day season prize pools: funded by market fees, standings posted by ops, prizes claimed by players |
+| `badges` | `badges.playskirm.testnet` (not deployed yet) | Soulbound achievement badges in the NEP-171 shape (core views, enumeration, metadata, `nft_mint` event); `nft_transfer` always panics |
 
 Roles used below: `playskirm.testnet` is the owner (full-access keys kept offline), the treasury and
 the market's governance account. `ops.playskirm.testnet` is the platform signer.
@@ -21,15 +22,16 @@ The ops key allow-list (function-call keys, one per contract):
 | `skills` | `nft_mint` |
 | `registry` | `record_match` |
 | `seasons` | `open_season`, `lock_season`, `post_standings`, `close_season` |
+| `badges` | `nft_mint` |
 
-Function-call keys cannot attach NEAR, so `skills`, `registry` and `seasons` pay their own storage.
+Function-call keys cannot attach NEAR, so `skills`, `registry`, `seasons` and `badges` pay their own storage.
 None of the market's admin methods are on the list: they all need 1 yocto.
 
 ## Build
 
 ```sh
 cd contracts
-./build.sh            # -> target/wasm32-unknown-unknown/release/skirm_{skills,market,registry,deposits,seasons}.wasm
+./build.sh            # -> target/wasm32-unknown-unknown/release/skirm_{skills,market,registry,deposits,seasons,badges}.wasm
 ```
 
 `wasm32v1-none` cannot build these contracts because it only provides `core`/`alloc` and
@@ -317,6 +319,21 @@ Every ops write is safe to retry: `open_season` with the same id and args, `lock
 season already locked or paid, and `close_season` on a paid season return the season unchanged with
 no event.
 
+### badges
+
+| Method | Caller | Deposit | Notes |
+| --- | --- | --- | --- |
+| `new(owner_id, ops_id, metadata?)` | deployer | | Metadata default `skirm badges` / `SKIRMBADGE` |
+| `nft_mint(token_id, receiver_id, badge: {achievement_id, player, title, description, unlocked_at_ms})` → Token | ops | | `token_id` must be `<achievement_id>:<player>` (player = platform account id): one badge per player and achievement. The same badge to the same owner again returns the existing token with no event; to another owner it panics |
+| `nft_transfer`, `nft_transfer_call` | | | Always panic: badges are soulbound. No approvals |
+| `nft_token`, `nft_total_supply`, `nft_tokens`, `nft_supply_for_owner`, `nft_tokens_for_owner`, `nft_metadata` | view | | NEP-171 / NEP-181 / NEP-177 |
+| `badge_info(token_id)`, `badge_for(achievement_id, player)`, `is_soulbound()`, `get_config()` | view | | |
+| `set_ops`, `set_owner` | owner | 1 yocto | |
+
+The backend mints through `NearBadges` (`packages/server/src/near/badges.ts`) when a signer is set,
+and records `local` through `NoopBadges` otherwise. Deploy it like `seasons` (owner, ops) and add an
+ops function-call key for `nft_mint`; nothing deploys it yet.
+
 ### deposits
 
 | Method | Caller | Deposit | Notes |
@@ -331,7 +348,7 @@ no event.
 
 | Standard | Events and data |
 | --- | --- |
-| `nep171` | `nft_mint`, `nft_transfer` (emitted by skills) |
+| `nep171` | `nft_mint`, `nft_transfer` (emitted by skills; badges emits `nft_mint` only, memo `soulbound`) |
 | `skirm_market` | `list` (listing), `delist`, `update_price`, `sale` `{token_id, seller, buyer, price, fee, fee_bps, season_share, treasury_share, royalties{account: amount}, seller_proceeds, refund, payout_fallback}`, `purchase_failed` `{token_id, seller, buyer, refund}`, `rental` `{rental_id, owner, renter, price, fee, fee_bps, season_share, treasury_share, owner_proceeds, refund}`, `season_share_forwarded` `{amount, treasury_id, season_pool_id}`, `fee_proposed` `{old_bps, new_bps, effective_at_ms, by}`, `fee_updated` `{old_bps, new_bps, by}`, `treasury_updated` / `owner_updated` / `governance_updated` / `season_pool_updated` `{old, new, by}` |
 | `skirm_registry` | `match_recorded` (MatchRecordV2) |
 | `skirm_seasons` | `season_opened`, `season_funded`, `season_locked`, `standings_posted`, `prize_claimed`, `season_closed`, `carry_rolled`, `ops_updated`, `owner_updated` |
