@@ -74,7 +74,7 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/rentals/mine` | ✓ | `{ offers, passes }`: the caller's active offers and unused one-match passes (each with the rented agent's public stats and owner handle) |
 | POST | `/rentals/:offerId` | ✓ | `{ txHash }` → `{ pass }`. A `market.rent` transaction from the caller's linked account whose `rental` event names this offer (`rental_id` = `<offerId>:<nonce>`), pays the owner's linked account and covers the price (422 `wrong_rental`, `wrong_owner`, `underpaid`, `wrong_sender`; 409 `own_agent`, `duplicate_tx`). Dev mode: `dev:<yocto>[:<nonce>]`. A replay returns the same pass. The pass is used up when a match with that agent ends (a void match keeps it); the agent plays with its owner's skills and its plans are withheld from the renter |
 | DELETE | `/me/near` | | `{ account }` with `nearAccountId: null`. `409 listing_active` while the player has an active listing |
-| GET | `/me/export` | ✓ | Everything skirm holds about the caller, one table per key (account, agents, skills created, ownership, listings, sales, rental offers and passes, ledger, matches with only the caller's debrief side, messages their agents said, standings, prizes, trials, cosmetics), plus `skillPrompts`: the caller's own skill prompts decrypted |
+| GET | `/me/export` | ✓ | Everything skirm holds about the caller, one table per key (account, agents, skills created, ownership, listings, sales, rental offers and passes, ledger, matches with only the caller's debrief side, messages their agents said, standings, prizes, trials, cosmetics, onboarding progress), plus `skillPrompts`: the caller's own skill prompts decrypted |
 | DELETE | `/me` | ✓ | `{ confirm }` (the current handle; 422 `confirm_mismatch`) → `{ deleted: true }`. 409 `agent_busy` mid-match, 409 `listing_active` with an open listing. Clears the Privy id, NEAR link and system prompts, ends rental offers, sets the handle to `~deleted-<id>` and `deleted_at`; the account never signs in again. Agents, match history, sales and the ledger stay (other players' records and paid rental passes depend on them); credits are forfeited |
 | GET | `/agents` | | `Agent[]`: `{ id, name, elo, matchesPlayed, wins, losses, draws, skills: [{id, version, name}], unlocks, role, vision, comms, tier, systemPrompt, appearance }` |
 | PATCH | `/agents/:id` | `{ name?, skills?: {id, version}[] (≤ 3, owned), unlocks?, role?, vision? (1-5), comms? (1-5), tier?, systemPrompt?: string \| null (≤ 600 characters; null or blank clears), appearance? }` | `Agent`. Gameplay fields are refused (`409 agent_busy`) while the agent is in a live match. `appearance` can change any time; a premium colour needs the cosmetic bought first (`403 cosmetic_not_owned`, `details.items`) |
@@ -122,6 +122,18 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | POST | `/cosmetics/:id/buy` | | `{ owned }`. Paid credits only, never the free allowance: `402 insufficient_credits` with `need`, `have`. Buying an owned item is a no-op 200 |
 | GET | `/credits` | | `{ balance, held, allowanceLeft, allowanceResetAt, available, creditsPerNear, rows: {id, type, amount, source, note, matchId, txHash, createdAt}[] }` (latest 100) |
 | POST | `/credits/deposits` | `{ txHash }` | `{ credited, balance, amountYocto }`: a `deposits.deposit()` tx verified through RPC (dev mode: `dev:<yocto>`), credited once (`409 duplicate_receipt`) |
+
+### Onboarding
+
+The tips, checklist items and templates are static (`TUTORIAL_STEPS`, `FIRST_STEPS`, `SKILL_TEMPLATES` in `@skirm/shared`); `onboarding_progress` stores only how far each player got. The guided match is ordinary practice against the greedy bot on `TUTORIAL_MATCH` (Copper Hollow, Easy, one agent); nothing in realtime knows it is a tutorial.
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| GET | `/onboarding` | | `{ tutorial: {status: 'new'\|'in_progress'\|'done'\|'skipped', step, steps, match: {mapId, difficulty, crewSize}, completedAt, skippedAt}, checklist: {items: {id: 'tutorial'\|'practice'\|'skill'\|'equip'\|'pvp', done}[], done, dismissed}, showChecklist }`. `step` is the number of tips seen. `tutorial` is done once the tutorial is finished or skipped; the others are read from the player's rows: an ended practice match, a skill they wrote, an agent of theirs carrying a skill they wrote, an ended casual or ranked match. `showChecklist` until every item is done or it is dismissed |
+| PUT | `/onboarding/tutorial` | `{ step? (0..steps), status?: 'done'\|'skipped'\|'restart' }` (one at least) | the same view. `step` only grows; the first `done` or `skipped` time sticks; `restart` sets the step to 0 and clears a skip (a finished tutorial stays finished) |
+| POST | `/onboarding/checklist/dismiss` | | the same view, `checklist.dismissed: true` |
+| GET | `/onboarding/templates` | | `{ id, name, summary, bestFor, lesson, prompt, reflexes, requires_actions, handles_tags }[]`: starter strategies, full text (they are examples, not secret) |
+| POST | `/onboarding/templates/:id/copy` | | `201 SkillPublic`: a new draft skill of the caller's (version 1, sealed into the vault like `POST /skills`). 404 for an unknown template |
 
 ### Operations
 

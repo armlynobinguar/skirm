@@ -617,3 +617,44 @@ export interface Cosmetics {
   items: CosmeticItem[];
   owned: string[];
 }
+
+// ---------- Onboarding ----------
+
+export type TutorialStatus = 'new' | 'in_progress' | 'done' | 'skipped';
+
+/** GET /onboarding: the guided match's progress and the home checklist. */
+export interface Onboarding {
+  tutorial: {
+    status: TutorialStatus;
+    /** Tips seen so far (only grows). */
+    step: number;
+    /** TUTORIAL_STEPS.length. */
+    steps: number;
+    match: { mapId: string; difficulty: Difficulty; crewSize: number };
+    completedAt: string | null;
+    skippedAt: string | null;
+  };
+  checklist: { items: { id: FirstStepId; done: boolean }[]; done: boolean; dismissed: boolean };
+  showChecklist: boolean;
+}
+
+export type FirstStepId = 'tutorial' | 'practice' | 'skill' | 'equip' | 'pvp';
+
+/** PUT /onboarding/tutorial. */
+export interface TutorialUpdate {
+  step?: number;
+  status?: 'done' | 'skipped' | 'restart';
+}
+
+/** GET /onboarding/templates: a starter strategy, full text shown (they are examples). */
+export interface SkillTemplateView {
+  id: string;
+  name: string;
+  summary: string;
+  bestFor: string;
+  lesson: string;
+  prompt: string;
+  reflexes: string;
+  requires_actions: ('place_block' | 'dig' | 'extinguish')[];
+  handles_tags: Tag[];
+}

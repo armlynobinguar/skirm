@@ -762,3 +762,21 @@ export const cosmeticsOwned = pgTable(
   },
   (t) => [primaryKey({ columns: [t.accountId, t.itemId] })],
 );
+
+// ---------- Onboarding ----------
+
+/**
+ * How far a player got with onboarding (@skirm/shared TUTORIAL_STEPS, FIRST_STEPS). No row: a new
+ * player who has seen nothing. `tutorial_step` is the number of tips seen and only grows; the rest
+ * of the checklist is read from the player's own matches, skills and agents.
+ */
+export const onboardingProgress = pgTable('onboarding_progress', {
+  accountId: text('account_id')
+    .primaryKey()
+    .references(() => accounts.id),
+  tutorialStep: integer('tutorial_step').notNull().default(0),
+  tutorialCompletedAt: ts('tutorial_completed_at'),
+  tutorialSkippedAt: ts('tutorial_skipped_at'),
+  checklistDismissedAt: ts('checklist_dismissed_at'),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+});
