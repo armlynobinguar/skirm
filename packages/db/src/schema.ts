@@ -493,6 +493,8 @@ export interface V2DebriefRecord {
   season?: { number: number; points: number };
   /** The crew's own live commands (V2Debrief.commands); absent when none were sent. */
   commands?: { tick: number; agents: { id: string; name: string }[]; preset: string | null; text: string | null }[];
+  /** Draft mode: every ban step, both crews' (V2Debrief.draft); absent outside draft mode. */
+  draft?: { bans: { team: 'A' | 'B'; step: number; skillId: string | null; name: string | null; timedOut?: true }[] };
 }
 
 /**
