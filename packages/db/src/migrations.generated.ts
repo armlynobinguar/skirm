@@ -234,5 +234,14 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE INDEX \"external_agents_account_idx\" ON \"external_agents\" USING btree (\"account_id\");",
       "\nCREATE UNIQUE INDEX \"external_agents_agent_uq\" ON \"external_agents\" USING btree (\"agent_id\");"
     ]
+  },
+  {
+    "tag": "0010_skill_roles",
+    "folderMillis": 1793789512440,
+    "bps": true,
+    "hash": "51cbfaa95df77c3aefb682be335cbcbc4a4fef7834ad7babc8da0f8070dfa95b",
+    "sql": [
+      "ALTER TABLE \"skill_versions\" ADD COLUMN \"roles\" jsonb DEFAULT '[\"any\"]'::jsonb NOT NULL;"
+    ]
   }
 ];
