@@ -22,7 +22,7 @@ import { DIFFS, diffIndex, mapById } from '@/features/arena/world';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { splitSale } from '@skirm/shared';
+import { splitSale, type SkillRole } from '@skirm/shared';
 import { ButtonLink } from '@/components/ButtonLink';
 import { EmptyState } from '@/components/states/EmptyState';
 import { ErrorCard } from '@/components/states/ErrorCard';
@@ -42,6 +42,7 @@ import { ConnectWalletModal } from './ConnectWalletModal';
 import { MarketplaceScreen } from './MarketplaceScreen';
 import { ACTION_UNLOCK, NEEDS_MODEL, bpsPct, devTxHash, near, parsePrice, shortDate } from './lib';
 import { StatusBadge, rarityOf, shortHash } from './parts';
+import { RoleTag, roleBlockReason } from './RoleTag';
 import s from './skills.module.css';
 import x from './exchange.module.css';
 
@@ -162,6 +163,7 @@ function DrawerView({ d, me, onClose }: { d: MarketDetail; me: Me | undefined; o
           <Badge icon={false}>v{sk.version}</Badge>
           <StatusBadge status={sk.status} />
           {d.owned ? <Badge tone="good">Owned</Badge> : null}
+          <RoleTag roles={sk.roles} />
         </div>
       </div>
       <span className="sk-kick" data-testid="s10-creator">
@@ -401,7 +403,9 @@ function TrialsProof({ d, agents }: { d: MarketDetail; agents: Agent[] }) {
   const trials = useTrials(sk.id, sk.version);
   const start = useStartTrial(sk.id);
   const [agentId, setAgentId] = useState('');
-  const agent = agents.find((a) => a.id === agentId) ?? agents[0];
+  const fits = (a: Agent) => roleBlockReason(sk.roles, a.role) === null;
+  const agent = agents.find((a) => a.id === agentId) ?? agents.find(fits) ?? agents[0];
+  const blocked = agent ? roleBlockReason(sk.roles, agent.role) : null;
   const limited = isApiError(start.error) && (start.error.status === 429 || start.error.code === 'trial_limit');
   const noneLeft = d.trials.left <= 0 || limited;
   // Between the 202 and the refetch that lists the new trial nothing looks open, so a second click
@@ -420,7 +424,7 @@ function TrialsProof({ d, agents }: { d: MarketDetail; agents: Agent[] }) {
             Agent
             <select className={s.select} value={agent?.id ?? ''} onChange={(e) => setAgentId(e.target.value)} data-testid="s10-trial-agent">
               {agents.map((a) => (
-                <option key={a.id} value={a.id}>
+                <option key={a.id} value={a.id} disabled={!fits(a)}>
                   {a.name} · {a.role}
                 </option>
               ))}
@@ -428,7 +432,8 @@ function TrialsProof({ d, agents }: { d: MarketDetail; agents: Agent[] }) {
           </label>
           <Button
             variant="primary"
-            disabled={noneLeft || running}
+            disabled={noneLeft || running || blocked !== null}
+            title={blocked ?? undefined}
             loading={start.isPending}
             onClick={() => start.mutate({ agentId: agent!.id, version: sk.version })}
             data-testid="s10-trial-start"
@@ -630,7 +635,7 @@ function Actions({ d, me, ownListing, creator }: { d: MarketDetail; me: Me | und
         </ButtonLink>
       ) : null}
 
-      {d.owned ? <Equip skillId={sk.id} version={sk.version} name={sk.name} agents={me?.agents ?? []} /> : null}
+      {d.owned ? <Equip skillId={sk.id} version={sk.version} name={sk.name} roles={sk.roles} agents={me?.agents ?? []} /> : null}
 
       {canList ? (
         <div className={x.listForm}>
@@ -711,15 +716,34 @@ function Actions({ d, me, ownListing, creator }: { d: MarketDetail; me: Me | und
   );
 }
 
-function Equip({ skillId, version, name, agents }: { skillId: string; version: number; name: string; agents: Agent[] }) {
+function Equip({
+  skillId,
+  version,
+  name,
+  roles,
+  agents,
+}: {
+  skillId: string;
+  version: number;
+  name: string;
+  roles: SkillRole[] | undefined;
+  agents: Agent[];
+}) {
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
   const [agentId, setAgentId] = useState<string>('');
-  const agent = agents.find((a) => a.id === agentId) ?? agents.find((a) => !a.skills.some((x) => x.id === skillId)) ?? agents[0];
+  // Role slots: agents of another role are listed but cannot take it; pick a fitting one first.
+  const fits = (a: Agent) => roleBlockReason(roles, a.role) === null;
+  const agent =
+    agents.find((a) => a.id === agentId) ??
+    agents.find((a) => fits(a) && !a.skills.some((x) => x.id === skillId)) ??
+    agents.find(fits) ??
+    agents[0];
   const already = agent?.skills.find((x) => x.id === skillId);
   const others = agent ? agent.skills.filter((x) => x.id !== skillId) : [];
   const full = others.length >= 3;
+  const blocked = agent ? roleBlockReason(roles, agent.role) : null;
 
   const equip = useMutation({
     mutationFn: () =>
@@ -739,8 +763,8 @@ function Equip({ skillId, version, name, agents }: { skillId: string; version: n
         Agent
         <select className={s.select} value={agent?.id ?? ''} onChange={(e) => setAgentId(e.target.value)} data-testid="s10-equip-agent">
           {agents.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name} · {a.skills.length} of 3 skills
+            <option key={a.id} value={a.id} disabled={!fits(a)}>
+              {a.name} · {a.role} · {fits(a) ? `${a.skills.length} of 3 skills` : 'wrong role'}
             </option>
           ))}
         </select>
@@ -748,14 +772,19 @@ function Equip({ skillId, version, name, agents }: { skillId: string; version: n
       <Button
         variant="primary"
         icon="plus"
-        disabled={full || (already?.version === version)}
+        disabled={full || blocked !== null || (already?.version === version)}
         loading={equip.isPending}
         onClick={() => equip.mutate()}
         data-testid="s10-equip-btn"
-        title={full ? `${agent?.name} has 3 skills. Remove one in the crew builder.` : undefined}
+        title={blocked ?? (full ? `${agent?.name} has 3 skills. Remove one in the crew builder.` : undefined)}
       >
         {already?.version === version ? `Equipped on ${agent?.name}` : `Equip on ${agent?.name}`}
       </Button>
+      {blocked ? (
+        <p className="sk-kick" data-testid="s10-equip-role">
+          {blocked}
+        </p>
+      ) : null}
     </div>
   );
 }

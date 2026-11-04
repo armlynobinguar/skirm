@@ -1,7 +1,7 @@
 // Skills and their immutable versions (Spec §9). Only ciphertext is stored; the public view never
 // includes it, and `loadSealed` is for the vault (runner decrypt, creator read-back) only.
 import { and, desc, eq, inArray, isNotNull, isNull, lt, max, ne, or, sql } from 'drizzle-orm';
-import type { Tag } from '@skirm/shared';
+import { normalizeSkillRoles, type SkillRole, type Tag } from '@skirm/shared';
 import type { Executor } from '../client';
 import { newId } from '../ids';
 import { accounts, agentSkills, agents, skillOwnership, skillVersions, skills } from '../schema';
@@ -16,6 +16,8 @@ export interface SkillMetaInput {
   summary?: string | null;
   requiresActions: RequiredAction[];
   handlesTags: Tag[];
+  /** Agent roles that may equip it; omitted or empty = any role. */
+  roles?: readonly SkillRole[];
   royaltyBps: number;
 }
 
@@ -32,6 +34,8 @@ export interface SkillVersionView {
   royaltyBps: number;
   requiresActions: RequiredAction[];
   handlesTags: Tag[];
+  /** `['any']` or the agent roles that may equip this version. */
+  roles: SkillRole[];
   promptSha256: string;
   status: SkillStatusName;
   tokenId: string | null;
@@ -53,6 +57,7 @@ const versionColumns = {
   royaltyBps: skillVersions.royaltyBps,
   requiresActions: skillVersions.requiresActions,
   handlesTags: skillVersions.handlesTags,
+  roles: skillVersions.roles,
   promptSha256: skillVersions.promptSha256,
   status: skillVersions.status,
   tokenId: skillVersions.tokenId,
@@ -377,6 +382,7 @@ async function insertVersion(
     summary: meta.summary ?? null,
     requiresActions: [...meta.requiresActions],
     handlesTags: [...meta.handlesTags],
+    roles: normalizeSkillRoles(meta.roles),
     royaltyBps: meta.royaltyBps,
     promptSha256: sealed.promptSha256,
     ciphertext: sealed.ciphertext,

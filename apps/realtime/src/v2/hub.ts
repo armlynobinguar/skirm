@@ -27,6 +27,7 @@ import {
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
+import { skillFitsRole } from '@skirm/shared';
 import { V2_MATCH_LAST_TTL_S, v2MatchChannel, v2MatchLastKey, type V2CrewEntry, type V2EndReason, type V2ServerMessage, type Vault } from '@skirm/server';
 import type { Logger, RegistryQueue } from '../deps';
 import { Matchmaker, type Lane, type QueueEntry } from '../matchmaker';
@@ -399,9 +400,15 @@ export class V2Hub {
       const ownerId = (await repos.agents.get(c.agentId))?.ownerId ?? accountId;
       const rented = ownerId !== accountId;
       const holder = ownerId;
+      // Role slots: the API refuses a skill for another role, so one here is stale; it sits out.
+      const roles = new Map((v.skills.length ? await repos.skills.getMany(v.skills) : []).map((m) => [`${m.id}:${m.version}`, m.roles]));
       for (const k of v.skills) {
         if (!(await repos.skills.owns(holder, k.id, k.version))) {
           log.warn(`v2: agent ${v.id} plays without skill ${k.id} v${k.version}: its player does not own it`);
+          continue;
+        }
+        if (!skillFitsRole(roles.get(`${k.id}:${k.version}`), v.role)) {
+          log.warn(`v2: agent ${v.id} plays without skill ${k.id} v${k.version}: it is not for a ${v.role}`);
           continue;
         }
         const sealed = await repos.skills.loadSealed(k.id, k.version);

@@ -17,7 +17,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import type { Tag, Unlock } from '@skirm/shared';
+import { AGENT_ROLES, type AgentRoleName, type Tag, type Unlock } from '@skirm/shared';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
 import { EmptyState } from '@/components/states/EmptyState';
@@ -49,6 +49,7 @@ import {
   type SkillForm,
 } from './lib';
 import { StatusBadge } from './parts';
+import { RoleTag } from './RoleTag';
 import s from './skills.module.css';
 
 const UNLOCK_LABEL: Record<Unlock, string> = { builder: 'Builder', digger: 'Digger', firefighter: 'Firefighter' };
@@ -91,6 +92,7 @@ function formOf(sk: SkillWithText): SkillForm {
     reflexes: sk.reflexes ?? '',
     requires: sk.requires_actions.map((a) => ACTION_UNLOCK[a as keyof typeof ACTION_UNLOCK]).filter(Boolean),
     tags: [...sk.handles_tags],
+    roles: (sk.roles ?? []).filter((r): r is AgentRoleName => r !== 'any'),
     royalty: bpsPct(sk.royalty_bps).replace('%', ''),
   };
 }
@@ -408,6 +410,29 @@ function Editor({ skill, owner }: { skill: SkillWithText | null; owner: string |
                 <span className="app-small sk-muted">Tags drive the market filters; agents never see them.</span>
               )}
             </fieldset>
+            <fieldset className={s.fieldset} data-testid="s08-roles">
+              <legend className={s.legend}>For roles</legend>
+              <div className={s.checks}>
+                <label className={`${s.checkTag} ${form.roles.length === 0 ? s.checkOn : ''}`}>
+                  <input type="checkbox" checked={form.roles.length === 0} onChange={() => set('roles', [])} data-testid="s08-role-any" />
+                  Any role
+                </label>
+                {AGENT_ROLES.map((r) => {
+                  const on = form.roles.includes(r);
+                  return (
+                    <label key={r} className={`${s.checkTag} ${on ? s.checkOn : ''}`}>
+                      <input type="checkbox" checked={on} onChange={() => set('roles', toggle(form.roles, r))} data-testid={`s08-role-${r}`} />
+                      {r}
+                    </label>
+                  );
+                })}
+              </div>
+              <span className="app-small sk-muted">
+                {form.roles.length
+                  ? `Only a ${form.roles.join(' or ')} can equip it. Public on the Exchange.`
+                  : 'Any agent can equip it. Pick roles to make it a role slot skill.'}
+              </span>
+            </fieldset>
           </section>
 
           <MintPanel skill={skill} dirty={dirty} form={form} setRoyalty={(v) => set('royalty', v)} royaltyError={shown.royalty} />
@@ -559,6 +584,14 @@ function MintPanel({
         <dd className={s.mono}>{skill?.tokenId ?? 'Assigned at mint'}</dd>
         <dt>Benchmark</dt>
         <dd data-testid="s08-benchmark">{bench ? benchmarkText(bench) : bound ? 'None for starter skills' : minted ? 'Not queued' : 'Runs at mint'}</dd>
+        {skill ? (
+          <>
+            <dt>Roles</dt>
+            <dd>
+              <RoleTag roles={skill.roles} />
+            </dd>
+          </>
+        ) : null}
       </dl>
       {skill?.requires_actions.length ? (
         <div className="sk-chiprow">

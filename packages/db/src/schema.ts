@@ -187,6 +187,8 @@ export const skillVersions = pgTable(
     summary: text('summary'),
     requiresActions: jsonb('requires_actions').$type<string[]>().notNull(),
     handlesTags: jsonb('handles_tags').$type<string[]>().notNull(),
+    /** Agent roles that may equip this version (`['any']`, or role names); public, like the tags. */
+    roles: jsonb('roles').$type<string[]>().notNull().default(['any']),
     royaltyBps: integer('royalty_bps').notNull().default(500),
     promptSha256: text('prompt_sha256').notNull(),
     ciphertext: bytea('ciphertext').notNull(),

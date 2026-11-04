@@ -1,6 +1,6 @@
 // Skills + Market helpers: limits mirrored from apps/api/src/validation.ts (Spec §9), NEAR amounts as
 // bigint strings (never floats) and test-run outcome labels.
-import { TAGS, UNLOCK_ACTION, type Tag, type Unlock } from '@skirm/shared';
+import { AGENT_ROLES, TAGS, UNLOCK_ACTION, type AgentRoleName, type Tag, type Unlock } from '@skirm/shared';
 import { formatNear, parseNear } from '@/lib/constants';
 import type { GatedAction, SkillBody, SkillStatus } from '@/lib/api/types';
 
@@ -83,6 +83,8 @@ export interface SkillForm {
   reflexes: string;
   requires: Unlock[];
   tags: Tag[];
+  /** Roles that may equip it; empty = any role. */
+  roles: AgentRoleName[];
   /** Percent text as typed ("5"). */
   royalty: string;
 }
@@ -94,6 +96,7 @@ export const emptyForm = (): SkillForm => ({
   reflexes: '',
   requires: [],
   tags: [],
+  roles: [],
   royalty: '5',
 });
 
@@ -120,6 +123,7 @@ export function toBody(f: SkillForm): SkillBody {
     reflexes: f.reflexes.trim() ? f.reflexes : null,
     requires_actions: UNLOCK_ORDER.filter((u) => f.requires.includes(u)).map(unlockAction),
     handles_tags: TAGS.filter((t) => f.tags.includes(t)),
+    roles: f.roles.length ? AGENT_ROLES.filter((r) => f.roles.includes(r)) : ['any'],
     royalty_bps: pctToBps(f.royalty) ?? LIMITS.royaltyDefaultBps,
   };
 }

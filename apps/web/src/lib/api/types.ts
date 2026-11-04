@@ -5,11 +5,11 @@
 //
 // Game types (SkillPublic, Tag, …) come from @skirm/shared (type-only imports,
 // browser-safe).
-import type { ActionKind, AgentAppearance, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, Tag, Unlock } from '@skirm/shared';
+import type { ActionKind, AgentAppearance, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, SkillRole, Tag, Unlock } from '@skirm/shared';
 
 import type { Difficulty, V2Debrief } from '../realtime/protocol';
 
-export type { AgentAppearance, CosmeticItem, SkillPublic, Tag, Unlock };
+export type { AgentAppearance, CosmeticItem, SkillPublic, SkillRole, Tag, Unlock };
 
 /** Skill version reference used everywhere a crew or agent names a skill. */
 export interface SkillRef {
@@ -199,6 +199,8 @@ export type SkillStatus = 'Draft' | 'Minted' | 'Listed' | 'Starter';
 
 /** views.ts SkillPublicView. */
 export interface SkillView extends SkillPublic {
+  /** Agent roles that may equip this version: `['any']` or role names (missing = any). */
+  roles?: SkillRole[];
   status: SkillStatus;
   tokenId: string | null;
   latestVersion: number;
@@ -228,6 +230,8 @@ export interface SkillBody {
   reflexes?: string | null;
   requires_actions: GatedAction[];
   handles_tags: Tag[];
+  /** `['any']` (default) or the agent roles that may equip it. */
+  roles?: SkillRole[];
   /** 0–1,000 (default 500). */
   royalty_bps?: number;
 }

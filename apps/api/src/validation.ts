@@ -9,7 +9,9 @@ import {
   OUTFIT_COLORS,
   PANTS_COLORS,
   SKIN_TONES,
+  SKILL_ROLES,
   TAGS,
+  type SkillRole,
 } from '@skirm/shared';
 import { z } from 'zod';
 import { ApiError } from './errors';
@@ -92,6 +94,13 @@ export const agentPatch = z.object({
     .optional(),
 });
 
+export const skillRoles = z
+  .array(z.enum(SKILL_ROLES as unknown as [SkillRole, ...SkillRole[]]))
+  .min(1)
+  .max(SKILL_ROLES.length)
+  .refine((a) => new Set(a).size === a.length, 'roles must be unique')
+  .refine((a) => !a.includes('any') || a.length === 1, 'roles: "any" stands alone');
+
 /** Spec §9 skill format limits. */
 export const skillBody = z.object({
   name: z
@@ -110,6 +119,8 @@ export const skillBody = z.object({
     .min(1)
     .max(10)
     .refine((a) => new Set(a).size === a.length, 'handles_tags must be unique'),
+  /** Agent roles that may equip it: `['any']` (the default) or 1-6 role names. */
+  roles: skillRoles.default(['any']),
   royalty_bps: z.number().int().min(0).max(1000).default(500),
 });
 
