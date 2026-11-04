@@ -5,6 +5,7 @@ import { closeDb, createDb, createRepos, migrate } from '@skirm/db';
 import { rankedDecayFromEnv } from '@skirm/shared';
 import {
   ConfigError,
+  RedisExternalTurnStore,
   CostMonitor,
   QUEUE_BENCHMARKS,
   RedisCostStore,
@@ -61,6 +62,8 @@ async function main(): Promise<void> {
     },
     benchmarkQueue,
     costs: new RedisDailyCosts(readRedis),
+    // Bring your own agent: pull turns realtime publishes, shared through Redis.
+    externalTurns: new RedisExternalTurnStore(queueRedis),
     // Shared replays read realtime's stored frames; the caster's spend joins the daily cost total.
     replayFrames: new RedisReplayFrames(readRedis),
     caster: createApiCaster({ ...config, V2_BRAIN: process.env.V2_BRAIN }, (usd) => {

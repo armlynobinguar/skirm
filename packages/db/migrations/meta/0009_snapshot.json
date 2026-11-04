@@ -1,5 +1,5 @@
 {
-  "id": "90f26275-f560-4212-bbff-3dbfa3ee95a2",
+  "id": "64979337-ed68-4180-8e18-d3b035b27ce9",
   "prevId": "6a627f80-1b50-4261-9cd0-5b4bfb182c10",
   "version": "7",
   "dialect": "postgresql",
@@ -162,96 +162,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.achievements_unlocked": {
-      "name": "achievements_unlocked",
-      "schema": "",
-      "columns": {
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "achievement_id": {
-          "name": "achievement_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "badge_status": {
-          "name": "badge_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "badge_token_id": {
-          "name": "badge_token_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "badge_tx": {
-          "name": "badge_tx",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "badge_owner": {
-          "name": "badge_owner",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "badge_at": {
-          "name": "badge_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "achievements_unlocked_account_id_accounts_id_fk": {
-          "name": "achievements_unlocked_account_id_accounts_id_fk",
-          "tableFrom": "achievements_unlocked",
-          "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "achievements_unlocked_account_id_achievement_id_pk": {
-          "name": "achievements_unlocked_account_id_achievement_id_pk",
-          "columns": [
-            "account_id",
-            "achievement_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "achievements_badge_status_ck": {
-          "name": "achievements_badge_status_ck",
-          "value": "\"achievements_unlocked\".\"badge_status\" in ('none', 'pending', 'minted', 'local', 'failed')"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.agent_skills": {
@@ -645,6 +555,187 @@
         "elo_decays_lower_ck": {
           "name": "elo_decays_lower_ck",
           "value": "\"elo_decays\".\"elo_after\" < \"elo_decays\".\"elo_before\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.external_agents": {
+      "name": "external_agents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "webhook_url": {
+          "name": "webhook_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "secret_sha256": {
+          "name": "secret_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret_ciphertext": {
+          "name": "secret_ciphertext",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret_iv": {
+          "name": "secret_iv",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret_auth_tag": {
+          "name": "secret_auth_tag",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret_wrapped_key": {
+          "name": "secret_wrapped_key",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "secret_key_id": {
+          "name": "secret_key_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calls": {
+          "name": "calls",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "misses": {
+          "name": "misses",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rotated_at": {
+          "name": "rotated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "external_agents_account_idx": {
+          "name": "external_agents_account_idx",
+          "columns": [
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "external_agents_agent_uq": {
+          "name": "external_agents_agent_uq",
+          "columns": [
+            {
+              "expression": "agent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "external_agents_account_id_accounts_id_fk": {
+          "name": "external_agents_account_id_accounts_id_fk",
+          "tableFrom": "external_agents",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "external_agents_agent_id_agents_id_fk": {
+          "name": "external_agents_agent_id_agents_id_fk",
+          "tableFrom": "external_agents",
+          "tableTo": "agents",
+          "columnsFrom": [
+            "agent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "external_agents_name_ck": {
+          "name": "external_agents_name_ck",
+          "value": "char_length(\"external_agents\".\"name\") between 1 and 40"
         }
       },
       "isRLSEnabled": false
@@ -1901,90 +1992,6 @@
         "prize_payouts_status_ck": {
           "name": "prize_payouts_status_ck",
           "value": "\"prize_payouts\".\"status\" in ('local', 'claimable', 'paid')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.quest_claims": {
-      "name": "quest_claims",
-      "schema": "",
-      "columns": {
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quest_id": {
-          "name": "quest_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period": {
-          "name": "period",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period_key": {
-          "name": "period_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reward_credits": {
-          "name": "reward_credits",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "credited": {
-          "name": "credited",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "quest_claims_account_id_accounts_id_fk": {
-          "name": "quest_claims_account_id_accounts_id_fk",
-          "tableFrom": "quest_claims",
-          "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "quest_claims_account_id_quest_id_period_key_pk": {
-          "name": "quest_claims_account_id_quest_id_period_key_pk",
-          "columns": [
-            "account_id",
-            "quest_id",
-            "period_key"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "quest_claims_period_ck": {
-          "name": "quest_claims_period_ck",
-          "value": "\"quest_claims\".\"period\" in ('daily', 'weekly')"
         }
       },
       "isRLSEnabled": false

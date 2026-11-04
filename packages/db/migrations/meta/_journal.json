@@ -68,8 +68,22 @@
     {
       "idx": 9,
       "version": "7",
-      "when": 1793786199138,
-      "tag": "0009_quests_achievements",
+      "when": 1793786157033,
+      "tag": "0009_external_agents",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793789512440,
+      "tag": "0010_skill_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793790455952,
+      "tag": "0011_quests_achievements",
       "breakpoints": true
     }
   ]

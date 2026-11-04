@@ -1,12 +1,14 @@
 // Skills + Market helpers: limits mirrored from apps/api/src/validation.ts (Spec §9), NEAR amounts as
 // bigint strings (never floats) and test-run outcome labels.
 import {
+  AGENT_ROLES,
   ALWAYS_TRIGGER,
   SKILL_TRIGGER_LIMITS,
   SKILL_TRIGGER_PARAM,
   TAGS,
   UNLOCK_ACTION,
   storedSkillTrigger,
+  type AgentRoleName,
   type SkillTrigger,
   type Tag,
   type Unlock,
@@ -93,6 +95,8 @@ export interface SkillForm {
   reflexes: string;
   requires: Unlock[];
   tags: Tag[];
+  /** Roles that may equip it; empty = any role. */
+  roles: AgentRoleName[];
   /** Percent text as typed ("5"). */
   royalty: string;
   /** When the skill plays (public): `always` unless the creator picks a condition. */
@@ -106,6 +110,7 @@ export const emptyForm = (): SkillForm => ({
   reflexes: '',
   requires: [],
   tags: [],
+  roles: [],
   royalty: '5',
   trigger: ALWAYS_TRIGGER,
 });
@@ -140,6 +145,7 @@ export function toBody(f: SkillForm): SkillBody {
     reflexes: f.reflexes.trim() ? f.reflexes : null,
     requires_actions: UNLOCK_ORDER.filter((u) => f.requires.includes(u)).map(unlockAction),
     handles_tags: TAGS.filter((t) => f.tags.includes(t)),
+    roles: f.roles.length ? AGENT_ROLES.filter((r) => f.roles.includes(r)) : ['any'],
     royalty_bps: pctToBps(f.royalty) ?? LIMITS.royaltyDefaultBps,
     trigger: storedSkillTrigger(f.trigger),
   };

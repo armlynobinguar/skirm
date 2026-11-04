@@ -162,6 +162,40 @@ describe('S10 Skill detail', () => {
     );
   });
 
+  it('shows the role tag and offers only agents of the skill role, saying why the others cannot take it', async () => {
+    const runnerSkill = { ...marketCardFixture().skill, roles: ['Runner' as const] };
+    const { user, api } = renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, {
+      handle: 'ada',
+      api: base({
+        marketSkill: async () => marketDetailFixture({ skill: runnerSkill, owned: true, listing: undefined }),
+        patchAgent: async (id) => ({ ...meFixture().agents[1]!, id }),
+      }),
+    });
+    const btn = await screen.findByTestId('s10-equip-btn');
+    expect(screen.getAllByTestId('role-tag').some((t) => t.textContent === 'Runner')).toBe(true);
+    // Rook is a Builder: listed, but disabled; Wren (Runner) is picked.
+    await waitFor(() => expect(btn).toHaveTextContent('Equip on Wren'));
+    const rook = within(screen.getByTestId('s10-equip-agent')).getByRole('option', { name: /Rook/ });
+    expect(rook).toBeDisabled();
+    expect(rook).toHaveTextContent('wrong role');
+    await user.selectOptions(screen.getByTestId('s10-equip-agent'), 'agt_01J0000000000000000000MOSS');
+    await user.click(btn);
+    await waitFor(() =>
+      expect(api.patchAgent).toHaveBeenCalledWith('agt_01J0000000000000000000MOSS', { skills: [{ id: SKILL_ID, version: 1 }] }),
+    );
+  });
+
+  it('disables equip with the reason when no agent has the skill role', async () => {
+    const scoutSkill = { ...marketCardFixture().skill, roles: ['Scout' as const] };
+    renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, {
+      handle: 'ada',
+      api: base({ marketSkill: async () => marketDetailFixture({ skill: scoutSkill, owned: true, listing: undefined }) }),
+    });
+    const btn = await screen.findByTestId('s10-equip-btn');
+    expect(btn).toBeDisabled();
+    expect(screen.getByTestId('s10-equip-role')).toHaveTextContent('For Scout only; this agent is a Builder');
+  });
+
   it('lists an owned minted skill for resale after M02 shows what the seller receives', async () => {
     const mine = marketCardFixture().skill;
     const { user, api } = renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, {

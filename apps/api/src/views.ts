@@ -15,7 +15,7 @@ import {
   type V2MatchRow,
 } from '@skirm/db';
 import { BOT_HANDLE } from '@skirm/engine/v2';
-import { SEASON, skillTriggerOf, splitSale, type SkillPublic } from '@skirm/shared';
+import { SEASON, normalizeSkillRoles, skillTriggerOf, splitSale, type SkillPublic, type SkillRole } from '@skirm/shared';
 
 export const accountView = (a: AccountRow) => ({
   id: a.id,
@@ -30,6 +30,8 @@ const STATUS_LABEL = { draft: 'Draft', minted: 'Minted', listed: 'Listed' } as c
 const STARTER_LABEL = 'Starter' as const;
 
 export type SkillPublicView = SkillPublic & {
+  /** Agent roles that may equip this version: `['any']` or role names. */
+  roles: SkillRole[];
   status: (typeof STATUS_LABEL)[keyof typeof STATUS_LABEL] | typeof STARTER_LABEL;
   tokenId: string | null;
   latestVersion: number;
@@ -51,6 +53,7 @@ export function skillPublic(v: SkillVersionView, owner?: string): SkillPublicVie
     royalty_bps: v.royaltyBps,
     requires_actions: v.requiresActions,
     handles_tags: v.handlesTags,
+    roles: normalizeSkillRoles(v.roles),
     prompt_sha256: v.promptSha256,
     created_at: new Date(v.createdAt).toISOString(),
     trigger: skillTriggerOf(v.trigger),

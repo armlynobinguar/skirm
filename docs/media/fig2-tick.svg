@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420" width="1000" height="420" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+    <marker id="arg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7a7a7a"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="420" fill="#ffffff"/>
+
+  <!-- agent i box -->
+  <rect x="16" y="20" width="560" height="250" rx="6" fill="#f6f8fb" stroke="#c9d3e0" stroke-dasharray="5 4"/>
+  <text x="30" y="42" font-size="13" fill="#4a5a70" font-weight="bold" letter-spacing="1">AGENT i, TICK t (all agents in parallel)</text>
+
+  <!-- observation -->
+  <rect x="36" y="70" width="150" height="110" rx="5" fill="#fff" stroke="#333" stroke-width="1.2"/>
+  <text x="48" y="92" font-size="13" font-weight="bold">Observation oᵢ,ₜ</text>
+  <text x="48" y="114" font-size="11.5" fill="#333">own fogged view:</text>
+  <text x="48" y="131" font-size="11.5" fill="#333">tiles, hazards, items,</text>
+  <text x="48" y="148" font-size="11.5" fill="#333">rivals in sight, score,</text>
+  <text x="48" y="165" font-size="11.5" fill="#333">lines heard</text>
+
+  <!-- context inputs -->
+  <rect x="216" y="196" width="150" height="58" rx="4" fill="#fbfbf6" stroke="#b5b5a5"/>
+  <text x="226" y="214" font-size="11" fill="#555">crew plan πₜ (every 25 t)</text>
+  <text x="226" y="230" font-size="11" fill="#555">skills sᵢ (sealed, triggered)</text>
+  <text x="226" y="246" font-size="11" fill="#555">player commands</text>
+
+  <!-- policy -->
+  <rect x="216" y="70" width="150" height="110" rx="5" fill="#eef4fb" stroke="#4a6fa5" stroke-width="1.4"/>
+  <text x="228" y="92" font-size="13" font-weight="bold" fill="#2c4a75">Policy  f</text>
+  <text x="228" y="114" font-size="11.5" fill="#333">any LLM (OpenAI-</text>
+  <text x="228" y="131" font-size="11.5" fill="#333">compatible), an external</text>
+  <text x="228" y="148" font-size="11.5" fill="#333">agent, or greedy</text>
+  <text x="228" y="168" font-size="10.5" fill="#666">deadline 1.5 s, else wait</text>
+
+  <!-- outputs -->
+  <rect x="396" y="70" width="160" height="50" rx="5" fill="#fff" stroke="#333" stroke-width="1.2"/>
+  <text x="408" y="92" font-size="13" font-weight="bold">Action aᵢ,ₜ</text>
+  <text x="408" y="110" font-size="11" fill="#555">move · take · deliver · use</text>
+  <rect x="396" y="130" width="160" height="50" rx="5" fill="#fff" stroke="#333" stroke-width="1.2"/>
+  <text x="408" y="152" font-size="13" font-weight="bold">Utterance uᵢ,ₜ</text>
+  <text x="408" y="170" font-size="11" fill="#555">team or say (overheard)</text>
+
+  <!-- world -->
+  <rect x="616" y="70" width="170" height="50" rx="5" fill="#fff" stroke="#333" stroke-width="1.2"/>
+  <text x="628" y="92" font-size="13" font-weight="bold">Environment step</text>
+  <text x="628" y="110" font-size="11" fill="#555">resolve all aₜ, spread hazards</text>
+  <rect x="616" y="130" width="170" height="50" rx="5" fill="#fff6f2" stroke="#c0603e" stroke-width="1.2"/>
+  <text x="628" y="152" font-size="13" font-weight="bold" fill="#8a3d22">Talk filter</text>
+  <text x="628" y="170" font-size="11" fill="#555">block leaks of sᵢ and abuse</text>
+
+  <!-- log -->
+  <rect x="816" y="80" width="168" height="90" rx="5" fill="#f4f4f4" stroke="#333" stroke-width="1.2"/>
+  <text x="828" y="102" font-size="13" font-weight="bold">Match log</text>
+  <text x="828" y="124" font-size="11.5" font-family="Courier New, monospace" fill="#333">hₜ = H(hₜ₋₁ ‖ eₜ)</text>
+  <text x="828" y="144" font-size="11" fill="#555">eₜ: every action and</text>
+  <text x="828" y="159" font-size="11" fill="#555">delivered line at t</text>
+
+  <!-- arrows -->
+  <g stroke="#333" stroke-width="1.3" fill="none" marker-end="url(#ar)">
+    <line x1="186" y1="125" x2="214" y2="125"/>
+    <line x1="291" y1="196" x2="291" y2="182"/>
+    <path d="M366,110 L380,110 L380,95 L394,95"/>
+    <path d="M366,140 L380,140 L380,155 L394,155"/>
+    <line x1="556" y1="95" x2="614" y2="95"/>
+    <line x1="556" y1="155" x2="614" y2="155"/>
+    <path d="M786,95 L800,95 L800,115 L814,115"/>
+    <path d="M786,155 L800,155 L800,135 L814,135"/>
+  </g>
+  <!-- next tick loop -->
+  <path d="M900,170 C 900,320 111,320 111,182" stroke="#7a7a7a" stroke-width="1.2" fill="none" stroke-dasharray="5 4" marker-end="url(#arg)"/>
+  <text x="505" y="300" font-size="11.5" font-style="italic" fill="#666" text-anchor="middle">t ← t + 1  (every 2 s; 150 ticks or until a crew delivers the goal)</text>
+
+  <!-- caption -->
+  <text x="16" y="362" font-size="13.5" fill="#222"><tspan font-weight="bold">Figure 2.</tspan> One tick of a match. Each agent observes only its own fogged view, and a policy chosen by the</text>
+  <text x="16" y="382" font-size="13.5" fill="#222">operator or player maps it, with the crew plan and sealed skills, to an action and an optional utterance.</text>
+  <text x="16" y="402" font-size="13.5" fill="#222">The environment resolves all actions together; filtered speech and every event extend a hash chain.</text>
+</svg>

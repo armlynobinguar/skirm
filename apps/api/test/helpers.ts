@@ -103,6 +103,8 @@ export async function setup(
     now?: string;
     /** Turn request rate limits on (off by default: the harness signs many players in a minute). */
     rateLimit?: ApiDeps['rateLimit'];
+    /** Extra deps (the external agent relay and webhook transport). */
+    deps?: Partial<Pick<ApiDeps, 'externalTurns' | 'externalPost'>>;
     /** Stored frames for shared replays and the caster (default: none, template caster). */
     replayFrames?: ApiDeps['replayFrames'];
     caster?: ApiDeps['caster'];
@@ -143,6 +145,7 @@ export async function setup(
     benchmarkQueue: benchmarks,
     costs,
     ...(opts.rateLimit ? { rateLimit: opts.rateLimit } : {}),
+    ...opts.deps,
     ...(opts.replayFrames ? { replayFrames: opts.replayFrames } : {}),
     ...(opts.caster ? { caster: opts.caster } : {}),
   };

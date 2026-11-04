@@ -35,6 +35,7 @@ describe('config', () => {
       'crew',
       'draft',
       'elo',
+      'external',
       'free',
       'market',
       'model',

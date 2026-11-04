@@ -27,6 +27,7 @@ import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
 import { TAGS, near } from './lib';
 import { SkillArt, rarityOf, useTilt } from './parts';
+import { RoleTag } from './RoleTag';
 import { SkillDrawer } from './SkillDetailScreen';
 import s from './skills.module.css';
 import x from './exchange.module.css';
@@ -425,6 +426,7 @@ function Card({ card: c, selected, onSelect }: { card: CardModel; selected: bool
             </Badge>
           ) : null}
           {c.owned ? <Badge tone="good">Owned</Badge> : null}
+          <RoleTag roles={sk.roles} />
         </span>
       </span>
       <span className={x.in}>

@@ -185,6 +185,28 @@ describe('agent editor', () => {
     expect(api.patchAgent).toHaveBeenLastCalledWith(MOSS.id, { tier: 'quiet' });
   });
 
+  it('lists skills for another role last and disabled with the reason, and tags the equipped skill', async () => {
+    const SCOUT = skillRowFixture({ id: 'skl_scout', version: 1, name: 'Scout Sweep', roles: ['Scout'] });
+    const { user, api } = renderWithProviders(<AgentEditorScreen agentId={MOSS.id} />, {
+      handle: 'ada',
+      path: `/agents/${MOSS.id}`,
+      api: {
+        me: async () => meFixture({ agents: [WICK, MOSS, PIKE] }),
+        skills: async (tab) => (tab === 'written' ? [MINE] : [SCOUT, MINE, { ...BOUGHT, roles: ['Runner'] }]),
+        patchAgent: async (id, p) => ({ ...MOSS, ...p, id }) as never,
+      },
+    });
+    const skill = await screen.findByTestId('agent-skill');
+    const scout = await within(skill).findByTestId('agent-skill-slot-skl_scout');
+    expect(scout).toBeDisabled();
+    expect(scout).toHaveAttribute('title', 'Scout Sweep v1 · Scout. For Scout only; this agent is a Runner');
+    const slots = within(screen.getByRole('group', { name: 'Swap skill' })).getAllByRole('button');
+    expect(slots.at(-1)).toBe(scout);
+    expect(within(skill).getByTestId('role-tag')).toHaveTextContent('Runner');
+    await user.click(within(skill).getByRole('button', { name: 'Dam First v2' }));
+    expect(api.patchAgent).toHaveBeenCalledWith(MOSS.id, { skills: [{ id: 'skl_mine', version: 2 }] });
+  });
+
   it('steps through the roster with the buttons and the arrow keys, not while typing', async () => {
     const { user, router } = setup(WICK.id, { mapId: 'copper-hollow' });
     await screen.findByTestId('agent-prompt');
