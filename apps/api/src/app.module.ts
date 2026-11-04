@@ -12,6 +12,7 @@ import { MarketController } from './controllers/market.controller';
 import { RentalsController } from './controllers/rentals.controller';
 import { OpsController } from './controllers/ops.controller';
 import { PublicController } from './controllers/public.controller';
+import { QuestsController } from './controllers/quests.controller';
 import { SeasonsController } from './controllers/seasons.controller';
 import { SkillsController } from './controllers/skills.controller';
 import { DEPS, type ApiDeps } from './deps';
@@ -32,6 +33,7 @@ export class AppModule {
         RentalsController,
         SeasonsController,
         CosmeticsController,
+        QuestsController,
         OpsController,
       ],
       providers: [

@@ -4,6 +4,7 @@ import type { Repos } from '@skirm/db';
 import type { NearKeyChecker } from './near-link';
 import type { RateLimitStore, RateLimits } from './rate-limit';
 import type {
+  BadgeMinter,
   BenchmarkJobData,
   DepositVerifier,
   RentalVerifier,
@@ -51,6 +52,8 @@ export interface ApiDeps {
     /** Agent rental payments (`market.rent`); dev mode also takes `dev:` hashes. */
     rentals: RentalVerifier;
     ownership: OwnershipReader;
+    /** Soulbound achievement badges (`badges` contract; NoopBadges without a signer). */
+    badges: BadgeMinter;
     /** Checks NEAR link proofs outside dev mode (absent: linking is refused with 503). */
     keys?: NearKeyChecker;
   };
