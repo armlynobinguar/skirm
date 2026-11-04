@@ -1,5 +1,5 @@
 {
-  "id": "2c66e371-3873-4645-adee-735a405a9da2",
+  "id": "04978272-2990-4846-afc5-73a34f373ddd",
   "prevId": "cdb877a8-1ea5-4e12-9e1d-53e0c3f2afc1",
   "version": "7",
   "dialect": "postgresql",
@@ -1137,6 +1137,71 @@
       },
       "isRLSEnabled": false
     },
+    "public.onboarding_progress": {
+      "name": "onboarding_progress",
+      "schema": "",
+      "columns": {
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tutorial_step": {
+          "name": "tutorial_step",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "tutorial_completed_at": {
+          "name": "tutorial_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tutorial_skipped_at": {
+          "name": "tutorial_skipped_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "checklist_dismissed_at": {
+          "name": "checklist_dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "onboarding_progress_account_id_accounts_id_fk": {
+          "name": "onboarding_progress_account_id_accounts_id_fk",
+          "tableFrom": "onboarding_progress",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.prize_payouts": {
       "name": "prize_payouts",
       "schema": "",
@@ -1563,181 +1628,6 @@
         "rentals_owner_renter_ck": {
           "name": "rentals_owner_renter_ck",
           "value": "\"rentals\".\"owner_id\" <> \"rentals\".\"renter_id\""
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.replay_casts": {
-      "name": "replay_casts",
-      "schema": "",
-      "columns": {
-        "match_id": {
-          "name": "match_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "highlights": {
-          "name": "highlights",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "caster": {
-          "name": "caster",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "model": {
-          "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cost_usd": {
-          "name": "cost_usd",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "replay_casts_match_id_v2_matches_id_fk": {
-          "name": "replay_casts_match_id_v2_matches_id_fk",
-          "tableFrom": "replay_casts",
-          "tableTo": "v2_matches",
-          "columnsFrom": [
-            "match_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.replay_shares": {
-      "name": "replay_shares",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "match_id": {
-          "name": "match_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "start_tick": {
-          "name": "start_tick",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "end_tick": {
-          "name": "end_tick",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "revoked_at": {
-          "name": "revoked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "replay_shares_match_idx": {
-          "name": "replay_shares_match_idx",
-          "columns": [
-            {
-              "expression": "match_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "account_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "replay_shares_match_id_v2_matches_id_fk": {
-          "name": "replay_shares_match_id_v2_matches_id_fk",
-          "tableFrom": "replay_shares",
-          "tableTo": "v2_matches",
-          "columnsFrom": [
-            "match_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "replay_shares_account_id_accounts_id_fk": {
-          "name": "replay_shares_account_id_accounts_id_fk",
-          "tableFrom": "replay_shares",
-          "tableTo": "accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "replay_shares_clip_ck": {
-          "name": "replay_shares_clip_ck",
-          "value": "(\"replay_shares\".\"start_tick\" is null and \"replay_shares\".\"end_tick\" is null) or (\"replay_shares\".\"start_tick\" >= 0 and \"replay_shares\".\"end_tick\" > \"replay_shares\".\"start_tick\")"
         }
       },
       "isRLSEnabled": false

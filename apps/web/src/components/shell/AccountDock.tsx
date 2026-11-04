@@ -11,6 +11,7 @@ import { fmt } from '@skirm/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
+import { TierBadge, tierFrom, tierText } from '@/components/TierBadge';
 import { nearShort, useNearBalance } from '@/features/play/useNearBalance';
 import { useMe } from '@/lib/api/queries';
 import type { Me } from '@/lib/api/types';
@@ -88,6 +89,7 @@ export function AccountDock() {
       >
         <i className="app-acct-dia" aria-hidden="true" />
         <b className="app-acct-handle">{handle}</b>
+        {me.data ? <TierBadge tier={tierFrom(me.data.rank)} size="sm" testId="topbar-tier" /> : null}
         {credits ? <span className="app-acct-cr">{fmt(credits.balance)} CR</span> : null}
         <svg className="app-acct-chev" viewBox="0 0 10 6" aria-hidden="true">
           <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -179,15 +181,16 @@ function WalletCell({ me }: { me: Me | undefined }) {
   );
 }
 
-/** Ranked Elo and its rank title; links to the Skirmish hub (ladder, record). */
+/** Ranked Elo with its tier and rank title; links to the Skirmish hub (ladder, record). */
 function EloCell({ me }: { me: Me | undefined }) {
   const elo = me?.rank.elo;
   const rank = me?.rank.title ?? null;
+  const tier = me ? tierText(tierFrom(me.rank)) : null;
   return (
-    <Link href={routes.pvp()} className="app-dock-cell" title={rank ? `${rank} · Ranked Elo ${elo}` : 'Ranked Elo'} data-testid="topbar-elo">
+    <Link href={routes.pvp()} className="app-dock-cell" title={rank ? `${tier} · ${rank} · Ranked Elo ${elo}` : 'Ranked Elo'} data-testid="topbar-elo">
       <small>Ranked Elo</small>
       <b>{elo === undefined ? '–' : elo}</b>
-      {rank ? <span>{rank}</span> : null}
+      {rank ? <span>{tier ? `${tier} · ${rank}` : rank}</span> : null}
     </Link>
   );
 }

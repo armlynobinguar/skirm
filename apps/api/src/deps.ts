@@ -2,6 +2,7 @@
 // queue, the spend reader and the NEAR adapters (docs/backend-contract.md).
 import type { Repos } from '@skirm/db';
 import type { Caster } from '@skirm/decision-engine/v2';
+import type { RankedDecayConfig } from '@skirm/shared';
 import type { NearKeyChecker } from './near-link';
 import type { ReplayFrameReader } from './replays';
 import type { RateLimitStore, RateLimits } from './rate-limit';
@@ -26,7 +27,8 @@ export interface BenchmarkQueue {
 
 /**
  * `V2_BRAIN` (not in ServerConfig) is read from the environment like the worker and realtime read
- * it: 'greedy' forces the offline brain even with an OpenRouter key.
+ * it: 'greedy' forces the offline brain even with an OpenRouter key. `rankedDecay` is the worker's
+ * Elo decay setting (RANKED_DECAY_DAYS / _AMOUNT, rankedDecayFromEnv), DEFAULTS.ranked.decay unset.
  */
 export type ApiConfig = Pick<
   ServerConfig,
@@ -34,6 +36,7 @@ export type ApiConfig = Pick<
 > &
   Partial<Pick<ServerConfig, 'OPS_TOKEN' | 'COST_ALERT_DAILY_USD' | 'OPENROUTER_API_KEY'>> & {
     V2_BRAIN?: string | undefined;
+    rankedDecay?: RankedDecayConfig;
   };
 
 /** Model spend per UTC day as the worker and realtime sum it (Redis `cost:usd:<day>`, kept 3 days). */

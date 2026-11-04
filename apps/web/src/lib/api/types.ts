@@ -5,7 +5,7 @@
 //
 // Game types (SkillPublic, Tag, …) come from @skirm/shared (type-only imports,
 // browser-safe).
-import type { ActionKind, AgentAppearance, CosmeticItem, SkillPublic, Tag, Unlock } from '@skirm/shared';
+import type { ActionKind, AgentAppearance, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, Tag, Unlock } from '@skirm/shared';
 
 import type { Difficulty, V2Debrief, V2Frame } from '../realtime/protocol';
 
@@ -106,6 +106,11 @@ export interface Me {
     title: string;
     /** Place on the player ladder (1 = top); null before the first ranked match. */
     position: number | null;
+    // The api always sends the two below; optional so test fixtures can leave them out.
+    /** Ranked tier (`playerTier` in @skirm/shared); `tier.tier` is null during placement. */
+    tier?: PlayerTier;
+    /** When inactivity next costs Elo (Diamond and up), ISO 8601; null when decay does not apply. */
+    decayAt?: string | null;
   };
   credits: Credits;
   agents: Agent[];
@@ -413,12 +418,64 @@ export interface PlayerLadderRow {
   wins: number;
   losses: number;
   draws: number;
+  /** Ranked tier (`playerTier` in @skirm/shared); optional so fixtures can leave it out. */
+  tier?: PlayerTier;
 }
 
 export interface PlayerLadder {
   rows: PlayerLadderRow[];
   /** The caller's row when signed in and ranked (it may be outside `rows`). */
   you?: PlayerLadderRow;
+}
+
+/** GET /leaderboards/maps/:mapId row: a player's ranked record on one map. */
+export interface MapLadderRow {
+  rank: number;
+  account: { id: string; handle: string };
+  /** Overall Elo and ranked matches (the tier comes from these). */
+  elo: number;
+  rankedMatches: number;
+  matches: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  /** wins / matches on this map, 0–1. */
+  winRate: number;
+  tier: PlayerTier;
+}
+
+export interface MapLadder {
+  mapId: string;
+  rows: MapLadderRow[];
+}
+
+/** GET /leaderboards/skills row: a skill's ranked record over all its versions. */
+export interface SkillLadderRow {
+  rank: number;
+  skill: { id: string; name: string };
+  creator: { id: string; handle: string };
+  matches: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  /** wins / matches, 0–1. */
+  winRate: number;
+}
+
+export interface SkillLadder {
+  /** Ranked matches a skill needs to be listed (DEFAULTS.ranked.skillMinMatches). */
+  minMatches: number;
+  mapId?: string;
+  rows: SkillLadderRow[];
+}
+
+/** GET /leaderboards/tiers. */
+export interface RankedTiers {
+  tiers: { name: RankedTierName; min: number; nextAt: number | null }[];
+  placementMatches: number;
+  kPlacement: number;
+  decay: { fromTier: RankedTierName; days: number; amount: number };
+  skillMinMatches: number;
 }
 
 /** packages/db V2CrewRecord: an agent as it played. */
@@ -665,4 +722,45 @@ export interface SharedReplay {
   framesKept: boolean;
   /** The clip's whole-board frames; null once they are no longer kept; absent with ?frames=0. */
   frames?: V2Frame[] | null;
+}
+
+// ---------- Onboarding ----------
+
+export type TutorialStatus = 'new' | 'in_progress' | 'done' | 'skipped';
+
+/** GET /onboarding: the guided match's progress and the home checklist. */
+export interface Onboarding {
+  tutorial: {
+    status: TutorialStatus;
+    /** Tips seen so far (only grows). */
+    step: number;
+    /** TUTORIAL_STEPS.length. */
+    steps: number;
+    match: { mapId: string; difficulty: Difficulty; crewSize: number };
+    completedAt: string | null;
+    skippedAt: string | null;
+  };
+  checklist: { items: { id: FirstStepId; done: boolean }[]; done: boolean; dismissed: boolean };
+  showChecklist: boolean;
+}
+
+export type FirstStepId = 'tutorial' | 'practice' | 'skill' | 'equip' | 'pvp';
+
+/** PUT /onboarding/tutorial. */
+export interface TutorialUpdate {
+  step?: number;
+  status?: 'done' | 'skipped' | 'restart';
+}
+
+/** GET /onboarding/templates: a starter strategy, full text shown (they are examples). */
+export interface SkillTemplateView {
+  id: string;
+  name: string;
+  summary: string;
+  bestFor: string;
+  lesson: string;
+  prompt: string;
+  reflexes: string;
+  requires_actions: ('place_block' | 'dig' | 'extinguish')[];
+  handles_tags: Tag[];
 }

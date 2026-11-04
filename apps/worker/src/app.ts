@@ -4,6 +4,7 @@ import { createV2Brain } from '@skirm/decision-engine/v2';
 import {
   CostMonitor,
   QUEUE_BENCHMARKS,
+  QUEUE_RANKED,
   QUEUE_REGISTRY,
   QUEUE_SEASONS,
   RedisCostStore,
@@ -14,6 +15,7 @@ import {
   createWorker,
   enqueueBenchmark,
   enqueueRegistry,
+  scheduleRankedDecay,
   scheduleSeasonTick,
   type ServerConfig,
 } from '@skirm/server';
@@ -27,6 +29,7 @@ import {
   type RegistryQueue,
   type WorkerDeps,
 } from './deps';
+import { decayConfigFrom, processRankedDecay, type DecayConfig } from './ranked-processor';
 import { processRegistry } from './registry-processor';
 import { processSeasonTick } from './season-processor';
 import { seedOfficialSkills } from './seed';
@@ -58,13 +61,15 @@ export function costMonitor(redis: Redis, dailyBudgetUsd: number, logger: Logger
   });
 }
 
-/** Starts the `registry`, `benchmarks` and `seasons` consumers over `deps`. */
+/** Starts the `registry`, `benchmarks`, `seasons` and `ranked` consumers over `deps`. */
 export function startConsumers(
   deps: WorkerDeps,
   connection: Redis,
   opts: {
     registryConcurrency?: number;
     benchmarksConcurrency?: number;
+    /** The Elo decay's days and amount (RANKED_DECAY_DAYS / RANKED_DECAY_AMOUNT). */
+    decay?: DecayConfig;
   } = {},
 ) {
   const registry = createWorker(
@@ -88,10 +93,12 @@ export function startConsumers(
     { ...(opts.benchmarksConcurrency ? { concurrency: opts.benchmarksConcurrency } : {}) },
   );
   const seasons = createWorker(QUEUE_SEASONS, () => processSeasonTick(deps), connection);
+  const ranked = createWorker(QUEUE_RANKED, () => processRankedDecay(deps, opts.decay), connection);
   for (const [name, w] of [
     ['registry', registry],
     ['benchmarks', benchmarks],
     ['seasons', seasons],
+    ['ranked', ranked],
   ] as const) {
     w.on('failed', (job, err) =>
       deps.logger.warn('job failed', { queue: name, jobId: job?.id, code: errorCode(err) }),
@@ -100,7 +107,7 @@ export function startConsumers(
       deps.logger.error('consumer error', { queue: name, code: errorCode(err) }),
     );
   }
-  return { registry, benchmarks, seasons };
+  return { registry, benchmarks, seasons, ranked };
 }
 
 export interface WorkerApp {
@@ -121,9 +128,10 @@ export async function startWorkerApp(
   const registryQueue = createQueue(QUEUE_REGISTRY, redis);
   const benchmarkQueue = createQueue(QUEUE_BENCHMARKS, redis);
   const seasonQueue = createQueue(QUEUE_SEASONS, redis);
+  const rankedQueue = createQueue(QUEUE_RANKED, redis);
   const closeAll = async () => {
     await Promise.all(
-      [registryQueue, benchmarkQueue, seasonQueue].map((q) => q.close().catch(() => undefined)),
+      [registryQueue, benchmarkQueue, seasonQueue, rankedQueue].map((q) => q.close().catch(() => undefined)),
     );
     await Promise.all([
       redis.quit().catch(() => redis.disconnect()),
@@ -131,7 +139,9 @@ export async function startWorkerApp(
     ]);
     await closeDb(db).catch(() => undefined);
   };
+  let decay: DecayConfig;
   try {
+    decay = decayConfigFrom(env);
     await db.execute('select 1');
     await redis.ping();
   } catch (err) {
@@ -162,11 +172,12 @@ export async function startWorkerApp(
     clock: systemClock,
     logger,
   };
-  const consumers = startConsumers(deps, consumerConn);
-  const workers = [consumers.registry, consumers.benchmarks, consumers.seasons];
+  const consumers = startConsumers(deps, consumerConn, { decay });
+  const workers = [consumers.registry, consumers.benchmarks, consumers.seasons, consumers.ranked];
   await Promise.all(workers.map((w) => w.waitUntilReady()));
   // One schedule however many workers start it (an upsert keyed by SEASON_TICK_JOB_ID).
   await scheduleSeasonTick(seasonQueue);
+  await scheduleRankedDecay(rankedQueue);
   if (brain.kind === 'greedy')
     logger.warn(
       'benchmarks and trials need a model key (OPENROUTER_API_KEY): they end needs_model',
@@ -175,6 +186,7 @@ export async function startWorkerApp(
     v2Brain: brain.kind,
     registry: near.registry.kind,
     seasons: near.seasons.kind,
+    eloDecay: decay,
   });
 
   // Official starter skills for the market (idempotent, advisory-locked across workers). In the

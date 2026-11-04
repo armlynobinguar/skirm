@@ -46,6 +46,8 @@ const METHODS: (keyof ApiClient)[] = [
   'credits',
   'deposit',
   'playerLadder',
+  'mapLadder',
+  'skillLadder',
   'v2Match',
   'v2LiveMatches',
   'v2Highlights',
@@ -53,6 +55,11 @@ const METHODS: (keyof ApiClient)[] = [
   'replayShares',
   'sharedReplay',
   'revokeReplayShare',
+  'onboarding',
+  'updateTutorial',
+  'dismissChecklist',
+  'skillTemplates',
+  'copyTemplate',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {

@@ -133,7 +133,7 @@ describe.skipIf(!baseUrl)('node-postgres (real Postgres)', () => {
 
     expect(await repos.ledger.v2MatchSpend(a.id)).toBe(paid);
     const row = await repos.leaderboards.playerRowFor(a.id);
-    expect(row).toMatchObject({ rank: 1, elo: 1216, rankedMatches: 1, wins: 1 });
+    expect(row).toMatchObject({ rank: 1, elo: 1224, rankedMatches: 1, wins: 1 });
     expect(typeof row!.rank).toBe('number');
   });
 });

@@ -11,6 +11,7 @@
 // per tier), unlike the feed, which keeps the last MAX_COMMS lines of everything. Your own live
 // commands (the frame's `commands`, never in the rival's) join both as 'order' lines.
 import { commandLabel, mapV2 } from '@skirm/engine/v2';
+import type { PlayerTier } from '@skirm/shared';
 import { useEffect, useSyncExternalStore } from 'react';
 import type { Realtime } from '@/lib/realtime/client';
 import type { Difficulty, FrameAgent, MatchResult, TalkTier, Team, V2Debrief, V2EndReason, V2Frame, WsServerMessage } from '@/lib/realtime/protocol';
@@ -75,6 +76,8 @@ export interface V2MatchView {
   crewLimit: number | null;
   headStartTicks: Record<Team, number> | null;
   rivalHandle: string | null;
+  /** Ranked: both players' tiers from v2_found (the rival stays unnamed until the start). */
+  tiers?: { you: PlayerTier; rival: PlayerTier } | null;
   tickMs: number;
   holdTicks: Record<Team, number> | null;
   frame: V2Frame | null;
@@ -121,6 +124,7 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
       crewLimit: null,
       headStartTicks: null,
       rivalHandle: m.rivalHandle ?? null,
+      tiers: m.tiers ?? null,
       tickMs: 2000,
       holdTicks: null,
       frame: null,
