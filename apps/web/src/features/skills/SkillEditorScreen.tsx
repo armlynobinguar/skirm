@@ -1,6 +1,5 @@
 'use client';
 // S08 Skill editor (/skills/[skillId]/edit, and /skills/new with skillId null). Owner: skills builder.
-// Design: .design-src/screens/S08-Skill-editor.dc.html
 //
 // - POST /skills creates v1 (draft); PUT /skills/:id always writes the next version as a draft
 //   (versions are immutable, a minted one included), so Save says which version it writes.

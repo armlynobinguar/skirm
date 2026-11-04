@@ -1,5 +1,4 @@
-/* Play group screens (S02-S06, M03). Tokens only; layouts follow the artboards in
- * .design-src/screens/. Phones from 360px: the shell pads 16px; nothing here scrolls the page
+/* Play group screens (S02-S06, M03). Tokens only. Phones from 360px: the shell pads 16px; nothing here scrolls the page
  * sideways (wide tables scroll inside their card). */
 
 .page { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }

@@ -1,6 +1,6 @@
 'use client';
 // S01 Sign in (/). Opens on the v2 Boot screen (Boot.tsx) over the arena; the pitch and sign-in follow.
-// Design: .design-src/screens/Main.dc.html
+//
 // One-screen v2 pitch, 3-panel explainer, sign-in with no wallet, the season ladder with no sign-in.
 //
 // dev mode (NEXT_PUBLIC_AUTH_MODE unset or `dev`): a handle field. The handle is sent as
