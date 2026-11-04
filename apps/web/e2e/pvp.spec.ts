@@ -116,7 +116,7 @@ test('two players play a v2 match: queue, accept, lock in, live arena with comms
   await a.getByTestId('v2-again').click();
   await expect(a.getByTestId('screen-s11')).toBeVisible();
   if (/draw/i.test(va)) await expect(a.getByTestId('s11-elo')).toHaveText('1,200');
-  else await expect(a.getByTestId('s11-elo')).toHaveText(/victory/i.test(va) ? '1,216' : '1,184');
+  else await expect(a.getByTestId('s11-elo')).toHaveText(/victory/i.test(va) ? '1,224' : '1,176');
 
   await ctxA.close();
   await ctxB.close();

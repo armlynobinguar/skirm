@@ -38,7 +38,7 @@ Use two separate browser profiles (a normal and a private window), signed in as 
 4. **See** the lock-in [`v2-lockin`] reading **Ranked plays every agent at Standard**; the rival is still unnamed. Click **Lock in ▸** [`v2-lock`] in both.
 5. **See** the live match [`v2-live`] with the rival's handle and the clock [`v2-clock`] running.
 6. At the end [`v2-ended`]: one window reads **Victory** and the other **Defeat**, or both **Draw** [`v2-verdict`], with the same log hash [`v2-hash`]. The report [`v2-tally`] shows the Elo change [`v2-elo`], the MVP and the credits **used of 30 held · the rest back** [`v2-credits`]. The NEAR line [`v2-registry`] reads **Recorded on this server only (NEAR is off here)**, because NEAR is a no-op locally.
-7. Click **Queue again** [`v2-again`]. **See** the hub with Elo **1,216** for the winner and **1,184** for the loser (1,200 on a draw) [`s11-elo`].
+7. Click **Queue again** [`v2-again`]. **See** the hub with Elo **1,224** for the winner and **1,176** for the loser (1,200 on a draw) [`s11-elo`].
 8. Click **Leaderboards** [`nav-leaderboards`] [`screen-s14`]. **See** both players in the season standings [`s14-season`, `s14-season-row-<rank>`] (25 points for a win, 5 for a loss, 12 each for a draw) and in the all-time ladder [`s14-alltime`]. The pool reads **local** [`s14-pool-local`] until the seasons contract is deployed.
 
 ### 4. Spectate
@@ -106,7 +106,7 @@ CA=$(curl -s -H 'x-dev-user: agent-a' $API/agents | jq -c '[.[] | select(.name==
 CB=$(curl -s -H 'x-dev-user: agent-b' $API/agents | jq -c '[.[] | select(.name=="Rook") | {agentId: .id, tier}]')
 node scripts/ws-v2.cjs "[{\"devUser\":\"agent-a\",\"crew\":$CA,\"ranked\":true},{\"devUser\":\"agent-b\",\"crew\":$CB,\"ranked\":true}]" 600 ranked.json
 R=$(jq -r '.clients[0].found.matchId' ranked.json)
-curl -s $API/v2/matches/$R | jq '{winner, elo}'              # Elo deltas +16 / -16 (0 / 0 on a draw)
+curl -s $API/v2/matches/$R | jq '{winner, elo}'              # Elo deltas +24 / -24 in placements (0 / 0 on a draw)
 curl -s -H 'x-dev-user: agent-a' $API/seasons/current | jq '{season: .season | {number, status, poolSource}, you}'
 curl -s "$API/leaderboards/players?limit=5" | jq .rows
 
