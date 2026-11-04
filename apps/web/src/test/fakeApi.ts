@@ -63,6 +63,7 @@ const METHODS: (keyof ApiClient)[] = [
   'joinTournament',
   'leaveTournament',
   'cancelTournament',
+  'v2MatchDecisions',
   'onboarding',
   'updateTutorial',
   'dismissChecklist',

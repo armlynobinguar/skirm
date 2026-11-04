@@ -11,7 +11,10 @@
 // holds and pays nothing. The match log is hash-chained per tick. At the end each crew gets its
 // debrief, and every frame is kept for replay. A player may send live commands (command()): each crew
 // has DEFAULTS.commands.perMatch, applied on the next tick, logged in the hash chain and shown only
-// to that crew.
+// to that crew. Draft mode (casual, `setup.draft`): between accept and lock-in each crew in turn
+// bans one of the rival's equipped skills (DEFAULTS.draft: bans per crew, the time per step; a step
+// not answered in time passes). A banned skill is unequipped from the rival crew for this match,
+// also from a crew swapped in at lock-in, and every ban is in both debriefs.
 import { V2_ACTION_DEADLINE_MS, V2_PLANNER_DEADLINE_MS, filterSpeech, maySpeak, type V2AgentCommand, type V2Brain, type V2Decision } from '@skirm/decision-engine/v2';
 import { DEFAULTS, chargeDue, playerTier, type PlayerTier } from '@skirm/shared';
 import {
@@ -46,16 +49,19 @@ import {
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
-import type { V2MatchMessageInput } from '@skirm/db';
-import type { V2Debrief, V2EndReason, V2ServerMessage } from '@skirm/server';
+import type { MatchTimelineInput, V2MatchMessageInput } from '@skirm/db';
+import type { V2Debrief, V2DraftBan, V2DraftSkill, V2EndReason, V2ServerMessage } from '@skirm/server';
 import type { Logger } from '../deps';
 import type { Scheduler } from '../timing';
 import { DebriefTally, buildDebrief } from './debrief';
+import { DecisionTimeline } from './timeline';
 
 export const TEAMS: readonly Team[] = ['A', 'B'];
 
 export interface V2Timing {
   acceptMs: number;
+  /** Draft mode: the time each ban step lasts. */
+  draftStepMs: number;
   lockMs: number;
   tickMs: number;
   actionMs: number;
@@ -66,6 +72,7 @@ export interface V2Timing {
 
 export const DEFAULT_V2_TIMING: V2Timing = {
   acceptMs: 10_000,
+  draftStepMs: DEFAULTS.draft.stepMs,
   lockMs: 30_000,
   tickMs: TICK_MS,
   actionMs: V2_ACTION_DEADLINE_MS,
@@ -94,6 +101,8 @@ export interface V2Roster {
   instructions?: (string | null)[];
   /** Per agent: the skill versions it plays with (recorded on v2_matches.crews, never in the log). */
   skillKeys?: { id: string; version: number }[][];
+  /** Per agent: the public names of `skillKeys`, in the same order (the draft's ban pool). */
+  skillNames?: string[][];
 }
 
 export interface V2Side extends V2Roster {
@@ -122,6 +131,8 @@ export interface V2Setup {
   talk?: TalkTier;
   /** A private lobby's crew size: at most this many agents a crew (the map may allow fewer). */
   crewMax?: number;
+  /** Draft mode (casual): a ban phase between accept and lock-in. */
+  draft?: boolean;
 }
 
 /** What the hub knows once the result is written: each player's Elo change, the registry line and (ranked) the season points. */
@@ -159,7 +170,7 @@ export interface V2MatchDeps {
   log: Logger;
 }
 
-type Phase = 'found' | 'lockin' | 'live' | 'ended';
+type Phase = 'found' | 'draft' | 'lockin' | 'live' | 'ended';
 
 /** A live command as the player sends it: one agent (absent: the whole crew), a preset and/or free text. */
 export interface V2CommandInput {
@@ -169,6 +180,10 @@ export interface V2CommandInput {
 }
 
 export type V2CommandError = 'not_live' | 'no_commands' | 'rate_limited' | 'invalid_command' | 'command_refused';
+
+export type V2BanError = 'not_your_turn' | 'invalid_ban';
+
+export type V2BanResult = { ok: true } | { ok: false; code: V2BanError; message: string };
 
 export type V2CommandResult = { ok: true; left: number; tick: number } | { ok: false; code: V2CommandError; message: string };
 
@@ -190,11 +205,17 @@ export class V2Match {
   private planWhys: Record<Team, string | null> = { A: null, B: null };
   /** Each agent's latest inner voice (its THINK line), by agent id. */
   private thoughts = new Map<string, string>();
+  /** Each crew's decision timeline for the debrief; set when the match goes live. */
+  private timeline: DecisionTimeline | null = null;
   /** Holds still open (released on a void). */
   private held = new Map<Team, number>();
   /** What each crew had held, kept for the debrief. */
   private heldFor: Partial<Record<Team, number>> = {};
   private lockBy = 0;
+  /** Draft mode: every ban step so far, the crew whose turn it is and when its step runs out. */
+  private readonly bans: V2DraftBan[] = [];
+  private draftTurn: Team | null = null;
+  private draftBy = 0;
   private readonly tally: DebriefTally;
   /** Every frame sent, per view, for replay once the match has ended. */
   private readonly frames: Record<FrameView, V2Frame[]> = { A: [], B: [], watch: [] };
@@ -251,6 +272,7 @@ export class V2Match {
     if (this.phase !== 'lockin' || this.locked.has(team)) return false;
     const side = this.setup.sides[team];
     if (roster) {
+      roster = this.withoutBans(team, roster);
       if (roster.crew.length < 1 || roster.crew.length > this.crewLimit) throw new Error(`crew ${team} must field 1 to ${this.crewLimit} agents`);
       side.crew = roster.crew;
       side.skills = roster.skills;
@@ -264,6 +286,98 @@ export class V2Match {
     this.toAll({ type: 'v2_locked', matchId: this.matchId, team });
     this.poke?.();
     return true;
+  }
+
+  /** Draft mode, the steps of the ban phase: DEFAULTS.draft.bansPerSide per crew, A first. */
+  get draftSteps(): number {
+    return this.setup.draft ? DEFAULTS.draft.bansPerSide * TEAMS.length : 0;
+  }
+
+  /**
+   * Draft mode: `team` bans one skill of the rival's crew (or passes, `skillId` null) on its own step.
+   * Only a skill in its pool (draftPool) may be banned.
+   */
+  ban(team: Team, skillId: string | null): V2BanResult {
+    if (this.phase !== 'draft' || this.draftTurn !== team) return { ok: false, code: 'not_your_turn', message: 'it is not your ban' };
+    let name: string | null = null;
+    if (skillId !== null) {
+      const pick = this.draftPool(team).find((s) => s.skillId === skillId);
+      if (!pick) return { ok: false, code: 'invalid_ban', message: 'that skill is not one the rival has equipped' };
+      name = pick.name;
+    }
+    this.bans.push({ team, step: this.bans.length, skillId, name });
+    this.draftTurn = null;
+    this.poke?.();
+    return { ok: true };
+  }
+
+  /** The rival's equipped skills `team` may still ban (ids and public names only, never prompts). */
+  draftPool(team: Team): V2DraftSkill[] {
+    const rival = this.setup.sides[other(team)];
+    const banned = this.bannedFor(other(team));
+    const out = new Map<string, V2DraftSkill>();
+    (rival.skillKeys ?? []).forEach((keys, i) => {
+      const seen = new Set<string>();
+      keys.forEach((k, j) => {
+        if (banned.has(k.id) || seen.has(k.id)) return;
+        seen.add(k.id);
+        const cur = out.get(k.id);
+        if (cur) cur.agents++;
+        else out.set(k.id, { skillId: k.id, name: rival.skillNames?.[i]?.[j] ?? k.id, agents: 1 });
+      });
+    });
+    return [...out.values()];
+  }
+
+  /** v2_draft for a crew: whose step it is, the time left, its pool and every ban so far. */
+  draftMessage(team: Team): V2ServerMessage {
+    return {
+      type: 'v2_draft',
+      matchId: this.matchId,
+      turn: this.draftTurn,
+      step: this.bans.length,
+      steps: this.draftSteps,
+      stepMs: this.draftTurn ? Math.max(0, this.draftBy - this.deps.scheduler.now()) : 0,
+      pool: this.draftPool(team),
+      bans: this.bans.map((b) => ({ ...b })),
+    };
+  }
+
+  /** The skill ids the rival banned from `team`'s crew. */
+  private bannedFor(team: Team): Set<string> {
+    return new Set(this.bans.filter((b) => b.team !== team && b.skillId !== null).map((b) => b.skillId!));
+  }
+
+  /** A roster for `team` with the skills its rival banned taken off every agent. */
+  private withoutBans<R extends V2Roster>(team: Team, r: R): R {
+    const banned = this.bannedFor(team);
+    if (!banned.size || !r.skillKeys) return r;
+    const keep = r.skillKeys.map((keys) => keys.map((k) => !banned.has(k.id)));
+    const pick = <T,>(rows: T[][]) => rows.map((row, i) => row.filter((_, j) => keep[i]?.[j] ?? true));
+    return { ...r, skills: pick(r.skills), skillKeys: pick(r.skillKeys), ...(r.skillNames ? { skillNames: pick(r.skillNames) } : {}) };
+  }
+
+  /** The ban phase: each step waits for its crew's ban, or passes when it runs out (or the crew has nothing to ban). */
+  private async draft(): Promise<void> {
+    this.phase = 'draft';
+    for (let step = 0; step < this.draftSteps; step++) {
+      const turn = TEAMS[step % TEAMS.length]!;
+      if (!this.draftPool(turn).length) {
+        this.bans.push({ team: turn, step, skillId: null, name: null });
+        continue;
+      }
+      this.draftTurn = turn;
+      this.draftBy = this.deps.scheduler.now() + this.timing.draftStepMs;
+      for (const t of TEAMS) this.deps.send(t, this.draftMessage(t));
+      await this.waitFor(() => this.bans.length > step, this.timing.draftStepMs);
+      if (this.stopReason) return;
+      if (this.bans.length <= step) this.bans.push({ team: turn, step, skillId: null, name: null, timedOut: true });
+      this.draftTurn = null;
+    }
+    for (const t of TEAMS) Object.assign(this.setup.sides[t], this.withoutBans(t, this.setup.sides[t]));
+    for (const t of TEAMS) this.deps.send(t, this.draftMessage(t));
+    const done = this.bans.filter((b) => b.skillId).map((b) => `${b.team} banned ${b.skillId}`);
+    this.deps.log.info(`v2 match ${this.matchId}: draft over (${done.length ? done.join(', ') : 'no bans'})`);
   }
 
   /** v2_lockin for a crew: the time left, the rival's crew size and both head starts as the crews stand. */
@@ -293,6 +407,7 @@ export class V2Match {
       difficulty: this.difficulty,
       ...(setup.practice ? { practice: true as const, rivalHandle: setup.sides[team === 'A' ? 'B' : 'A'].handle } : {}),
       ...(setup.free?.[team] ? { free: true as const } : {}),
+      ...(setup.draft ? { draft: true as const } : {}),
       ...this.foundTiers(team),
     };
   }
@@ -329,6 +444,11 @@ export class V2Match {
     return this.frames[view];
   }
 
+  /** Each crew's decision timeline (the debrief's "why did it do that?"); empty until the match went live. */
+  timelines(): MatchTimelineInput[] {
+    return this.timeline?.records() ?? [];
+  }
+
   /** Stops the match at the next checkpoint; it ends void with every credit returned. */
   abort(reason: string): void {
     this.stopReason ??= reason;
@@ -359,7 +479,7 @@ export class V2Match {
   /** One crew's own numbers for v2_end. */
   debrief(team: Team, end: V2MatchEnd, fin: V2Finish): V2Debrief {
     const held = this.heldFor[team] ?? 0;
-    return buildDebrief({
+    const d = buildDebrief({
       state: this.state,
       team,
       difficulty: this.difficulty,
@@ -372,6 +492,7 @@ export class V2Match {
       ...(end.result && fin.season?.[team] ? { season: fin.season[team] } : {}),
       commands: this.commandLog[team],
     });
+    return this.setup.draft ? { ...d, draft: { bans: this.bans.map((b) => ({ ...b })) } } : d;
   }
 
   /** Commands a crew can still send. */
@@ -473,6 +594,11 @@ export class V2Match {
     if (this.declined) return this.voidMatch('declined', this.declined);
     if (this.accepted.size < 2) return this.voidMatch('accept_timeout', TEAMS.find((t) => !this.accepted.has(t)));
 
+    if (setup.draft) {
+      await this.draft();
+      if (this.stopReason) return this.voidMatch('aborted');
+    }
+
     this.phase = 'lockin';
     this.lockBy = this.deps.scheduler.now() + timing.lockMs;
     for (const t of TEAMS) this.deps.send(t, this.lockinMessage(t));
@@ -496,6 +622,8 @@ export class V2Match {
     }
 
     this.state = s;
+    const crewOf = (t: Team) => ({ brain: this.deps.brains[t].kind, bought: setup.sides[t].bought ?? [], skillKeys: setup.sides[t].skillKeys ?? [] });
+    this.timeline = new DecisionTimeline({ A: crewOf('A'), B: crewOf('B') });
     // One model name when both crews share a brain, else each crew's (as the headless runner writes it).
     const { A: brainA, B: brainB } = this.deps.brains;
     const model = brainA.model === brainB.model ? brainA.model : `A:${brainA.model} B:${brainB.model}`;
@@ -537,10 +665,12 @@ export class V2Match {
         // The inner voice is never part of the match (not in the log, never heard); only its own crew's frames show it.
         if (d.thought) this.thoughts.set(a.id, d.thought);
         this.count(a.team, d);
+        this.timeline?.turn(a, d);
       });
       const ev = stepMatch(s, { actions, says });
       appendTick(log, { tick: s.tick, actions, says, ...(commands.length ? { commands } : {}) });
       this.tally.add(ev);
+      this.timeline?.resolve(s, ev);
       this.collect(s, ev);
       for (const t of pays) {
         cum100[t] += costPer100[t];
@@ -579,6 +709,7 @@ export class V2Match {
   private decide(s: MatchState, id: string): Promise<V2Decision> {
     const a = s.agents.find((x) => x.id === id)!;
     const o = observe(s, id);
+    this.timeline?.observe(id, o);
     const canSpeak = maySpeak(a.tier, s.tick + 1, a.lastSpoke);
     const wait: Action = { type: 'wait' };
     if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
@@ -624,6 +755,7 @@ export class V2Match {
       if (r.text) {
         this.plans[team] = r.text;
         this.planWhys[team] = r.why ?? null;
+        this.timeline?.plan(team, s.tick + 1, r.text, r.why ?? null);
       }
     }
   }
@@ -719,5 +851,7 @@ export function withRivalMind(
   });
   return { ...frame, agents };
 }
+
+const other = (t: Team): Team => (t === 'A' ? 'B' : 'A');
 
 const header = (a: { id: string; name: string; role: string; vision: number; comms: number; tier: string }) => ({ id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier });

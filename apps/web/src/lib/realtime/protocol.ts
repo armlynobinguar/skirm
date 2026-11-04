@@ -53,6 +53,25 @@ export interface V2Debrief {
   season?: { number: number; points: number };
   /** The live commands this crew's player sent, as applied (tick order); absent when none. */
   commands?: V2DebriefCommand[];
+  /** Draft mode: every ban step, both crews'. */
+  draft?: { bans: V2DraftBan[] };
+}
+
+/** Draft mode: a rival skill you may ban (its id and public name, never its text). */
+export interface V2DraftSkill {
+  skillId: string;
+  name: string;
+  /** How many rival agents run it. */
+  agents: number;
+}
+
+/** One ban step: who banned what (null: passed), and whether the step ran out. */
+export interface V2DraftBan {
+  team: Team;
+  step: number;
+  skillId: string | null;
+  name: string | null;
+  timedOut?: true;
 }
 
 /** One live command in the debrief transcript. */
@@ -69,7 +88,7 @@ export type V2ClientMessage =
    * them. `opponent: 'bot'` is practice against the greedy bot: casual only, no matchmaking, it
    * starts at once (the server picks DEFAULT_PRACTICE when no board is given).
    */
-  | { type: 'v2_queue'; crew: V2CrewEntry[]; ranked: boolean; mapId?: string; difficulty?: Difficulty; opponent?: V2Opponent }
+  | { type: 'v2_queue'; crew: V2CrewEntry[]; ranked: boolean; mapId?: string; difficulty?: Difficulty; opponent?: V2Opponent; draft?: boolean }
   | { type: 'v2_cancel_queue' }
   | { type: 'v2_watch'; matchId: string }
   | { type: 'v2_unwatch'; matchId: string }
@@ -82,7 +101,9 @@ export type V2ClientMessage =
   /** Readies a crew in a private lobby; the match starts once both players have. v2_cancel_queue steps back. */
   | { type: 'v2_lobby_ready'; lobbyId: string; crew: V2CrewEntry[] }
   /** A live command to your own crew: one agent or all of it, a preset and/or free text. Answered with v2_command_ok. */
-  | { type: 'v2_command'; matchId: string; agentId?: string; preset?: CommandPreset; text?: string };
+  | { type: 'v2_command'; matchId: string; agentId?: string; preset?: CommandPreset; text?: string }
+  /** Draft mode, on your turn: ban one of the rival's skills from the v2_draft pool, or pass (null). */
+  | { type: 'v2_ban'; matchId: string; skillId: string | null };
 
 /** What practice adds to v2_found and v2_lockin. */
 export interface V2PracticeFlags {
@@ -100,8 +121,10 @@ export interface V2FoundTiers {
 }
 
 export type V2ServerMessage =
-  | ({ type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty } & V2PracticeFlags & V2FoundTiers)
+  | ({ type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty; draft?: true } & V2PracticeFlags & V2FoundTiers)
   | { type: 'v2_accepted'; matchId: string; team: Team }
+  /** Draft mode: each ban step (`turn` bans within `stepMs`, else it passes), then once more with `turn` null. */
+  | { type: 'v2_draft'; matchId: string; turn: Team | null; step: number; steps: number; stepMs: number; pool: V2DraftSkill[]; bans: V2DraftBan[] }
   /** `crewLimit`: most agents this map takes; `headStartTicks`: each crew's hold with the crews as they stand. */
   | ({ type: 'v2_lockin'; matchId: string; lockMs: number; rival: { agents: number }; crewLimit?: number; headStartTicks?: Record<Team, number> } & V2PracticeFlags)
   | { type: 'v2_locked'; matchId: string; team: Team }
@@ -136,6 +159,9 @@ export type WsErrorCode =
   | 'in_match'
   | 'invalid_crew'
   | 'not_in_lockin'
+  | 'draft_casual'
+  | 'not_your_turn'
+  | 'invalid_ban'
   | 'agent_busy'
   | 'insufficient_credits'
   | 'match_void'

@@ -53,6 +53,27 @@ export interface V2Debrief {
   season?: { number: number; points: number };
   /** The live commands this crew's player sent, as applied (tick order); absent when none. Never the rival's. */
   commands?: V2DebriefCommand[];
+  /** Draft mode: every ban step of the match, both crews' (bans are public to both players). */
+  draft?: { bans: V2DraftBan[] };
+}
+
+/**
+ * Draft mode: a skill the rival crew has equipped, as the ban screen shows it. Only its id and public
+ * name (and how many rival agents run it), never its prompt.
+ */
+export interface V2DraftSkill {
+  skillId: string;
+  name: string;
+  agents: number;
+}
+
+/** One ban step: the crew that banned, the skill it banned (null: passed), and whether the step ran out. */
+export interface V2DraftBan {
+  team: Team;
+  step: number;
+  skillId: string | null;
+  name: string | null;
+  timedOut?: true;
 }
 
 /** One live command in the debrief transcript. */
@@ -69,7 +90,11 @@ export type V2ClientMessage =
    * them. `opponent: 'bot'` is practice against the greedy bot: casual only (ranked is refused with
    * practice_unranked), no matchmaking, it starts at once (default board: DEFAULT_PRACTICE).
    */
-  | { type: 'v2_queue'; crew: V2CrewEntry[]; ranked: boolean; mapId?: string; difficulty?: Difficulty; opponent?: V2Opponent }
+  /**
+   * `draft: true` queues draft mode (casual only, `draft_casual`): draft searches pair only with
+   * draft searches, and after accept each crew bans a rival skill in turn (v2_draft / v2_ban).
+   */
+  | { type: 'v2_queue'; crew: V2CrewEntry[]; ranked: boolean; mapId?: string; difficulty?: Difficulty; opponent?: V2Opponent; draft?: boolean }
   | { type: 'v2_cancel_queue' }
   | { type: 'v2_watch'; matchId: string }
   | { type: 'v2_unwatch'; matchId: string }
@@ -91,7 +116,9 @@ export type V2ClientMessage =
    * A live command to the player's own crew: one agent (`agentId`) or all of it, a preset and/or free
    * text (at most DEFAULTS.commands.maxChars, through the speech filter). Answered with v2_command_ok.
    */
-  | { type: 'v2_command'; matchId: string; agentId?: string; preset?: CommandPreset; text?: string };
+  | { type: 'v2_command'; matchId: string; agentId?: string; preset?: CommandPreset; text?: string }
+  /** Draft mode, on your turn: ban one of the rival's equipped skills (from v2_draft `pool`), or pass with null. */
+  | { type: 'v2_ban'; matchId: string; skillId: string | null };
 
 export type V2ServerMessage =
   /**
@@ -99,8 +126,14 @@ export type V2ServerMessage =
    * crew holds and pays nothing (the bot, or a player on the offline greedy brain). `tiers`: ranked
    * only, both players' ranked tiers as they queued (the rival stays unnamed).
    */
-  | { type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty; practice?: true; free?: true; rivalHandle?: string; tiers?: { you: PlayerTier; rival: PlayerTier } }
+  | { type: 'v2_found'; matchId: string; team: Team; mapId: string; ranked: boolean; acceptMs: number; difficulty?: Difficulty; practice?: true; free?: true; rivalHandle?: string; draft?: true; tiers?: { you: PlayerTier; rival: PlayerTier } }
   | { type: 'v2_accepted'; matchId: string; team: Team }
+  /**
+   * Draft mode, after accept and before lock-in: sent to both crews at each ban step and once when the
+   * draft is over (`turn` null). `turn` bans within `stepMs` (else it passes); `pool` is what this
+   * crew may ban (the rival's equipped skills not banned yet); `bans` every step so far.
+   */
+  | { type: 'v2_draft'; matchId: string; turn: Team | null; step: number; steps: number; stepMs: number; pool: V2DraftSkill[]; bans: V2DraftBan[] }
   /** `crewLimit`: most agents this map takes; `headStartTicks`: the hold each crew gets with the crews as they stand. */
   /** `free`: as on v2_found, this crew is not held for the match. */
   | { type: 'v2_lockin'; matchId: string; lockMs: number; rival: { agents: number }; crewLimit?: number; headStartTicks?: Record<Team, number>; free?: true }

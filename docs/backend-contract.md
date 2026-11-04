@@ -59,7 +59,7 @@ Talk tiers are priced in whole credits per 100 agent-ticks (`DEFAULTS.talk.rateP
 
 ## REST (`apps/api`, JSON, no prefix)
 
-Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/*`, `GET /v2/matches/*`, `GET /seasons*` and `GET /ops/stats` / `GET /ops/talk-rates` (their own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
+Auth: every route needs a session except `GET /health`, `POST /auth/session`, `GET /leaderboards/*`, `GET /v2/matches/*` (but `/v2/matches/:id/decisions`), `GET /seasons*` and `GET /ops/stats` / `GET /ops/talk-rates` (their own token). The public routes add the caller's own rows when a session is sent. Errors are `{ error: { code, message, details? } }`.
 
 ### Account
 
@@ -87,6 +87,7 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/v2/matches/live` | | matches being played now, newest first: `{ id, mapId, difficulty, ranked, practice, startedAt, teams: {A, B}: {handle, size} }`. Crews stay hidden; the bot side of a practice match is `Greedy bot` |
 | GET | `/v2/matches/:id` | | `{ id, mapId, ranked, practice, status: 'live'\|'ended'\|'void', difficulty, teams: {A, B}: {accountId, handle, crew[]}, winner, reason, decidedBy, score: {A, B} \| null, ticks, elo: {accountId, team, before, delta, after}[], stats, logHash, registry: {status, txHash?}, createdAt, endedAt, you?, debrief? }`. While live the rival side is blank and only a player sees their own crew. `you` and `debrief` (that crew's, as sent with `v2_end`) only for a player. The log stays server side: `logHash` is its proof. `registry.status` is `none` for casual, practice and void matches |
 | GET | `/v2/matches/:id/messages` | `?afterTick=&limit=` (≤ `MATCH_MESSAGES_MAX_LIMIT`, default 200) | `{ messages: {tick, team, agent: {id, name}, channel, text, heardBy, overheardBy}[], next? }`: the lines realtime saw delivered. `409 match_live` until the match ends. Page with `next` as the following `afterTick` |
+| GET | `/v2/matches/:id/decisions` | ✓ | `{ matchId, you, ticks, crews: {team, own, brain, agents: {id, name, role, skills}[], plans: {tick, text, why, hidden?}[], decisions: {tick, agentId, observed, action, reason, outcome?, effect?, said?, thought?, skill: {id, version, by: 'model'\|'inferred'} \| null}[], moments: {tick, kind: 'hazard_breach'\|'switch'\|'supply_drop'\|'goal', team, agentId, text}[]}[], skills: {id, version, name, mine, prompt?}[] }`: the debrief's decision timeline (`match_timelines`, written by realtime at the end). Players only (403 otherwise), each their own crew; practice adds the bot's. `409 match_live` until it ends; a void match has no crews. `skill` is the one the agent's model named (a `SKILL:` line), else, on a model brain, the only equipped skill whose required action is the verb that resolved. Plans shaped by a bought skill are kept as `hidden`, and an agent on a bought or rented skill keeps no `thought`. `prompt` only for skills the caller wrote |
 | GET | `/leaderboards/players` | `?limit=` (≤ 200, default 100) | `{ rows: {rank, account: {id, handle}, elo, title, tier, rankedMatches, wins, losses, draws}[], you? }`: players with a ranked match by Elo (ties share a rank) |
 | GET | `/leaderboards/tiers` | | `{ tiers: {name, min, nextAt}[], placementMatches, kPlacement, decay: {fromTier, days, amount}, skillMinMatches }` |
 | GET | `/leaderboards/maps/:mapId` | `?limit=` (≤ 200, default 100) | `{ mapId, rows: {rank, account, elo, rankedMatches, tier, matches, wins, losses, draws, winRate}[] }`: players by ranked results on one map, most wins then win rate (ties share a rank). 404 for an unknown map |
@@ -189,9 +190,10 @@ Client → server (`WsClientMessage`):
 | Message | Meaning |
 | --- | --- |
 | `{type:'auth', token?, devUser?}` | sign in (dev: `devUser` is the handle). On reconnect during a match the server re-sends where it stands (found, lock-in or the latest frame) |
-| `{type:'v2_queue', crew: {agentId, tier}[] (1-3), ranked, mapId?, difficulty?, opponent?: 'bot'}` | search for a match. Casual pairs only with the same `mapId` (or any) and `difficulty`; ranked ignores both (any fitting map, Normal). `opponent: 'bot'` is practice: casual only (`practice_unranked`), no matchmaking, starts at once on `mapId`/`difficulty` or `DEFAULT_PRACTICE` (Copper Hollow, Easy) |
+| `{type:'v2_queue', crew: {agentId, tier}[] (1-3), ranked, mapId?, difficulty?, opponent?: 'bot', draft?}` | search for a match. Casual pairs only with the same `mapId` (or any) and `difficulty`; ranked ignores both (any fitting map, Normal). `opponent: 'bot'` is practice: casual only (`practice_unranked`), no matchmaking, starts at once on `mapId`/`difficulty` or `DEFAULT_PRACTICE` (Copper Hollow, Easy). `draft: true` is draft mode: casual against a player only (`draft_casual`), pairs only with other draft searches, and adds a ban phase after accept |
 | `{type:'v2_cancel_queue'}` | stop searching |
 | `{type:'v2_accept', matchId}` / `{type:'v2_decline', matchId}` | answer `v2_found` (10 s) |
+| `{type:'v2_ban', matchId, skillId}` | draft mode, on your step: ban one skill from your `v2_draft` pool, or pass with `skillId: null` (`not_your_turn`, `invalid_ban`) |
 | `{type:'v2_lock_in', matchId, tiers, crew?}` | lock the crew in (30 s): a talk tier per agent in slot order; `crew` swaps, removes or adds agents up to `crewLimit` and its tiers win |
 | `{type:'v2_watch', matchId}` / `{type:'v2_unwatch', matchId}` | spectate: the latest whole-board frame now, then every one after, and `v2_end`. Released on `v2_end`, unwatch or disconnect; at most 8 per socket |
 | `{type:'v2_replay', matchId}` | every stored frame of an ended match, for replay at another speed (kept 6 h) |
@@ -205,6 +207,7 @@ Server → client (`WsServerMessage`):
 | `{type:'queue_status', searchingMs, eloRange}` | every second while searching; the Elo window widens from ±100 by 50 every 5 s up to ±1000 |
 | `{type:'v2_found', matchId, team, mapId, ranked, acceptMs, difficulty, practice?, free?, rivalHandle?, tiers?}` | a match: accept within `acceptMs`. `practice` and `rivalHandle` ('Greedy bot') for practice; `free` when this crew holds nothing; `tiers: {you, rival}` (`PlayerTier`) on ranked matches, as both players queued |
 | `{type:'v2_accepted', matchId, team}` | a crew accepted |
+| `{type:'v2_draft', matchId, turn, step, steps, stepMs, pool: {skillId, name, agents}[], bans: {team, step, skillId, name, timedOut?}[]}` | draft mode (`v2_found` carries `draft: true`): after accept, crews ban in turn, A first, `DEFAULTS.draft.bansPerSide` each; `turn` bans within `stepMs` (`DEFAULTS.draft.stepMs`, 15 s) or the step passes (`timedOut`). `pool` is the rival's equipped skills you may still ban, by id and public name only (never the prompt). Sent at each step and once more with `turn: null` when the draft is over; then `v2_lockin`. A banned skill is unequipped from the rival crew for that match (also from a crew swapped in at lock-in) and every ban is in both debriefs (`debrief.draft.bans`) |
 | `{type:'v2_lockin', matchId, lockMs, rival: {agents}, crewLimit, headStartTicks, free?}` | lock-in started (the rival's crew size only). Re-sent when a crew changes its roster |
 | `{type:'v2_locked', matchId, team}` | a crew locked in |
 | `{type:'v2_start', matchId, team, rival: {handle}, tickMs, holdTicks}` | live: the rival is named, holds are placed |
@@ -215,7 +218,7 @@ Server → client (`WsServerMessage`):
 | `{type:'v2_command_ok', matchId, tick, left}` | answer to `v2_command`: it lands on `tick`; `left` remain |
 | `{type:'error', code, message}` | see below |
 
-WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthenticated`, `auth_failed`, `already_authenticated`, `already_queued`, `not_queued`, `in_match`, `invalid_crew`, `not_in_lockin`, `practice_unranked`, `agent_busy`, `not_found`, `lobby_closed`, `not_live`, `no_commands`, `rate_limited`, `invalid_command`, `command_refused`, `too_many_subscriptions`, `unavailable`, `internal`.
+WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthenticated`, `auth_failed`, `already_authenticated`, `already_queued`, `not_queued`, `in_match`, `invalid_crew`, `not_in_lockin`, `practice_unranked`, `draft_casual`, `lobby_closed`, `not_your_turn`, `invalid_ban`, `agent_busy`, `not_found`, `not_live`, `no_commands`, `rate_limited`, `invalid_command`, `command_refused`, `too_many_subscriptions`, `unavailable`, `internal`.
 
 `scripts/ws-v2.cjs` is a ready client: it signs in, queues, accepts, locks in and waits for `v2_end` (README of the script at its top).
 
@@ -226,7 +229,7 @@ WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthe
 - One `realtime` instance holds each match in memory and serves its players. A live row no instance holds (crash) is voided by the orphan sweep and its holds released; shutdown voids live matches with credits returned.
 - Practice: the player is crew A; crew B is `SYSTEM_ACCOUNT_ID` with a Standard crew the player's size on the greedy brain, accepting and locking in by itself. Casual only, no Elo, no registry write, `v2_matches.practice = true`.
 - Lobby: no matchmaking; the lobby's map, difficulty, talk rule (`V2Setup.talk`) and crew size (`V2Setup.crewMax`). Casual, no Elo, no registry. After the result is written the lobby is settled (`LobbiesRepo.settleMatch`), which moves a bracket on; the `tournaments` tick settles any lobby that was missed.
-- Settlement (`V2MatchesRepo.finish`, one transaction): the result, both players' Elo (ranked; start 1200, K 48 for the 5 placement matches, 32 up to the 20th ranked match, then 16, floor 100) and their last ranked result time, season points (ranked), the skill versions' ranked records, the delivered lines (`match_messages`), each crew's debrief. Then a ranked result is queued for the registry, and the frames are kept for replay.
+- Settlement (`V2MatchesRepo.finish`, one transaction): the result, both players' Elo (ranked; start 1200, K 48 for the 5 placement matches, 32 up to the 20th ranked match, then 16, floor 100) and their last ranked result time, season points (ranked), the skill versions' ranked records, the delivered lines (`match_messages`), each crew's debrief. Each crew's decision timeline (`match_timelines`) is written right after, before `v2_end`. Then a ranked result is queued for the registry, and the frames are kept for replay.
 
 ## Queues (BullMQ, names in `@skirm/server`)
 

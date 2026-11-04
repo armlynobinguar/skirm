@@ -34,6 +34,9 @@ export type ErrorCode =
   | 'invalid_crew'
   | 'not_in_lockin'
   | 'practice_unranked'
+  | 'draft_casual'
+  | 'not_your_turn'
+  | 'invalid_ban'
   | 'agent_busy'
   | 'not_found'
   | 'lobby_closed'
@@ -85,6 +88,7 @@ const TYPES = [
   'v2_replay',
   'v2_lobby_ready',
   'v2_command',
+  'v2_ban',
 ] as const;
 const TIERS = ['quiet', 'standard', 'open'] as const;
 
@@ -138,12 +142,15 @@ export function parseClientMessage(raw: unknown): ParseResult {
       return { ok: true, msg };
     }
     case 'v2_queue': {
-      if (extraKeys(v, ['type', 'crew', 'ranked', 'mapId', 'difficulty', 'opponent']))
-        return bad('v2_queue takes {crew, ranked, mapId?, difficulty?, opponent?}');
+      if (extraKeys(v, ['type', 'crew', 'ranked', 'mapId', 'difficulty', 'opponent', 'draft']))
+        return bad('v2_queue takes {crew, ranked, mapId?, difficulty?, opponent?, draft?}');
       if (typeof v.ranked !== 'boolean') return bad('v2_queue.ranked must be a boolean');
       const practice = v.opponent !== undefined && v.opponent !== null;
       if (practice && !isV2Opponent(v.opponent)) return bad("v2_queue.opponent must be 'bot'");
       if (practice && v.ranked) return { ok: false, code: 'practice_unranked', message: 'practice against the bot is casual only' };
+      if (v.draft !== undefined && v.draft !== null && typeof v.draft !== 'boolean') return bad('v2_queue.draft must be a boolean');
+      const draft = v.draft === true;
+      if (draft && (v.ranked || practice)) return { ok: false, code: 'draft_casual', message: 'draft mode is a casual queue against another player' };
       const crew = parseV2Crew(v.crew);
       if (typeof crew === 'string') return bad(crew);
       const msg: Extract<WsClientMessage, { type: 'v2_queue' }> = { type: 'v2_queue', crew, ranked: v.ranked };
@@ -156,6 +163,7 @@ export function parseClientMessage(raw: unknown): ParseResult {
         msg.difficulty = v.difficulty;
       }
       if (practice) msg.opponent = 'bot';
+      if (draft) msg.draft = true;
       return { ok: true, msg };
     }
     case 'v2_cancel_queue': {
@@ -191,6 +199,12 @@ export function parseClientMessage(raw: unknown): ParseResult {
       }
       if (!msg.preset && !msg.text) return bad('v2_command needs a preset or text');
       return { ok: true, msg };
+    }
+    case 'v2_ban': {
+      if (extraKeys(v, ['type', 'matchId', 'skillId'])) return bad('v2_ban takes {matchId, skillId}');
+      if (typeof v.matchId !== 'string' || !ID_RE.test(v.matchId)) return bad('v2_ban.matchId must be an id');
+      if (v.skillId !== null && (typeof v.skillId !== 'string' || !ID_RE.test(v.skillId))) return bad('v2_ban.skillId must be a skill id, or null to pass');
+      return { ok: true, msg: { type: 'v2_ban', matchId: v.matchId, skillId: v.skillId } };
     }
     case 'v2_lock_in': {
       if (extraKeys(v, ['type', 'matchId', 'tiers', 'crew'])) return bad('v2_lock_in takes {matchId, tiers, crew?}');

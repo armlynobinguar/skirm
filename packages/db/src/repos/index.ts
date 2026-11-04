@@ -7,6 +7,7 @@ import { LedgerRepo, type LedgerRepoOptions } from './ledger';
 import { LobbiesRepo } from './lobbies';
 import { MarketRepo } from './market';
 import { MatchMessagesRepo } from './match-messages';
+import { MatchTimelinesRepo } from './match-timelines';
 import { OnboardingRepo } from './onboarding';
 import { OpsRepo } from './ops';
 import { ProofRepo } from './proof';
@@ -31,6 +32,8 @@ export interface Repos {
   v2Matches: V2MatchesRepo;
   /** Lines delivered in v2 matches (GET /v2/matches/:id/messages). */
   matchMessages: MatchMessagesRepo;
+  /** Each crew's decision timeline of a v2 match (GET /v2/matches/:id/decisions). */
+  matchTimelines: MatchTimelinesRepo;
   /** Operator aggregates (GET /ops/stats). */
   ops: OpsRepo;
   /** v2 seasons: standings, pool, locked prizes. */
@@ -69,6 +72,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     ranked: new RankedRepo(db, opts.clock),
     v2Matches: new V2MatchesRepo(db, opts.clock),
     matchMessages: new MatchMessagesRepo(db),
+    matchTimelines: new MatchTimelinesRepo(db),
     ops: new OpsRepo(db),
     seasons: new SeasonsRepo(db, opts.clock),
     proof: new ProofRepo(db),
@@ -89,6 +93,7 @@ export * from './ledger';
 export * from './lobbies';
 export * from './market';
 export * from './match-messages';
+export * from './match-timelines';
 export * from './onboarding';
 export * from './ops';
 export * from './proof';
