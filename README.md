@@ -10,7 +10,7 @@
 ![NEAR](https://img.shields.io/badge/NEAR-testnet-00C08B?logo=near&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 
-[Quick start](#quick-start) · [Try it](#try-it-in-two-minutes) · [How it works](#how-it-works) · [NEAR](#where-near-fits) · [Docs](#documentation)
+[Quick start](#quick-start) · [Try it](#try-it-in-two-minutes) · [How it works](#how-it-works) · [NEAR](#where-near-fits) · [FAQ](#faq) · [Docs](#documentation)
 
 <img src="docs/media/gameplay.gif" alt="A live 3 vs 3 skirm match in third person: Rook carries a seed vial while Wren and Moss call out deliveries" width="820">
 
@@ -109,24 +109,44 @@ With a model, skills change how agents play and benchmarks run for real. See [`.
 
 ## How it works
 
-```
-browser ── Next.js web (:3000)
-   │ REST                         │ WebSocket
-   ▼                              ▼
- api (NestJS, :4000)          realtime (:4001) ── matchmaking, tick loop, brains, talk filter, settlement
-   │ BullMQ                       │
-   ▼                              │ Redis pub/sub (spectating across instances)
- worker ── benchmarks, trials, seasons, registry writes
-   │
- Postgres · Redis · NEAR contracts (skills, market, registry, deposits, seasons)
-```
+You never control an agent directly: you write the plan, and AI agents carry it out. Strategies that win can be minted, proven and sold.
 
-- **Engine**: a deterministic shared-map tick with fog, hazards in waves, switches and supply drops. Every match writes a **hash-chained log** of every action and every delivered line; its hash is the proof of the result.
-- **Brains**: the configured model acts and speaks in one call per agent per tick and replans the crew every 25 ticks. A deterministic greedy brain plays without any model or key.
+<p align="center"><img src="docs/media/fig1-overview.svg" alt="Figure 1: overview of skirm, from strategy to crew, match, verifiable result, and minting and trading on NEAR" width="900"></p>
+
+Inside a match, every agent runs the same loop each tick. It sees only its own part of the map, its model decides what to do and say, and the world moves for everyone at once. Every action and every line spoken is added to a tamper-evident log.
+
+<p align="center"><img src="docs/media/fig2-tick.svg" alt="Figure 2: one tick of a match, from observation through the policy to action, utterance, environment step, talk filter and the hash-chained match log" width="900"></p>
+
+### What lives where
+
+| | Where | Why |
+| --- | --- | --- |
+| Matches, maps and AI decisions | skirm services | Fast and cheap: thousands of decisions per match |
+| The text of your strategy | Encrypted vault | Only you can read it, even after you sell its use |
+| Skill ownership, trades and royalties | NEAR | You own what you write, and royalties pay out automatically |
+| Ranked results and prize pools | NEAR | Anyone can verify a result, and prizes cannot be withheld |
+
+<details>
+<summary><b>Architecture (for developers)</b></summary>
+<br>
+<p align="center"><img src="docs/media/fig3-architecture.svg" alt="Figure 3: system architecture with the web client, API, realtime, worker, Postgres, Redis, LLM provider, external agents and five NEAR contracts" width="900"></p>
+
+- **Engine**: a deterministic shared-map tick with fog, hazards in waves, switches and supply drops, and a hash-chained log of every action and every delivered line.
+- **Policies**: the configured model acts and speaks in one call per agent per tick and replans the crew every 25 ticks. A deterministic greedy brain plays without any model or key.
 - **Skill vault**: prompts are encrypted at rest and only decrypted for the agent's model call.
-- **Credits**: a ledger that holds credits at lock-in and charges per tick, with a free daily allowance. See [docs/economy.md](docs/economy.md).
+- **Credits**: a ledger that holds credits at lock-in and charges per tick, with a free daily allowance ([docs/economy.md](docs/economy.md)).
 
 **Stack:** Next.js 16 · React 19 · NestJS · BullMQ · WebSocket · Drizzle · PostgreSQL · Redis · Rust (near-sdk 5) · Turborepo · Vitest · Playwright · Docker · Cloud Run
+
+</details>
+
+## Hackathon tracks
+
+| Track | How skirm fits |
+| --- | --- |
+| **Games With Real Economies** | Credits bought with NEAR, a creator economy of skills with royalties, and season prize pools paid onchain |
+| **NFTs That Do Something** | A skill NFT is a working strategy: equip it and your agents play differently. Its proof (benchmarks, ranked stats) travels with it |
+| **Agent Economy** | AI agents compete and can be rented, and their strategies are traded as assets with verifiable track records |
 
 ## Security
 
@@ -167,6 +187,23 @@ curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"registry.playskirm.testnet","method_name":"get_match","args_base64":"'"$ARGS"'"}}' \
   | jq -r '.result.result | implode | fromjson'
 ```
+
+## FAQ
+
+**Do I need a wallet or an API key to try it?**
+No. The local stack signs you in with any handle and plays with a built-in offline bot. A wallet is only needed to mint, buy, sell or top up.
+
+**Which AI models does skirm support?**
+Any model behind an OpenAI-compatible API, from hosted providers to a model running on your own machine. See [Bring your own model](#bring-your-own-model).
+
+**How many agents play?**
+One to three per crew and two crews per map, so up to six agents at once.
+
+**Can someone steal my strategy?**
+Buyers get the right to use a skill, never its text. Prompts are encrypted at rest, only decrypted for the model call, and a filter stops agents from saying them out loud. Benchmarks test this with hijack attempts and publish a leak rate.
+
+**How do I know a result is real?**
+Every match produces a hash-chained log of every action and every line spoken. Ranked results are recorded on NEAR with that hash, so anyone can check them ([Verify a match](#verify-a-match)).
 
 ## Roadmap
 
