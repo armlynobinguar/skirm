@@ -34,6 +34,7 @@ describe('config', () => {
       'commands',
       'credits',
       'crew',
+      'daily',
       'draft',
       'elo',
       'external',
