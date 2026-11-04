@@ -17,6 +17,7 @@
 //                  through; the agent's own counters with "Soon" until it loads or if it fails
 // `map` / `d` name the crew screen it was opened from, for "Back to crew".
 import { isDifficulty, type Difficulty, type TalkTier } from '@skirm/engine/v2';
+import { skillRolesLabel } from '@skirm/shared';
 import { DisplayHeading, Pips, Soon, fmt } from '@skirm/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -25,6 +26,7 @@ import { AgentPortrait } from '@/features/arena/AgentPortrait';
 import { useArena } from '@/features/arena/store';
 import { MAPS, mapById, type V2Map } from '@/features/arena/world';
 import { SkillArt } from '@/features/skills/parts';
+import { RoleTag, roleBlockReason } from '@/features/skills/RoleTag';
 import { RentOut } from './RentOut';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
@@ -250,6 +252,11 @@ function AgentEditor({
   const barkLine = sampleInner(who, map, seed + 7 + bark)[bark % 3];
 
   const ownedSkills = owned.data ?? [];
+  // Role slots: skills for this agent's role (or any) come first; the rest show, disabled, with why.
+  const pickable = [...ownedSkills].sort(
+    (a, b) => Number(roleBlockReason(a.roles, role) !== null) - Number(roleBlockReason(b.roles, role) !== null),
+  );
+  const equippedRoles = skill ? ownedSkills.find((s) => s.id === skill.id && s.version === skill.version)?.roles : undefined;
   const rec = record.data ? (record.data.season ?? record.data.allTime) : null;
   const played = rec ? rec.matches : agent.matchesPlayed;
   const winPct = played ? Math.round(((rec ? rec.wins : agent.wins) / played) * 100) : null;
@@ -473,17 +480,19 @@ function AgentEditor({
 
         <section className={e.skills} aria-label="Skill" data-rise style={{ '--rise-i': 2 } as CSSProperties} data-testid="agent-skill">
           <div className={e.slots} role="group" aria-label="Swap skill">
-            {ownedSkills.slice(0, 4).map((s) => {
+            {pickable.slice(0, 4).map((s) => {
               const on = s.id === skill?.id && s.version === skill.version;
+              const blocked = roleBlockReason(s.roles, role);
               return (
                 <button
                   key={`${s.id}:${s.version}`}
                   type="button"
                   className={e.slot}
                   aria-pressed={s.id === skill?.id}
-                  aria-label={`${s.name} v${s.version}`}
-                  title={`${s.name} v${s.version}`}
-                  disabled={patch.isPending || on}
+                  aria-label={`${s.name} v${s.version}${blocked ? ` (${blocked})` : ''}`}
+                  title={`${s.name} v${s.version} · ${skillRolesLabel(s.roles)}${blocked ? `. ${blocked}` : ''}`}
+                  disabled={patch.isPending || on || blocked !== null}
+                  data-testid={`agent-skill-slot-${s.id}`}
                   onClick={() => equip(s)}
                 >
                   <SkillArt name={s.name} tag={s.handles_tags[0]} className={e.slotArt} />
@@ -491,8 +500,8 @@ function AgentEditor({
                 </button>
               );
             })}
-            {ownedSkills.length < 3
-              ? Array.from({ length: 3 - ownedSkills.length }, (_, i) => <span key={i} className={`${e.slot} ${e.slotEmpty}`} aria-hidden="true" />)
+            {pickable.length < 3
+              ? Array.from({ length: 3 - pickable.length }, (_, i) => <span key={i} className={`${e.slot} ${e.slotEmpty}`} aria-hidden="true" />)
               : null}
           </div>
           <div className={e.skInfo}>
@@ -500,6 +509,7 @@ function AgentEditor({
             <b className={e.skName}>
               {skill ? skill.name : 'No skill'} {skill ? <span className={e.ver}>v{skill.version}</span> : null}
             </b>
+            {skill ? <RoleTag roles={equippedRoles} /> : null}
             {!skill ? (
               <p className={e.sub}>{owned.isSuccess && !ownedSkills.length ? 'You own no skills yet. Write one or buy one on the Exchange.' : 'Equip a skill. Without one the agent plays the rules alone.'}</p>
             ) : mine ? (

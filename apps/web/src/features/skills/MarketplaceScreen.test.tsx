@@ -39,6 +39,15 @@ describe('S09 Marketplace', () => {
     expect(api.market).toHaveBeenCalledWith({ sort: 'winrate' });
   });
 
+  it('tags each card with the roles that may equip it (any when the server sends none)', async () => {
+    const scout = marketCardFixture({ skill: { ...marketCardFixture().skill, id: 'skl_01J0000000000000000000SCOUT', roles: ['Scout', 'Hauler'] } });
+    renderWithProviders(<MarketplaceScreen />, { handle: 'ada', api: base({ market: async () => [marketCardFixture(), scout] }) });
+    const anyCard = await screen.findByTestId(`s09-card-${SKILL_ID}`);
+    expect(within(anyCard).getByTestId('role-tag')).toHaveTextContent('Any role');
+    const scoutCard = screen.getByTestId('s09-card-skl_01J0000000000000000000SCOUT');
+    expect(within(scoutCard).getByTestId('role-tag')).toHaveTextContent('Scout · Hauler');
+  });
+
   it('opens a card in the side drawer, moves the URL there, and closes on ✕ and Esc', async () => {
     const { user, api } = renderWithProviders(<MarketplaceScreen />, {
       handle: 'ada',

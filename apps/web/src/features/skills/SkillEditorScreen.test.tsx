@@ -63,11 +63,39 @@ describe('S08 Skill editor', () => {
         reflexes: null,
         requires_actions: ['place_block'],
         handles_tags: ['spreads', 'liquid'],
+        roles: ['any'],
         royalty_bps: 500,
         trigger: null,
       }),
     );
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/skills/${SKILL_ID}/edit`));
+  });
+
+  it('picks the roles that may equip it (any by default) and sends them in role order', async () => {
+    const { user, api } = renderWithProviders(<SkillEditorScreen skillId={null} />, {
+      handle: 'ada',
+      api: base({ createSkill: async () => skillRowFixture() }),
+    });
+    await user.type(await screen.findByLabelText('Name'), 'Scout Sweep');
+    await user.type(screen.getByTestId('s08-prompt'), 'Repel rivals near the gems.');
+    await user.click(screen.getByTestId('s08-tag-collectible'));
+    expect(screen.getByTestId('s08-role-any')).toBeChecked();
+    await user.click(screen.getByTestId('s08-role-Hauler'));
+    await user.click(screen.getByTestId('s08-role-Scout'));
+    expect(screen.getByTestId('s08-role-any')).not.toBeChecked();
+    expect(screen.getByTestId('s08-roles')).toHaveTextContent('Only a Hauler or Scout can equip it.');
+    await user.click(screen.getByTestId('s08-save'));
+    await waitFor(() => expect(api.createSkill).toHaveBeenCalledWith(expect.objectContaining({ roles: ['Scout', 'Hauler'] })));
+  });
+
+  it('loads a version’s roles into the picker and shows its role tag', async () => {
+    renderWithProviders(<SkillEditorScreen skillId={SKILL_ID} />, {
+      handle: 'ada',
+      api: base({ skill: async () => skillWithTextFixture({ roles: ['Digger'] }) }),
+    });
+    expect(await screen.findByTestId('s08-role-Digger')).toBeChecked();
+    expect(screen.getByTestId('s08-role-any')).not.toBeChecked();
+    expect(screen.getByTestId('role-tag')).toHaveTextContent('Digger');
   });
 
   it('reads back the creator’s own prompt and saves an edit as the next version', async () => {

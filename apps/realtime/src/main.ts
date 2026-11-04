@@ -7,6 +7,7 @@ import { OfficialRepo, closeDb, createDb, createRepos } from '@skirm/db';
 import {
   CostMonitor,
   RedisCostStore,
+  RedisExternalTurnStore,
   createQueue,
   createRedis,
   createVault,
@@ -59,6 +60,8 @@ async function bootstrap(): Promise<void> {
     registry: { enqueue: (data) => enqueueRegistry(registryQueue, data) },
     v2Brain,
     v2Timing: { tickMs: v2TickMs },
+    // Bring your own agent: pull turns go through Redis, so any api instance serves them.
+    externalTurns: new RedisExternalTurnStore(redis),
     log,
   };
 

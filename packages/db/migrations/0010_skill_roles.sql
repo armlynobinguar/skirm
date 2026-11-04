@@ -1,0 +1,1 @@
+ALTER TABLE "skill_versions" ADD COLUMN "roles" jsonb DEFAULT '["any"]'::jsonb NOT NULL;

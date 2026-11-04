@@ -4,7 +4,8 @@ import type { Repos } from '@skirm/db';
 import type { V2Brain } from '@skirm/decision-engine/v2';
 import type { MapDefV2 } from '@skirm/engine/v2';
 import type { V2Timing } from './v2/match';
-import type { RegistryJobData, ServerConfig, Vault } from '@skirm/server';
+import type { ExternalTurnStore, RegistryJobData, ServerConfig, Vault } from '@skirm/server';
+import type { WebhookPost } from './v2/external';
 import type { PubSub } from './pubsub';
 import type { QueueTiming, Scheduler } from './timing';
 
@@ -46,6 +47,10 @@ export interface RealtimeDeps {
   /** v2: the brain every agent uses (default: the offline greedy brain; production passes the model brain). */
   v2Brain?: V2Brain;
   v2Timing?: Partial<V2Timing>;
+  /** Bring your own agent: the pull relay shared with the api (Redis in production). */
+  externalTurns?: ExternalTurnStore;
+  /** Tests only: the external agents' webhook transport (default: the SSRF-safe POST). */
+  externalPost?: WebhookPost;
   /** v2 map pool (default: MAPS_V2). */
   v2Maps?: readonly MapDefV2[];
   /** Picks the map for a pair (default: random from the maps that take both crews). */
