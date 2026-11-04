@@ -19,8 +19,8 @@ function recorder() {
   const seen = { act: new Set<string | null>(), plan: new Set<string | null>() };
   const greedy = createGreedyBrain();
   const brain: V2Brain = {
-    kind: 'haiku',
-    model: 'fake-haiku',
+    kind: 'model',
+    model: 'fake-model',
     async act(o, ctx) {
       seen.act.add(ctx.playbook ?? null);
       return greedy.act(o, ctx);
