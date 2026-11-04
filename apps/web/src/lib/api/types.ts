@@ -805,6 +805,71 @@ export type ExternalAgentPing =
   | { ok: false; mode: 'webhook'; error: string; message: string }
   | { ok: boolean; mode: 'pull'; lastSeenAt: string | null };
 
+// ---------- Quests and achievements ----------
+
+/** One quest of the current day or week (GET /quests). */
+export interface QuestView {
+  id: string;
+  period: 'daily' | 'weekly';
+  title: string;
+  target: number;
+  progress: number;
+  done: boolean;
+  claimed: boolean;
+  claimable: boolean;
+  /** Free credits the claim refills, at most. */
+  rewardCredits: number;
+  /** What the claim refilled, once claimed. */
+  credited: number | null;
+}
+
+export interface PlayStreak {
+  current: number;
+  best: number;
+  playedToday: boolean;
+}
+
+/** GET /quests. */
+export interface QuestBoard {
+  daily: { key: string; endsAt: string; quests: QuestView[] };
+  weekly: { key: string; endsAt: string; quests: QuestView[] };
+  streak: PlayStreak;
+  allowanceLeft: number;
+}
+
+/** POST /quests/:id/claim. */
+export interface QuestClaimResponse {
+  quest: QuestView;
+  credited: number;
+  allowanceLeft: number;
+}
+
+export interface AchievementBadge {
+  status: 'pending' | 'minted' | 'local' | 'failed';
+  tokenId: string | null;
+  txHash: string | null;
+  owner: string | null;
+  mintedAt: string | null;
+}
+
+export interface AchievementView {
+  id: string;
+  title: string;
+  detail: string;
+  target: number;
+  progress: number;
+  unlocked: boolean;
+  unlockedAt: string | null;
+  cosmetic: { id: string; name: string } | null;
+  badge: AchievementBadge | null;
+}
+
+/** GET /achievements. */
+export interface Achievements {
+  streak: PlayStreak;
+  achievements: AchievementView[];
+}
+
 // ---------- Skill test bench ----------
 
 /** GET /bench: what a run costs on this server and how many the caller has left this hour. */

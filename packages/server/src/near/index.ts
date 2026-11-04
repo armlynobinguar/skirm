@@ -1,4 +1,5 @@
 import type { ServerConfig } from '../config';
+import { NearBadges, NoopBadges, type BadgeMinter } from './badges';
 import {
   CompositeDepositVerifier,
   DevDepositVerifier,
@@ -19,6 +20,7 @@ import { NearRpc, type NearRpcOptions } from './rpc';
 import { NearSeasons, NoopSeasons, type SeasonsChain } from './seasons';
 import { OpsFunctionCaller, type FunctionCaller } from './signer';
 
+export * from './badges';
 export * from './deposits';
 export * from './rentals';
 export * from './ownership';
@@ -36,6 +38,8 @@ export interface NearAdapters {
   rentals: RentalVerifier;
   ownership: OwnershipReader;
   seasons: SeasonsChain;
+  /** Soulbound achievement badges (`badges` contract). */
+  badges: BadgeMinter;
 }
 
 export interface NearAdapterOptions extends NearRpcOptions {
@@ -53,12 +57,13 @@ type NearConfig = Pick<
   | 'NEAR_CONTRACT_DEPOSITS'
   | 'NEAR_CONTRACT_MARKET'
   | 'NEAR_CONTRACT_SEASONS'
+  | 'NEAR_CONTRACT_BADGES'
   | 'CREDITS_PER_NEAR'
   | 'nearRpcUrls'
 >;
 
 /**
- * Registry/Minter/OwnershipReader/Seasons are Near* when the ops signer is configured, Noop*
+ * Registry/Minter/OwnershipReader/Seasons/Badges are Near* when the ops signer is configured, Noop*
  * otherwise.
  * Deposits and rentals always verify through RPC; `dev:` hashes are accepted only with AUTH_MODE=dev.
  */
@@ -82,6 +87,7 @@ export function createNearAdapters(
     seasons: caller
       ? new NearSeasons(caller, rpc, config.NEAR_CONTRACT_SEASONS)
       : new NoopSeasons(),
+    badges: caller ? new NearBadges(caller, config.NEAR_CONTRACT_BADGES) : new NoopBadges(),
     deposits: new CompositeDepositVerifier(
       new RpcDepositVerifier(rpc, config.NEAR_CONTRACT_DEPOSITS, config.CREDITS_PER_NEAR),
       config.AUTH_MODE === 'dev' ? new DevDepositVerifier(config.CREDITS_PER_NEAR) : undefined,

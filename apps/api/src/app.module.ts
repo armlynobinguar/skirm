@@ -18,6 +18,7 @@ import { RentalsController } from './controllers/rentals.controller';
 import { OpsController } from './controllers/ops.controller';
 import { PlaybooksController } from './controllers/playbooks.controller';
 import { PublicController } from './controllers/public.controller';
+import { QuestsController } from './controllers/quests.controller';
 import { ReplaysController } from './controllers/replays.controller';
 import { RankedController } from './controllers/ranked.controller';
 import { SeasonsController } from './controllers/seasons.controller';
@@ -42,6 +43,7 @@ export class AppModule {
         LobbiesController,
         SeasonsController,
         CosmeticsController,
+        QuestsController,
         OpsController,
         ReplaysController,
         DecisionsController,

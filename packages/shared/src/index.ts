@@ -9,6 +9,7 @@ export * from './appearance';
 export * from './cosmetics';
 export * from './season';
 export * from './rank';
+export * from './quests';
 export * from './tournament';
 export * from './onboarding';
 export * from './tier';

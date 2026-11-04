@@ -18,6 +18,7 @@ export const ENV_DEFAULTS = {
   NEAR_CONTRACT_REGISTRY: 'registry.playskirm.testnet',
   NEAR_CONTRACT_DEPOSITS: 'deposits.playskirm.testnet',
   NEAR_CONTRACT_SEASONS: 'seasons.playskirm.testnet',
+  NEAR_CONTRACT_BADGES: 'badges.playskirm.testnet',
   /** One credit is priced off DEFAULTS.credits (priceUsd at an assumed $1 NEAR). */
   CREDITS_PER_NEAR: DEFAULTS.credits.perNear,
   COST_ALERT_DAILY_USD: 10,
@@ -140,6 +141,7 @@ export const envSchema = z
     NEAR_CONTRACT_REGISTRY: nearAccount(ENV_DEFAULTS.NEAR_CONTRACT_REGISTRY),
     NEAR_CONTRACT_DEPOSITS: nearAccount(ENV_DEFAULTS.NEAR_CONTRACT_DEPOSITS),
     NEAR_CONTRACT_SEASONS: nearAccount(ENV_DEFAULTS.NEAR_CONTRACT_SEASONS),
+    NEAR_CONTRACT_BADGES: nearAccount(ENV_DEFAULTS.NEAR_CONTRACT_BADGES),
     CREDITS_PER_NEAR: z
       .string()
       .optional()

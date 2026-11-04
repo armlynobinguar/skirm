@@ -7,6 +7,7 @@ import type { NearKeyChecker } from './near-link';
 import type { ReplayFrameReader } from './replays';
 import type { RateLimitStore, RateLimits } from './rate-limit';
 import type {
+  BadgeMinter,
   BenchmarkJobData,
   DepositVerifier,
   ExternalTurnStore,
@@ -74,6 +75,8 @@ export interface ApiDeps {
     /** Agent rental payments (`market.rent`); dev mode also takes `dev:` hashes. */
     rentals: RentalVerifier;
     ownership: OwnershipReader;
+    /** Soulbound achievement badges (`badges` contract; NoopBadges without a signer). */
+    badges: BadgeMinter;
     /** Checks NEAR link proofs outside dev mode (absent: linking is refused with 503). */
     keys?: NearKeyChecker;
   };
