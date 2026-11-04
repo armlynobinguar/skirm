@@ -5,11 +5,11 @@
 //
 // Game types (SkillPublic, Tag, …) come from @skirm/shared (type-only imports,
 // browser-safe).
-import type { ActionKind, AgentAppearance, CosmeticItem, SkillPublic, Tag, Unlock } from '@skirm/shared';
+import type { ActionKind, AgentAppearance, CosmeticItem, SkillPublic, SkillTrigger, Tag, Unlock } from '@skirm/shared';
 
 import type { Difficulty, V2Debrief } from '../realtime/protocol';
 
-export type { AgentAppearance, CosmeticItem, SkillPublic, Tag, Unlock };
+export type { AgentAppearance, CosmeticItem, SkillPublic, SkillTrigger, Tag, Unlock };
 
 /** Skill version reference used everywhere a crew or agent names a skill. */
 export interface SkillRef {
@@ -225,6 +225,8 @@ export interface SkillBody {
   handles_tags: Tag[];
   /** 0–1,000 (default 500). */
   royalty_bps?: number;
+  /** When the skill joins its agent's prompt; null or absent: always. Public, unlike the prompt. */
+  trigger?: SkillTrigger | null;
 }
 
 export interface MintResponse {

@@ -103,7 +103,7 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | Method | Path | Body / query | Returns |
 | --- | --- | --- | --- |
 | GET | `/skills` | `?tab=written\|owned` | `SkillRow[]`: public fields, `status` (`Draft`, `Minted`, `Listed`, or `Starter` for the account-bound starter skill), `requiredUnlocks`; `written` rows add `royaltiesYocto` |
-| POST | `/skills` | `{ name, summary?, prompt (≤ 1200), reflexes? (≤ 400), requires_actions, handles_tags, royalty_bps }` | `SkillPublic` (draft, version 1). The text goes encrypted into the vault |
+| POST | `/skills` | `{ name, summary?, prompt (≤ 1200), reflexes? (≤ 400), requires_actions, handles_tags, royalty_bps, trigger? }` | `SkillPublic` (draft, version 1). The text goes encrypted into the vault. `trigger` (`@skirm/shared` `SkillTrigger`, null or absent: always) is one of `always`, `hazard_within {tiles 1-10}`, `behind_on_score`, `ahead_on_score`, `rival_near_switch {tiles 1-10}`, `carrying_item`, `time_left_under {seconds 10-300}`: the skill joins its agent's prompt only on ticks the condition holds on that agent's own view. Public on every `SkillPublic` (Exchange included); the prompt stays sealed |
 | PUT | `/skills/:id` | same fields | the next version as a draft (minted versions are immutable). Creator only |
 | GET | `/skills/:id` | `?version=` | `SkillPublic`; the creator alone also gets `{ prompt, reflexes }` |
 | POST | `/skills/:id/mint` | `{ version? }` | `{ tokenId, status: 'minted'\|'pending', txHash?, benchmark: {status} }`. Never gated on a test: the hidden benchmark is queued first, then `nft_mint`. `409 mint_in_progress`, `422 near_account_required` (NEAR minter), `502 mint_failed`, `503 queue_unavailable` |

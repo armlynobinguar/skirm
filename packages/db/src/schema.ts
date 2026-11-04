@@ -21,6 +21,7 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
+import type { SkillTrigger } from '@skirm/shared';
 
 /** bytea column mapped to Uint8Array. */
 export const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | Buffer | string }>({
@@ -185,6 +186,8 @@ export const skillVersions = pgTable(
     summary: text('summary'),
     requiresActions: jsonb('requires_actions').$type<string[]>().notNull(),
     handlesTags: jsonb('handles_tags').$type<string[]>().notNull(),
+    /** When the skill joins its agent's prompt (public, @skirm/shared SkillTrigger); null is always. */
+    trigger: jsonb('trigger').$type<SkillTrigger>(),
     royaltyBps: integer('royalty_bps').notNull().default(500),
     promptSha256: text('prompt_sha256').notNull(),
     ciphertext: bytea('ciphertext').notNull(),

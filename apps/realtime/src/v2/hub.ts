@@ -34,7 +34,7 @@ import type { WsServerMessage } from '../protocol';
 import type { PubSub, Unsubscribe } from '../pubsub';
 import type { QueueTiming, Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
-import { TEAMS, V2Match, crewLimitOf, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Roster, type V2Setup, type V2Side, type V2Timing } from './match';
+import { TEAMS, V2Match, crewLimitOf, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
 import type { V2FrameStore } from './replay';
 
 export interface V2Search {
@@ -378,6 +378,7 @@ export class V2Hub {
     const crew: AgentSpec[] = [];
     const skills: string[][] = [];
     const skillKeys: { id: string; version: number }[][] = [];
+    const skillMeta: V2SkillMeta[][] = [];
     const bought: boolean[] = [];
     const instructions: (string | null)[] = [];
     for (const c of entries) {
@@ -403,10 +404,17 @@ export class V2Hub {
       skills.push(prompts);
       skillKeys.push(keys);
       const meta = keys.length ? await repos.skills.getMany(keys) : [];
+      // Public name and trigger per skill, in prompt order (a version missing here plays always).
+      skillMeta.push(
+        keys.map((k) => {
+          const m = meta.find((x) => x.id === k.id && x.version === k.version);
+          return { name: m?.name ?? 'Skill', trigger: m?.trigger ?? null };
+        }),
+      );
       bought.push(rented || meta.some((m) => m.creatorId !== accountId));
       instructions.push(v.systemPrompt ?? null);
     }
-    return { crew, skills, skillKeys, bought, instructions };
+    return { crew, skills, skillKeys, skillMeta, bought, instructions };
   }
 
   /** A V2Match wired to this hub: its credits on the ledger, its watchers, and finish(). */

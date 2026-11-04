@@ -145,5 +145,14 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "CREATE TABLE \"onboarding_progress\" (\n\t\"account_id\" text PRIMARY KEY NOT NULL,\n\t\"tutorial_step\" integer DEFAULT 0 NOT NULL,\n\t\"tutorial_completed_at\" timestamp with time zone,\n\t\"tutorial_skipped_at\" timestamp with time zone,\n\t\"checklist_dismissed_at\" timestamp with time zone,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL\n);\n",
       "\nALTER TABLE \"onboarding_progress\" ADD CONSTRAINT \"onboarding_progress_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;"
     ]
+  },
+  {
+    "tag": "0004_skill_triggers",
+    "folderMillis": 1793774355379,
+    "bps": true,
+    "hash": "0ec50c90f3d147cd5d12266aa7ca4fde019078a08e98bbc76cf788af4a3b7171",
+    "sql": [
+      "ALTER TABLE \"skill_versions\" ADD COLUMN \"trigger\" jsonb;"
+    ]
   }
 ];

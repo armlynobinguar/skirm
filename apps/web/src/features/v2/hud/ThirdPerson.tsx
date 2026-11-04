@@ -14,6 +14,7 @@ import { usePreferences } from '@/lib/preferences';
 import type { V2CommsLine } from '../v2Store';
 import c from './hud.module.css';
 import { heardBy, slotsOf, subtitlesFor, type Sub } from './model';
+import { MindSkills } from './MindSkills';
 import { BigSlots, Ear } from './parts';
 
 export interface ThirdPersonProps {
@@ -135,6 +136,7 @@ function Mind({ agent, team, ranked, lines }: { agent: FrameAgent; team: Team; r
           </div>
         </section>
       )}
+      {rival ? null : <MindSkills skills={agent.skills} />}
       <section>
         <h3>{rival ? 'Said aloud' : 'Heard'}</h3>
         <div className={c.heard}>
