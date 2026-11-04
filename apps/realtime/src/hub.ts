@@ -212,6 +212,7 @@ export class RealtimeHub {
           ...(msg.mapId !== undefined ? { mapId: msg.mapId } : {}),
           ...(msg.difficulty !== undefined ? { difficulty: msg.difficulty } : {}),
           ...(msg.draft ? { draft: true } : {}),
+          ...(msg.mission !== undefined ? { mission: msg.mission } : {}),
         };
         this.externalScope(c, msg.crew, msg.ranked);
         // The parser already refused a ranked practice (practice_unranked).

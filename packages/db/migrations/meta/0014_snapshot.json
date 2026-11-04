@@ -1,5 +1,5 @@
 {
-  "id": "d6ff110d-2775-4be6-a9c8-7c3260c99c42",
+  "id": "8b3171a8-fceb-4010-b9e9-44dcd4f38833",
   "prevId": "4c179385-eeb8-49e7-b7f2-5bd2729d228f",
   "version": "7",
   "dialect": "postgresql",
@@ -437,20 +437,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "xp": {
-          "name": "xp",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "traits": {
-          "name": "traits",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -515,6 +501,151 @@
           "value": "char_length(\"agents\".\"system_prompt\") <= 600"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.campaign_progress": {
+      "name": "campaign_progress",
+      "schema": "",
+      "columns": {
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mission_id": {
+          "name": "mission_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "cleared_at": {
+          "name": "cleared_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "best_ticks": {
+          "name": "best_ticks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_match_id": {
+          "name": "last_match_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "campaign_progress_account_id_accounts_id_fk": {
+          "name": "campaign_progress_account_id_accounts_id_fk",
+          "tableFrom": "campaign_progress",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "campaign_progress_account_id_mission_id_pk": {
+          "name": "campaign_progress_account_id_mission_id_pk",
+          "columns": [
+            "account_id",
+            "mission_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_rewards": {
+      "name": "campaign_rewards",
+      "schema": "",
+      "columns": {
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chapter_id": {
+          "name": "chapter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "skill_id": {
+          "name": "skill_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cosmetic_id": {
+          "name": "cosmetic_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "campaign_rewards_account_id_accounts_id_fk": {
+          "name": "campaign_rewards_account_id_accounts_id_fk",
+          "tableFrom": "campaign_rewards",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "campaign_rewards_account_id_chapter_id_pk": {
+          "name": "campaign_rewards_account_id_chapter_id_pk",
+          "columns": [
+            "account_id",
+            "chapter_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.cosmetics_owned": {

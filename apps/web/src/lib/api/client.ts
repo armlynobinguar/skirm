@@ -7,6 +7,7 @@ import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
 import { ApiError, errorFromBody } from './errors';
+import type { Campaign, CampaignStart } from './campaignTypes';
 import type { Playbook, PlaybookList, PlaybookWithText } from './playbookTypes';
 import type { CreateTournament, Lobby, LobbySettings, TournamentDetail, TournamentStatus, TournamentSummary } from './lobbyTypes';
 import type {
@@ -220,6 +221,10 @@ export interface ApiClient {
   skillTemplates(): Promise<SkillTemplateView[]>;
   /** POST /onboarding/templates/:id/copy: a new draft skill of the caller's from the template. */
   copyTemplate(templateId: string): Promise<SkillView>;
+  /** GET /campaign: chapters, missions with their state, and each chapter's rewards. */
+  campaign(): Promise<Campaign>;
+  /** POST /campaign/missions/:id/start: the v2_queue to send (403 `mission_locked`). */
+  startMission(missionId: string): Promise<CampaignStart>;
 
   /** GET /external-agents: the caller's own programs (bring your own agent). */
   externalAgents(): Promise<ExternalAgent[]>;
@@ -390,6 +395,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     dismissChecklist: () => json('POST', '/onboarding/checklist/dismiss'),
     skillTemplates: () => get('/onboarding/templates'),
     copyTemplate: (id) => json('POST', `/onboarding/templates/${enc(id)}/copy`),
+    campaign: () => get('/campaign'),
+    startMission: (id) => json('POST', `/campaign/missions/${enc(id)}/start`),
 
     externalAgents: () => get('/external-agents'),
     createExternalAgent: (body) => json('POST', '/external-agents', { body }),

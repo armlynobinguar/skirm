@@ -2,6 +2,7 @@ import type { Executor } from '../client';
 import { AccountsRepo } from './accounts';
 import { AgentsRepo } from './agents';
 import { BenchRepo } from './bench';
+import { CampaignRepo } from './campaign';
 import { CosmeticsRepo } from './cosmetics';
 import { ExternalAgentsRepo } from './external-agents';
 import { LeaderboardsRepo } from './leaderboards';
@@ -65,6 +66,8 @@ export interface Repos {
   externalAgents: ExternalAgentsRepo;
   /** Crew playbooks (sealed; owner-only). */
   playbooks: PlaybooksRepo;
+  /** Campaign progress and chapter rewards. */
+  campaign: CampaignRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -106,6 +109,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     onboarding: new OnboardingRepo(db),
     externalAgents: new ExternalAgentsRepo(db),
     playbooks: new PlaybooksRepo(db),
+    campaign: new CampaignRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -113,6 +117,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
 export * from './accounts';
 export * from './agents';
 export * from './bench';
+export * from './campaign';
 export * from './cosmetics';
 export * from './external-agents';
 export * from './leaderboards';

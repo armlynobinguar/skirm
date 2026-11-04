@@ -1270,3 +1270,45 @@ export const achievementsUnlocked = pgTable(
     ),
   ],
 );
+
+// ---------- Campaign ----------
+
+/**
+ * A player's campaign progress, one row per mission played (@skirm/shared CAMPAIGN_CHAPTERS):
+ * every result against the bot counts an attempt; the first that meets the objective sets
+ * `cleared_at` for good. Written by realtime when a campaign match settles.
+ */
+export const campaignProgress = pgTable(
+  'campaign_progress',
+  {
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    missionId: text('mission_id').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    clearedAt: ts('cleared_at'),
+    /** Fewest ticks of a clearing win. */
+    bestTicks: integer('best_ticks'),
+    lastMatchId: text('last_match_id'),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.missionId] })],
+);
+
+/**
+ * A chapter's rewards, granted once per account (the primary key makes a repeat a no-op): the
+ * starter skill (an account-bound skill_ownership row) and any cosmetic, in the same transaction.
+ */
+export const campaignRewards = pgTable(
+  'campaign_rewards',
+  {
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    chapterId: text('chapter_id').notNull(),
+    skillId: text('skill_id').notNull(),
+    cosmeticId: text('cosmetic_id'),
+    grantedAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.chapterId] })],
+);

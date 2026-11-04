@@ -18,8 +18,12 @@
 // talk rule and crew size, host as crew A. It is casual (no Elo, no registry) and both crews hold
 // credits as usual. When it ends the lobby is settled (LobbiesRepo.settleMatch), which moves a
 // tournament bracket on.
+//
+// A campaign mission (@skirm/shared CAMPAIGN_CHAPTERS) is practice with `mission`: the mission fixes
+// the map, difficulty and largest crew, it must be unlocked for the player, and its result is
+// recorded (CampaignRepo.record, which grants a completed chapter's rewards) before v2_end goes out.
 import { SYSTEM_ACCOUNT_ID, newId, sealedSecretOf, type LobbyRow, type Repos, type V2CrewRecord, type V2MatchRow } from '@skirm/db';
-import { forcedTier, isLobbyTalkRule } from '@skirm/shared';
+import { campaignMission, forcedTier, isLobbyTalkRule, missionUnlocked } from '@skirm/shared';
 import { createGreedyBrain, type V2Brain } from '@skirm/decision-engine/v2';
 import {
   BOT_HANDLE,
@@ -76,6 +80,8 @@ export interface V2QueueOptions {
   difficulty?: Difficulty;
   /** Draft mode: casual only. */
   draft?: boolean;
+  /** Practice only: a campaign mission (its map and difficulty win over mapId and difficulty). */
+  mission?: string;
 }
 
 /** The match a roster is loaded for (its external agents' turns name it; ranked has none). */
@@ -138,6 +144,7 @@ export class V2HubError extends Error {
       | 'external_unranked'
       | 'lobby_closed'
       | 'draft_casual'
+      | 'mission_locked'
       | V2BanError
       | V2CommandError,
     message: string,
@@ -162,6 +169,8 @@ export class V2Hub {
   private readonly waitingIn = new Map<string, string>();
   /** Matches started from a lobby: settled when they end. */
   private readonly lobbyMatches = new Set<string>();
+  /** Campaign matches: match id → the player and the mission, recorded when they end. */
+  private readonly campaignMatches = new Map<string, { accountId: string; missionId: string }>();
   private closing = false;
 
   constructor(private readonly deps: V2HubDeps) {
@@ -225,12 +234,17 @@ export class V2Hub {
     if (this.closing) throw new V2HubError('unavailable', 'server is shutting down');
     this.free(user.accountId);
     if (crew.length < 1 || crew.length > 3) throw new V2HubError('invalid_crew', 'a crew has 1 to 3 agents');
-    const map = this.pool().find((m) => m.id === (opts.mapId ?? DEFAULT_PRACTICE.mapId));
+    const mission = opts.mission !== undefined ? campaignMission(opts.mission) : undefined;
+    if (opts.mission !== undefined && !mission) throw new V2HubError('not_found', 'no such campaign mission');
+    if (mission && crew.length > mission.crewSize) throw new V2HubError('invalid_crew', `this mission takes at most ${mission.crewSize} agents`);
+    const map = this.pool().find((m) => m.id === (mission?.mapId ?? opts.mapId ?? DEFAULT_PRACTICE.mapId));
     if (!map) throw new V2HubError('invalid_crew', 'no such map');
     if (crew.length > crewLimitOf(map)) throw new V2HubError('invalid_crew', `${map.name} takes at most ${crewLimitOf(map)} agents`);
+    if (mission && !missionUnlocked(mission.id, await this.deps.repos.campaign.cleared(user.accountId)))
+      throw new V2HubError('mission_locked', 'clear the missions before this one first');
     await this.ownCrew(user.accountId, crew);
     this.free(user.accountId);
-    this.track(this.startPractice(user, crew, map, opts.difficulty ?? DEFAULT_PRACTICE.difficulty));
+    this.track(this.startPractice(user, crew, map, mission?.difficulty ?? opts.difficulty ?? DEFAULT_PRACTICE.difficulty, mission?.id));
   }
 
   /**
@@ -714,7 +728,7 @@ export class V2Hub {
   }
 
   /** The player is crew A; the bot (crew B) answers its own v2_found and v2_lockin. */
-  private async startPractice(user: { accountId: string; handle: string }, entries: V2CrewEntry[], map: MapDefV2, difficulty: Difficulty): Promise<void> {
+  private async startPractice(user: { accountId: string; handle: string }, entries: V2CrewEntry[], map: MapDefV2, difficulty: Difficulty, missionId?: string): Promise<void> {
     const matchId = newId('mat');
     await this.launch(matchId, [user.accountId], async () => {
       // The difficulty shapes the bot: crew size, talk tier, a late start and its bluff cap (practiceRival).
@@ -726,6 +740,7 @@ export class V2Hub {
       const free: V2Setup['free'] = this.deps.brain.kind === 'greedy' ? { A: true, B: true } : { B: true };
       await this.deps.repos.v2Matches.create({ id: matchId, mapId: map.id, ranked: false, practice: true, teamA: user.accountId, teamB: SYSTEM_ACCOUNT_ID, crews: { A: crewRecords(sides.A), B: crewRecords(bot) }, difficulty });
       const hold = rival.hold ? { B: rival.hold } : undefined;
+      if (missionId !== undefined) this.campaignMatches.set(matchId, { accountId: user.accountId, missionId });
       const match = this.newMatch({ matchId, map, ranked: false, difficulty, sides, practice: true, free, lieCap: { B: rival.lieCap }, ...(hold ? { hold } : {}) }, { A: this.deps.brain, B: createGreedyBrain() }, (t, msg) => {
         if (t === 'A') return this.deps.send(user.accountId, msg);
         if (msg.type === 'v2_found') queueMicrotask(() => match.accept('B'));
@@ -803,6 +818,11 @@ export class V2Hub {
     }
     // A lobby's match moves its lobby on (a rematch, or the next bracket round); the worker settles
     // any lobby left unsettled.
+    const campaign = this.campaignMatches.get(end.matchId);
+    if (campaign) {
+      this.campaignMatches.delete(end.matchId);
+      if (end.result) await this.recordCampaign(end.matchId, campaign, end.result);
+    }
     if (this.lobbyMatches.delete(end.matchId))
       await this.deps.repos.lobbies.settleMatch(end.matchId).catch((err: unknown) => log.warn(`v2 match ${end.matchId}: lobby not settled: ${(err as Error).message}`));
     // Frames are kept for replay in the background, so a slow store never holds up v2_end.
@@ -817,6 +837,17 @@ export class V2Hub {
     }
     await this.recordExternal(end.matchId, match);
     return out;
+  }
+
+  /** A campaign match's result for its player; a cleared chapter grants its rewards (logged, never fatal). */
+  private async recordCampaign(matchId: string, c: { accountId: string; missionId: string }, result: MatchResult): Promise<void> {
+    const { repos, log } = this.deps;
+    try {
+      const r = await repos.campaign.record(c.accountId, c.missionId, matchId, { winner: result.winner, score: result.score, ticks: result.ticks });
+      if (r.newlyCleared) log.info(`v2 match ${matchId}: campaign mission ${c.missionId} cleared${r.granted.length ? `, rewards of ${r.granted.join(', ')} granted` : ''}`);
+    } catch (err) {
+      log.warn(`v2 match ${matchId}: campaign result not kept: ${(err as Error).message}`);
+    }
   }
 
   /** Each external agent's calls and misses in this match, added to its counters. */

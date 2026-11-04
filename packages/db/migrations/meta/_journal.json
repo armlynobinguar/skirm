@@ -103,8 +103,15 @@
     {
       "idx": 14,
       "version": "7",
-      "when": 1793809824290,
-      "tag": "0014_agent_progression",
+      "when": 1793810479717,
+      "tag": "0014_campaign",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793811505660,
+      "tag": "0015_agent_progression",
       "breakpoints": true
     }
   ]

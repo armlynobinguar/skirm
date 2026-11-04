@@ -59,6 +59,9 @@ export interface HeadlessOptions {
   inject?: { team: Team; every: number; lines: string[] };
   /** Every stepped tick: the engine's events and the state after it (read only; for timelines and debriefs). */
   onTick?: (events: readonly MatchEvent[], s: Readonly<MatchState>) => void;
+  /** Extra ticks a crew holds at the start and its bluff cap (the practice bot, practiceRival). */
+  hold?: Partial<Record<Team, number>>;
+  lieCap?: Partial<Record<Team, number>>;
 }
 
 export interface HeadlessStats {
@@ -100,7 +103,7 @@ export async function playHeadless(opts: HeadlessOptions): Promise<HeadlessResul
   };
 
   // The engine applies the head start: a held crew's agents have only `wait` until it runs out.
-  const s = createMatch(def, crews, { difficulty });
+  const s = createMatch(def, crews, { difficulty, ...(opts.hold ? { hold: opts.hold } : {}), ...(opts.lieCap ? { lieCap: opts.lieCap } : {}) });
   const header = (t: Team) => s.agents.filter((a) => a.team === t).map(logAgent);
   const model = brains.A.model === brains.B.model ? brains.A.model : `A:${brains.A.model} B:${brains.B.model}`;
   const log = startLog({
