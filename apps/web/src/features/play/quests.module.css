@@ -1,0 +1,27 @@
+/* S02 Home quests panel. Tokens only. Two columns from tablet width, one on phones. */
+
+.panel {
+  background: var(--panel);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+  border-radius: var(--radius-3);
+  box-shadow: var(--elev-1);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.head { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: baseline; justify-content: space-between; }
+.title { margin: 0; font: 800 24px/28px var(--font-display); text-transform: uppercase; }
+.streak { font: 600 13px/18px var(--font-mono); color: var(--good); }
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: var(--space-4); }
+.group { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.groupTitle { margin: 0; font: 700 12px/16px var(--font-sans); color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.quest { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.questTop, .questFoot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); min-height: 24px; }
+.questTitle { font: 600 14px/20px var(--font-sans); min-width: 0; overflow-wrap: anywhere; }
+.reward { flex: none; font: 600 12px/16px var(--font-mono); color: var(--ink-muted); }
+.count { font: 500 12px/16px var(--font-mono); color: var(--ink-muted); }
+.claimed { font: 700 12px/16px var(--font-mono); color: var(--good); }
+.note { margin: 0; font-size: 12px; line-height: 16px; color: var(--ink-muted); }

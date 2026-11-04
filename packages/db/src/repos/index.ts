@@ -15,6 +15,7 @@ import { OnboardingRepo } from './onboarding';
 import { OpsRepo } from './ops';
 import { PlaybooksRepo } from './playbooks';
 import { ProofRepo } from './proof';
+import { QuestsRepo } from './quests';
 import { RankedRepo } from './ranked';
 import { RentalsRepo } from './rentals';
 import { ReplaysRepo } from './replays';
@@ -51,6 +52,8 @@ export interface Repos {
   cosmetics: CosmeticsRepo;
   /** Agent rental offers and one-match passes. */
   rentals: RentalsRepo;
+  /** Quest claims, play streaks and achievements (with their soulbound badges). */
+  quests: QuestsRepo;
   /** Private lobbies (friend challenges and bracket matches). */
   lobbies: LobbiesRepo;
   /** Single-elimination tournaments built from lobbies, with prize pools in paid credits. */
@@ -94,6 +97,12 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     bench: new BenchRepo(db),
     cosmetics: new CosmeticsRepo(db, opts.ledger),
     rentals: new RentalsRepo(db),
+    quests: new QuestsRepo(db, {
+      ...(opts.ledger?.clock ? { clock: opts.ledger.clock } : opts.clock ? { clock: opts.clock } : {}),
+      ...(opts.ledger?.config?.freeAllowance !== undefined
+        ? { freeAllowance: opts.ledger.config.freeAllowance }
+        : {}),
+    }),
     lobbies: new LobbiesRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
     tournaments: new TournamentsRepo(db, { ...(opts.ledger ? { ledger: opts.ledger } : {}), ...(opts.clock ? { clock: opts.clock } : {}) }),
     replays: new ReplaysRepo(db),
@@ -121,6 +130,7 @@ export * from './onboarding';
 export * from './ops';
 export * from './playbooks';
 export * from './proof';
+export * from './quests';
 export * from './ranked';
 export * from './rentals';
 export * from './replays';

@@ -267,5 +267,29 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nALTER TABLE \"skill_bench_runs\" ADD CONSTRAINT \"skill_bench_runs_skill_id_version_skill_versions_skill_id_version_fk\" FOREIGN KEY (\"skill_id\",\"version\") REFERENCES \"public\".\"skill_versions\"(\"skill_id\",\"version\") ON DELETE no action ON UPDATE no action;",
       "\nCREATE INDEX \"skill_bench_runs_account_idx\" ON \"skill_bench_runs\" USING btree (\"account_id\",\"created_at\");"
     ]
+  },
+  {
+    "tag": "0013_quests_achievements",
+    "folderMillis": 1793808491502,
+    "bps": true,
+    "hash": "593479cdbca45782b2d776a3f5c3b4ff29257350a41aadcdf96e060beee9f1cd",
+    "sql": [
+      "CREATE TABLE \"achievements_unlocked\" (\n\t\"account_id\" text NOT NULL,\n\t\"achievement_id\" text NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"badge_status\" text DEFAULT 'none' NOT NULL,\n\t\"badge_token_id\" text,\n\t\"badge_tx\" text,\n\t\"badge_owner\" text,\n\t\"badge_at\" timestamp with time zone,\n\tCONSTRAINT \"achievements_unlocked_account_id_achievement_id_pk\" PRIMARY KEY(\"account_id\",\"achievement_id\"),\n\tCONSTRAINT \"achievements_badge_status_ck\" CHECK (\"achievements_unlocked\".\"badge_status\" in ('none', 'pending', 'minted', 'local', 'failed'))\n);\n",
+      "\nCREATE TABLE \"quest_claims\" (\n\t\"account_id\" text NOT NULL,\n\t\"quest_id\" text NOT NULL,\n\t\"period\" text NOT NULL,\n\t\"period_key\" text NOT NULL,\n\t\"reward_credits\" integer NOT NULL,\n\t\"credited\" integer NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"quest_claims_account_id_quest_id_period_key_pk\" PRIMARY KEY(\"account_id\",\"quest_id\",\"period_key\"),\n\tCONSTRAINT \"quest_claims_period_ck\" CHECK (\"quest_claims\".\"period\" in ('daily', 'weekly'))\n);\n",
+      "\nALTER TABLE \"achievements_unlocked\" ADD CONSTRAINT \"achievements_unlocked_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"quest_claims\" ADD CONSTRAINT \"quest_claims_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;"
+    ]
+  },
+  {
+    "tag": "0014_campaign",
+    "folderMillis": 1793810479717,
+    "bps": true,
+    "hash": "5ff960c6e8fdc2f62c0d5c2858183bca788cc76dc70e8a85ef5af80e3a93d462",
+    "sql": [
+      "CREATE TABLE \"campaign_progress\" (\n\t\"account_id\" text NOT NULL,\n\t\"mission_id\" text NOT NULL,\n\t\"attempts\" integer DEFAULT 0 NOT NULL,\n\t\"cleared_at\" timestamp with time zone,\n\t\"best_ticks\" integer,\n\t\"last_match_id\" text,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"campaign_progress_account_id_mission_id_pk\" PRIMARY KEY(\"account_id\",\"mission_id\")\n);\n",
+      "\nCREATE TABLE \"campaign_rewards\" (\n\t\"account_id\" text NOT NULL,\n\t\"chapter_id\" text NOT NULL,\n\t\"skill_id\" text NOT NULL,\n\t\"cosmetic_id\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"campaign_rewards_account_id_chapter_id_pk\" PRIMARY KEY(\"account_id\",\"chapter_id\")\n);\n",
+      "\nALTER TABLE \"campaign_progress\" ADD CONSTRAINT \"campaign_progress_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"campaign_rewards\" ADD CONSTRAINT \"campaign_rewards_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;"
+    ]
   }
 ];

@@ -13,6 +13,7 @@ import {
   type RentalPayment,
   type RentalVerifier,
   LocalKeyWrapper,
+  NoopBadges,
   NoopMinter,
   NoopOwnershipReader,
   Vault,
@@ -70,6 +71,7 @@ export interface Harness {
   deps: ApiDeps;
   benchmarks: MemoryBenchmarkQueue;
   minter: NoopMinter;
+  badges: NoopBadges;
   ownership: FakeOwnership | NoopOwnershipReader;
   rpcDeposits: FakeRpcDeposits;
   rpcRentals: FakeRpcRentals;
@@ -113,6 +115,7 @@ export async function setup(
   const repos = createRepos(db, { ledger: { clock: () => clock.now }, clock: () => clock.now });
   const benchmarks = new MemoryBenchmarkQueue();
   const minter = new NoopMinter();
+  const badges = new NoopBadges();
   const ownership = opts.nearOwnership ? new FakeOwnership() : new NoopOwnershipReader();
   const rpcDeposits = new FakeRpcDeposits();
   const rpcRentals = new FakeRpcRentals();
@@ -136,6 +139,7 @@ export async function setup(
       ),
       rentals: new CompositeRentalVerifier(rpcRentals, config.AUTH_MODE === 'dev' ? new DevRentalVerifier() : undefined),
       ownership,
+      badges,
       ...(opts.nearKeys ? { keys: opts.nearKeys } : {}),
     },
     benchmarkQueue: benchmarks,
@@ -170,6 +174,7 @@ export async function setup(
     deps,
     benchmarks,
     minter,
+    badges,
     ownership,
     rpcDeposits,
     rpcRentals,

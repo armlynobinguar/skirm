@@ -6,6 +6,7 @@ import type { Executor } from '../client';
 import { newId } from '../ids';
 import {
   accounts,
+  achievementsUnlocked,
   agentSkills,
   campaignProgress,
   campaignRewards,
@@ -19,6 +20,7 @@ import {
   onboardingProgress,
   playbooks,
   prizePayouts,
+  questClaims,
   rentalOffers,
   rentals,
   sales,
@@ -153,6 +155,8 @@ export class AccountsRepo {
       const side = m.teamAAccountId === accountId ? 'A' : 'B';
       return { ...m, debriefs: m.debriefs?.[side] ? { [side]: m.debriefs[side] } : null };
     });
+    const quests = await this.db.select().from(questClaims).where(eq(questClaims.accountId, accountId));
+    const achievements = await this.db.select().from(achievementsUnlocked).where(eq(achievementsUnlocked.accountId, accountId));
     const messages = agentIds.length ? await this.db.select().from(matchMessages).where(inArray(matchMessages.agentId, agentIds)) : [];
     const [campaign, campaignRewardRows] = await Promise.all([
       this.db.select().from(campaignProgress).where(eq(campaignProgress.accountId, accountId)),
@@ -177,6 +181,8 @@ export class AccountsRepo {
       prizePayouts: payouts,
       skillTrials: trials,
       cosmetics,
+      questClaims: quests,
+      achievements,
       onboarding,
       eloDecays: decays,
       skillBenchRuns: benchRuns,

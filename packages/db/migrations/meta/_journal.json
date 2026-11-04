@@ -92,6 +92,20 @@
       "when": 1793799819457,
       "tag": "0012_skill_bench",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793808491502,
+      "tag": "0013_quests_achievements",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793810479717,
+      "tag": "0014_campaign",
+      "breakpoints": true
     }
   ]
 }
