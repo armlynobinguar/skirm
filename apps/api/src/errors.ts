@@ -39,6 +39,7 @@ const REPO_STATUS: Record<string, number> = {
   hold_mismatch: 409,
   trial_limit: 429,
   bench_limit: 429,
+  puzzle_limit: 429,
   rate_limited: 429,
 };
 

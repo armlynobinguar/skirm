@@ -27,6 +27,7 @@ import { MAPS_V2, PRACTICE_MAPS, botCrew, type AgentSpec, type Difficulty } from
 import type { BenchmarkJobData } from '@skirm/server';
 import { WorkerError, errorCode, type WorkerDeps } from './deps';
 import { processBenchRun } from './bench-processor';
+import { processPuzzleRun } from './puzzle-processor';
 
 export type BenchmarkDeps = Pick<
   WorkerDeps,
@@ -150,6 +151,7 @@ export async function processBenchmark(
   attempt: BenchmarkAttempt = { attemptsMade: 0, attempts: 1 },
 ): Promise<BenchmarkOutcome> {
   if (data.kind === 'bench') return processBenchRun(deps, data.runId, attempt);
+  if (data.kind === 'puzzle') return processPuzzleRun(deps, data.runId, attempt);
   return data.kind === 'mint'
     ? benchmarkVersion(deps, data.skillId, data.version, attempt)
     : runTrial(deps, data.trialId, attempt);
