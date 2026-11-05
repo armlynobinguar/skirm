@@ -82,6 +82,10 @@ These contracts are live and initialized, built with `contracts/build.sh` and de
 | [`deposits.playskirm.testnet`](https://testnet.nearblocks.io/address/deposits.playskirm.testnet) | `skirm_deposits.wasm` | treasury `playskirm.testnet`, default minimum deposit |
 | [`ops.playskirm.testnet`](https://testnet.nearblocks.io/address/ops.playskirm.testnet) | none (platform signer, 1 NEAR) | |
 
+The market on testnet predates `rent` (agent rentals): until the operator redeploys it
+([contracts/market/README.md](market/README.md), no state migration needed) the api keeps
+`NEAR_RENTALS_ONCHAIN` off and rentals are paid in credits.
+
 The backend's season job opens each season onchain with the ops key. While no season is open,
 the market forwards the season share of each fee to the treasury.
 
@@ -226,7 +230,7 @@ going to the creator. On the creator's own (primary) sale the royalty is 0.
 | `delist(token_id)` | seller | 1 yocto | |
 | `update_price(token_id, price)` | seller | 1 yocto | |
 | `buy(token_id)` → `bool` | anyone but the seller | ≥ price | Needs ≥ 120 Tgas (the web sends 150). Excess deposit refunded |
-| `rent(rental_id, owner_id, price)` | anyone but `owner_id` | ≥ price | Agent rentals (agents are offchain, nothing is transferred). The platform fee comes out of `price` with the same season/treasury split as a sale, `owner_id` gets the rest, the excess is refunded. `rental_id` is 1–96 bytes (the api's offer id and a nonce). Keeps no state. The web sends 60 Tgas |
+| `rent(rental_id, owner_id, price)` | anyone but `owner_id` | ≥ price | Agent rentals (agents are offchain, nothing is transferred). The platform fee comes out of `price` with the same season/treasury split as a sale, `owner_id` gets the rest, the excess is refunded. `rental_id` is 1–96 bytes (the api's offer id and a nonce). Keeps no state. The web sends 60 Tgas. **Not on testnet yet**: the deployed market predates it; see the [redeploy runbook](market/README.md#redeploy-runbook-testnet-operator-only) |
 | `resolve_purchase(...)`, `on_season_funded(amount)` | private callbacks | | |
 | `get_listing`, `get_listings(from_index?, limit?)`, `get_listings_by_seller`, `listing_count`, `is_purchase_pending`, `fee_for(price)`, `get_config` | view | | `get_config` → `{owner_id, governance_id, nft_contract_id, treasury_id, season_pool_id, season_share_bps, fee_bps, max_fee_bps, pending_fee: {bps, effective_at_ms}?, fee_delay_ms}` |
 | `propose_fee(bps)` → `{bps, effective_at_ms}` | owner or governance | 1 yocto | `bps` ≤ 1000. Replaces a pending proposal and restarts its delay |

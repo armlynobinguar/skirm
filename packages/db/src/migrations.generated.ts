@@ -329,5 +329,14 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE INDEX \"community_maps_published_idx\" ON \"community_maps\" USING btree (\"status\",\"published_at\");",
       "\nCREATE UNIQUE INDEX \"community_maps_name_uq\" ON \"community_maps\" USING btree (lower(\"name\")) WHERE \"community_maps\".\"status\" = 'published';"
     ]
+  },
+  {
+    "tag": "0018_rental_credits",
+    "folderMillis": 1793843159582,
+    "bps": true,
+    "hash": "3283c5c9e19ba7e1b62f01392335cd653c33f661dc4db38551d2a9d3bc960531",
+    "sql": [
+      "ALTER TYPE \"public\".\"ledger_note\" ADD VALUE 'rental';"
+    ]
   }
 ];

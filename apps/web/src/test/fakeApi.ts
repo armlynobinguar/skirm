@@ -28,6 +28,7 @@ const METHODS: (keyof ApiClient)[] = [
   'myRentals',
   'setRentalOffer',
   'rent',
+  'rentWithCredits',
   'patchAgent',
   'skills',
   'createSkill',

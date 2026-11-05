@@ -50,6 +50,7 @@ export type ApiConfig = Pick<
       | 'LLM_PLANNER_MODEL'
       | 'LLM_PRICE_INPUT_USD'
       | 'LLM_PRICE_OUTPUT_USD'
+      | 'NEAR_RENTALS_ONCHAIN'
     >
   > & {
     V2_BRAIN?: string | undefined;

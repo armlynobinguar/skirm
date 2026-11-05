@@ -103,7 +103,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     bench: new BenchRepo(db),
     daily: new DailyRepo(db),
     cosmetics: new CosmeticsRepo(db, opts.ledger),
-    rentals: new RentalsRepo(db),
+    rentals: new RentalsRepo(db, opts.ledger),
     quests: new QuestsRepo(db, {
       ...(opts.ledger?.clock ? { clock: opts.ledger.clock } : opts.clock ? { clock: opts.clock } : {}),
       ...(opts.ledger?.config?.freeAllowance !== undefined

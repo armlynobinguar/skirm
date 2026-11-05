@@ -2,9 +2,11 @@
 // Rented agents on the crew screen (the prototype's agent rentals). Two rows under your roster:
 //   passes   agents you have rented and not played yet: pick them like your own; one match each,
 //            used up when that match ends (a void match keeps the pass)
-//   offers   other players' agents for rent at a price per match: Rent pays `market.rent` from your
-//            linked wallet (dev mode: a `dev:<yocto>:<nonce>` hash) and POST /rentals/:offerId
-//            turns the payment into a pass
+//   offers   other players' agents for rent at a price per match. How Rent pays follows the api's
+//            `payWith` (NEAR_RENTALS_ONCHAIN): `near` signs `market.rent` from your linked wallet,
+//            `credits` spends paid credits; dev mode pays with a `dev:<yocto>:<nonce>` hash. POST
+//            /rentals/:offerId turns the payment into a pass. A signed tx (or a credits key) is kept
+//            until the api answers, so a retry after a dropped request never pays twice.
 // A rented agent plays with its owner's skills; you never see them, and its plans stay hidden.
 import { defaultAppearance } from '@skirm/shared';
 import { Button } from '@skirm/ui';
@@ -58,6 +60,35 @@ export function passesByAgent(passes: readonly RentalPass[]): RentalPass[] {
 
 const nonce = () => `${Date.now().toString(36)}${Math.floor(Math.random() * 1e9).toString(36)}`;
 
+/** A payment made but not yet turned into a pass: a signed tx hash, or the key of a credits rental. */
+interface Pending {
+  offerId: string;
+  txHash?: string;
+  key?: string;
+}
+
+// Kept in localStorage too, so a reload after signing re-sends the same tx instead of paying again.
+const PENDING_KEY = 'skirm:rent:pending';
+function loadPending(): Pending | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(PENDING_KEY) ?? 'null') as Pending | null;
+    return v && typeof v.offerId === 'string' ? v : null;
+  } catch {
+    return null;
+  }
+}
+function savePending(p: Pending | null): void {
+  try {
+    if (p) localStorage.setItem(PENDING_KEY, JSON.stringify(p));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch {
+    // Storage off (private window): the in-memory copy still covers retries on this page.
+  }
+}
+
+/** Api refusals that will not change on a retry: drop the pending payment so the next click pays afresh. */
+const isFinal = (err: unknown) => err instanceof ApiError && (err.status === 409 || err.status === 422 || err.status === 402 || err.status === 403);
+
 export function RentShelf({
   passes,
   picked,
@@ -78,31 +109,59 @@ export function RentShelf({
   const { mode } = useSession();
   const signer = useNearSigner();
   const offers = useQuery({ queryKey: qk.rentalOffers, queryFn: () => api.rentalOffers(), retry: false });
-  // Signed but not yet recorded (the POST failed): re-sent as is, never signed (paid) twice.
-  const signed = useRef<{ offerId: string; txHash: string } | null>(null);
+  // Paid but not yet recorded (the POST failed): re-sent as is, never signed (paid) twice.
+  const pending = useRef<Pending | null>(null);
+  if (pending.current === null && typeof window !== 'undefined') pending.current = loadPending();
+  const remember = (p: Pending | null) => {
+    pending.current = p;
+    savePending(p);
+  };
   const counts = new Map<string, number>();
   for (const p of passes) counts.set(p.agentId, (counts.get(p.agentId) ?? 0) + 1);
 
   const rent = useMutation({
     mutationFn: async (o: RentalOffer) => {
-      let txHash: string;
-      if (mode === 'dev') txHash = devTxHash(o.priceYocto);
-      else if (signed.current?.offerId === o.offerId) txHash = signed.current.txHash;
-      else {
-        if (!nearId) throw new WalletError('wallet_no_account', 'Link a NEAR account to rent an agent.');
-        if (!o.ownerNearAccountId) throw new ApiError(409, 'owner_unlinked', `${o.ownerHandle} has no NEAR account to be paid.`);
-        txHash = await signer.send(rentTx(signer.contracts, o.offerId, nonce(), o.ownerNearAccountId, o.priceYocto), nearId);
-        signed.current = { offerId: o.offerId, txHash };
+      const prior = pending.current?.offerId === o.offerId ? pending.current : null;
+      try {
+        if (mode === 'dev') return await api.rent(o.offerId, devTxHash(o.priceYocto));
+        if (o.payWith === 'credits') {
+          const key = prior?.key ?? nonce();
+          remember({ offerId: o.offerId, key });
+          const r = await api.rentWithCredits(o.offerId, key);
+          remember(null);
+          return r;
+        }
+        let txHash = prior?.txHash;
+        if (!txHash) {
+          if (!nearId) throw new WalletError('wallet_no_account', 'Link a NEAR account to rent an agent.');
+          if (!o.ownerNearAccountId) throw new ApiError(409, 'owner_unlinked', `${o.ownerHandle} has no NEAR account to be paid.`);
+          txHash = await signer.send(rentTx(signer.contracts, o.offerId, nonce(), o.ownerNearAccountId, o.priceYocto), nearId);
+          remember({ offerId: o.offerId, txHash });
+        }
+        const r = await api.rent(o.offerId, txHash);
+        remember(null);
+        return r;
+      } catch (err) {
+        // A refused payment (failed tx, wrong owner, not enough credits) is not retried as is.
+        if (isFinal(err) && pending.current?.offerId === o.offerId) remember(null);
+        throw err;
       }
-      const r = await api.rent(o.offerId, txHash);
-      signed.current = null;
-      return r;
     },
     onSuccess: (_r, o) => {
       void qc.invalidateQueries({ queryKey: qk.myRentals });
       toast.show({ tone: 'good', title: `${o.name} is yours for one match`, message: 'Pick it under Rented to field it.' });
     },
-    onError: (err) => toast.show({ tone: 'critical', title: 'Rental not completed', message: err instanceof ApiError ? err.message : 'Try again.' }),
+    onError: (err) =>
+      toast.show({
+        tone: 'critical',
+        title: 'Rental not completed',
+        message:
+          err instanceof ApiError && err.code === 'insufficient_credits'
+            ? 'Rentals are paid with paid credits. Top up on the Credits page, then rent again.'
+            : err instanceof ApiError
+              ? err.message
+              : 'Try again.',
+      }),
   });
 
   const list = offers.data ?? [];
@@ -148,11 +207,13 @@ export function RentShelf({
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={disabled || rent.isPending || (mode !== 'dev' && !o.ownerNearAccountId)}
+                  disabled={disabled || rent.isPending || (mode !== 'dev' && o.payWith !== 'credits' && !o.ownerNearAccountId)}
                   onClick={() => rent.mutate(o)}
                   data-testid={`s04-rent-${o.offerId}`}
                 >
-                  Rent · {formatNear(BigInt(o.priceYocto))} NEAR
+                  {mode !== 'dev' && o.payWith === 'credits' && o.priceCredits !== undefined
+                    ? `Rent · ${o.priceCredits.toLocaleString('en-US')} credits`
+                    : `Rent · ${formatNear(BigInt(o.priceYocto))} NEAR`}
                 </Button>
               </li>
             ))}

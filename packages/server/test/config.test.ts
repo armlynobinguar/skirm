@@ -16,6 +16,7 @@ describe('loadConfig', () => {
       NEAR_CONTRACT_REGISTRY: 'registry.playskirm.testnet',
       NEAR_CONTRACT_DEPOSITS: 'deposits.playskirm.testnet',
       NEAR_CONTRACT_SEASONS: 'seasons.playskirm.testnet',
+      NEAR_RENTALS_ONCHAIN: false,
       CREDITS_PER_NEAR: 1000,
       API_PORT: 4000,
       REALTIME_PORT: 4001,
@@ -52,9 +53,11 @@ describe('loadConfig', () => {
       NEAR_OPS_ACCOUNT: 'ops.playskirm.testnet',
       NEAR_OPS_KEY: `ed25519:${'3'.repeat(88)}`,
       OPS_TOKEN: 'o'.repeat(32),
+      NEAR_RENTALS_ONCHAIN: 'true',
     });
     expect(c).toMatchObject({
       AUTH_MODE: 'dev',
+      NEAR_RENTALS_ONCHAIN: true,
       API_PORT: 5000,
       CREDITS_PER_NEAR: 250,
       OPS_TOKEN: 'o'.repeat(32),

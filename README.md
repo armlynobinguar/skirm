@@ -75,6 +75,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 **Own and trade**
 - **Exchange**: mint, list and buy skills as NEAR NFTs, with creator royalties on every resale
 - **Proof**: every minted version gets a hidden benchmark (win, leak and manipulation rates), ranked stats per map, and 3 free trials for buyers
+- **Agent rentals**: rent another player's agent for one match, paid in credits, or with NEAR through the market contract once rentals are switched onchain
 
 ## Quick start
 
