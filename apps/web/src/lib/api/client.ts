@@ -6,6 +6,7 @@ import type { TraitId } from '@skirm/shared';
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
+import type { PublicMatchLog } from './matchLogTypes';
 import { ApiError, errorFromBody } from './errors';
 import type { Campaign, CampaignStart } from './campaignTypes';
 import type { PuzzleDetail, PuzzleLeaderboard, PuzzleList, PuzzleRun, PuzzleRunRequest } from './puzzleTypes';
@@ -188,6 +189,8 @@ export interface ApiClient {
   skillLadder(opts?: { mapId?: string; limit?: number }): Promise<SkillLadder>;
   /** GET /v2/matches/:id: a v2 match with Elo changes and crew stats (the result screen). */
   v2Match(matchId: string): Promise<V2MatchRecord>;
+  /** GET /v2/matches/:id/log: the hash-chained match log (public once ended; live commands redacted). */
+  v2MatchLog(matchId: string): Promise<PublicMatchLog>;
   /** GET /v2/matches/live: v2 matches being played now, crews hidden. */
   v2LiveMatches(): Promise<V2LiveMatch[]>;
   /** GET /v2/matches/:id/highlights: highlight moments with caster lines (public, once ended). */
@@ -413,6 +416,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     mapLadder: (mapId, limit) => get(`/leaderboards/maps/${enc(mapId)}`, { limit }),
     skillLadder: (opts = {}) => get('/leaderboards/skills', { mapId: opts.mapId, limit: opts.limit }),
     v2Match: (id) => get(`/v2/matches/${enc(id)}`),
+    v2MatchLog: (id) => get(`/v2/matches/${enc(id)}/log`),
     v2LiveMatches: () => get('/v2/matches/live'),
     v2Highlights: (id) => get(`/v2/matches/${enc(id)}/highlights`),
     createReplayShare: (id, clip) => json('POST', `/v2/matches/${enc(id)}/shares`, { body: clip ? { clip } : {} }),

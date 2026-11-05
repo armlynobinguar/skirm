@@ -41,6 +41,8 @@ export const routes = {
   matchReplay: (matchId: string, tick?: number) => `/matches/${e(matchId)}${tick !== undefined ? `?t=${tick}` : ''}#replay`,
   /** A shared replay link (public; the whole board only). */
   replay: (shareId: string) => `/replays/${e(shareId)}`,
+  /** Check a match against the NEAR registry in the browser (`?id=` prefills and runs it). Public. */
+  verify: (matchId?: string) => `/verify${matchId ? `?id=${e(matchId)}` : ''}`,
   leaderboards: () => '/leaderboards', // S14
   terms: () => '/terms',
   privacy: () => '/privacy',
@@ -96,6 +98,7 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/tournaments\/?$/, key: 'tournaments', title: 'Tournaments', sub: '// brackets', back: routes.pvp() },
   { re: /^\/tournaments\//, key: 'tournament', title: 'Bracket', sub: '// single elimination', back: routes.tournaments() },
   { re: /^\/replays\/[^/]+\/?$/, key: 'replay', title: 'Replay', sub: '// shared', back: routes.pvp() },
+  { re: /^\/verify\/?$/, key: 'verify', title: 'Verify', sub: '// match vs NEAR', back: routes.pvp() },
   { re: /^\/matches\/[^/]+\/result\/?$/, key: 'match-result', title: 'Debrief', sub: '// replay hash on NEAR', back: routes.pvp() },
   { re: /^\/matches(\/|$)/, key: 'match', title: 'Live', sub: '// 2 s ticks', back: routes.pvp() },
   { re: /^\/leaderboards(\/|$)/, key: 'ladder', title: 'Ladder', sub: '// season', back: routes.home() },
