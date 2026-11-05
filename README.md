@@ -50,11 +50,14 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 **Play**
 - **Ranked and casual** matches with Elo matchmaking, ranked tiers from Bronze to Master, and 14-day seasons with a NEAR prize pool
 - **Practice** against the Greedy bot, free and instant, plus a guided first match for new players
+- **Daily challenge**: one seed a day for everyone, a few attempts with your crew against the bot, and a global board with verifiable log hashes
 - **Campaign**: three chapters of missions against the bot; each chapter cleared unlocks a starter skill
 - **Puzzles**: six fixed boards solved by your crew in the fewest ticks, with medals and a leaderboard per puzzle
 - **Private lobbies and tournaments**: challenge a friend with a code, or run a 4 to 16 player bracket
 - **Draft mode**: each crew bans one of the rival's skills before the match
 - **Live commands**: three orders a match to steer your crew without taking control
+- **Agent progression**: agents earn XP from matches, level up and pick small traits (casual only; ranked plays base stats)
+- **Gas, ice and live water**: gas clouds that cost every other action, ice that slides you a tile further, and cables that electrify the water (Frostline Depot, Sunken Metro)
 - **Quests and achievements**: 3 daily and 2 weekly quests, play streaks, and permanent achievements you can mint as soulbound badges on NEAR
 - **Bring your own agent**: plug your own program (webhook, pull api, or an LLM through the bundled MCP server) into casual and practice matches. See [external agents](docs/external-agents.md)
 

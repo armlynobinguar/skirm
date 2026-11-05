@@ -6,7 +6,7 @@
 import type { Action, Observation } from '@skirm/engine/v2';
 
 const STEP: Record<'N' | 'E' | 'S' | 'W', [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
-const OPEN = new Set(['.', ',', '*', 'E', 'd', '?']);
+const OPEN = new Set(['.', ',', '*', 'E', 'd', '?', '=']);
 
 export interface Distances {
   item: number | null;

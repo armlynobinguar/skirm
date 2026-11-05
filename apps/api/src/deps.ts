@@ -56,6 +56,8 @@ export type ApiConfig = Pick<
     rankedDecay?: RankedDecayConfig;
     /** Bench runs per account per rolling hour (default DEFAULTS.bench.runsPerHour). */
     BENCH_RUNS_PER_HOUR?: number | undefined;
+    /** Daily challenge attempts per account per UTC day (default DEFAULTS.daily.attemptsPerDay). */
+    DAILY_ATTEMPTS?: number | undefined;
   };
 
 /** Model spend per UTC day as the worker and realtime sum it (Redis `cost:usd:<day>`, kept 3 days). */
@@ -96,4 +98,6 @@ export interface ApiDeps {
   replayFrames?: ReplayFrameReader;
   /** Writes the highlights' caster lines (absent: the offline template caster). */
   caster?: Caster;
+  /** Tests only: the clock the daily challenge reads (default: the wall clock). */
+  now?: () => Date;
 }

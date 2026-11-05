@@ -368,6 +368,9 @@ function drawThing(c, t, x, y, sx, sy, T, pal, time, fresh, gone) {
       c.globalAlpha = 0.35 + 0.25*Math.sin(ph); diamond(c, sx+Math.sin(ph)*T*0.05, b+T*0.02, T, .45*grow, hi); c.globalAlpha = 1;
       if (t === 'lava') { c.globalAlpha = .18 + .1*Math.sin(ph*2); diamond(c, sx, b-T*0.02, T, 1.25*grow, '#ff7a2a'); c.globalAlpha = 1; }
       break; }
+    case 'ice': { diamond(c, sx, b+T*0.01, T, .97, '#bfe6f5'); diamond(c, sx, b+T*0.01, T, .7, '#e8f8ff');
+      c.strokeStyle = 'rgba(70,140,180,.55)'; c.lineWidth = Math.max(1,T/45); c.beginPath(); c.moveTo(sx-T*.18,b-T*.02); c.lineTo(sx+T*.05,b+T*.05); c.lineTo(sx+T*.2,b-T*.03); c.stroke();
+      c.globalAlpha = .25 + .2*Math.sin(time*1.8 + x + y); diamond(c, sx+T*.08, b-T*.02, T, .18, '#ffffff'); c.globalAlpha = 1; break; }
     case 'grass': diamond(c, sx, b, T, .96, shade(pal.grass,-.35)); for (let i=0;i<5;i++) { const gx = sx+(hash(x*3+i,y)-.5)*T*.6, gy = b+(hash(x,y*3+i)-.5)*T*.25; c.strokeStyle = shade(pal.grass,.15); c.lineWidth = Math.max(1,T/40); c.beginPath(); c.moveTo(gx,gy); c.lineTo(gx+Math.sin(time*2+i)*T*.02,gy-T*.08); c.stroke(); } break;
     case 'fire': { diamond(c, sx, b, T, .95*grow, '#3a1a10');
       for (let i=0;i<4;i++) { const fx = sx+(hash(x+i,y*2)-.5)*T*.5, fy = b+(hash(x*2,y+i)-.5)*T*.2, fh = T*(0.22+0.18*Math.abs(Math.sin(time*6+i*1.7+x)))*grow;
@@ -439,6 +442,15 @@ function renderArena(c, A, pal, prev, cur, alpha, T, ox, oy, time, opts={}) {
     drawThing(c, it.t, it.x, it.y, sx, sy - slab + dy, T, pal, time, it.fresh, it.fade ? null : it.gone);
     c.globalAlpha = 1;
   }
+  // Live water (crackling arcs over electrified tiles) and gas (drifting green puffs), over the board.
+  for (const j of cur.shock || []) { const x = j % W, y = (j / W) | 0, [sx, sy] = P(x, y), lb = opts.light ? opts.light[j] : 1, b = sy - slab;
+    c.globalAlpha = (.35 + .25*Math.abs(Math.sin(time*9 + x*1.3 + y))) * lb; diamond(c, sx, b, T, .92, '#ffe94a');
+    c.globalAlpha = .9 * lb; c.strokeStyle = '#fffbd0'; c.lineWidth = Math.max(1.2, T/30); c.beginPath();
+    const ph = Math.floor(time*12 + x*3 + y*5); c.moveTo(sx - T*.3, b); for (let i = 1; i <= 4; i++) c.lineTo(sx - T*.3 + i*T*.15, b + ((ph + i) % 2 ? -1 : 1)*T*.06); c.stroke(); c.globalAlpha = 1; }
+  for (const j of cur.gas || []) { const x = j % W, y = (j / W) | 0, [sx, sy] = P(x, y), lb = opts.light ? opts.light[j] : 1, b = sy - slab;
+    for (let i = 0; i < 3; i++) { const ph = time*0.9 + i*2.1 + hash(x, y)*6, px = sx + Math.sin(ph)*T*.14 + (i-1)*T*.12, py = b - T*(.12 + .1*i) - Math.abs(Math.sin(ph*.7))*T*.06;
+      c.globalAlpha = (.28 + .08*Math.sin(ph*1.3)) * lb; c.fillStyle = i % 2 ? '#9be36b' : '#6fbf4a'; c.beginPath(); c.ellipse(px, py, T*.24, T*.13, 0, 0, 7); c.fill(); }
+    c.globalAlpha = 1; }
   if (opts.tags) for (const it of items) if (it.agent && !it.agent.out) {
     const a = it.agent, fs = Math.max(10, T*0.2), team = a.team === 'A' ? '#34e0c8' : '#ff4655';
     c.font = `600 ${fs}px Barlow, sans-serif`;

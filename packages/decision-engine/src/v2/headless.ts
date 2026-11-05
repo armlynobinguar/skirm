@@ -18,6 +18,7 @@ import {
   appendTick,
   clean,
   createMatch,
+  logAgent,
   logHash,
   observe,
   startLog,
@@ -29,6 +30,7 @@ import {
   type MapDefV2,
   type MatchEvent,
   type MatchLog,
+  type MatchOptions,
   type MatchResult,
   type MatchState,
   type SayInput,
@@ -58,11 +60,11 @@ export interface HeadlessOptions {
   inject?: { team: Team; every: number; lines: string[] };
   /** Every stepped tick: the engine's events and the state after it (read only; for timelines and debriefs). */
   onTick?: (events: readonly MatchEvent[], s: Readonly<MatchState>) => void;
+  /** Engine knobs on top of the difficulty: the clock, extra start ticks and bluff caps per crew. */
+  match?: Pick<MatchOptions, 'ticks' | 'hold' | 'lieCap'>;
   /** Extra ticks a crew holds at the start and its bluff cap (the practice bot, practiceRival). */
   hold?: Partial<Record<Team, number>>;
   lieCap?: Partial<Record<Team, number>>;
-  /** Match length in ticks (default: the difficulty's clock). */
-  ticks?: number;
   /**
    * A mode's own end check after every tick (puzzles): a result here ends the match and replaces the
    * engine's; null leaves the engine's (or plays on).
@@ -109,8 +111,8 @@ export async function playHeadless(opts: HeadlessOptions): Promise<HeadlessResul
   };
 
   // The engine applies the head start: a held crew's agents have only `wait` until it runs out.
-  const s = createMatch(def, crews, { difficulty, ...(opts.hold ? { hold: opts.hold } : {}), ...(opts.lieCap ? { lieCap: opts.lieCap } : {}), ...(opts.ticks !== undefined ? { ticks: opts.ticks } : {}) });
-  const header = (t: Team) => s.agents.filter((a) => a.team === t).map((a) => ({ id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier }));
+  const s = createMatch(def, crews, { ...opts.match, difficulty, ...(opts.hold ? { hold: opts.hold } : {}), ...(opts.lieCap ? { lieCap: opts.lieCap } : {}) });
+  const header = (t: Team) => s.agents.filter((a) => a.team === t).map(logAgent);
   const model = brains.A.model === brains.B.model ? brains.A.model : `A:${brains.A.model} B:${brains.B.model}`;
   const log = startLog({
     schema: 'skirm.match/v2',

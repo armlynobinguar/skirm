@@ -84,13 +84,17 @@ export async function playPuzzle(opts: PuzzleRunOptions): Promise<PuzzleRun> {
     contexts[a.id] = { ...c, instructions: c.instructions ? `${objective}\n\n${c.instructions}` : objective };
   }
   let last: Readonly<MatchState> | undefined;
+  const o = puzzleMatchOptions(p);
   const headless = await playHeadless({
     def: puzzleMap(p),
     crews: { A: crew, B: puzzleRivals(crew.length) },
     brains: { A: puzzleBrain(p, opts.brain), B: INERT_BRAIN },
     contexts,
     seed: `puzzle:${p.id}`,
-    ...puzzleMatchOptions(p),
+    difficulty: o.difficulty,
+    hold: o.hold,
+    lieCap: o.lieCap,
+    match: { ticks: o.ticks },
     judge: (s) => puzzleResult(p, s),
     ...(opts.deadlineMs !== undefined ? { deadlineMs: opts.deadlineMs } : {}),
     onTick: (ev, s) => {

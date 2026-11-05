@@ -70,6 +70,30 @@ function harness(over: Partial<V2MatchDeps> = {}, ranked = false, setupOver: Par
   return { m, inbox, credits, answer };
 }
 
+describe('v2 match server: agent traits', () => {
+  const traited = (ranked: boolean) => {
+    const base = setup(ranked);
+    const sides = { ...base.sides, A: { ...base.sides.A, crew: [{ ...spec('wick', 'Builder'), traits: ['steady', 'keen'] as const }, spec('moss', 'Digger')] } };
+    const h = harness({ send: (t, msg) => (h.inbox[t].push(msg), h.answer(t, msg)) }, ranked, { sides: sides as V2Setup['sides'] });
+    return h;
+  };
+
+  it('plays a casual crew with its traits and records them in the hashed log header', async () => {
+    const h = traited(false);
+    const end = await h.m.play();
+    expect(end.log!.header.crews.A[0]).toMatchObject({ id: 'wick', vision: 3, traits: ['keen', 'steady'] });
+    expect(end.log!.header.crews.A[1]).not.toHaveProperty('traits');
+    expect(verifyLog(end.log!)).toBeNull();
+  });
+
+  it('plays ranked on base stats: no traits in play or in the log', async () => {
+    const h = traited(true);
+    const end = await h.m.play();
+    expect(end.log!.header.crews.A[0]).not.toHaveProperty('traits');
+    expect(h.m.state!.agents.every((a) => !a.traits)).toBe(true);
+  });
+});
+
 describe('v2 match server', () => {
   it('runs accept, lock-in and a whole match, with fogged frames per crew and a verifiable log', async () => {
     const h = harness({ send: (t, msg) => (h.inbox[t].push(msg), h.answer(t, msg)) });
@@ -347,11 +371,19 @@ describe('v2 match: difficulty, lock-in crew changes, plans, debrief and frames'
   it('ends with each crew’s debrief (Elo, credits, talk, MVP) and keeps every frame for replay', async () => {
     const h = harness({
       send: (t, msg) => (h.inbox[t].push(msg), h.answer(t, msg)),
-      finish: async () => ({ eloDelta: { A: 12, B: -12 }, registry: 'pending', season: { A: { number: 3, points: 25 }, B: { number: 3, points: 5 } } }),
+      finish: async () => ({
+        eloDelta: { A: 12, B: -12 },
+        registry: 'pending',
+        season: { A: { number: 3, points: 25 }, B: { number: 3, points: 5 } },
+        xp: { A: [{ agentId: 'wick', name: 'wick', gained: 60, xp: 260, level: 3, leveledUp: true, traitReady: true }] },
+      }),
     });
     const end = await h.m.play();
     const endA = of(h.inbox.A, 'v2_end')[0]!;
     const d = endA.debrief!;
+    // The XP the stored result gave each crew's agents arrives with v2_end (crew B earned none here).
+    expect(d.xp).toEqual([expect.objectContaining({ agentId: 'wick', gained: 60, leveledUp: true })]);
+    expect(of(h.inbox.B, 'v2_end')[0]!.debrief!.xp).toBeUndefined();
     const held = holdFor(h.m.state!.agents.filter((a) => a.team === 'A'), false);
     expect(d).toMatchObject({ eloDelta: 12, registry: 'pending', difficulty: 'normal', season: { number: 3, points: 25 } });
     const used = h.credits.charged.A!;

@@ -30,6 +30,7 @@ describe('S02 Command deck', () => {
     expect(screen.getByTestId('s02-tile-practice')).toHaveAttribute('href', '/maps/copper-hollow/crew?d=easy&opponent=bot');
     expect(screen.getByTestId('s02-tile-practice')).toHaveTextContent('Vs Greedy bot');
     expect(screen.getByTestId('s02-tile-practice')).toHaveTextContent('Quick practice · Copper Hollow · Easy · starts at once');
+    expect(screen.getByTestId('s02-tile-daily')).toHaveAttribute('href', '/daily');
   });
 
   it('puts your ranked Elo on the Skirmish tile', async () => {

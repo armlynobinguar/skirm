@@ -14,7 +14,7 @@ export const NOTES = {
     title: 'Command deck',
     lead: 'Home. Ranked Skirmish is the biggest tile.',
     points: [
-      'Menu tiles use the same icon language: a textured plate with the icon top-right, a large faint copy as a watermark, a serial code (OP·01 to PRC·06), grain and hatching across the tile, hazard tape in the corner, and a halftone in the tile colour that strengthens on hover.',
+      'Menu tiles use the same icon language: a textured plate with the icon top-right, a large faint copy as a watermark, a serial code (OP·01 to DLY·07), grain and hatching across the tile, hazard tape in the corner, and a halftone in the tile colour that strengthens on hover.',
       'Header icons are drawn in code, Arknights-style: a halftone dot gradient (real dots, sized by position), fine hatching, corner brackets and one teal accent stroke each; PvP adds a red guard for the rival side. Tabs carry film grain, diagonal hatching and a serial code (PLY·01 to LDR·05); the active tab adds a teal halftone fade from the right.',
       'The header has no bar. Back, logo, the five section tabs and the SFX and Notes toggles are separate chips floating over the arena, like the menu tiles. The active tab gets a teal underline.',
       'Your account is the last chip of the top bar: handle and credits. Click it for the card with network, credits, wallet and ranked Elo with its title. It steps aside on the live match.',

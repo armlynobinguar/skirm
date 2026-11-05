@@ -5,7 +5,7 @@
 //
 // Game types (SkillPublic, Tag, …) come from @skirm/shared (type-only imports,
 // browser-safe).
-import type { ActionKind, AgentAppearance, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, SkillRole, SkillTrigger, Tag, Unlock } from '@skirm/shared';
+import type { ActionKind, AgentAppearance, AgentProgression, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, SkillRole, SkillTrigger, Tag, TraitInfo, Unlock } from '@skirm/shared';
 
 import type { Difficulty, V2Debrief, V2Frame } from '../realtime/protocol';
 
@@ -85,6 +85,20 @@ export interface Agent {
   tier: 'quiet' | 'standard' | 'open';
   /** v2: the owner's instructions put ahead of the agent's skills (≤ 600 characters). Owner only. */
   systemPrompt?: string | null;
+  /** XP, level and traits (absent from an older server). */
+  progression?: AgentProgression;
+}
+
+/** GET /agents/:id/progression: the agent's progression and the trait catalogue. */
+export interface AgentProgressionInfo {
+  agentId: string;
+  progression: AgentProgression;
+  traits: TraitInfo[];
+  /** Levels that earn a trait pick. */
+  traitLevels: number[];
+  maxTraits: number;
+  /** Whether ranked plays traits (by default every agent plays its base stats there). */
+  rankedTraits: boolean;
 }
 
 export interface UnlockItem {
@@ -971,4 +985,102 @@ export interface BenchCompare {
   a: BenchRun;
   b: BenchRun;
   prompt: { hidden: true; same: null; diff: null } | { hidden: false; same: boolean; diff: DiffPart[] };
+}
+
+// ---------- Daily challenge ----------
+
+export type DailyTwist = 'none' | 'short_clock' | 'sly_bot' | 'eager_bot';
+
+/** One UTC day's challenge (@skirm/engine dailyChallenge), with names for display. */
+export interface DailyChallenge {
+  date: string;
+  seed: string;
+  mapId: string;
+  mapName: string;
+  difficulty: Difficulty;
+  twist: DailyTwist;
+  twistName: string;
+  twistLine: string;
+  /** The bot's crew size; yours may be 1 up to this. */
+  crewSize: 1 | 2 | 3;
+  ticks: number;
+  bot: { tier: string; hold: number; lieCap: number };
+}
+
+/** An agent of an attempt's crew as it was queued (skill names only). */
+export interface DailyCrewAgent {
+  name: string;
+  role: string;
+  skills: string[];
+}
+
+export type DailyAttemptStatus = 'queued' | 'running' | 'done' | 'failed' | 'insufficient_credits';
+export type DailyOutcome = 'win' | 'loss' | 'draw';
+
+export interface DailyAttemptResult {
+  seed: string;
+  mapId: string;
+  difficulty: Difficulty;
+  twist: DailyTwist;
+  outcome: DailyOutcome;
+  reason: string;
+  decidedBy: string;
+  score: { you: number; bot: number };
+  ticks: number;
+  clock: number;
+  points: number;
+  logHash: string;
+  calls: number;
+}
+
+export interface DailyAttempt {
+  id: string;
+  date: string;
+  status: DailyAttemptStatus;
+  brain: string | null;
+  credits: number;
+  crew: DailyCrewAgent[];
+  points: number | null;
+  outcome: DailyOutcome | null;
+  ticks: number | null;
+  logHash: string | null;
+  result: DailyAttemptResult | null;
+  shortfall: { need: number; have: number } | null;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+/** GET /daily: today's challenge, its cost, the caller's attempts and the time left. */
+export interface DailyToday {
+  challenge: DailyChallenge;
+  brain: 'greedy' | 'model';
+  free: boolean;
+  costCredits: number;
+  attempts: { perDay: number; used: number; left: number };
+  msLeft: number;
+  endsAt: string;
+  mine: DailyAttempt[];
+}
+
+export interface DailyBoardRow {
+  rank: number;
+  attemptId: string;
+  handle: string;
+  you: boolean;
+  points: number;
+  outcome: DailyOutcome;
+  ticks: number;
+  logHash: string;
+  crew: DailyCrewAgent[];
+  finishedAt: string;
+}
+
+/** GET /daily/leaderboard?date=: the day's top attempts and the caller's rank. */
+export interface DailyBoard {
+  date: string;
+  challenge: DailyChallenge;
+  players: number;
+  top: DailyBoardRow[];
+  me: DailyBoardRow | null;
 }

@@ -56,6 +56,9 @@ async function main(): Promise<void> {
       ...(Number(process.env.BENCH_RUNS_PER_HOUR) > 0
         ? { BENCH_RUNS_PER_HOUR: Math.floor(Number(process.env.BENCH_RUNS_PER_HOUR)) }
         : {}),
+      ...(Number(process.env.DAILY_ATTEMPTS) > 0
+        ? { DAILY_ATTEMPTS: Math.floor(Number(process.env.DAILY_ATTEMPTS)) }
+        : {}),
     },
     repos,
     vault: createVault(config),

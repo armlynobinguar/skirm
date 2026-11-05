@@ -9,6 +9,7 @@ import { BenchController } from './controllers/bench.controller';
 import { CampaignController } from './controllers/campaign.controller';
 import { PuzzlesController } from './controllers/puzzles.controller';
 import { CoreController } from './controllers/core.controller';
+import { DailyController } from './controllers/daily.controller';
 import { CosmeticsController } from './controllers/cosmetics.controller';
 import { AgentApiController, ExternalAgentsController } from './controllers/external-agents.controller';
 import { CreditsController } from './controllers/credits.controller';
@@ -53,6 +54,7 @@ export class AppModule {
         ExternalAgentsController,
         AgentApiController,
         BenchController,
+        DailyController,
         PlaybooksController,
         CampaignController,
         PuzzlesController,

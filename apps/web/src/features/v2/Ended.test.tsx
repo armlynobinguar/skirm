@@ -31,6 +31,32 @@ describe('v2 result screen', () => {
     expect(await screen.findByTestId('v2-season-points')).toHaveTextContent('Ranked only');
   });
 
+  it('shows the XP each agent gained, a level up and a waiting trait pick', async () => {
+    renderWithProviders(<V2ResultScreen matchId="mat_v2" />, {
+      handle: 'ada',
+      path: '/matches/mat_v2/result',
+      search: '',
+      api: {
+        v2Match: async () =>
+          v2MatchRecordFixture({
+            debrief: v2DebriefFixture({
+              xp: [
+                { agentId: 'wick', name: 'Wick', gained: 66, xp: 266, level: 3, leveledUp: true, traitReady: true },
+                { agentId: 'moss', name: 'Moss', gained: 62, xp: 62, level: 1, leveledUp: false, traitReady: false },
+              ],
+            }),
+          }),
+      },
+    });
+    expect(await screen.findByTestId('v2-xp')).toHaveTextContent('Wick +66 · level 3! · trait ready · Moss +62');
+  });
+
+  it('has no XP line when the debrief has none', async () => {
+    renderWithProviders(<V2ResultScreen matchId="mat_v2" />, { handle: 'ada', path: '/matches/mat_v2/result', search: '', api: { v2Match: async () => v2MatchRecordFixture() } });
+    await screen.findByTestId('v2-verdict');
+    expect(screen.queryByTestId('v2-xp')).toBeNull();
+  });
+
   it('shows the bluffs told and landed, and the rival bluffs seen through', async () => {
     renderWithProviders(<V2ResultScreen matchId="mat_v2" />, {
       handle: 'ada',
