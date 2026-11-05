@@ -66,6 +66,8 @@ export const ledgerNote = pgEnum('ledger_note', [
   'prize_pool',
   'prize',
   'backing',
+  /** An agent rental paid in credits: the renter's spend and the owner's top-up. */
+  'rental',
 ]);
 export const holdStatus = pgEnum('hold_status', ['held', 'settled', 'aborted']);
 /** `local`: recorded by the NoopRegistry only (NEAR is off in local mode); never onchain. */

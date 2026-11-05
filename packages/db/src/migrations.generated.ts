@@ -368,5 +368,14 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE UNIQUE INDEX \"backings_round_backer_uq\" ON \"backings\" USING btree (\"round_id\",\"backer_id\");",
       "\nCREATE INDEX \"backings_backer_idx\" ON \"backings\" USING btree (\"backer_id\");"
     ]
+  },
+  {
+    "tag": "0020_rental_credits",
+    "folderMillis": 1793851860295,
+    "bps": true,
+    "hash": "3283c5c9e19ba7e1b62f01392335cd653c33f661dc4db38551d2a9d3bc960531",
+    "sql": [
+      "ALTER TYPE \"public\".\"ledger_note\" ADD VALUE 'rental';"
+    ]
   }
 ];

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."ledger_note" ADD VALUE 'rental';

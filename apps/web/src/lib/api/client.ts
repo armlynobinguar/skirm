@@ -112,6 +112,8 @@ export interface ApiClient {
   setRentalOffer(agentId: string, priceYocto: string | null): Promise<{ offer: MyRentalOffer | null }>;
   /** POST /rentals/:offerId: records a paid rental (`market.rent` tx, or `dev:<yocto>[:<nonce>]`). */
   rent(offerId: string, txHash: string): Promise<{ pass: RentalPass }>;
+  /** POST /rentals/:offerId `{ credits, key }`: pays in paid credits; a retry with the same key returns the same pass. */
+  rentWithCredits(offerId: string, key: string): Promise<{ pass: RentalPass; credits: number }>;
   /** GET /agents/:id/record: the agent's season and all-time record, bluffs included. */
   agentRecord(agentId: string): Promise<AgentRecord>;
   /** GET /agents/:id/progression: XP, level, traits and the trait catalogue. */
@@ -392,6 +394,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     myRentals: () => get('/rentals/mine'),
     setRentalOffer: (id, priceYocto) => json('PUT', `/agents/${enc(id)}/rental`, { body: { priceYocto } }),
     rent: (offerId, txHash) => json('POST', `/rentals/${enc(offerId)}`, { body: { txHash } }),
+    rentWithCredits: (offerId, key) => json('POST', `/rentals/${enc(offerId)}`, { body: { credits: true, key } }),
     patchAgent: (id, patch) => json('PATCH', `/agents/${enc(id)}`, { body: patch }),
 
     skills: (tab = 'written') => get('/skills', { tab }),

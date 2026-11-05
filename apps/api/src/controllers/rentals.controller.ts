@@ -7,12 +7,17 @@
 //   GET  /rentals                                   active offers of other players, cheapest first
 //   GET  /rentals/mine                              the caller's offers and unused passes
 //   POST /rentals/:offerId    { txHash }            records a verified payment as a pass
+//                             { credits: true, key } pays in credits (NEAR_RENTALS_ONCHAIN off)
 //
 // A payment counts when its `rental` event names this offer (`rental_id` = `<offerId>:<nonce>`),
 // pays the agent's owner's linked NEAR account, comes from the caller's linked account and is at
 // least the offer price. Dev mode trusts `dev:<yocto>[:<nonce>]` hashes at or above the price.
+// NEAR_RENTALS_ONCHAIN (off by default) picks how the web pays: on, `market.rent` from the wallet
+// (the deployed market needs the `rent` redeploy, contracts/market/README.md); off, the renter's
+// paid credits at CREDITS_PER_NEAR, the owner credited the price minus the 5% fee. A verified
+// onchain payment is honoured either way, so flipping the flag never strands a signed rental.
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Put } from '@nestjs/common';
-import { RentalError, type RentalErrorCode } from '@skirm/server';
+import { RentalError, rentalCredits, RENTAL_DEV_FEE_BPS, type RentalErrorCode } from '@skirm/server';
 import { RepoError, type AccountRow, type RentalOfferRow, type RentalRow } from '@skirm/db';
 import { z } from 'zod';
 import { CurrentAccount, mustAccount } from '../auth';
@@ -23,7 +28,10 @@ import { idOr404 } from './util';
 
 const offerId = z.string().regex(/^rof_[0-9A-HJKMNP-TV-Z]{26}$/);
 const offerBody = z.object({ priceYocto: z.string().regex(/^[1-9][0-9]{0,39}$/).nullable() });
-const rentBody = z.object({ txHash: z.string().min(1).max(128) });
+const rentBody = z.union([
+  z.object({ txHash: z.string().min(1).max(128) }).strict(),
+  z.object({ credits: z.literal(true), key: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/) }).strict(),
+]);
 
 /** HTTP status for each verifier refusal. */
 const RENTAL_STATUS: Record<RentalErrorCode, number> = {
@@ -68,10 +76,21 @@ export class RentalsController {
     }
   }
 
+  /** How renters pay right now: the market contract, or paid credits until it is redeployed. */
+  private payWith(): 'near' | 'credits' {
+    return this.deps.config.NEAR_RENTALS_ONCHAIN ? 'near' : 'credits';
+  }
+
   @Get('rentals')
   async offers(@CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
-    return this.deps.repos.rentals.offers({ excludeOwner: account.id });
+    const payWith = this.payWith();
+    const perNear = this.deps.config.CREDITS_PER_NEAR;
+    return (await this.deps.repos.rentals.offers({ excludeOwner: account.id })).map((o) => ({
+      ...o,
+      payWith,
+      priceCredits: rentalCredits(BigInt(o.priceYocto), perNear).priceCredits,
+    }));
   }
 
   @Get('rentals/mine')
@@ -96,7 +115,9 @@ export class RentalsController {
   async rent(@Param('offerId') id: string, @Body() body: unknown, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
     const oid = idOr404(offerId, id, 'rental offer');
-    const { txHash } = parse(rentBody, body);
+    const parsed = parse(rentBody, body);
+    if ('credits' in parsed) return this.rentWithCredits(account, oid, parsed.key);
+    const { txHash } = parsed;
     const { repos, near, config } = this.deps;
     // A replayed payment is answered with the pass it already bought.
     const done = await repos.rentals.byTx(txHash);
@@ -140,6 +161,47 @@ export class RentalsController {
       return { pass: passView(pass) };
     } catch (err) {
       if (err instanceof RepoError && (err.code === 'duplicate_tx' || err.code === 'own_agent')) throw new ApiError(409, err.code, err.message);
+      throw err;
+    }
+  }
+
+  /**
+   * Pays the offer in paid credits: only while rentals are not onchain. The pass records the offer's
+   * yocto price and split; the ledger moves the credits. `key` makes a retry return the same pass.
+   */
+  private async rentWithCredits(account: AccountRow, oid: string, key: string) {
+    const { repos, config } = this.deps;
+    const offer = await repos.rentals.getOffer(oid);
+    if (!offer) throw notFound('rental offer');
+    if (offer.ownerId === account.id) throw new ApiError(409, 'own_agent', 'you own this agent');
+    if (this.payWith() === 'near')
+      throw new ApiError(409, 'rentals_onchain', 'rentals are paid with NEAR through the market contract');
+    const priceYocto = BigInt(offer.priceYocto);
+    const feeYocto = (priceYocto * RENTAL_DEV_FEE_BPS) / 10_000n;
+    const { priceCredits, ownerCredits } = rentalCredits(priceYocto, config.CREDITS_PER_NEAR);
+    try {
+      const { pass, charged } = await repos.rentals.payWithCredits({
+        offerId: offer.id,
+        renterId: account.id,
+        key,
+        priceCredits,
+        ownerCredits,
+        priceYocto: priceYocto.toString(),
+        feeYocto: feeYocto.toString(),
+        ownerProceedsYocto: (priceYocto - feeYocto).toString(),
+      });
+      // A retry of a paid key returns its pass (even if the offer has ended since), charging nothing.
+      return { pass: passView(pass), credits: charged ? priceCredits : 0 };
+    } catch (err) {
+      if (err instanceof RepoError) {
+        if (err.code === 'insufficient_credits')
+          throw new ApiError(402, 'insufficient_credits', 'rentals are paid with paid credits; top up first', undefined, {
+            need: err.details?.need,
+            have: err.details?.have,
+          });
+        if (err.code === 'duplicate_tx' || err.code === 'own_agent' || err.code === 'not_offered') throw new ApiError(409, err.code, err.message);
+        if (err.code === 'not_found') throw notFound('rental offer');
+      }
       throw err;
     }
   }

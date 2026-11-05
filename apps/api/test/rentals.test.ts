@@ -88,8 +88,88 @@ describe('agent rentals', () => {
     expect(ok.body.pass).toMatchObject({ agentId: owner.agent.id, offerId: offer.offerId });
   });
 
+  it('pays in credits while rentals are offchain: spend, owner share, idempotent key, refusals', async () => {
+    const owner = await player('cora', 'cora.testnet');
+    const renter = await player('cyd', null);
+    const offer = (await owner.u.put(`/agents/${owner.agent.id}/rental`, { priceYocto: ONE_NEAR })).body.offer;
+    const listed = ((await renter.u.get('/rentals')).body as { offerId: string }[]).find((o) => o.offerId === offer.offerId);
+    expect(listed).toMatchObject({ payWith: 'credits', priceCredits: 1000 });
+    const rent = (key: string, who = renter) => who.u.post(`/rentals/${offer.offerId}`, { credits: true, key });
+
+    // Paid credits only: the free allowance never pays a rental.
+    const broke = await rent('k1');
+    expect(broke.status).toBe(402);
+    expect(broke.body.error).toMatchObject({ code: 'insufficient_credits', need: 1000, have: 0 });
+    expect((await renter.u.post('/credits/deposits', { txHash: `dev:${2n * BigInt(ONE_NEAR)}` })).status).toBe(200);
+
+    const ok = await rent('k1');
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ credits: 1000, pass: { agentId: owner.agent.id, offerId: offer.offerId, priceYocto: ONE_NEAR, matchId: null } });
+    // A retry of the same click returns the same pass and charges nothing.
+    const again = await rent('k1');
+    expect(again.body).toMatchObject({ credits: 0, pass: { rentalId: ok.body.pass.rentalId } });
+    expect((await renter.u.get('/credits')).body.balance).toBe(1000);
+    // The owner gets the price minus the 5% fee, as credits.
+    const ownerCredits = (await owner.u.get('/credits')).body;
+    expect(ownerCredits.balance).toBe(950);
+    expect(ownerCredits.rows).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'topup', amount: 950, note: 'rental' })]));
+    expect((await renter.u.get('/credits')).body.rows).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 'spend', amount: 1000, note: 'rental' })]),
+    );
+    expect((await renter.u.get('/rentals/mine')).body.passes).toHaveLength(1);
+    // Earn-back's NEAR line counts NEAR only; this share arrived as credits.
+    expect((await owner.u.get('/me/earn-back')).body.rentalsYocto).toBe('0');
+
+    // Another renter cannot claim the key; the owner cannot rent; a malformed body is a 400.
+    const other = await player('cato', null);
+    expect((await rent('k1', other)).body.error.code).toBe('duplicate_tx');
+    expect((await rent('k2', owner)).body.error.code).toBe('own_agent');
+    expect((await renter.u.post(`/rentals/${offer.offerId}`, { credits: true, key: 'bad key!' })).status).toBe(400);
+    // An ended offer takes no new credit rentals but still answers a retry.
+    await owner.u.put(`/agents/${owner.agent.id}/rental`, { priceYocto: null });
+    expect((await rent('k3')).body.error.code).toBe('not_offered');
+    expect((await rent('k1')).body.pass.rentalId).toBe(ok.body.pass.rentalId);
+    expect((await renter.u.get('/credits')).body.balance).toBe(1000);
+  });
+
   it('needs a session', async () => {
     expect((await h.http().get('/rentals')).status).toBe(401);
     expect((await h.http().post('/rentals/rof_01JB7Z3K9QX4M2T8V6N5R1C0DE').send({ txHash: 'dev:1' })).status).toBe(401);
+  });
+});
+
+describe('agent rentals with NEAR_RENTALS_ONCHAIN', () => {
+  let on: Harness;
+  beforeAll(async () => {
+    on = await setup({ config: { NEAR_RENTALS_ONCHAIN: true } });
+  });
+  afterAll(() => on.close());
+
+  it('lists offers as paid with NEAR, refuses credits and grants a verified market.rent payment', async () => {
+    await on.http().post('/auth/session').set('x-dev-user', 'olga').send({ nearAccountId: 'olga.testnet' });
+    await on.http().post('/auth/session').set('x-dev-user', 'ivo').send({ nearAccountId: 'ivo.testnet' });
+    const owner = await on.as('olga');
+    const renter = await on.as('ivo');
+    const [agent] = (await owner.get('/agents')).body as { id: string }[];
+    const offer = (await owner.put(`/agents/${agent!.id}/rental`, { priceYocto: ONE_NEAR })).body.offer;
+    expect(((await renter.get('/rentals')).body as { payWith: string }[])[0]).toMatchObject({ offerId: offer.offerId, payWith: 'near' });
+    const credits = await renter.post(`/rentals/${offer.offerId}`, { credits: true, key: 'k1' });
+    expect(credits.status).toBe(409);
+    expect(credits.body.error.code).toBe('rentals_onchain');
+
+    const hash = 'G'.repeat(44);
+    on.rpcRentals.txs.set(hash, {
+      rentalId: `${offer.offerId}:n1`,
+      owner: 'olga.testnet',
+      renter: 'ivo.testnet',
+      priceYocto: BigInt(ONE_NEAR),
+      feeYocto: BigInt(ONE_NEAR) / 20n,
+      ownerProceedsYocto: BigInt(ONE_NEAR) - BigInt(ONE_NEAR) / 20n,
+    });
+    const ok = await renter.post(`/rentals/${offer.offerId}`, { txHash: hash });
+    expect(ok.status).toBe(200);
+    // Retries of the same tx are answered with the same pass.
+    expect((await renter.post(`/rentals/${offer.offerId}`, { txHash: hash })).body.pass.rentalId).toBe(ok.body.pass.rentalId);
+    expect((await renter.get('/rentals/mine')).body.passes).toHaveLength(1);
   });
 });

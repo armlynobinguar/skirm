@@ -187,7 +187,7 @@ export interface LedgerRow {
   type: LedgerRowType;
   amount: number;
   source: 'paid' | 'free';
-  note: 'entry_fee' | 'reversal' | 'expired' | 'cosmetic' | 'prize_pool' | 'prize' | 'backing' | null;
+  note: 'entry_fee' | 'reversal' | 'expired' | 'cosmetic' | 'prize_pool' | 'prize' | 'backing' | 'rental' | null;
   /** The v2 match a hold, charge or refund belongs to; null for top-ups, free grants and spends. */
   matchId: string | null;
   txHash: string | null;
@@ -569,6 +569,13 @@ export interface RentalOffer {
   /** Where `market.rent` pays the owner; null while the owner has no NEAR account linked. */
   ownerNearAccountId: string | null;
   priceYocto: string;
+  /**
+   * How the api takes payment (NEAR_RENTALS_ONCHAIN): `near` through `market.rent` from the wallet,
+   * `credits` from paid credits. Absent from an older api: `near`.
+   */
+  payWith?: 'near' | 'credits';
+  /** The price in whole credits (CREDITS_PER_NEAR, rounded up), for `credits`. */
+  priceCredits?: number;
 }
 
 /** The caller's own offer for one agent (PUT /agents/:id/rental, GET /rentals/mine). */

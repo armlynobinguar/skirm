@@ -142,6 +142,14 @@ export const envSchema = z
     NEAR_CONTRACT_DEPOSITS: nearAccount(ENV_DEFAULTS.NEAR_CONTRACT_DEPOSITS),
     NEAR_CONTRACT_SEASONS: nearAccount(ENV_DEFAULTS.NEAR_CONTRACT_SEASONS),
     NEAR_CONTRACT_BADGES: nearAccount(ENV_DEFAULTS.NEAR_CONTRACT_BADGES),
+    /**
+     * `true`: agent rentals are paid through `market.rent` from the renter's wallet (needs the
+     * market redeployed with `rent`, contracts/market/README.md). Off: they are paid in credits.
+     */
+    NEAR_RENTALS_ONCHAIN: z
+      .enum(['true', 'false', ''])
+      .optional()
+      .transform((v) => v === 'true'),
     CREDITS_PER_NEAR: z
       .string()
       .optional()

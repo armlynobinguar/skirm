@@ -8,6 +8,21 @@ import { eventsOf, isSuccess, NearRpcError, type TxStatus } from './rpc';
 /** The market's default platform fee (contracts/market DEFAULT_FEE_BPS), used for dev rentals. */
 export const RENTAL_DEV_FEE_BPS = 500n;
 
+/**
+ * A rental paid in credits (NEAR_RENTALS_ONCHAIN off): the yocto price at `creditsPerNear`, rounded
+ * up to whole credits (at least 1); the platform fee (rounded down) is burned, the owner gets the rest.
+ */
+export function rentalCredits(
+  priceYocto: bigint,
+  creditsPerNear: number,
+): { priceCredits: number; feeCredits: number; ownerCredits: number } {
+  const ONE_NEAR = 10n ** 24n;
+  const scaled = priceYocto * BigInt(creditsPerNear);
+  const priceCredits = Number(scaled / ONE_NEAR + (scaled % ONE_NEAR > 0n ? 1n : 0n)) || 1;
+  const feeCredits = Number((BigInt(priceCredits) * RENTAL_DEV_FEE_BPS) / 10_000n);
+  return { priceCredits, feeCredits, ownerCredits: priceCredits - feeCredits };
+}
+
 export interface RentalPayment {
   /** Idempotency key (the tx hash, or the full dev hash). */
   receipt: string;
@@ -100,10 +115,9 @@ export class RpcRentalVerifier implements RentalVerifier {
       throw new RentalError('wrong_sender', 'transaction was signed by another account');
     if (!isSuccess(tx.status)) throw new RentalError('failed', 'rental transaction failed');
 
-    // Only the market's own event counts (another contract in the tx could log a lookalike).
-    const event = eventsOf(tx, 'skirm_market').find(
-      (e) => e.event === 'rental' && (e.executor ?? this.marketContract) === this.marketContract,
-    );
+    // Only the market's own event counts: another contract in the tx could log a lookalike, so a
+    // receipt without an executor is not trusted either.
+    const event = eventsOf(tx, 'skirm_market').find((e) => e.event === 'rental' && e.executor === this.marketContract);
     const data = Array.isArray(event?.data)
       ? (event!.data[0] as Record<string, unknown> | undefined)
       : (event?.data as Record<string, unknown> | undefined);
