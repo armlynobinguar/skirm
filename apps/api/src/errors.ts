@@ -40,6 +40,7 @@ const REPO_STATUS: Record<string, number> = {
   trial_limit: 429,
   bench_limit: 429,
   daily_limit: 429,
+  puzzle_limit: 429,
   rate_limited: 429,
 };
 

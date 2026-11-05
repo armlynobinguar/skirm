@@ -52,6 +52,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 - **Practice** against the Greedy bot, free and instant, plus a guided first match for new players
 - **Daily challenge**: one seed a day for everyone, a few attempts with your crew against the bot, and a global board with verifiable log hashes
 - **Campaign**: three chapters of missions against the bot; each chapter cleared unlocks a starter skill
+- **Puzzles**: six fixed boards solved by your crew in the fewest ticks, with medals and a leaderboard per puzzle
 - **Private lobbies and tournaments**: challenge a friend with a code, or run a 4 to 16 player bracket
 - **Draft mode**: each crew bans one of the rival's skills before the match
 - **Map editor and community maps**: paint your own mirrored map, test-play it greedy vs greedy, publish it, and play other players' maps in practice and casual

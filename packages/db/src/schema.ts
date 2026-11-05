@@ -1376,6 +1376,71 @@ export const campaignRewards = pgTable(
   (t) => [primaryKey({ columns: [t.accountId, t.chapterId] })],
 );
 
+export type PuzzleRunStatus = 'queued' | 'running' | 'done' | 'failed' | 'insufficient_credits';
+
+/**
+ * One puzzle run (@skirm/engine/v2 PUZZLES): the player's crew on a puzzle board, played headless
+ * on the worker (`benchmarks` job `{ kind: 'puzzle' }`). `crew` is the `[{ agentId, tier }]` asked
+ * for; `result` is what the worker stored (ticks, score, medal, log hash, key events).
+ */
+export const puzzleRuns = pgTable(
+  'puzzle_runs',
+  {
+    /** `pzr_` + ULID. */
+    id: text('id').primaryKey(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    puzzleId: text('puzzle_id').notNull(),
+    crew: jsonb('crew').$type<{ agentId: string; tier: 'quiet' | 'standard' | 'open' }[]>().notNull(),
+    status: text('status').$type<PuzzleRunStatus>().notNull().default('queued'),
+    /** Brain kind that played the crew (greedy, model). */
+    brain: text('brain'),
+    /** Credits the run cost (0 on the greedy brain). */
+    credits: integer('credits').notNull().default(0),
+    result: jsonb('result'),
+    error: text('error'),
+    createdAt: createdAt(),
+    finishedAt: ts('finished_at'),
+  },
+  (t) => [
+    index('puzzle_runs_account_idx').on(t.accountId, t.createdAt),
+    check(
+      'puzzle_runs_status_ck',
+      sql`${t.status} in ('queued', 'running', 'done', 'failed', 'insufficient_credits')`,
+    ),
+  ],
+);
+
+/**
+ * A player's best solve of each puzzle (lowest score, then earliest): one row per account and
+ * puzzle, with the run and log hash that set it. The per-puzzle leaderboard reads this table.
+ */
+export const puzzleBests = pgTable(
+  'puzzle_bests',
+  {
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    puzzleId: text('puzzle_id').notNull(),
+    /** Lower is better (ticks; a hold-out adds knock-downs and takes off deliveries). */
+    score: integer('score').notNull(),
+    ticks: integer('ticks').notNull(),
+    /** gold | silver | bronze, or null above the bronze threshold. */
+    medal: text('medal'),
+    runId: text('run_id').notNull(),
+    logHash: text('log_hash').notNull(),
+    brain: text('brain').notNull(),
+    /** Solved runs so far (every solve counts, best or not). */
+    solves: integer('solves').notNull().default(1),
+    achievedAt: ts('achieved_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.accountId, t.puzzleId] }),
+    index('puzzle_bests_board_idx').on(t.puzzleId, t.score, t.achievedAt),
+  ],
+);
+
 // ---------- Community maps ----------
 
 /**

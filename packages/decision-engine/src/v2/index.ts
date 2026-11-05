@@ -11,4 +11,5 @@ export * from './caster';
 export * from './observed';
 export * from '../llm';
 export { DEFAULT_LLM_BASE_URL, DEFAULT_LLM_MODEL, DEFAULT_MODEL_PRICES } from '../config';
+export * from './puzzle';
 export * from './tools';

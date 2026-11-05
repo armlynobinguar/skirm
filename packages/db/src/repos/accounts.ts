@@ -12,6 +12,8 @@ import {
   backings,
   campaignProgress,
   campaignRewards,
+  puzzleBests,
+  puzzleRuns,
   communityMaps,
   agents,
   cosmeticsOwned,
@@ -174,6 +176,10 @@ export class AccountsRepo {
       this.db.select().from(backingRounds).where(eq(backingRounds.writerId, accountId)),
       this.db.select().from(backings).where(eq(backings.backerId, accountId)),
     ]);
+    const [puzzleRunRows, puzzleBestRows] = await Promise.all([
+      this.db.select().from(puzzleRuns).where(eq(puzzleRuns.accountId, accountId)),
+      this.db.select().from(puzzleBests).where(eq(puzzleBests.accountId, accountId)),
+    ]);
     return {
       account: [account],
       agents: myAgents,
@@ -202,6 +208,8 @@ export class AccountsRepo {
       dailyAttempts: daily,
       campaign,
       campaignRewards: campaignRewardRows,
+      puzzleRuns: puzzleRunRows,
+      puzzleBests: puzzleBestRows,
       communityMaps: communityMapRows,
       backingRounds: backingRoundRows,
       backings: backingRows,

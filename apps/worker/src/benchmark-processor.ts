@@ -28,6 +28,7 @@ import type { BenchmarkJobData } from '@skirm/server';
 import { WorkerError, errorCode, type WorkerDeps } from './deps';
 import { processBenchRun } from './bench-processor';
 import { processDailyAttempt } from './daily-processor';
+import { processPuzzleRun } from './puzzle-processor';
 
 export type BenchmarkDeps = Pick<
   WorkerDeps,
@@ -152,6 +153,7 @@ export async function processBenchmark(
 ): Promise<BenchmarkOutcome> {
   if (data.kind === 'bench') return processBenchRun(deps, data.runId, attempt);
   if (data.kind === 'daily') return processDailyAttempt(deps, data.attemptId, attempt);
+  if (data.kind === 'puzzle') return processPuzzleRun(deps, data.runId, attempt);
   return data.kind === 'mint'
     ? benchmarkVersion(deps, data.skillId, data.version, attempt)
     : runTrial(deps, data.trialId, attempt);
