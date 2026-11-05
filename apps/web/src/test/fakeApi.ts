@@ -69,6 +69,7 @@ const METHODS: (keyof ApiClient)[] = [
   'mapLadder',
   'skillLadder',
   'v2Match',
+  'v2MatchLog',
   'v2LiveMatches',
   'createLobby',
   'myLobbies',

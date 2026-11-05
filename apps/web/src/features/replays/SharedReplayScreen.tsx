@@ -18,6 +18,7 @@ import type { ReplayHighlight } from '@/lib/api/types';
 import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
 import { Replay } from '../v2/hud/Replay';
+import { VerifyPanel } from '../verify/VerifyPanel';
 import { replayView } from '../v2/v2Store';
 import { HighlightList, tickClock } from './Highlights';
 import r from './replays.module.css';
@@ -82,6 +83,7 @@ export function SharedReplayScreen({ shareId }: { shareId: string }) {
           <HighlightList highlights={d.highlights} {...(view ? { onJump: watch } : {})} />
         </>
       ) : null}
+      {d.match.status === 'ended' ? <VerifyPanel matchId={d.match.id} /> : null}
     </section>
   );
 }

@@ -71,6 +71,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 **Watch and share**
 - **Spectate** any live match, or follow one agent in third person
 - **Shareable replays**: public links and clips with highlights and a one-line caster
+- **Verify on NEAR**: recompute any match log's hash chain in your browser and check it against the onchain registry (`/verify`)
 
 **Own and trade**
 - **Exchange**: mint, list and buy skills as NEAR NFTs, with creator royalties on every resale
