@@ -183,7 +183,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     clearPrivateDrafts();
     credentials.set(null);
     queryClient.clear();
-    if (mode === 'privy' && privy) await privy.logout();
+    // Our session is already gone; a failed Privy logout must not leave the button doing nothing.
+    if (mode === 'privy' && privy) await privy.logout().catch(() => undefined);
   }, [credentials, queryClient, mode, privy]);
 
   // privy: still 'loading' until Privy knows whether it has a session (and its token is fetched).

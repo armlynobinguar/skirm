@@ -110,6 +110,18 @@ describe('TopBar', () => {
     expect(screen.queryByTestId('account-dock')).not.toBeInTheDocument();
   });
 
+  it('signs out from the account card, even when /me fails to load', async () => {
+    const { user } = renderWithProviders(<AppShell>hi</AppShell>, {
+      handle: 'ada',
+      path: '/market',
+      api: { me: async () => Promise.reject(new Error('down')) },
+    });
+    await user.click(screen.getByTestId('account-badge'));
+    await user.click(screen.getByTestId('topbar-sign-out'));
+    expect(await screen.findByTestId('topbar-signin')).toBeInTheDocument();
+    expect(screen.queryByTestId('account-badge')).not.toBeInTheDocument();
+  });
+
   it('toggles the design notes from the Notes button', async () => {
     const { user } = renderWithProviders(<AppShell>hi</AppShell>, { path: '/maps' });
     const notes = screen.getByTestId('topbar-notes');
