@@ -14,7 +14,12 @@
 // to that crew. Draft mode (casual, `setup.draft`): between accept and lock-in each crew in turn
 // bans one of the rival's equipped skills (DEFAULTS.draft: bans per crew, the time per step; a step
 // not answered in time passes). A banned skill is unequipped from the rival crew for this match,
-// also from a crew swapped in at lock-in, and every ban is in both debriefs.
+// also from a crew swapped in at lock-in, and every ban is in both debriefs. Hybrid control
+// (control(), steer(); casual and practice only): a player may steer one agent of their own crew by
+// hand. Its action each tick comes from the player's latest input (steerAction) instead of the brain,
+// a wait when none came by the action deadline; the crew planner is told who is steered, the frames
+// mark it and every tick's log entry lists the steered agents (`controlled`), so replays and results
+// stay verifiable.
 import { V2_ACTION_DEADLINE_MS, V2_PLANNER_DEADLINE_MS, filterSpeech, maySpeak, type V2AgentCommand, type V2Brain, type V2Decision } from '@skirm/decision-engine/v2';
 import { DEFAULTS, chargeDue, playerTier, type PlayerTier } from '@skirm/shared';
 import {
@@ -33,6 +38,7 @@ import {
   observe,
   skillActivity,
   startLog,
+  steerAction,
   stepMatch,
   tickCostPer100,
   type Action,
@@ -47,8 +53,10 @@ import {
   type MatchEvent,
   type MatchLog,
   type MatchState,
+  type Observation,
   type SayInput,
   type SkillTrigger,
+  type SteerInput,
   type TalkTier,
   type Team,
   type V2Frame,
@@ -219,6 +227,10 @@ export type V2BanResult = { ok: true } | { ok: false; code: V2BanError; message:
 
 export type V2CommandResult = { ok: true; left: number; tick: number } | { ok: false; code: V2CommandError; message: string };
 
+export type V2ControlError = 'not_live' | 'control_casual' | 'invalid_command' | 'not_controlling';
+
+export type V2ControlResult = { ok: true; agentId: string | null } | { ok: false; code: V2ControlError; message: string };
+
 export class V2Match {
   readonly matchId: string;
   readonly timing: V2Timing;
@@ -268,6 +280,14 @@ export class V2Match {
   private readonly commandLog: Record<Team, FrameCommand[]> = { A: [], B: [] };
   /** The order in force for each agent (by id), until its last tick. */
   private readonly orders = new Map<string, { preset: CommandPreset | null; order: string; until: number }>();
+  /** Hybrid control: the agent each crew's player steers (null: the brain runs the whole crew). */
+  private readonly controlled: Record<Team, string | null> = { A: null, B: null };
+  /** The player's one-tick input waiting for the steered agent's next turn (the latest wins). */
+  private readonly steerNext: Record<Team, SteerInput | null> = { A: null, B: null };
+  /** The standing order the steered agent walks each tick until it is done (take, deliver, goto). */
+  private readonly steerStanding: Record<Team, SteerInput | null> = { A: null, B: null };
+  /** Wakes a steered agent's turn that is waiting for input. */
+  private readonly steerWake: Record<Team, (() => void) | null> = { A: null, B: null };
   private stats: V2MatchEnd['stats'] = {
     A: { timeouts: 0, errors: 0, illegal: 0, refusedSays: 0, costUsd: 0, charged: 0 },
     B: { timeouts: 0, errors: 0, illegal: 0, refusedSays: 0, costUsd: 0, charged: 0 },
@@ -580,6 +600,93 @@ export class V2Match {
     return { ok: true, left: this.commandsLeft[team], tick: lands };
   }
 
+  /** The agent `team`'s player steers, or null. */
+  controlledBy(team: Team): string | null {
+    return this.controlled[team];
+  }
+
+  /**
+   * Hybrid control: `team`'s player takes over one of its agents still playing (`agentId`), or
+   * hands it back to the brain (null). One at a time: taking another hands the first one back.
+   * Casual and practice only: refused in ranked, where every move must be the crew's brain's.
+   */
+  control(team: Team, agentId: string | null): V2ControlResult {
+    const s = this.state;
+    if (this.phase !== 'live' || !s || s.result) return { ok: false, code: 'not_live', message: 'control is taken during a live match' };
+    if (this.setup.ranked) return { ok: false, code: 'control_casual', message: 'steering an agent is for casual and practice matches only' };
+    if (agentId !== null && !s.agents.some((a) => a.id === agentId && a.team === team && !a.out))
+      return { ok: false, code: 'invalid_command', message: 'that agent is not one of your crew in the match' };
+    if (this.controlled[team] === agentId) return { ok: true, agentId };
+    this.setControl(team, agentId);
+    // The planner learns who is steered on its next plan; a fresh one now so the crew adapts at once.
+    void this.replan(team);
+    return { ok: true, agentId };
+  }
+
+  /**
+   * Hybrid control: the player's input for the agent it steers. A one-tick input (move, wait, use)
+   * waits for the agent's next turn and replaces any earlier one; a standing order (take, deliver,
+   * goto) replaces the last and is walked each tick until done; stop drops both.
+   */
+  steer(team: Team, input: SteerInput): V2ControlResult {
+    const s = this.state;
+    if (this.phase !== 'live' || !s || s.result) return { ok: false, code: 'not_live', message: 'steering is during a live match' };
+    const id = this.controlled[team];
+    if (!id) return { ok: false, code: 'not_controlling', message: 'take control of an agent first' };
+    if (input.kind === 'stop') {
+      this.steerNext[team] = null;
+      this.steerStanding[team] = null;
+    } else if (input.kind === 'take' || input.kind === 'deliver' || input.kind === 'goto') {
+      this.steerNext[team] = null;
+      this.steerStanding[team] = input;
+    } else this.steerNext[team] = input;
+    this.steerWake[team]?.();
+    return { ok: true, agentId: id };
+  }
+
+  private setControl(team: Team, agentId: string | null) {
+    this.controlled[team] = agentId;
+    this.steerNext[team] = null;
+    this.steerStanding[team] = null;
+    this.steerWake[team]?.();
+  }
+
+  /** The steered agent's action this tick from the player's input; null when there is none yet. */
+  private steered(team: Team, o: Observation): V2Decision | null {
+    const next = this.steerNext[team];
+    if (next) {
+      this.steerNext[team] = null;
+      return { action: steerAction(o, next).action, reason: 'chosen', say: null };
+    }
+    const standing = this.steerStanding[team];
+    if (!standing) return null;
+    const r = steerAction(o, standing);
+    if (r.done) this.steerStanding[team] = null;
+    return { action: r.action, reason: 'chosen', say: null };
+  }
+
+  /** A steered agent's turn: the input already waiting, else the first to arrive by the action deadline, else a wait. */
+  private steerDecide(team: Team, o: Observation): Promise<V2Decision> {
+    const wait: V2Decision = { action: { type: 'wait' }, reason: 'chosen', say: null };
+    const now = this.steered(team, o);
+    if (now) return Promise.resolve(now);
+    const sched = this.deps.scheduler;
+    return new Promise((resolve) => {
+      const finish = (d: V2Decision) => {
+        sched.clearTimeout(h);
+        this.steerWake[team] = null;
+        resolve(d);
+      };
+      const h = sched.setTimeout(() => finish(this.steered(team, o) ?? wait), this.timing.actionMs);
+      this.steerWake[team] = () => {
+        // Handed back to the brain or to another agent meanwhile: this turn waits.
+        if (this.controlled[team] !== o.me.id) return finish(wait);
+        const d = this.steered(team, o);
+        if (d) finish(d);
+      };
+    });
+  }
+
   /** The commands waiting for `tick` (the one about to be played), now in force. */
   private applyCommands(tick: number): CrewCommand[] {
     const out: CrewCommand[] = [];
@@ -690,6 +797,7 @@ export class V2Match {
       const costPer100 = { A: tickCostPer100(s, 'A'), B: tickCostPer100(s, 'B') };
       const live = s.agents.filter((a) => !a.out);
       const commands = this.applyCommands(s.tick + 1);
+      const steered = live.filter((a) => this.controlled[a.team] === a.id).map((a) => a.id);
       const decisions = await Promise.all(live.map((a) => this.decide(s, a.id)));
       if (this.stopReason) return this.voidMatch('aborted', undefined, log);
       const actions: Record<string, Action> = {};
@@ -707,7 +815,9 @@ export class V2Match {
         this.timeline?.turn(a, d);
       });
       const ev = stepMatch(s, { actions, says });
-      appendTick(log, { tick: s.tick, actions, says, ...(commands.length ? { commands } : {}) });
+      appendTick(log, { tick: s.tick, actions, says, ...(commands.length ? { commands } : {}), ...(steered.length ? { controlled: steered } : {}) });
+      // A steered agent that is out goes back to nobody: there is nothing left to steer.
+      for (const t of TEAMS) if (this.controlled[t] && s.agents.find((a) => a.id === this.controlled[t])?.out) this.setControl(t, null);
       this.tally.add(ev);
       this.timeline?.resolve(s, ev);
       this.collect(s, ev);
@@ -757,6 +867,8 @@ export class V2Match {
     const skillTriggers = skills.map((_, i) => meta[i]?.trigger ?? null);
     const active = skillActivity(skillTriggers, o);
     if (skills.length) this.skillsActive.set(id, skills.map((_, i) => ({ name: meta[i]?.name ?? `Skill ${i + 1}`, trigger: skillTriggers[i] ?? { kind: 'always' }, active: active[i]! })));
+    // Hybrid control: the player's input, never the brain (a steered agent does not speak).
+    if (this.controlled[a.team] === id) return this.steerDecide(a.team, o);
     if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
     const command = this.orderFor(s, id, s.tick + 1);
     const ctx = { skills, skillTriggers, instructions: side.instructions?.[a.slot] ?? null, playbook: side.playbook?.text ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [], command };
@@ -800,7 +912,7 @@ export class V2Match {
     const instructions = (this.setup.sides[team].instructions ?? []).filter((t): t is string => !!t).join('\n\n') || null;
     let timer: unknown;
     const late = new Promise<null>((r) => (timer = this.deps.scheduler.setTimeout(() => r(null), this.timing.planMs)));
-    const r = await Promise.race([this.deps.brains[team].plan(observe(s, lead.id), { skills, skillTriggers, instructions, playbook: side.playbook?.text ?? null }).catch(() => null), late]);
+    const r = await Promise.race([this.deps.brains[team].plan(observe(s, lead.id), { skills, skillTriggers, instructions, playbook: side.playbook?.text ?? null, controlled: this.controlledName(team) }).catch(() => null), late]);
     this.deps.scheduler.clearTimeout(timer);
     if (r) {
       this.stats[team].costUsd += r.call?.costUsd ?? 0;
@@ -812,6 +924,12 @@ export class V2Match {
     }
   }
 
+  /** The name of the agent `team`'s player steers, for the planner. */
+  private controlledName(team: Team): string | null {
+    const id = this.controlled[team];
+    return id ? (this.state?.agents.find((a) => a.id === id)?.name ?? null) : null;
+  }
+
   private publish(ev: MatchEvent[]) {
     const s = this.state!;
     for (const t of TEAMS) {
@@ -821,6 +939,11 @@ export class V2Match {
       // Its crew playbook by name only (the owner's mind panel); never the text, never another view.
       const playbook = this.setup.sides[t].playbook;
       if (playbook) frame.playbook = playbook.name;
+      // Hybrid control: who its player steers and the standing order it walks (its own frames only).
+      const steering = this.controlled[t];
+      const standing = this.steerStanding[t];
+      if (steering) frame.steer = { agentId: steering, standing: standing ? { ...standing } : null };
+      frame = withControlled(frame, this.controlled);
       // Practice shows all minds (the prototype): the player also sees the bot's plan, reason and inner voice.
       if (this.setup.practice) {
         const r: Team = t === 'A' ? 'B' : 'A';
@@ -831,7 +954,7 @@ export class V2Match {
       this.lastFrames[t] = msg;
       this.deps.send(t, msg);
     }
-    const watch = frameFor(s, 'watch', ev);
+    const watch = withControlled(frameFor(s, 'watch', ev), this.controlled);
     this.frames.watch.push(watch);
     if (this.deps.watch) {
       const msg: V2ServerMessage = { type: 'v2_frame', matchId: this.matchId, frame: watch };
@@ -908,6 +1031,16 @@ export function withRivalMind(
     return { ...a, ...(plan ? { plan } : {}), ...(plan && why ? { planWhy: why } : {}), ...(thought ? { thought } : {}) };
   });
   return { ...frame, agents };
+}
+
+/**
+ * Hybrid control: marks the agents their players steer (`controlled`) in a frame, in every view
+ * (own, rival and watch), as the match log does: a steered agent is never passed off as the brain's.
+ */
+export function withControlled(frame: V2Frame, controlled: Readonly<Record<Team, string | null>>): V2Frame {
+  const ids = new Set(TEAMS.map((t) => controlled[t]).filter((id): id is string => !!id));
+  if (!ids.size) return frame;
+  return { ...frame, agents: frame.agents.map((a) => (ids.has(a.id) ? { ...a, controlled: true as const } : a)) };
 }
 
 const other = (t: Team): Team => (t === 'A' ? 'B' : 'A');

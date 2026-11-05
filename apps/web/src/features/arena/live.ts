@@ -20,6 +20,8 @@ export interface LiveArena {
   tick?: number;
   /** Speech bubbles over agents for this frame's talk, by agent id. */
   barks?: Record<string, LiveBark> | null;
+  /** Hybrid control: the agent its player steers (ringed when the camera follows no one). */
+  controlled?: string;
 }
 
 /** A line an agent said this tick, drawn as a bubble over it for 2.6 s. */
@@ -97,6 +99,8 @@ export function composeV2Arena(frame: V2Frame): LiveArena | null {
     };
   });
   const team = frame.view === 'watch' ? undefined : frame.view;
+  // Hybrid control: the agent this crew's player steers gets the ring (a watcher sees any steered agent).
+  const controlled = frame.agents.find((g) => g.controlled && (!team || g.team === team))?.id;
   // Gas and live water ride on the board as overlays (tile indexes this side can see).
   const state: ArenaState = { grid, agents };
   if (frame.gas?.length) state.gas = frame.gas;
@@ -111,6 +115,7 @@ export function composeV2Arena(frame: V2Frame): LiveArena | null {
     team,
     tick: frame.tick,
     barks: barksOf(frame),
+    ...(controlled ? { controlled } : {}),
   };
 }
 

@@ -40,6 +40,7 @@ import {
   type FrameView,
   type MapDefV2,
   type MatchResult,
+  type SteerInput,
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
@@ -52,7 +53,7 @@ import type { PubSub, Unsubscribe } from '../pubsub';
 import type { QueueTiming, Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
 import { ExternalBrain, isExternalBrain, type WebhookPost } from './external';
-import { DEFAULT_V2_TIMING, TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Playbook, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
+import { DEFAULT_V2_TIMING, TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2ControlError, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Playbook, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
 import type { V2FrameStore } from './replay';
 
 export interface V2Search {
@@ -148,7 +149,8 @@ export class V2HubError extends Error {
       | 'draft_casual'
       | 'mission_locked'
       | V2BanError
-      | V2CommandError,
+      | V2CommandError
+      | V2ControlError,
     message: string,
   ) {
     super(message);
@@ -411,6 +413,33 @@ export class V2Hub {
     if (!r.ok) throw new V2HubError(r.code, r.message);
     this.deps.log.info(`v2 match ${matchId} ${team}: command ${input.preset ?? 'text'}${input.agentId ? ` to ${input.agentId}` : ' to the crew'} (${r.left} left)`);
     return { tick: r.tick, left: r.left };
+  }
+
+  /**
+   * Hybrid control (V2Match.control): the player takes over one of its own agents in a live casual
+   * or practice match (null hands it back to the brain). Throws the reason it was refused.
+   */
+  control(accountId: string, matchId: string, agentId: string | null): { agentId: string | null } {
+    const { match, team } = this.mine(accountId, matchId);
+    const r = match.control(team, agentId);
+    if (!r.ok) throw new V2HubError(r.code, r.message);
+    this.deps.log.info(`v2 match ${matchId} ${team}: ${agentId ? `steers ${agentId}` : 'hands control back'}`);
+    return { agentId: r.agentId };
+  }
+
+  /** Hybrid control (V2Match.steer): the player's input for the agent it steers. Throws the reason it was refused. */
+  steer(accountId: string, matchId: string, input: SteerInput): void {
+    const { match, team } = this.mine(accountId, matchId);
+    const r = match.steer(team, input);
+    if (!r.ok) throw new V2HubError(r.code, r.message);
+  }
+
+  /** Hands every steered agent of a player back to the brain (its last connection closed). */
+  releaseControl(accountId: string): void {
+    for (const match of this.matches.values()) {
+      const team = TEAMS.find((t) => match.setup.sides[t].accountId === accountId);
+      if (team && match.controlledBy(team)) match.control(team, null);
+    }
   }
 
   /**
