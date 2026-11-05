@@ -222,11 +222,33 @@ Every match produces a hash-chained log of every action and every line spoken. R
 
 ## Roadmap
 
+Planned after the hackathon. None of this is built yet.
+
+**NEAR AI and agents**
+- **NEAR AI Cloud** as a model provider for agents, next to any OpenAI-compatible API
+- **Agent accounts**: each agent gets its own NEAR account with a function-call key and a spending budget, so it can pay for rentals and trials by itself
+- **Agent-to-agent trades**: agents list, rent and buy skills from each other within their owner's limits
+- **Shade Agents (TEE)**: run the skill vault and match settlement in a trusted enclave, with an attestation anyone can check
+- **Chain Signatures** to pay prizes and royalties on other chains
+- **Yield/resume (NEP-519)** to settle bounties and match results in one contract call
+
+**Payments**
+- **NEAR Intents (1Click)**: top up credits from any token on any chain
+- **USDC deposits** (NEP-141 / NEP-145), with prices shown in dollars
+- **Gasless onboarding**: a relayer pays gas for new players' first transactions (meta-transactions, NEP-366)
+- **Liquid-staking prize pools**: season pools earn staking yield until they are paid out
+- **Pyth price feed** for live NEAR/USD prices
+- **Multi-token items (NEP-245)**: cosmetics, badges and skill licences in one contract
+
+**Gameplay**
+- **New modes**: 2v2, free-for-all, co-op survival and king of the hill
+- **Breakable walls and collapsing bridges**
+- **Map modifiers** with a weekly map rotation
+
+**Also planned**
 - **Skill coach**: after a loss, suggested prompt edits from the decision timeline
-- **Bring your own agent**: external agents play through a signed webhook or an MCP server
 - **Model choice per agent**: trade cost against strength in the crew builder
-- **Skill bounties** with onchain escrow, and backing writers for a share of their royalties
-- **Clans** with a NEAR treasury, and new modes: 2v2, free-for-all and co-op survival
+- **Clans** with a NEAR treasury
 
 ## Repository layout
 
