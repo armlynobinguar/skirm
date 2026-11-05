@@ -1,0 +1,12 @@
+/* Hybrid control (Control.tsx): the steering panel, above your agent cards (.mbot is its containing block). */
+.bar { position: absolute; left: 0; bottom: calc(100% + 8px); max-width: min(340px, 100%); display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-left: 3px solid var(--amber); }
+.hd { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.keys { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; opacity: .85; }
+.keys kbd { display: inline-block; min-width: 18px; padding: 0 4px; margin-right: 3px; text-align: center; font: 600 11px/18px var(--font-mono, monospace); border: 1px solid var(--line-strong); border-radius: 3px; }
+.order { font-size: 12px; color: var(--amber); }
+
+/* "Take control" under an agent card, and the steered card's highlight. */
+.take { all: unset; cursor: pointer; display: block; width: 100%; margin-top: 4px; padding: 2px 0; text-align: center; font: 700 10px/1.4 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 50%, transparent); }
+.take:hover, .take:focus-visible { background: color-mix(in srgb, var(--amber) 18%, transparent); }
+.take[aria-pressed="true"] { color: var(--bg); background: var(--amber); }
+.steered { position: absolute; top: 6px; left: 6px; z-index: 2; padding: 1px 5px; font: 700 10px/1.4 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--bg); background: var(--amber); pointer-events: none; }
