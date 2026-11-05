@@ -90,6 +90,10 @@ export interface V2Frame {
   result: MatchResult | null;
   /** Tick each map switch can be used again (map order). */
   switchReady?: number[];
+  /** Gas in this side's sight, as tile indexes (y * w + x). Present only on maps with gas vents. */
+  gas?: number[];
+  /** Electrified water in this side's sight, as tile indexes. Present only on maps with sparking cables. */
+  shock?: number[];
   /** Each hazard's state: waves grown so far and whether it is receding. */
   hazards?: { kind: HazardKind; waves: number; receding: boolean }[];
   /** The viewing crew's live commands (its own frames only; never the rival's or the watch view). */
@@ -183,5 +187,15 @@ export function frameFor(s: MatchState, view: FrameView, events: MatchEvent[], e
       const H = s.hazards[kind];
       return { kind, waves: H?.waves.length ?? 0, receding: H?.receding ?? false };
     }),
+    ...overlaysFor(s, team),
   };
+}
+
+/** Gas and electrified water this side can see right now (fog applies), as tile indexes. */
+export function overlaysFor(s: MatchState, team: Team | null): Pick<V2Frame, 'gas' | 'shock'> {
+  const sees = (j: number) => !team || s.visible[team][j];
+  const out: Pick<V2Frame, 'gas' | 'shock'> = {};
+  if (s.map.def.gas?.length) out.gas = Object.keys(s.gas).map(Number).filter(sees);
+  if (s.map.def.sparks?.length) out.shock = s.shocked.filter(sees);
+  return out;
 }

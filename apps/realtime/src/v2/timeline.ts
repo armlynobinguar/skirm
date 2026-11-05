@@ -91,6 +91,15 @@ export class DecisionTimeline {
         case 'stunned':
           tag(e.agent, 'stunned');
           break;
+        case 'shocked':
+          tag(e.agent, `shocked by ${e.by}`);
+          break;
+        case 'choked':
+          tag(e.agent, 'lost the action to gas');
+          break;
+        case 'slid':
+          tag(e.agent, `slid on ice to ${e.to[0]},${e.to[1]}`);
+          break;
         case 'refused':
           tag(e.agent, `refused: ${e.reason}`);
           break;

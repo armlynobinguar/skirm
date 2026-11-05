@@ -33,6 +33,7 @@ import {
   createMatch,
   frameFor,
   holdFor,
+  logAgent,
   logHash,
   observe,
   skillActivity,
@@ -177,6 +178,8 @@ export interface V2Finish {
   eloDelta: Partial<Record<Team, number>>;
   registry: V2Debrief['registry'];
   season?: Partial<Record<Team, NonNullable<V2Debrief['season']>>>;
+  /** XP each crew's agents earned (from the stored debriefs). */
+  xp?: Partial<Record<Team, NonNullable<V2Debrief['xp']>>>;
 }
 
 /** Most agents a crew fields on this map (both sides start from the same number of tiles). */
@@ -545,6 +548,7 @@ export class V2Match {
       eloDelta: end.result ? (fin.eloDelta[team] ?? null) : null,
       registry: end.result ? fin.registry : null,
       ...(end.result && fin.season?.[team] ? { season: fin.season[team] } : {}),
+      ...(end.result && fin.xp?.[team]?.length ? { xp: fin.xp[team] } : {}),
       commands: this.commandLog[team],
     });
     return this.setup.draft ? { ...d, draft: { bans: this.bans.map((b) => ({ ...b })) } } : d;
@@ -1041,4 +1045,4 @@ export function withControlled(frame: V2Frame, controlled: Readonly<Record<Team,
 
 const other = (t: Team): Team => (t === 'A' ? 'B' : 'A');
 
-const header = (a: { id: string; name: string; role: string; vision: number; comms: number; tier: string }) => ({ id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier });
+const header = logAgent;

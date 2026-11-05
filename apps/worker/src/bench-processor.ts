@@ -103,6 +103,8 @@ export function benchEventLine(
       return { kind: e.kind, text: `${name(e.agent)} pulled ${e.name}` };
     case 'stunned':
       return { kind: e.kind, text: `${name(e.agent)} was stunned by ${name(e.by)}` };
+    case 'shocked':
+      return { kind: e.kind, text: `${name(e.agent)} was shocked by ${e.by}` };
     case 'bluff':
       return {
         kind: e.kind,

@@ -4,13 +4,26 @@
 import { canonicalJson, sha256Hex } from '../canonical';
 import type { Difficulty } from './difficulty';
 import type { CrewCommand } from './commands';
-import type { Action, MatchResult } from './match';
+import type { TraitId } from '@skirm/shared';
+import type { Action, AgentSpec, AgentState, MatchResult, Role } from './match';
+import type { TalkTier } from './talk';
 import type { SayInput } from './talk';
+
+/** One agent as the log header records it: its base stats, and the traits it played with (absent when none, so older logs hash the same). */
+export interface LogAgent {
+  id: string;
+  name: string;
+  role: string;
+  vision: number;
+  comms: number;
+  tier: string;
+  traits?: readonly TraitId[];
+}
 
 export interface LogHeader {
   schema: 'skirm.match/v2';
   map: string;
-  crews: Record<'A' | 'B', { id: string; name: string; role: string; vision: number; comms: number; tier: string }[]>;
+  crews: Record<'A' | 'B', LogAgent[]>;
   ranked: boolean;
   /** The level played (replaying needs it). Absent means Normal: a Normal log leaves it out. */
   difficulty?: Difficulty;
@@ -33,6 +46,25 @@ export interface MatchLog {
   /** Hash after the header and after each tick. */
   hashes: string[];
   result: MatchResult | null;
+}
+
+/** An agent as it played, for the log header (ranked without traits records none). */
+export function logAgent(a: Pick<AgentState, 'id' | 'name' | 'role' | 'vision' | 'comms' | 'tier' | 'traits'>): LogAgent {
+  return { id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier, ...(a.traits?.length ? { traits: [...a.traits] } : {}) };
+}
+
+/** The crews a header records, as createMatch takes them: replaying the logged ticks on these reproduces the match. */
+export function specsFromHeader(header: LogHeader): Record<'A' | 'B', AgentSpec[]> {
+  const spec = (a: LogAgent): AgentSpec => ({
+    id: a.id,
+    name: a.name,
+    role: a.role as Role,
+    vision: a.vision,
+    comms: a.comms,
+    tier: a.tier as TalkTier,
+    ...(a.traits?.length ? { traits: a.traits } : {}),
+  });
+  return { A: header.crews.A.map(spec), B: header.crews.B.map(spec) };
 }
 
 export function startLog(header: LogHeader): MatchLog {

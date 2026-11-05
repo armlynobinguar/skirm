@@ -597,7 +597,9 @@ export class V2Hub {
     for (const c of entries) {
       const v = await repos.agents.view(c.agentId);
       if (!v) throw new V2HubError('invalid_crew', 'an agent no longer exists');
-      crew.push({ id: v.id, name: v.name, role: v.role, vision: v.vision, comms: v.comms, tier: c.tier });
+      // Progression traits travel with the agent (a rented one plays its owner's); ranked drops them in the engine.
+      const traits = v.progression?.traits ?? [];
+      crew.push({ id: v.id, name: v.name, role: v.role, vision: v.vision, comms: v.comms, tier: c.tier, ...(traits.length ? { traits } : {}) });
       const prompts: string[] = [];
       const keys: { id: string; version: number }[] = [];
       const names: string[] = [];
@@ -834,6 +836,8 @@ export class V2Hub {
     for (const t of TEAMS) {
       const season = row?.debriefs?.[t]?.season;
       if (season) (out.season ??= {})[t] = season;
+      const xp = row?.debriefs?.[t]?.xp;
+      if (xp?.length) (out.xp ??= {})[t] = xp;
     }
     if (row?.registryStatus === 'pending') {
       out.registry = 'pending';
@@ -962,7 +966,7 @@ export function v2EndOf(row: V2MatchRow): Extract<V2ServerMessage, { type: 'v2_e
   return { type: 'v2_end', matchId: row.id, result, reason: (row.reason ?? 'aborted') as V2EndReason, logHash: row.logHash };
 }
 
-const rec = (a: AgentSpec) => ({ id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier });
+const rec = (a: AgentSpec) => ({ id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier, ...(a.traits?.length ? { traits: [...a.traits] } : {}) });
 
 /** The skill versions an agent of this crew runs. */
 const skillsOf = (side: V2Roster, agentId: string) => side.skillKeys?.[side.crew.findIndex((a) => a.id === agentId)] ?? [];

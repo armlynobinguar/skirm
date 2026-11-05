@@ -12,6 +12,7 @@
 import type { AgentState, MatchEvent, MatchState } from './match';
 import { manhattan } from './match';
 import { clean, rangeOf, TALK_TIERS, type SayInput } from './talk';
+import { commsOf, visionOf } from './traits';
 
 /** Bluffs each crew may tell in a match unless the match sets its own cap. */
 export const BLUFF_CAP = 3;
@@ -76,7 +77,7 @@ export function planBluffs(s: MatchState, says: readonly SayInput[]): PlannedBlu
       if (victim.team === T || !up(victim) || victim.carrying.length >= (victim.role === 'Hauler' ? 3 : 2)) continue;
       const tile = closingOn(s, victim);
       if (tile === null) continue;
-      const liar = s.agents.find((a) => a.team === T && up(a) && !a.stun && !speaking.has(a.id) && canTell(s, a) && manhattan(a, victim) <= rangeOf(a.comms));
+      const liar = s.agents.find((a) => a.team === T && up(a) && !a.stun && !speaking.has(a.id) && canTell(s, a) && manhattan(a, victim) <= rangeOf(commsOf(a)));
       if (!liar) continue;
       out.push({ liar, victim, tile, say: { agent: liar.id, channel: 'say', text: bluffLine(s, s.tally[T].lies) } });
       break;
@@ -97,8 +98,8 @@ export function bluffRoll(tick: number, liar: string, victim: string): number {
 
 /** The chance a target believes a bluff about `tile` (the prototype's odds). */
 export function believeChance(s: MatchState, victim: AgentState, tile: number): number {
-  if (s.map.def.fog) return s.visible[victim.team][tile] ? 0 : Math.max(0, 0.78 - victim.vision * 0.08);
-  return Math.max(0, 0.7 - victim.vision * 0.11);
+  if (s.map.def.fog) return s.visible[victim.team][tile] ? 0 : Math.max(0, 0.78 - visionOf(victim) * 0.08);
+  return Math.max(0, 0.7 - visionOf(victim) * 0.11);
 }
 
 /**

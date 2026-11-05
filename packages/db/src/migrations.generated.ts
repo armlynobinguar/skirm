@@ -291,5 +291,27 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nALTER TABLE \"campaign_progress\" ADD CONSTRAINT \"campaign_progress_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
       "\nALTER TABLE \"campaign_rewards\" ADD CONSTRAINT \"campaign_rewards_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;"
     ]
+  },
+  {
+    "tag": "0015_daily_challenge",
+    "folderMillis": 1793811501948,
+    "bps": true,
+    "hash": "f201b96b0ee14f39984cc8f4fc46cf66be2b9970e07a450293993b552d805454",
+    "sql": [
+      "CREATE TABLE \"daily_attempts\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"date\" text NOT NULL,\n\t\"seed\" text NOT NULL,\n\t\"map_id\" text NOT NULL,\n\t\"difficulty\" text NOT NULL,\n\t\"twist\" text NOT NULL,\n\t\"crew\" jsonb NOT NULL,\n\t\"status\" text DEFAULT 'queued' NOT NULL,\n\t\"brain\" text,\n\t\"credits\" integer DEFAULT 0 NOT NULL,\n\t\"points\" integer,\n\t\"outcome\" text,\n\t\"ticks\" integer,\n\t\"log_hash\" text,\n\t\"result\" jsonb,\n\t\"error\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"finished_at\" timestamp with time zone,\n\tCONSTRAINT \"daily_attempts_status_ck\" CHECK (\"daily_attempts\".\"status\" in ('queued', 'running', 'done', 'failed', 'insufficient_credits'))\n);\n",
+      "\nALTER TABLE \"daily_attempts\" ADD CONSTRAINT \"daily_attempts_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"daily_attempts_account_idx\" ON \"daily_attempts\" USING btree (\"account_id\",\"date\");",
+      "\nCREATE INDEX \"daily_attempts_board_idx\" ON \"daily_attempts\" USING btree (\"date\",\"points\");"
+    ]
+  },
+  {
+    "tag": "0016_agent_progression",
+    "folderMillis": 1793838065587,
+    "bps": true,
+    "hash": "f998158f7fa03cc306ff33bfcd5929a012f0e3a8d9aae7436d8b7140f73da043",
+    "sql": [
+      "ALTER TABLE \"agents\" ADD COLUMN \"xp\" integer DEFAULT 0 NOT NULL;",
+      "\nALTER TABLE \"agents\" ADD COLUMN \"traits\" jsonb DEFAULT '[]'::jsonb NOT NULL;"
+    ]
   }
 ];

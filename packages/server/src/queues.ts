@@ -42,12 +42,13 @@ export interface RegistryJobData {
 
 /**
  * `benchmarks` queue: a minted version's benchmark, one buyer's trial, or one writer's test-bench
- * run (each loaded from the DB).
+ * run, or one player's daily challenge attempt (each loaded from the DB).
  */
 export type BenchmarkJobData =
   | { kind: 'mint'; skillId: string; version: number }
   | { kind: 'trial'; trialId: string }
-  | { kind: 'bench'; runId: string };
+  | { kind: 'bench'; runId: string }
+  | { kind: 'daily'; attemptId: string };
 
 /** `seasons` queue: one repeatable tick. */
 export interface SeasonJobData {
@@ -112,7 +113,9 @@ export const benchmarkJobId = (d: BenchmarkJobData) =>
     ? `benchmark-${d.skillId}-v${d.version}`
     : d.kind === 'trial'
       ? `trial-${d.trialId}`
-      : `bench-${d.runId}`;
+      : d.kind === 'bench'
+        ? `bench-${d.runId}`
+        : `daily-${d.attemptId}`;
 /** The season tick's job scheduler id: one schedule however many workers start it. */
 export const SEASON_TICK_JOB_ID = 'season-tick';
 export const SEASON_TICK_EVERY_MS = 10 * 60_000;

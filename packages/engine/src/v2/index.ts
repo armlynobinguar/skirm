@@ -15,3 +15,5 @@ export * from './commands';
 export * from './highlights';
 export * from './triggers';
 export * from './steer';
+export * from './traits';
+export * from './daily';

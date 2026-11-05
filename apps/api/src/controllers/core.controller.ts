@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import type { AccountRow } from '@skirm/db';
 import { verifyCredentials } from '@skirm/server';
-import { DEFAULTS, playerTier, premiumItemsIn, rankTitle } from '@skirm/shared';
+import { DEFAULTS, PROGRESSION, TRAITS, TRAIT_IDS, playerTier, premiumItemsIn, rankTitle } from '@skirm/shared';
 import { z } from 'zod';
 import { CurrentAccount, Public, mustAccount } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
@@ -25,6 +25,15 @@ import { accountView, myMatchView } from '../views';
 import { idOr404 } from './util';
 
 const myMatchesQuery = z.object({ limit: intQuery(1, 50, 20) });
+const traitBody = z.object({ trait: z.enum(TRAIT_IDS) });
+
+/** The trait catalogue with the levels that earn a pick (GET /agents/:id/progression). */
+const traitCatalogue = () => ({
+  traits: TRAIT_IDS.map((id) => TRAITS[id]),
+  traitLevels: PROGRESSION.traitLevels.slice(0, PROGRESSION.maxTraits),
+  maxTraits: PROGRESSION.maxTraits,
+  rankedTraits: PROGRESSION.rankedTraits,
+});
 
 const nearTaken = () =>
   new ApiError(409, 'near_account_taken', 'that NEAR account is linked to another player');
@@ -304,6 +313,35 @@ export class CoreController {
       current ? v2Matches.agentRecord(agent, { since: current.startsAt, until: current.endsAt }) : null,
     ]);
     return { allTime, season: current && season ? { number: current.number, endsAt: current.endsAt.toISOString(), ...season } : null };
+  }
+
+  /**
+   * One of the caller's agents' progression: XP, level, the traits it holds and the picks it has
+   * earned, with the trait catalogue (what each does, the levels that earn a pick, the cap, and
+   * whether ranked plays them: by default it does not, every agent plays its base stats there).
+   */
+  @Get('agents/:id/progression')
+  async agentProgression(@Param('id') id: string, @CurrentAccount() acc?: AccountRow) {
+    const account = mustAccount(acc);
+    const agent = idOr404(agentId, id, 'agent');
+    const row = await this.deps.repos.agents.get(agent);
+    if (!row || row.ownerId !== account.id) throw new ApiError(404, 'not_found', 'agent not found');
+    const view = await this.deps.repos.agents.view(agent);
+    return { agentId: agent, progression: view!.progression, ...traitCatalogue() };
+  }
+
+  /**
+   * Picks a trait for one of the caller's agents: `{ trait }`, one per trait level reached, each once,
+   * at most DEFAULTS.progression.maxTraits. 422 `no_trait_slot` / `trait_taken`, 409 `agent_busy`
+   * while it plays. Returns the agent. A trait applies from the agent's next casual match.
+   */
+  @Post('agents/:id/traits')
+  @HttpCode(200)
+  async pickTrait(@Param('id') id: string, @Body() body: unknown, @CurrentAccount() acc?: AccountRow) {
+    const account = mustAccount(acc);
+    const agent = idOr404(agentId, id, 'agent');
+    const { trait } = parse(traitBody, body);
+    return this.deps.repos.agents.pickTrait(account.id, agent, trait);
   }
 
   /**

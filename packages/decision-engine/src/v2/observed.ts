@@ -36,6 +36,8 @@ export function observedSummary(o: Observation): string {
   if (d.deliver !== null) parts.push(`${o.map.deliverTo.toLowerCase()} ${d.deliver} steps`);
   const h = nearestHazard(o);
   if (h && h.steps <= 4) parts.push(`${h.kind} ${h.steps} ${h.steps === 1 ? 'step' : 'steps'} away`);
+  if (o.choking) parts.push('choking in gas');
+  if (o.shock?.some(([x, y]) => Math.abs(x - o.me.x) + Math.abs(y - o.me.y) <= 2)) parts.push('live water close');
   if (o.rivals.length) parts.push(`rivals in sight: ${o.rivals.map((r) => r.name).join(', ')}`);
   parts.push(`score ${o.score.mine}–${o.score.rival}`);
   if (o.legal.some((a) => a.type === 'switch')) parts.push('switch at hand');

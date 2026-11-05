@@ -7,6 +7,7 @@
 import { DEFAULTS } from '@skirm/shared';
 import type { MatchEvent, MatchState } from './match';
 import { manhattan } from './match';
+import { commsOf } from './traits';
 
 export type TalkTier = 'quiet' | 'standard' | 'open';
 export type Channel = 'say' | 'team';
@@ -75,7 +76,7 @@ export function deliverTalk(s: MatchState, says: SayInput[]): MatchEvent[] {
     }
     spoke.add(a.id);
     a.lastSpoke = s.tick;
-    const range = rangeOf(a.comms);
+    const range = rangeOf(commsOf(a));
     const heardBy: string[] = [];
     const overheardBy: string[] = [];
     for (const o of s.agents) {

@@ -31,6 +31,18 @@ export interface V2DebriefAgent {
   bluffs?: { told: number; landed: number; seenThrough: number };
 }
 
+/** XP one agent earned from the match, with its total and level after it (agent progression). */
+export interface V2DebriefXp {
+  agentId: string;
+  name: string;
+  gained: number;
+  xp: number;
+  level: number;
+  leveledUp: boolean;
+  /** A trait pick is waiting (earned and not yet taken). */
+  traitReady: boolean;
+}
+
 /** What one crew is told at the end (its own numbers only). */
 export interface V2Debrief {
   /** Ranked: this player's Elo change; null for casual and void matches. */
@@ -51,6 +63,8 @@ export interface V2Debrief {
   difficulty?: Difficulty;
   /** Ranked: the season this result counted towards and the standings points it gave; absent otherwise. */
   season?: { number: number; points: number };
+  /** XP each of the crew's agents earned (ranked and casual matches played to the end); absent when none. */
+  xp?: V2DebriefXp[];
   /** The live commands this crew's player sent, as applied (tick order); absent when none. */
   commands?: V2DebriefCommand[];
   /** Draft mode: every ban step, both crews'. */
