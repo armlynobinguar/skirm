@@ -313,5 +313,21 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "ALTER TABLE \"agents\" ADD COLUMN \"xp\" integer DEFAULT 0 NOT NULL;",
       "\nALTER TABLE \"agents\" ADD COLUMN \"traits\" jsonb DEFAULT '[]'::jsonb NOT NULL;"
     ]
+  },
+  {
+    "tag": "0017_community_maps",
+    "folderMillis": 1793839285264,
+    "bps": true,
+    "hash": "165843e19a9badf601828efba0f3fe5e53b19acc9f9ff1ec77807d171b34a7d6",
+    "sql": [
+      "CREATE TABLE \"community_map_likes\" (\n\t\"map_id\" text NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"community_map_likes_map_id_account_id_pk\" PRIMARY KEY(\"map_id\",\"account_id\")\n);\n",
+      "\nCREATE TABLE \"community_maps\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"author_id\" text NOT NULL,\n\t\"name\" text NOT NULL,\n\t\"theme\" text NOT NULL,\n\t\"map\" jsonb NOT NULL,\n\t\"status\" text DEFAULT 'draft' NOT NULL,\n\t\"plays\" integer DEFAULT 0 NOT NULL,\n\t\"likes\" integer DEFAULT 0 NOT NULL,\n\t\"balance\" jsonb,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"published_at\" timestamp with time zone,\n\tCONSTRAINT \"community_maps_status_ck\" CHECK (\"community_maps\".\"status\" in ('draft', 'published'))\n);\n",
+      "\nALTER TABLE \"community_map_likes\" ADD CONSTRAINT \"community_map_likes_map_id_community_maps_id_fk\" FOREIGN KEY (\"map_id\") REFERENCES \"public\".\"community_maps\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"community_map_likes\" ADD CONSTRAINT \"community_map_likes_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"community_maps\" ADD CONSTRAINT \"community_maps_author_id_accounts_id_fk\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"community_maps_author_idx\" ON \"community_maps\" USING btree (\"author_id\");",
+      "\nCREATE INDEX \"community_maps_published_idx\" ON \"community_maps\" USING btree (\"status\",\"published_at\");",
+      "\nCREATE UNIQUE INDEX \"community_maps_name_uq\" ON \"community_maps\" USING btree (lower(\"name\")) WHERE \"community_maps\".\"status\" = 'published';"
+    ]
   }
 ];

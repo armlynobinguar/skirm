@@ -1374,3 +1374,56 @@ export const campaignRewards = pgTable(
   },
   (t) => [primaryKey({ columns: [t.accountId, t.chapterId] })],
 );
+
+// ---------- Community maps ----------
+
+/**
+ * Community maps: v2 maps players draw in the web map editor (`map` is the skirm.map/v2 JSON). A
+ * draft is the author's alone and may be anything the editor saves; publishing (API: validated
+ * with validateCommunityMap and a greedy balance check) makes it public and fixes it for good, so
+ * matches and replays played on it stay true. Published maps play in practice and casual, never
+ * ranked. `plays` counts matches started on it; `likes` mirrors community_map_likes.
+ */
+export const communityMaps = pgTable(
+  'community_maps',
+  {
+    /** `cmp_` + ULID; also the map's `id` once published. */
+    id: text('id').primaryKey(),
+    authorId: text('author_id')
+      .notNull()
+      .references(() => accounts.id),
+    name: text('name').notNull(),
+    /** The official map whose look (palette, walls) the board borrows. */
+    theme: text('theme').notNull(),
+    map: jsonb('map').notNull(),
+    status: text('status').notNull().default('draft'),
+    plays: integer('plays').notNull().default(0),
+    likes: integer('likes').notNull().default(0),
+    /** The balance check that let it publish (BalanceReport). */
+    balance: jsonb('balance'),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+    publishedAt: ts('published_at'),
+  },
+  (t) => [
+    index('community_maps_author_idx').on(t.authorId),
+    index('community_maps_published_idx').on(t.status, t.publishedAt),
+    uniqueIndex('community_maps_name_uq').on(sql`lower(${t.name})`).where(sql`${t.status} = 'published'`),
+    check('community_maps_status_ck', sql`${t.status} in ('draft', 'published')`),
+  ],
+);
+
+/** One like per player per community map. */
+export const communityMapLikes = pgTable(
+  'community_map_likes',
+  {
+    mapId: text('map_id')
+      .notNull()
+      .references(() => communityMaps.id),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.mapId, t.accountId] })],
+);

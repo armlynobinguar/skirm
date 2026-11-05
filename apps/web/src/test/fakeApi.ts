@@ -102,6 +102,15 @@ const METHODS: (keyof ApiClient)[] = [
   'deleteExternalAgent',
   'campaign',
   'startMission',
+  'communityMaps',
+  'myCommunityMaps',
+  'communityMap',
+  'createCommunityMap',
+  'updateCommunityMap',
+  'deleteCommunityMap',
+  'publishCommunityMap',
+  'testPlayMap',
+  'likeCommunityMap',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {

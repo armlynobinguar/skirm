@@ -89,8 +89,16 @@ export const MAPS = proto.MAPS as unknown as V2Map[];
 /** Index of today's ranked rotation map (Copper Hollow, the hand-built arena). */
 export const ROTATION_INDEX: number = proto.ROT;
 
+/** Community maps loaded this session (features/maps/convert.ts registers them), by id. */
+const extraMaps = new Map<string, V2Map>();
+
+/** Makes a community map findable by mapById (the crew screen, the match screen, the arena). */
+export function registerMap(m: V2Map): void {
+  extraMaps.set(m.id, m);
+}
+
 export function mapById(id: string): V2Map | undefined {
-  return MAPS.find((m) => m.id === id);
+  return MAPS.find((m) => m.id === id) ?? extraMaps.get(id);
 }
 
 /** The atlas puts the first five maps on the teal Starter side and the last five on the red Veteran side. */

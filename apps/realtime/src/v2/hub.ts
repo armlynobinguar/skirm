@@ -29,10 +29,12 @@ import {
   BOT_HANDLE,
   DEFAULT_PRACTICE,
   MAPS_V2,
+  isCommunityMapId,
   isDifficulty,
   RANKED_DIFFICULTY,
   botCrew,
   practiceRival,
+  validateCommunityMap,
   type AgentSpec,
   type Difficulty,
   type FrameView,
@@ -204,7 +206,7 @@ export class V2Hub {
     const mapId = ranked ? undefined : opts.mapId;
     const difficulty = ranked ? RANKED_DIFFICULTY : (opts.difficulty ?? RANKED_DIFFICULTY);
     if (mapId !== undefined) {
-      const map = this.pool().find((m) => m.id === mapId);
+      const map = await this.mapFor(mapId);
       if (!map) throw new V2HubError('invalid_crew', 'no such map');
       if (crew.length > crewLimitOf(map)) throw new V2HubError('invalid_crew', `${map.name} takes at most ${crewLimitOf(map)} agents`);
     }
@@ -239,7 +241,7 @@ export class V2Hub {
     const mission = opts.mission !== undefined ? campaignMission(opts.mission) : undefined;
     if (opts.mission !== undefined && !mission) throw new V2HubError('not_found', 'no such campaign mission');
     if (mission && crew.length > mission.crewSize) throw new V2HubError('invalid_crew', `this mission takes at most ${mission.crewSize} agents`);
-    const map = this.pool().find((m) => m.id === (mission?.mapId ?? opts.mapId ?? DEFAULT_PRACTICE.mapId));
+    const map = await this.mapFor(mission?.mapId ?? opts.mapId ?? DEFAULT_PRACTICE.mapId);
     if (!map) throw new V2HubError('invalid_crew', 'no such map');
     if (crew.length > crewLimitOf(map)) throw new V2HubError('invalid_crew', `${map.name} takes at most ${crewLimitOf(map)} agents`);
     if (mission && !missionUnlocked(mission.id, await this.deps.repos.campaign.cleared(user.accountId)))
@@ -546,6 +548,25 @@ export class V2Hub {
     return this.deps.maps ?? MAPS_V2;
   }
 
+  /**
+   * A map by id: one of the pool, or a published community map (practice and casual only; ranked
+   * never names a map). A stored community map that no longer parses is treated as missing.
+   */
+  private async mapFor(id: string): Promise<MapDefV2 | undefined> {
+    const own = this.pool().find((m) => m.id === id);
+    if (own || !isCommunityMapId(id)) return own;
+    const row = await this.deps.repos.communityMaps.published(id);
+    if (!row) return undefined;
+    const check = validateCommunityMap(row.map);
+    return check.ok ? check.map.def : undefined;
+  }
+
+  /** Counts a match started on a community map (best effort: the match goes on regardless). */
+  private countPlay(map: MapDefV2): void {
+    if (!isCommunityMapId(map.id)) return;
+    this.deps.repos.communityMaps.played(map.id).catch((err: Error) => this.deps.log.warn(`community map ${map.id}: play not counted: ${err.message}`));
+  }
+
   private fitting(size: number): MapDefV2[] {
     return this.pool().filter((m) => crewLimitOf(m) >= size);
   }
@@ -719,10 +740,12 @@ export class V2Hub {
     await this.launch(matchId, [a.key, b.key], async () => {
       const at = { matchId, ranked: a.payload.ranked };
       const sides = { A: await this.side(a.payload, at), B: await this.side(b.payload, at) };
-      const fits = this.fitting(Math.max(sides.A.crew.length, sides.B.crew.length));
-      // A casual pair picked the same map, or one of them takes any map (v2PoolsMatch).
+      const size = Math.max(sides.A.crew.length, sides.B.crew.length);
+      const fits = this.fitting(size);
+      // A casual pair picked the same map (an official or a community one), or one of them takes any map (v2PoolsMatch).
       const pickedId = a.payload.mapId ?? b.payload.mapId;
-      const picked = pickedId !== undefined ? fits.find((m) => m.id === pickedId) : undefined;
+      const pickedMap = pickedId !== undefined ? await this.mapFor(pickedId) : undefined;
+      const picked = pickedMap && crewLimitOf(pickedMap) >= size ? pickedMap : undefined;
       if (pickedId !== undefined && !picked) throw new V2HubError('invalid_crew', 'the picked map does not take both crews');
       const map = picked ?? (this.deps.pickMap ?? ((f) => f[Math.floor(Math.random() * f.length)]!))(fits);
       const ranked = a.payload.ranked;
@@ -730,6 +753,7 @@ export class V2Hub {
       // Draft searches pair only with draft searches (v2PoolsMatch).
       const draft = !ranked && !!a.payload.draft;
       await this.deps.repos.v2Matches.create({ id: matchId, mapId: map.id, ranked, teamA: a.key, teamB: b.key, crews: { A: crewRecords(sides.A), B: crewRecords(sides.B) }, ...(ranked ? {} : { difficulty }) });
+      this.countPlay(map);
       return this.newMatch({ matchId, map, ranked, difficulty, sides, ...(draft ? { draft } : {}) }, { A: this.deps.brain, B: this.deps.brain }, (t, msg) => this.deps.send(sides[t].accountId, msg));
     });
   }
@@ -768,6 +792,7 @@ export class V2Hub {
       // The greedy brain makes no model calls, so a player on it plays free; the bot always does.
       const free: V2Setup['free'] = this.deps.brain.kind === 'greedy' ? { A: true, B: true } : { B: true };
       await this.deps.repos.v2Matches.create({ id: matchId, mapId: map.id, ranked: false, practice: true, teamA: user.accountId, teamB: SYSTEM_ACCOUNT_ID, crews: { A: crewRecords(sides.A), B: crewRecords(bot) }, difficulty });
+      this.countPlay(map);
       const hold = rival.hold ? { B: rival.hold } : undefined;
       if (missionId !== undefined) this.campaignMatches.set(matchId, { accountId: user.accountId, missionId });
       const match = this.newMatch({ matchId, map, ranked: false, difficulty, sides, practice: true, free, lieCap: { B: rival.lieCap }, ...(hold ? { hold } : {}) }, { A: this.deps.brain, B: createGreedyBrain() }, (t, msg) => {

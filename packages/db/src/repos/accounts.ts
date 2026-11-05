@@ -10,6 +10,7 @@ import {
   agentSkills,
   campaignProgress,
   campaignRewards,
+  communityMaps,
   agents,
   cosmeticsOwned,
   eloDecays,
@@ -106,6 +107,8 @@ export class AccountsRepo {
       if (!row) throw new RepoError('not_found', 'account not found');
       await t.update(agents).set({ systemPrompt: null }).where(eq(agents.ownerId, accountId));
       await t.delete(playbooks).where(eq(playbooks.ownerId, accountId));
+      // Unpublished map drafts go; published community maps stay playable.
+      await t.delete(communityMaps).where(and(eq(communityMaps.authorId, accountId), eq(communityMaps.status, 'draft')));
       await t.update(rentalOffers).set({ active: false, updatedAt: now }).where(and(eq(rentalOffers.ownerId, accountId), eq(rentalOffers.active, true)));
       return row;
     });
@@ -160,9 +163,10 @@ export class AccountsRepo {
     const quests = await this.db.select().from(questClaims).where(eq(questClaims.accountId, accountId));
     const achievements = await this.db.select().from(achievementsUnlocked).where(eq(achievementsUnlocked.accountId, accountId));
     const messages = agentIds.length ? await this.db.select().from(matchMessages).where(inArray(matchMessages.agentId, agentIds)) : [];
-    const [campaign, campaignRewardRows] = await Promise.all([
+    const [campaign, campaignRewardRows, communityMapRows] = await Promise.all([
       this.db.select().from(campaignProgress).where(eq(campaignProgress.accountId, accountId)),
       this.db.select().from(campaignRewards).where(eq(campaignRewards.accountId, accountId)),
+      this.db.select().from(communityMaps).where(eq(communityMaps.authorId, accountId)),
     ]);
     return {
       account: [account],
@@ -192,6 +196,7 @@ export class AccountsRepo {
       dailyAttempts: daily,
       campaign,
       campaignRewards: campaignRewardRows,
+      communityMaps: communityMapRows,
     };
   }
 
