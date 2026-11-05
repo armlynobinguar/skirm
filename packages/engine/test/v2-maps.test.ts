@@ -15,7 +15,7 @@ const STEPS: [number, number][] = [
 /** Steps from (x, y) to every tile, rubble costing 3 (it is dug through); -1 where unreachable. */
 function distances(p: ParsedMap, [x0, y0]: [number, number]): number[] {
   const { w, h, grid } = p;
-  const walk = (t: Tile | null) => t === null || t === 'grass' || t === 'item' || t === 'exit' || t === 'dirt';
+  const walk = (t: Tile | null) => t === null || t === 'grass' || t === 'item' || t === 'exit' || t === 'dirt' || t === 'ice';
   const d = new Array<number>(w * h).fill(-1);
   const q = [y0 * w + x0];
   d[q[0]!] = 0;
@@ -62,7 +62,7 @@ describe('v2 maps', () => {
       const { w, h, grid } = p;
       const walk = (i: number) => {
         const t = grid[i];
-        return t === null || t === 'grass' || t === 'item' || t === 'exit' || t === 'dirt';
+        return t === null || t === 'grass' || t === 'item' || t === 'exit' || t === 'dirt' || t === 'ice';
       };
       const nb = (i: number) =>
         STEPS.map(([dx, dy]) => [(i % w) + dx, ((i / w) | 0) + dy] as const)

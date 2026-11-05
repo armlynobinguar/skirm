@@ -6,7 +6,7 @@ import { mapV2, type Difficulty, type FrameAgent, type Team, type V2Frame } from
 import type { CSSProperties } from 'react';
 import { crewName } from '../common';
 import c from './hud.module.css';
-import { clock, clockLine, goalTag } from './model';
+import { clock, clockLine, fieldHazards, goalTag } from './model';
 
 export interface MatchTopProps {
   frame: V2Frame | null;
@@ -33,6 +33,7 @@ export function MatchTop({ frame, team, ranked, difficulty, tickMs, you, rivalHa
   const seen = frame?.agents.filter((a) => a.team === them) ?? [];
   const line = frame ? clockLine(frame, team, difficulty, tickMs) : null;
   const tag = frame ? goalTag(frame.mapId, difficulty) : null;
+  const field = frame ? fieldHazards(frame) : [];
   const tick = frame?.tick ?? 0;
   const limit = frame?.limit ?? 150;
   // A crew's head start is the other crew's hold at the start.
@@ -88,6 +89,16 @@ export function MatchTop({ frame, team, ranked, difficulty, tickMs, you, rivalHa
             ) : null}
             {line.dropIn != null ? ` · drop in ${line.dropIn} s` : null}
             {line.holding > 0 ? ` · holding ${line.holding} s` : null}
+          </span>
+        ) : null}
+        {field.length ? (
+          <span className={c.hzField} data-testid="v2-field-hazards">
+            {field.map((h) => (
+              <span key={h.key} className={c.hzChip} data-kind={h.key} data-live={h.live || undefined} title={h.hint} aria-label={`${h.name}: ${h.hint}`}>
+                <i />
+                {h.name}
+              </span>
+            ))}
           </span>
         ) : null}
         {tag ? (

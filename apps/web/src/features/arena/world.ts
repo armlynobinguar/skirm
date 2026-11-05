@@ -1,7 +1,7 @@
 // Typed access to the prototype's v2 world (./proto/world.ts): the 10-map roster with mirrored
 // 2-crew arenas, and the draw calls the arena canvas needs. Screens read maps through here, never
 // through the proto module directly.
-import type { Difficulty as DifficultyKey, GoalCheck, TalkTier } from '@skirm/engine/v2';
+import { mapV2, type Difficulty as DifficultyKey, type GoalCheck, type TalkTier } from '@skirm/engine/v2';
 import * as proto from './proto/world';
 
 export type { DifficultyKey, GoalCheck };
@@ -101,6 +101,10 @@ export function isStarter(m: V2Map): boolean {
 export interface ArenaState {
   grid: (string | null)[];
   agents: { id: string; name: string; team: 'A' | 'B'; slot: number; x: number; y: number; inv: unknown[] }[];
+  /** Tiles under a gas cloud (live matches on maps with gas vents). */
+  gas?: number[];
+  /** Electrified water tiles (live matches on maps with sparking cables). */
+  shock?: number[];
 }
 
 const resting = new Map<string, ArenaState>();
@@ -110,8 +114,11 @@ export function restingState(m: V2Map): ArenaState {
   if (!s) {
     const R = proto.ROSTER;
     const B = proto.RIVALS;
+    // Ice patches are the engine map's, not the prototype's: lay them on the resting board too.
+    const grid = m.A.grid.slice();
+    for (const [x, y] of mapV2(m.id)?.ice ?? []) grid[y * m.A.w + x] = 'ice';
     s = {
-      grid: m.A.grid.slice(),
+      grid,
       agents: [
         ...m.A.starts.A.slice(0, 2).map(([x, y], i) => ({ ...R[i]!, team: 'A' as const, slot: i, x, y, inv: [] })),
         ...m.A.starts.B.slice(0, 2).map(([x, y], i) => ({ ...B[i]!, team: 'B' as const, slot: i, x, y, inv: [] })),
