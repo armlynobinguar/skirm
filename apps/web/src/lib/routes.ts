@@ -33,6 +33,8 @@ export const routes = {
     `/skills/bench${skillId ? `?skill=${e(skillId)}${version ? `&version=${version}` : ''}` : ''}`,
   benchRun: (runId: string) => `/skills/bench/${e(runId)}`, // a bench run's debrief
   market: () => '/market', // S09
+  /** Writer backing: open rounds, the caller's backings and own rounds. */
+  backing: () => '/backing',
   marketSkill: (skillId: string) => `/market/${e(skillId)}`, // S10
   pvp: () => '/pvp', // S11
   match: (matchId: string) => `/matches/${e(matchId)}`, // S12 v2 match: accept, lock-in, live, end
@@ -41,6 +43,8 @@ export const routes = {
   matchReplay: (matchId: string, tick?: number) => `/matches/${e(matchId)}${tick !== undefined ? `?t=${tick}` : ''}#replay`,
   /** A shared replay link (public; the whole board only). */
   replay: (shareId: string) => `/replays/${e(shareId)}`,
+  /** Check a match against the NEAR registry in the browser (`?id=` prefills and runs it). Public. */
+  verify: (matchId?: string) => `/verify${matchId ? `?id=${e(matchId)}` : ''}`,
   leaderboards: () => '/leaderboards', // S14
   terms: () => '/terms',
   privacy: () => '/privacy',
@@ -60,7 +64,7 @@ export type NavGroup = 'play' | 'skills' | 'market' | 'pvp' | 'leaderboards' | '
 export function navGroupOf(pathname: string): NavGroup | null {
   if (/^\/(play|maps|agents|tutorial|daily|campaign|puzzles)(\/|$)/.test(pathname)) return 'play';
   if (/^\/skills(\/|$)/.test(pathname)) return 'skills';
-  if (/^\/market(\/|$)/.test(pathname)) return 'market';
+  if (/^\/(market|backing)(\/|$)/.test(pathname)) return 'market';
   if (/^\/(pvp|matches|lobbies|tournaments)(\/|$)/.test(pathname)) return 'pvp';
   if (/^\/leaderboards(\/|$)/.test(pathname)) return 'leaderboards';
   if (/^\/account(\/|$)/.test(pathname)) return 'account';
@@ -96,12 +100,14 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/tournaments\/?$/, key: 'tournaments', title: 'Tournaments', sub: '// brackets', back: routes.pvp() },
   { re: /^\/tournaments\//, key: 'tournament', title: 'Bracket', sub: '// single elimination', back: routes.tournaments() },
   { re: /^\/replays\/[^/]+\/?$/, key: 'replay', title: 'Replay', sub: '// shared', back: routes.pvp() },
+  { re: /^\/verify\/?$/, key: 'verify', title: 'Verify', sub: '// match vs NEAR', back: routes.pvp() },
   { re: /^\/matches\/[^/]+\/result\/?$/, key: 'match-result', title: 'Debrief', sub: '// replay hash on NEAR', back: routes.pvp() },
   { re: /^\/matches(\/|$)/, key: 'match', title: 'Live', sub: '// 2 s ticks', back: routes.pvp() },
   { re: /^\/leaderboards(\/|$)/, key: 'ladder', title: 'Ladder', sub: '// season', back: routes.home() },
   { re: /^\/terms\/?$/, key: 'terms', title: 'Terms', sub: '// the rules', back: routes.home() },
   { re: /^\/privacy\/?$/, key: 'privacy', title: 'Privacy', sub: '// your data', back: routes.home() },
   { re: /^\/market(\/|$)/, key: 'market', title: 'Exchange', sub: '// proof first', back: routes.home() },
+  { re: /^\/backing\/?$/, key: 'backing', title: 'Backing', sub: '// share of royalties', back: routes.market() },
   { re: /^\/skills(\/|$)/, key: 'skills', title: 'Skills', sub: '// your strategies', back: routes.home() },
   { re: /^\/account\/credits\/?$/, key: 'credits', title: 'Credits', sub: '// NEAR top-ups', back: routes.account() },
   { re: /^\/account(\/|$)/, key: 'account', title: 'Profile', sub: '// you', back: routes.home() },

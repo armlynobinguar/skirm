@@ -70,6 +70,7 @@ const METHODS: (keyof ApiClient)[] = [
   'mapLadder',
   'skillLadder',
   'v2Match',
+  'v2MatchLog',
   'v2LiveMatches',
   'createLobby',
   'myLobbies',
@@ -117,6 +118,16 @@ const METHODS: (keyof ApiClient)[] = [
   'publishCommunityMap',
   'testPlayMap',
   'likeCommunityMap',
+  'backingConfig',
+  'backingRounds',
+  'backingRound',
+  'myBacking',
+  'openBackingRound',
+  'backRound',
+  'endBackingRound',
+  'claimBacking',
+  'distributeBacking',
+  'syncBacking',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {

@@ -1,5 +1,5 @@
 {
-  "id": "41d6883b-871a-4cec-9b37-4609fe9a1cb4",
+  "id": "c89e6e0b-4e27-41f3-a8c1-22d05d15d7b0",
   "prevId": "d35e80f1-7485-4a2e-bb2f-5b34281b8ffe",
   "version": "7",
   "dialect": "postgresql",
@@ -515,6 +515,483 @@
           "value": "char_length(\"agents\".\"system_prompt\") <= 600"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.backing_payouts": {
+      "name": "backing_payouts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "round_id": {
+          "name": "round_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sale_id": {
+          "name": "sale_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_hash": {
+          "name": "tx_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "royalty_yocto": {
+          "name": "royalty_yocto",
+          "type": "numeric(40, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_backers_yocto": {
+          "name": "to_backers_yocto",
+          "type": "numeric(40, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_writer_yocto": {
+          "name": "to_writer_yocto",
+          "type": "numeric(40, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "backing_payouts_round_idx": {
+          "name": "backing_payouts_round_idx",
+          "columns": [
+            {
+              "expression": "round_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "backing_payouts_sale_uq": {
+          "name": "backing_payouts_sale_uq",
+          "columns": [
+            {
+              "expression": "round_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sale_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"backing_payouts\".\"sale_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "backing_payouts_tx_uq": {
+          "name": "backing_payouts_tx_uq",
+          "columns": [
+            {
+              "expression": "tx_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"backing_payouts\".\"tx_hash\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "backing_payouts_round_id_backing_rounds_id_fk": {
+          "name": "backing_payouts_round_id_backing_rounds_id_fk",
+          "tableFrom": "backing_payouts",
+          "tableTo": "backing_rounds",
+          "columnsFrom": [
+            "round_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.backing_rounds": {
+      "name": "backing_rounds",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "writer_id": {
+          "name": "writer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "skill_id": {
+          "name": "skill_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "share_bps": {
+          "name": "share_bps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cap_multiple_bps": {
+          "name": "cap_multiple_bps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_raise_yocto": {
+          "name": "max_raise_yocto",
+          "type": "numeric(40, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "raised_yocto": {
+          "name": "raised_yocto",
+          "type": "numeric(40, 0)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "backers": {
+          "name": "backers",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_round_id": {
+          "name": "chain_round_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "royalties_in_yocto": {
+          "name": "royalties_in_yocto",
+          "type": "numeric(40, 0)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "backers_earned_yocto": {
+          "name": "backers_earned_yocto",
+          "type": "numeric(40, 0)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "backing_rounds_writer_idx": {
+          "name": "backing_rounds_writer_idx",
+          "columns": [
+            {
+              "expression": "writer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "backing_rounds_status_idx": {
+          "name": "backing_rounds_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "backing_rounds_chain_uq": {
+          "name": "backing_rounds_chain_uq",
+          "columns": [
+            {
+              "expression": "chain_round_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"backing_rounds\".\"chain_round_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "backing_rounds_writer_id_accounts_id_fk": {
+          "name": "backing_rounds_writer_id_accounts_id_fk",
+          "tableFrom": "backing_rounds",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "writer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "backing_rounds_skill_id_skills_id_fk": {
+          "name": "backing_rounds_skill_id_skills_id_fk",
+          "tableFrom": "backing_rounds",
+          "tableTo": "skills",
+          "columnsFrom": [
+            "skill_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "backing_rounds_status_ck": {
+          "name": "backing_rounds_status_ck",
+          "value": "\"backing_rounds\".\"status\" in ('open', 'closed', 'cancelled')"
+        },
+        "backing_rounds_mode_ck": {
+          "name": "backing_rounds_mode_ck",
+          "value": "\"backing_rounds\".\"mode\" in ('credits', 'near')"
+        },
+        "backing_rounds_share_ck": {
+          "name": "backing_rounds_share_ck",
+          "value": "\"backing_rounds\".\"share_bps\" between 1 and 5000"
+        },
+        "backing_rounds_cap_ck": {
+          "name": "backing_rounds_cap_ck",
+          "value": "\"backing_rounds\".\"cap_multiple_bps\" between 10000 and 100000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.backings": {
+      "name": "backings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "round_id": {
+          "name": "round_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "backer_id": {
+          "name": "backer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stake_yocto": {
+          "name": "stake_yocto",
+          "type": "numeric(40, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "claimed_yocto": {
+          "name": "claimed_yocto",
+          "type": "numeric(40, 0)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "refunded": {
+          "name": "refunded",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "backings_round_backer_uq": {
+          "name": "backings_round_backer_uq",
+          "columns": [
+            {
+              "expression": "round_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "backer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "backings_backer_idx": {
+          "name": "backings_backer_idx",
+          "columns": [
+            {
+              "expression": "backer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "backings_round_id_backing_rounds_id_fk": {
+          "name": "backings_round_id_backing_rounds_id_fk",
+          "tableFrom": "backings",
+          "tableTo": "backing_rounds",
+          "columnsFrom": [
+            "round_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "backings_backer_id_accounts_id_fk": {
+          "name": "backings_backer_id_accounts_id_fk",
+          "tableFrom": "backings",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "backer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.campaign_progress": {
@@ -5729,7 +6206,7 @@
         "cosmetic",
         "prize_pool",
         "prize",
-        "rental"
+        "backing"
       ]
     },
     "public.ledger_row_type": {

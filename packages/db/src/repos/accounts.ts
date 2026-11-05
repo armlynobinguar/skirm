@@ -8,6 +8,8 @@ import {
   accounts,
   achievementsUnlocked,
   agentSkills,
+  backingRounds,
+  backings,
   campaignProgress,
   campaignRewards,
   puzzleBests,
@@ -170,6 +172,10 @@ export class AccountsRepo {
       this.db.select().from(campaignRewards).where(eq(campaignRewards.accountId, accountId)),
       this.db.select().from(communityMaps).where(eq(communityMaps.authorId, accountId)),
     ]);
+    const [backingRoundRows, backingRows] = await Promise.all([
+      this.db.select().from(backingRounds).where(eq(backingRounds.writerId, accountId)),
+      this.db.select().from(backings).where(eq(backings.backerId, accountId)),
+    ]);
     const [puzzleRunRows, puzzleBestRows] = await Promise.all([
       this.db.select().from(puzzleRuns).where(eq(puzzleRuns.accountId, accountId)),
       this.db.select().from(puzzleBests).where(eq(puzzleBests.accountId, accountId)),
@@ -205,6 +211,8 @@ export class AccountsRepo {
       puzzleRuns: puzzleRunRows,
       puzzleBests: puzzleBestRows,
       communityMaps: communityMapRows,
+      backingRounds: backingRoundRows,
+      backings: backingRows,
     };
   }
 

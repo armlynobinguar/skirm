@@ -6,8 +6,19 @@ import type { TraitId } from '@skirm/shared';
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
+import type { PublicMatchLog } from './matchLogTypes';
 import { ApiError, errorFromBody } from './errors';
 import type { Campaign, CampaignStart } from './campaignTypes';
+import type {
+  BackingConfig,
+  BackingPosition,
+  BackingRound,
+  BackingRoundDetail,
+  BackingRoundStatus,
+  BackingWrite,
+  MyBacking,
+  OpenRoundBody,
+} from './backingTypes';
 import type { PuzzleDetail, PuzzleLeaderboard, PuzzleList, PuzzleRun, PuzzleRunRequest } from './puzzleTypes';
 import type { MapDefV2 } from '@skirm/engine/v2';
 import type { CommunityMap, CommunityMapBody, CommunityMapList, MyCommunityMaps, TestPlayResult } from './communityMapTypes';
@@ -190,6 +201,8 @@ export interface ApiClient {
   skillLadder(opts?: { mapId?: string; limit?: number }): Promise<SkillLadder>;
   /** GET /v2/matches/:id: a v2 match with Elo changes and crew stats (the result screen). */
   v2Match(matchId: string): Promise<V2MatchRecord>;
+  /** GET /v2/matches/:id/log: the hash-chained match log (public once ended; live commands redacted). */
+  v2MatchLog(matchId: string): Promise<PublicMatchLog>;
   /** GET /v2/matches/live: v2 matches being played now, crews hidden. */
   v2LiveMatches(): Promise<V2LiveMatch[]>;
   /** GET /v2/matches/:id/highlights: highlight moments with caster lines (public, once ended). */
@@ -267,6 +280,24 @@ export interface ApiClient {
   /** POST /community-maps/test-play: validation issues, or a greedy balance report. */
   testPlayMap(map: MapDefV2): Promise<TestPlayResult>;
   likeCommunityMap(id: string, on: boolean): Promise<{ likes: number; liked: boolean }>;
+
+  /** GET /backing/config: where backing money moves (near, credits or off) and the limits. */
+  backingConfig(): Promise<BackingConfig>;
+  /** GET /backing/rounds: by writer handle, skill (its writer's all-skill rounds too) or status. */
+  backingRounds(q?: { writer?: string; skill?: string; status?: BackingRoundStatus }): Promise<{ rounds: BackingRound[] }>;
+  backingRound(roundId: string): Promise<BackingRoundDetail>;
+  /** GET /backing/mine: the caller's positions and own rounds. */
+  myBacking(): Promise<MyBacking>;
+  openBackingRound(body: OpenRoundBody): Promise<BackingWrite<{ round: BackingRound }>>;
+  /** POST /backing/rounds/:id/back (402 `insufficient_credits`, 409 `round_full`, `own_round`). */
+  backRound(roundId: string, amountYocto: string): Promise<BackingWrite<{ position: BackingPosition; stakedYocto: string }>>;
+  endBackingRound(roundId: string, how: 'close' | 'cancel'): Promise<BackingWrite<{ round: BackingRound }>>;
+  /** POST /backing/rounds/:id/claim: earnings, or the stake of a cancelled round. */
+  claimBacking(roundId: string): Promise<BackingWrite<{ position: BackingPosition; claimedCredits: number }>>;
+  /** POST /backing/rounds/:id/distribute: near mode, the writer forwards owed royalties. */
+  distributeBacking(roundId: string): Promise<BackingWrite<never>>;
+  /** POST /backing/sync: mirrors a signed backing-contract transaction. */
+  syncBacking(txHash: string): Promise<{ rounds: BackingRound[] }>;
 
   /** GET /external-agents: the caller's own programs (bring your own agent). */
   externalAgents(): Promise<ExternalAgent[]>;
@@ -416,6 +447,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     mapLadder: (mapId, limit) => get(`/leaderboards/maps/${enc(mapId)}`, { limit }),
     skillLadder: (opts = {}) => get('/leaderboards/skills', { mapId: opts.mapId, limit: opts.limit }),
     v2Match: (id) => get(`/v2/matches/${enc(id)}`),
+    v2MatchLog: (id) => get(`/v2/matches/${enc(id)}/log`),
     v2LiveMatches: () => get('/v2/matches/live'),
     v2Highlights: (id) => get(`/v2/matches/${enc(id)}/highlights`),
     createReplayShare: (id, clip) => json('POST', `/v2/matches/${enc(id)}/shares`, { body: clip ? { clip } : {} }),
@@ -466,5 +498,16 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     publishCommunityMap: (id) => json('POST', `/community-maps/${enc(id)}/publish`),
     testPlayMap: (map) => json('POST', '/community-maps/test-play', { body: { map } }),
     likeCommunityMap: (id, on) => json(on ? 'POST' : 'DELETE', `/community-maps/${enc(id)}/like`),
+
+    backingConfig: () => get('/backing/config'),
+    backingRounds: (q = {}) => get('/backing/rounds', q),
+    backingRound: (id) => get(`/backing/rounds/${enc(id)}`),
+    myBacking: () => get('/backing/mine'),
+    openBackingRound: (body) => json('POST', '/backing/rounds', { body }),
+    backRound: (id, amountYocto) => json('POST', `/backing/rounds/${enc(id)}/back`, { body: { amountYocto } }),
+    endBackingRound: (id, how) => json('POST', `/backing/rounds/${enc(id)}/${how}`),
+    claimBacking: (id) => json('POST', `/backing/rounds/${enc(id)}/claim`),
+    distributeBacking: (id) => json('POST', `/backing/rounds/${enc(id)}/distribute`, { body: {} }),
+    syncBacking: (txHash) => json('POST', '/backing/sync', { body: { txHash } }),
   };
 }

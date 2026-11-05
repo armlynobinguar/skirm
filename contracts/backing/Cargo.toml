@@ -1,0 +1,16 @@
+[package]
+name = "skirm-backing"
+description = "skirm backing contract: players back a skill writer for a capped share of the writer's future royalties"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }

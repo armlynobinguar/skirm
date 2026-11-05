@@ -187,7 +187,7 @@ export interface LedgerRow {
   type: LedgerRowType;
   amount: number;
   source: 'paid' | 'free';
-  note: 'entry_fee' | 'reversal' | 'expired' | 'cosmetic' | 'prize_pool' | 'prize' | 'rental' | null;
+  note: 'entry_fee' | 'reversal' | 'expired' | 'cosmetic' | 'prize_pool' | 'prize' | 'backing' | 'rental' | null;
   /** The v2 match a hold, charge or refund belongs to; null for top-ups, free grants and spends. */
   matchId: string | null;
   txHash: string | null;

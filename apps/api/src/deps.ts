@@ -7,6 +7,7 @@ import type { NearKeyChecker } from './near-link';
 import type { ReplayFrameReader } from './replays';
 import type { RateLimitStore, RateLimits } from './rate-limit';
 import type {
+  BackingTxReader,
   BadgeMinter,
   BenchmarkJobData,
   DepositVerifier,
@@ -59,6 +60,8 @@ export type ApiConfig = Pick<
     BENCH_RUNS_PER_HOUR?: number | undefined;
     /** Daily challenge attempts per account per UTC day (default DEFAULTS.daily.attemptsPerDay). */
     DAILY_ATTEMPTS?: number | undefined;
+    /** Writer backing contract (env BACKING_CONTRACT). Unset: backing runs on paid credits with AUTH_MODE=dev, and is off otherwise. */
+    BACKING_CONTRACT?: string | undefined;
   };
 
 /** Model spend per UTC day as the worker and realtime sum it (Redis `cost:usd:<day>`, kept 3 days). */
@@ -82,6 +85,8 @@ export interface ApiDeps {
     badges: BadgeMinter;
     /** Checks NEAR link proofs outside dev mode (absent: linking is refused with 503). */
     keys?: NearKeyChecker;
+    /** Reads backing-contract transactions (set with BACKING_CONTRACT). */
+    backing?: BackingTxReader;
   };
   /** Benchmarks queued at mint and buyers' trials (the worker plays them). */
   benchmarkQueue: BenchmarkQueue;

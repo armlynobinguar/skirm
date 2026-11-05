@@ -1,0 +1,17 @@
+/* Writer backing: rounds, the back form and the portfolio. Values are design tokens; cards come from pvp.module.css. */
+
+.list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.item { display: flex; flex-direction: column; gap: var(--space-2); padding: 12px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.itemHead { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: baseline; justify-content: space-between; }
+.muted { color: var(--ink-muted); font-size: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: var(--space-3); align-items: end; }
+.input { min-width: 0; width: 100%; max-width: 180px; }
+
+.bar { position: relative; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.barFill { position: absolute; inset: 0 auto 0 0; background: var(--good); }
+.facts { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr)); gap: var(--space-2); }
+.facts dt { font: 600 11px/16px var(--font-sans); text-transform: uppercase; color: var(--ink-muted); }
+.facts dd { margin: 0; font: 600 14px/20px var(--font-mono); overflow-wrap: anywhere; }
+
+.panel { border: 1px solid var(--line-strong); border-radius: var(--radius-2); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }

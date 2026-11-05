@@ -1,4 +1,4 @@
-// Public reads: /leaderboards/players, /v2/matches/live, /v2/matches/:id(/messages). A signed-in
+// Public reads: /leaderboards/players, /v2/matches/live, /v2/matches/:id(/messages, /log). A signed-in
 // caller also gets their own rows.
 import { Controller, Get, Inject, Param, Query } from '@nestjs/common';
 import { MATCH_MESSAGES_MAX_LIMIT, type AccountRow, type PlayerLadderRow } from '@skirm/db';
@@ -79,6 +79,24 @@ export class PublicController {
     return { messages: page.messages.map(messageView), ...(page.next !== undefined ? { next: page.next } : {}) };
   }
 
+  /**
+   * The match log, so anyone can re-check its hash chain (the web's "Verify on NEAR"). Public once
+   * the match is over (409 `match_live` until then); 404 `log` when none was kept (a void match).
+   * Live crew commands are a player's private orders (shared replays strip them too), so a tick
+   * that carries any is served without them and marked `redacted`: the verifier takes that one link
+   * of the chain on the logged hash.
+   */
+  @Get('v2/matches/:id/log')
+  async v2Log(@Param('id') id: string) {
+    const { repos } = this.deps;
+    const m = await repos.v2Matches.get(idOr404(matchId, id, 'match'));
+    if (!m) throw notFound('match');
+    if (m.status === 'live') throw new ApiError(409, 'match_live', 'the log is public once the match ends');
+    const log = publicLog(m.log);
+    if (!log) throw notFound('log');
+    return { matchId: m.id, logHash: m.logHash ?? null, log };
+  }
+
   /** A v2 match (the result screen); a player of it also gets `you` and their crew's debrief. */
   @Get('v2/matches/:id')
   async v2Match(@Param('id') id: string, @CurrentAccount() account?: AccountRow) {
@@ -88,4 +106,27 @@ export class PublicController {
     const [a, b] = await Promise.all([repos.accounts.get(m.teamAAccountId), repos.accounts.get(m.teamBAccountId)]);
     return v2MatchView(m, { A: a?.handle ?? null, B: b?.handle ?? null }, account?.id);
   }
+}
+
+interface StoredLog {
+  header: unknown;
+  ticks: { tick: number; commands?: unknown[] }[];
+  hashes: string[];
+  result: unknown;
+}
+
+/** The stored log with each tick's live commands removed (that tick marked `redacted`); null without a usable log. */
+export function publicLog(raw: unknown) {
+  const log = raw as Partial<StoredLog> | null | undefined;
+  if (!log || typeof log !== 'object' || !log.header || !Array.isArray(log.ticks) || !Array.isArray(log.hashes)) return null;
+  return {
+    header: log.header,
+    ticks: log.ticks.map((t) => {
+      if (!t.commands?.length) return t;
+      const { commands: _hidden, ...rest } = t;
+      return { ...rest, redacted: true as const };
+    }),
+    hashes: log.hashes,
+    result: log.result ?? null,
+  };
 }

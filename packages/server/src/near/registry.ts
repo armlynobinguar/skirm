@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto';
 import { HEAD_START_TICKS_PER_AGENT } from '@skirm/engine/v2';
 import type { Tag } from '@skirm/shared';
-import type { FunctionCaller } from './signer';
+import { NearCallError, type FunctionCaller } from './signer';
 
 /**
  * `local`: the NoopRegistry took the record because NEAR is off (no NEAR_OPS_*); nothing went
@@ -174,6 +174,16 @@ export function nftMintArgs(s: SkillMintInput): Record<string, unknown> {
   };
 }
 
+/** Sends after a lost answer this many more times. */
+const MINT_RETRIES = 1;
+
+/**
+ * Mints through the ops key. nft_mint is idempotent on the skills contract (the same version with
+ * the same content returns the existing token), so a call that failed without reaching a known
+ * outcome (no tx hash: timeout, dropped connection) is sent again and the existing token counts as
+ * minted. A failure with a tx hash ran onchain and failed (such as a conflicting version); it is
+ * not retried.
+ */
 export class NearMinter implements Minter {
   readonly kind = 'near' as const;
   constructor(
@@ -181,12 +191,18 @@ export class NearMinter implements Minter {
     private readonly contractId: string,
   ) {}
   async mint(skill: SkillMintInput): Promise<MintResult> {
-    const { txHash, value } = await this.caller.call(
-      this.contractId,
-      'nft_mint',
-      nftMintArgs(skill),
-      150,
-    );
+    const args = nftMintArgs(skill);
+    let res: Awaited<ReturnType<FunctionCaller['call']>>;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        res = await this.caller.call(this.contractId, 'nft_mint', args, 150);
+        break;
+      } catch (err) {
+        if (err instanceof NearCallError && !err.txHash && attempt < MINT_RETRIES) continue;
+        throw err;
+      }
+    }
+    const { txHash, value } = res;
     const tokenId =
       value &&
       typeof value === 'object' &&
