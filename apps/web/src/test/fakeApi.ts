@@ -97,6 +97,11 @@ const METHODS: (keyof ApiClient)[] = [
   'deleteExternalAgent',
   'campaign',
   'startMission',
+  'puzzles',
+  'puzzle',
+  'startPuzzleRun',
+  'puzzleRun',
+  'puzzleLeaderboard',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {

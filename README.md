@@ -51,6 +51,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 - **Ranked and casual** matches with Elo matchmaking, ranked tiers from Bronze to Master, and 14-day seasons with a NEAR prize pool
 - **Practice** against the Greedy bot, free and instant, plus a guided first match for new players
 - **Campaign**: three chapters of missions against the bot; each chapter cleared unlocks a starter skill
+- **Puzzles**: six fixed boards solved by your crew in the fewest ticks, with medals and a leaderboard per puzzle
 - **Private lobbies and tournaments**: challenge a friend with a code, or run a 4 to 16 player bracket
 - **Draft mode**: each crew bans one of the rival's skills before the match
 - **Live commands**: three orders a match to steer your crew without taking control

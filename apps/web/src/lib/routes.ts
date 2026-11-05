@@ -18,6 +18,9 @@ export const routes = {
   tutorial: () => '/tutorial',
   /** The campaign: chapters of missions against the bot that unlock starter skills (`#<missionId>` opens one). */
   campaign: (missionId?: string) => `/campaign${missionId ? `#${e(missionId)}` : ''}`,
+  /** Puzzle mode: small boards solved in the fewest ticks. */
+  puzzles: () => '/puzzles',
+  puzzle: (puzzleId: string) => `/puzzles/${e(puzzleId)}`,
   skills: (tab?: 'written' | 'owned') => (tab === 'owned' ? '/skills?tab=owned' : '/skills'), // S07
   newSkill: () => '/skills/new', // S08 (blank)
   editSkill: (skillId: string) => `/skills/${e(skillId)}/edit`, // S08
@@ -51,7 +54,7 @@ export type NavGroup = 'play' | 'skills' | 'market' | 'pvp' | 'leaderboards' | '
 
 /** Which header item a path belongs to (TopBar.dc.html `active`). */
 export function navGroupOf(pathname: string): NavGroup | null {
-  if (/^\/(play|maps|agents|tutorial|campaign)(\/|$)/.test(pathname)) return 'play';
+  if (/^\/(play|maps|agents|tutorial|campaign|puzzles)(\/|$)/.test(pathname)) return 'play';
   if (/^\/skills(\/|$)/.test(pathname)) return 'skills';
   if (/^\/market(\/|$)/.test(pathname)) return 'market';
   if (/^\/(pvp|matches|lobbies|tournaments)(\/|$)/.test(pathname)) return 'pvp';
@@ -77,6 +80,8 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/maps\/[^/]+\/crew\/?$/, key: 'crew', title: 'Lock in', sub: '// crew + talk', back: routes.home() },
   { re: /^\/tutorial\/?$/, key: 'tutorial', title: 'Tutorial', sub: '// first match', back: routes.home() },
   { re: /^\/campaign\/?$/, key: 'campaign', title: 'Campaign', sub: '// missions vs the bot', back: routes.home() },
+  { re: /^\/puzzles\/?$/, key: 'puzzles', title: 'Puzzles', sub: '// fewest ticks', back: routes.home() },
+  { re: /^\/puzzles\/[^/]+\/?$/, key: 'puzzle', title: 'Puzzle', sub: '// fewest ticks', back: routes.puzzles() },
   { re: /^\/agents(\/|$)/, key: 'agent', title: 'Agent', sub: '// prompt + stats', back: routes.home() },
   { re: /^\/maps(\/|$)/, key: 'maps', title: 'Atlas', sub: '// maps', back: routes.home() },
   { re: /^\/pvp(\/|$)/, key: 'pvp', title: 'Skirmish', sub: '// ranked', back: routes.home() },
