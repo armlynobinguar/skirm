@@ -236,6 +236,11 @@ export function linesOf(frame: V2Frame, prev: V2Frame | null): V2CommsLine[] {
       out.push({ tick, from: a.id, fromName: a.name, team: a.team, channel: 'verb', text: name, verb: name, overheard: false });
     } else if (e.kind === 'supply_drop') {
       out.push({ tick, from: 'arena', fromName: 'Arena', team: 'A', channel: 'arena', text: `Supply drop is down. One ${(def?.item ?? 'item').toLowerCase()} in the middle.`, overheard: false });
+    } else if (e.kind === 'tool_dropped') {
+      out.push({ tick, from: 'arena', fromName: 'Arena', team: 'A', channel: 'arena', text: `The drop carries ${e.tool === 'sandbag' ? 'sandbags' : `a ${e.tool}`} at ${e.at[0]},${e.at[1]}.`, overheard: false });
+    } else if (e.kind === 'tool_used') {
+      const a = agent(e.agent);
+      if (a) out.push({ tick, from: a.id, fromName: a.name, team: a.team, channel: 'verb', text: `Placed ${e.tool === 'sandbag' ? 'sandbags' : `a ${e.tool}`}`, verb: e.tool, overheard: false });
     } else if (e.kind === 'bluff') {
       // Tag the lie itself, then the target's answer right after it.
       const bluff = e.believed ? 'landed' : 'doubted';

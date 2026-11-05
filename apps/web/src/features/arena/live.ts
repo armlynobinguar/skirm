@@ -1,6 +1,7 @@
 // Live v2 matches as the arena draws them: one crew's frame (or a spectator's whole board) on the
 // map's own arena, under soft fog, with this tick's talk as bubbles.
 import type { Team, V2Frame } from '@skirm/engine/v2';
+import { gearOf } from './gear';
 import { mapById, type Arena, type ArenaState } from './world';
 
 export interface LiveArena {
@@ -90,6 +91,7 @@ export function composeV2Arena(frame: V2Frame): LiveArena | null {
       y: g.y,
       out: g.out || g.down,
       inv: g.items.map(() => 'item'),
+      ...(g.tool ? { tool: g.tool } : {}),
       c: BODY[g.team][slot % 3],
       bone: HEAD[g.team],
     };
@@ -99,6 +101,8 @@ export function composeV2Arena(frame: V2Frame): LiveArena | null {
   const state: ArenaState = { grid, agents };
   if (frame.gas?.length) state.gas = frame.gas;
   if (frame.shock?.length) state.shock = frame.shock;
+  const gear = gearOf(frame);
+  if (gear) state.gear = gear;
   return {
     A: { ...A, grid },
     state,
