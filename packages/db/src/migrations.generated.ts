@@ -331,8 +331,22 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     ]
   },
   {
-    "tag": "0018_rental_credits",
-    "folderMillis": 1793843159582,
+    "tag": "0018_puzzles",
+    "folderMillis": 1793841545839,
+    "bps": true,
+    "hash": "6af3fc2ae910a31b642873dacd9869e721b3489030a3b5b822cc442b70b135d0",
+    "sql": [
+      "CREATE TABLE \"puzzle_bests\" (\n\t\"account_id\" text NOT NULL,\n\t\"puzzle_id\" text NOT NULL,\n\t\"score\" integer NOT NULL,\n\t\"ticks\" integer NOT NULL,\n\t\"medal\" text,\n\t\"run_id\" text NOT NULL,\n\t\"log_hash\" text NOT NULL,\n\t\"brain\" text NOT NULL,\n\t\"solves\" integer DEFAULT 1 NOT NULL,\n\t\"achieved_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"puzzle_bests_account_id_puzzle_id_pk\" PRIMARY KEY(\"account_id\",\"puzzle_id\")\n);\n",
+      "\nCREATE TABLE \"puzzle_runs\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"puzzle_id\" text NOT NULL,\n\t\"crew\" jsonb NOT NULL,\n\t\"status\" text DEFAULT 'queued' NOT NULL,\n\t\"brain\" text,\n\t\"credits\" integer DEFAULT 0 NOT NULL,\n\t\"result\" jsonb,\n\t\"error\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"finished_at\" timestamp with time zone,\n\tCONSTRAINT \"puzzle_runs_status_ck\" CHECK (\"puzzle_runs\".\"status\" in ('queued', 'running', 'done', 'failed', 'insufficient_credits'))\n);\n",
+      "\nALTER TABLE \"puzzle_bests\" ADD CONSTRAINT \"puzzle_bests_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"puzzle_runs\" ADD CONSTRAINT \"puzzle_runs_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"puzzle_bests_board_idx\" ON \"puzzle_bests\" USING btree (\"puzzle_id\",\"score\",\"achieved_at\");",
+      "\nCREATE INDEX \"puzzle_runs_account_idx\" ON \"puzzle_runs\" USING btree (\"account_id\",\"created_at\");"
+    ]
+  },
+  {
+    "tag": "0019_rental_credits",
+    "folderMillis": 1793844628224,
     "bps": true,
     "hash": "3283c5c9e19ba7e1b62f01392335cd653c33f661dc4db38551d2a9d3bc960531",
     "sql": [

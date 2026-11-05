@@ -18,4 +18,5 @@ export * from './steer';
 export * from './community';
 export * from './traits';
 export * from './daily';
+export * from './puzzles';
 export * from './tools';

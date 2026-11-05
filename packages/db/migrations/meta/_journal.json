@@ -131,8 +131,15 @@
     {
       "idx": 18,
       "version": "7",
-      "when": 1793843159582,
-      "tag": "0018_rental_credits",
+      "when": 1793841545839,
+      "tag": "0018_puzzles",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793844628224,
+      "tag": "0019_rental_credits",
       "breakpoints": true
     }
   ]
