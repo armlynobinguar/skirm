@@ -16,6 +16,7 @@ import { MatchTimelinesRepo } from './match-timelines';
 import { OnboardingRepo } from './onboarding';
 import { OpsRepo } from './ops';
 import { PlaybooksRepo } from './playbooks';
+import { PuzzlesRepo } from './puzzles';
 import { ProofRepo } from './proof';
 import { QuestsRepo } from './quests';
 import { RankedRepo } from './ranked';
@@ -72,6 +73,8 @@ export interface Repos {
   playbooks: PlaybooksRepo;
   /** Campaign progress and chapter rewards. */
   campaign: CampaignRepo;
+  /** Puzzle runs and each player's best solve per puzzle. */
+  puzzles: PuzzlesRepo;
   /** Players' own maps from the map editor: drafts and published community maps. */
   communityMaps: CommunityMapsRepo;
   /** Runs `fn` with repositories bound to one transaction. */
@@ -117,6 +120,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     externalAgents: new ExternalAgentsRepo(db),
     playbooks: new PlaybooksRepo(db),
     campaign: new CampaignRepo(db),
+    puzzles: new PuzzlesRepo(db),
     communityMaps: new CommunityMapsRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
@@ -127,6 +131,7 @@ export * from './agents';
 export * from './bench';
 export * from './daily';
 export * from './campaign';
+export * from './puzzles';
 export * from './community-maps';
 export * from './cosmetics';
 export * from './external-agents';

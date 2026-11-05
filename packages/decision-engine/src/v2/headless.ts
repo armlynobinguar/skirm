@@ -65,6 +65,11 @@ export interface HeadlessOptions {
   /** Extra ticks a crew holds at the start and its bluff cap (the practice bot, practiceRival). */
   hold?: Partial<Record<Team, number>>;
   lieCap?: Partial<Record<Team, number>>;
+  /**
+   * A mode's own end check after every tick (puzzles): a result here ends the match and replaces the
+   * engine's; null leaves the engine's (or plays on).
+   */
+  judge?: (s: Readonly<MatchState>) => MatchResult | null;
 }
 
 export interface HeadlessStats {
@@ -183,6 +188,8 @@ export async function playHeadless(opts: HeadlessOptions): Promise<HeadlessResul
       else stats[a.team].refused[f.reason]++;
     });
     const ev = stepMatch(s, { actions, says });
+    const judged = opts.judge?.(s);
+    if (judged) s.result = judged;
     appendTick(log, { tick: s.tick, actions, says });
     opts.onTick?.(ev, s);
     // The brain's own messages; bluffs the engine told for an agent are not its speech.

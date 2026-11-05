@@ -8,6 +8,7 @@ import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
 import { ApiError, errorFromBody } from './errors';
 import type { Campaign, CampaignStart } from './campaignTypes';
+import type { PuzzleDetail, PuzzleLeaderboard, PuzzleList, PuzzleRun, PuzzleRunRequest } from './puzzleTypes';
 import type { MapDefV2 } from '@skirm/engine/v2';
 import type { CommunityMap, CommunityMapBody, CommunityMapList, MyCommunityMaps, TestPlayResult } from './communityMapTypes';
 import type { Playbook, PlaybookList, PlaybookWithText } from './playbookTypes';
@@ -237,6 +238,16 @@ export interface ApiClient {
   campaign(): Promise<Campaign>;
   /** POST /campaign/missions/:id/start: the v2_queue to send (403 `mission_locked`). */
   startMission(missionId: string): Promise<CampaignStart>;
+  /** GET /puzzles: every puzzle with par, medals and the caller's best; the brain, cost and hourly cap. */
+  puzzles(): Promise<PuzzleList>;
+  /** GET /puzzles/:id: one puzzle with its board layout and the caller's recent runs. */
+  puzzle(puzzleId: string): Promise<PuzzleDetail>;
+  /** POST /puzzles/:id/runs: 202 queued; 429 `puzzle_limit` past the hourly cap. */
+  startPuzzleRun(puzzleId: string, body: PuzzleRunRequest): Promise<PuzzleRun>;
+  /** GET /puzzles/:id/runs/:runId: one of the caller's runs (poll while queued or running). */
+  puzzleRun(puzzleId: string, runId: string): Promise<PuzzleRun>;
+  /** GET /puzzles/:id/leaderboard: each player's best, lowest score first (public). */
+  puzzleLeaderboard(puzzleId: string): Promise<PuzzleLeaderboard>;
 
   /** GET /community-maps: published community maps, newest or most popular first. */
   communityMaps(sort?: 'new' | 'popular'): Promise<CommunityMapList>;
@@ -430,6 +441,11 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     copyTemplate: (id) => json('POST', `/onboarding/templates/${enc(id)}/copy`),
     campaign: () => get('/campaign'),
     startMission: (id) => json('POST', `/campaign/missions/${enc(id)}/start`),
+    puzzles: () => get('/puzzles'),
+    puzzle: (id) => get(`/puzzles/${enc(id)}`),
+    startPuzzleRun: (id, body) => json('POST', `/puzzles/${enc(id)}/runs`, { body }),
+    puzzleRun: (id, runId) => get(`/puzzles/${enc(id)}/runs/${enc(runId)}`),
+    puzzleLeaderboard: (id) => get(`/puzzles/${enc(id)}/leaderboard`),
 
     externalAgents: () => get('/external-agents'),
     createExternalAgent: (body) => json('POST', '/external-agents', { body }),

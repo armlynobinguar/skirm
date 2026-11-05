@@ -127,6 +127,13 @@
       "when": 1793839285264,
       "tag": "0017_community_maps",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793841545839,
+      "tag": "0018_puzzles",
+      "breakpoints": true
     }
   ]
 }
