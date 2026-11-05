@@ -8,6 +8,8 @@ import {
   accounts,
   achievementsUnlocked,
   agentSkills,
+  backingRounds,
+  backings,
   campaignProgress,
   campaignRewards,
   communityMaps,
@@ -168,6 +170,10 @@ export class AccountsRepo {
       this.db.select().from(campaignRewards).where(eq(campaignRewards.accountId, accountId)),
       this.db.select().from(communityMaps).where(eq(communityMaps.authorId, accountId)),
     ]);
+    const [backingRoundRows, backingRows] = await Promise.all([
+      this.db.select().from(backingRounds).where(eq(backingRounds.writerId, accountId)),
+      this.db.select().from(backings).where(eq(backings.backerId, accountId)),
+    ]);
     return {
       account: [account],
       agents: myAgents,
@@ -197,6 +203,8 @@ export class AccountsRepo {
       campaign,
       campaignRewards: campaignRewardRows,
       communityMaps: communityMapRows,
+      backingRounds: backingRoundRows,
+      backings: backingRows,
     };
   }
 

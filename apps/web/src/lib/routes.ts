@@ -30,6 +30,8 @@ export const routes = {
     `/skills/bench${skillId ? `?skill=${e(skillId)}${version ? `&version=${version}` : ''}` : ''}`,
   benchRun: (runId: string) => `/skills/bench/${e(runId)}`, // a bench run's debrief
   market: () => '/market', // S09
+  /** Writer backing: open rounds, the caller's backings and own rounds. */
+  backing: () => '/backing',
   marketSkill: (skillId: string) => `/market/${e(skillId)}`, // S10
   pvp: () => '/pvp', // S11
   match: (matchId: string) => `/matches/${e(matchId)}`, // S12 v2 match: accept, lock-in, live, end
@@ -57,7 +59,7 @@ export type NavGroup = 'play' | 'skills' | 'market' | 'pvp' | 'leaderboards' | '
 export function navGroupOf(pathname: string): NavGroup | null {
   if (/^\/(play|maps|agents|tutorial|daily|campaign)(\/|$)/.test(pathname)) return 'play';
   if (/^\/skills(\/|$)/.test(pathname)) return 'skills';
-  if (/^\/market(\/|$)/.test(pathname)) return 'market';
+  if (/^\/(market|backing)(\/|$)/.test(pathname)) return 'market';
   if (/^\/(pvp|matches|lobbies|tournaments)(\/|$)/.test(pathname)) return 'pvp';
   if (/^\/leaderboards(\/|$)/.test(pathname)) return 'leaderboards';
   if (/^\/account(\/|$)/.test(pathname)) return 'account';
@@ -97,6 +99,7 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/terms\/?$/, key: 'terms', title: 'Terms', sub: '// the rules', back: routes.home() },
   { re: /^\/privacy\/?$/, key: 'privacy', title: 'Privacy', sub: '// your data', back: routes.home() },
   { re: /^\/market(\/|$)/, key: 'market', title: 'Exchange', sub: '// proof first', back: routes.home() },
+  { re: /^\/backing\/?$/, key: 'backing', title: 'Backing', sub: '// share of royalties', back: routes.market() },
   { re: /^\/skills(\/|$)/, key: 'skills', title: 'Skills', sub: '// your strategies', back: routes.home() },
   { re: /^\/account\/credits\/?$/, key: 'credits', title: 'Credits', sub: '// NEAR top-ups', back: routes.account() },
   { re: /^\/account(\/|$)/, key: 'account', title: 'Profile', sub: '// you', back: routes.home() },

@@ -17,3 +17,4 @@ export * from './skill-roles';
 export * from './skill-trigger';
 export * from './progression';
 export * from './campaign';
+export * from './backing';

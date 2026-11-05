@@ -9,6 +9,7 @@ import {
   CostMonitor,
   QUEUE_BENCHMARKS,
   RedisCostStore,
+  RpcBackingTxReader,
   createNearAdapters,
   createQueue,
   createRedis,
@@ -48,10 +49,14 @@ async function main(): Promise<void> {
       ),
   });
 
+  // Writer backing on NEAR (contracts/backing) once its account is set; credits in dev otherwise.
+  const backingContract = process.env.BACKING_CONTRACT?.trim() || undefined;
+
   const deps: ApiDeps = {
     config: {
       ...config,
       V2_BRAIN: process.env.V2_BRAIN,
+      BACKING_CONTRACT: backingContract,
       rankedDecay: rankedDecayFromEnv(process.env),
       ...(Number(process.env.BENCH_RUNS_PER_HOUR) > 0
         ? { BENCH_RUNS_PER_HOUR: Math.floor(Number(process.env.BENCH_RUNS_PER_HOUR)) }
@@ -69,6 +74,7 @@ async function main(): Promise<void> {
       ownership: near.ownership,
       badges: near.badges,
       keys: new RpcNearKeyChecker(near.rpc),
+      ...(backingContract ? { backing: new RpcBackingTxReader(near.rpc, backingContract) } : {}),
     },
     benchmarkQueue,
     costs: new RedisDailyCosts(readRedis),

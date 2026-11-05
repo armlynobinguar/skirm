@@ -43,6 +43,7 @@ The single reference for `apps/api`, `apps/worker`, `apps/realtime` and `apps/we
 | `RANKED_DECAY_DAYS` / `RANKED_DECAY_AMOUNT` | `14` / `25` (`DEFAULTS.ranked.decay`) | worker, api: days without a ranked match before an inactive Diamond+ player loses `amount` Elo (again every `days`); `0` turns decay off. Not part of `loadConfig()`: `rankedDecayFromEnv` in `@skirm/shared` |
 | `BENCH_RUNS_PER_HOUR` | `20` (`DEFAULTS.bench.runsPerHour`) | api: test-bench runs per account per rolling hour |
 | `DAILY_ATTEMPTS` | `3` (`DEFAULTS.daily.attemptsPerDay`) | api: daily challenge attempts per account per UTC day |
+| `BACKING_CONTRACT` | unset | api: the writer backing contract account (`contracts/backing`, not deployed yet). Set: backing writes answer wallet calls and `/backing/sync` mirrors them. Unset: backing runs on paid credits with `AUTH_MODE=dev` (the keyless local stack) and is off otherwise. Not part of `loadConfig()` |
 
 ## New account defaults
 
@@ -195,6 +196,27 @@ Players' own v2 maps from the web map editor (`/maps/editor`), stored in `commun
 | POST / DELETE | `/community-maps/:id/like` | | `{ likes, liked }`; published maps only, once per player |
 
 `CommunityMap`: `{ id, name, theme, author, status: 'draft'\|'published', plays, likes, liked?, map, balance?, createdAt, updatedAt, publishedAt }`. `BalanceReport`: `{ runs: { seed, difficulty, size, swapped, winner, side, reason, decidedBy, score, ticks }[], wins: { left, right, draw }, fair, playable, ok, problems }`.
+
+### Writer backing
+
+Players back a skill writer up front for a capped share of the writer's future royalties (`contracts/backing`, the same arithmetic in `@skirm/shared` `backing.ts`). A writer opens a round with fixed terms: `shareBps` (1–5,000) of every royalty routed to the round goes to the backers until they together received `capMultipleBps / 10⁴` (1×–10×) times the raise, `maxRaiseYocto` bounds the stakes. One open round per writer; `skillId` null covers every skill the writer sells. Closing pays the raise to the writer and fixes the stakes; cancelling (while open) returns them. A backer's entitlement is `floor(stake × backersEarned / raised)`, so all backers reach the cap together. Tables: `backing_rounds` (`brd_`), `backings` (`bkg_`), `backing_payouts` (`bpo_`).
+
+Modes (`GET /backing/config` `mode`): `near` when `BACKING_CONTRACT` is set: every write answers `{ wallet: { contractId, methodName, args, depositYocto, gas } }` for the player's wallet, and the web posts the tx hash to `/backing/sync`, which reads it through RPC (receiver, signer = the caller's linked account, success) and mirrors the contract's `skirm_backing` events. Royalties reach a round through `distribute(round_id)`: the skills contract pays NEP-199 royalties to the creator account fixed at mint, so the writer forwards them (the api shows what a round is owed from mirrored resales). `credits` (no contract, `AUTH_MODE=dev`): stakes are spent from paid credits (ledger note `backing`), the raise and payouts are credited, and every resale of a covered skill after the round closed routes its royalty to the oldest closed round with room under the cap. `off` otherwise: reads work, writes answer `503 backing_disabled`.
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| GET | `/backing/config` | | public. `{ mode, contractId, creditsPerNear, maxShareBps, minCapMultipleBps, maxCapMultipleBps, minStakeYocto, maxRaiseYocto, openRoundStorageYocto }` |
+| GET | `/backing/rounds` | `?writer=<handle>&skill=<skl_…>&status=open\|closed\|cancelled` | public. `{ rounds: BackingRound[] }`, newest first; `skill` includes its writer's all-skill rounds |
+| GET | `/backing/rounds/:id` | | public. `{ round, payouts (latest 20), position (signed in, if backed), owedYocto (near, the writer) }` |
+| GET | `/backing/mine` | | `{ mode, positions: BackingPosition[], rounds: (BackingRound & { owedYocto })[] }` |
+| POST | `/backing/rounds` | `{ skillId?, shareBps, capMultipleBps, maxRaiseYocto }` | credits: `{ round }` (`409 round_open`); near: `{ wallet }` for `open_round` (0.01 NEAR storage attached, excess refunded). `403` on another writer's skill |
+| POST | `/backing/rounds/:id/back` | `{ amountYocto }` | credits: `{ position, stakedYocto }` in whole credits, cut to what is left of the raise (`402 insufficient_credits`, `409 round_full`, `own_round`, `round_not_open`, `422 stake_too_small` under 0.1 NEAR); near: `{ wallet }` for `back` |
+| POST | `/backing/rounds/:id/close` / `cancel` | | the writer. credits: `{ round }`; near: `{ wallet }` |
+| POST | `/backing/rounds/:id/claim` | | a backer: earnings in whole credits `{ position, claimedCredits }` (`409 nothing_to_claim`, `round_not_closed`); near: `{ wallet }` for `claim` (or `refund` on a cancelled round) |
+| POST | `/backing/rounds/:id/distribute` | `{ amountYocto? }` (default: owed) | near, the writer: `{ wallet }` for `distribute` (`409 nothing_owed`) |
+| POST | `/backing/sync` | `{ txHash }` | near: `{ rounds }` touched. `409 not_onchain` otherwise; `422 wrong_sender` / `wrong_receiver` / `failed` / `no_events`, `404`, `503 rpc_unavailable` |
+
+`BackingRound`: `{ id, writerId, writerHandle, writerNearAccountId, skillId, skillName, shareBps, capMultipleBps, maxRaiseYocto, raisedYocto, backers, status, mode, chainRoundId, royaltiesInYocto, backersEarnedYocto, capYocto, createdAt, closedAt }`. `BackingPosition`: `{ backingId, round, stakeYocto, earnedYocto, claimedYocto, claimableYocto, capYocto, refunded }`.
 
 ### Cosmetics and credits
 

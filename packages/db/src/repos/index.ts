@@ -1,6 +1,7 @@
 import type { Executor } from '../client';
 import { AccountsRepo } from './accounts';
 import { AgentsRepo } from './agents';
+import { BackingRepo } from './backing';
 import { BenchRepo } from './bench';
 import { DailyRepo } from './daily';
 import { CampaignRepo } from './campaign';
@@ -74,6 +75,8 @@ export interface Repos {
   campaign: CampaignRepo;
   /** Players' own maps from the map editor: drafts and published community maps. */
   communityMaps: CommunityMapsRepo;
+  /** Writer backing rounds, backers' stakes and the royalties routed to them. */
+  backing: BackingRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -118,12 +121,14 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     playbooks: new PlaybooksRepo(db),
     campaign: new CampaignRepo(db),
     communityMaps: new CommunityMapsRepo(db),
+    backing: new BackingRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
 
 export * from './accounts';
 export * from './agents';
+export * from './backing';
 export * from './bench';
 export * from './daily';
 export * from './campaign';

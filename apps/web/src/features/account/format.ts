@@ -153,6 +153,7 @@ export function ledgerDisplay(
     case 'topup': {
       if (row.note === 'prize') return { type: 'Prize', detail: 'Tournament prize', from, amount, tone };
       if (row.note === 'prize_pool') return { type: 'Refund', detail: 'Tournament cancelled · prize pool returned', from, amount, tone };
+      if (row.note === 'backing') return { type: 'Backing', detail: 'Writer backing · raise, royalty share or refund', from, amount, tone };
       const y = yoctoFromDevHash(row.txHash);
       // Rates can change between deposits: only quote today's rate when it matches what was credited.
       const detail = y
@@ -198,7 +199,7 @@ export function ledgerDisplay(
     case 'spend':
       return {
         type: 'Purchase',
-        detail: row.note === 'cosmetic' ? 'Premium look' : row.note === 'prize_pool' ? 'Tournament prize pool' : 'Paid credits spent',
+        detail: row.note === 'cosmetic' ? 'Premium look' : row.note === 'prize_pool' ? 'Tournament prize pool' : row.note === 'backing' ? 'Backed a writer' : 'Paid credits spent',
         from,
         amount,
         tone,

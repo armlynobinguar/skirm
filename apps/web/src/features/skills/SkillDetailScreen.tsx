@@ -37,6 +37,7 @@ import { useApi } from '@/lib/services';
 import { buyTx, listTx, tokenIdOf } from '@/lib/wallet/contracts';
 import { useNearSigner } from '@/lib/wallet/hooks';
 import { WalletError } from '@/lib/wallet/types';
+import { BackWriterPanel } from '@/features/backing/BackWriterPanel';
 import { ConfirmTransactionModal } from './ConfirmTransactionModal';
 import { ConnectWalletModal } from './ConnectWalletModal';
 import { MarketplaceScreen } from './MarketplaceScreen';
@@ -198,6 +199,8 @@ function DrawerView({ d, me, onClose }: { d: MarketDetail; me: Me | undefined; o
       )}
 
       <Actions d={d} me={me} ownListing={ownListing} creator={creator} />
+
+      <BackWriterPanel skillId={sk.id} isCreator={isCreator} />
 
       <Proof title="Version lock" sub={`V${version}`} data-testid="s10-version-lock">
         <p>

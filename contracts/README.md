@@ -11,6 +11,7 @@ and the season prize pools. The stretch `pool` contract is not included.
 | `deposits` | [`deposits.playskirm.testnet`](https://testnet.nearblocks.io/address/deposits.playskirm.testnet) | `deposit()` top-ups with a NEP-297 event for the credits ledger; owner withdraws to the treasury |
 | `seasons` | [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | 14-day season prize pools: funded by market fees, standings posted by ops, prizes claimed by players |
 | `badges` | `badges.playskirm.testnet` (not deployed yet) | Soulbound achievement badges in the NEP-171 shape (core views, enumeration, metadata, `nft_mint` event); `nft_transfer` always panics |
+| `backing` | `backing.playskirm.testnet` (not deployed yet) | Writer backing rounds: `open_round` (writer sets share, cap multiple, max raise), payable `back`, `close_round` (raise to the writer), `cancel_round` + `refund`, payable `distribute` (royalty income: backers' capped share kept for `claim`, the rest to the writer), `claim`; NEP-297 `skirm_backing` events |
 
 Roles used below: `playskirm.testnet` is the owner (full-access keys kept offline), the treasury and
 the market's governance account. `ops.playskirm.testnet` is the platform signer.
@@ -31,7 +32,7 @@ None of the market's admin methods are on the list: they all need 1 yocto.
 
 ```sh
 cd contracts
-./build.sh            # -> target/wasm32-unknown-unknown/release/skirm_{skills,market,registry,deposits,seasons,badges}.wasm
+./build.sh            # -> target/wasm32-unknown-unknown/release/skirm_{skills,market,registry,deposits,seasons,badges,backing}.wasm
 ```
 
 `wasm32v1-none` cannot build these contracts because it only provides `core`/`alloc` and
@@ -344,6 +345,31 @@ ops function-call key for `nft_mint`; nothing deploys it yet.
 | `get_deposit(receipt)`, `total_deposited_by(account_id)`, `withdrawable()`, `get_config()` | view | | |
 | `set_treasury`, `set_min_deposit`, `set_owner` | owner | 1 yocto | |
 
+### backing
+
+Players back a skill writer for a capped share of the writer's future royalties. Every backer of a
+round earns the same fraction of their stake (`floor(stake · backers_earned / raised)`), so all of
+them reach the cap together.
+
+| Method | Caller | Deposit | Notes |
+| --- | --- | --- | --- |
+| `new(owner_id, min_stake?)` | deployer | | `min_stake` default 0.1 NEAR |
+| `open_round(skill_id?, share_bps, cap_multiple_bps, max_raise)` → Round | the writer | storage (~0.005 NEAR; excess refunded) | `share_bps` 1–5,000, `cap_multiple_bps` 10,000–100,000 (1×–10×), `max_raise` ≤ 1,000,000 NEAR |
+| `back(round_id)` → BackingView | anyone but the writer | the stake | A new backer's record storage comes out of the attachment; above what is left of `max_raise` the rest is refunded; ≤ 500 backers |
+| `close_round(round_id)` | the writer | | Open → Closed; the raise goes to the writer, stakes are fixed |
+| `cancel_round(round_id)` | the writer | | Open → Cancelled; backers pull their stake with `refund(round_id)` |
+| `distribute(round_id)` → backers' part | anyone | the royalty | Closed rounds only: `min(floor(amount · share_bps / 10⁴), cap − backers_earned)` stays for the backers, the rest goes to the writer |
+| `claim(round_id)` → amount | a backer | | Pulls what the stake earned so far |
+| `get_round`, `get_rounds(from_id?, limit?)`, `get_backing(round_id, account_id)`, `claimable(round_id, account_id)`, `get_config()` | view | | |
+| `set_min_stake`, `set_owner` | owner | 1 yocto | |
+
+Royalty routing: the skills contract's NEP-199 payout pays the royalty to the skill's creator, fixed
+at the first mint and also the token's first owner, so this contract cannot sit in the payout map
+without changing the skills contract. Royalties reach a round through `distribute`: the writer (or an
+ops flow acting for the writer) forwards them. The api mirrors resales and shows each round's writer
+what it is owed (`POST /backing/rounds/:id/distribute` builds the call). Nothing deploys it yet; it
+needs no ops key (every call is signed by a player's wallet).
+
 ## Events (NEP-297, `EVENT_JSON:` logs)
 
 | Standard | Events and data |
@@ -353,6 +379,7 @@ ops function-call key for `nft_mint`; nothing deploys it yet.
 | `skirm_registry` | `match_recorded` (MatchRecordV2) |
 | `skirm_seasons` | `season_opened`, `season_funded`, `season_locked`, `standings_posted`, `prize_claimed`, `season_closed`, `carry_rolled`, `ops_updated`, `owner_updated` |
 | `skirm_deposits` | `deposit` `{receipt, player, amount, block_height, timestamp_ms}`, `withdraw` `{treasury, amount}` |
+| `skirm_backing` | `round_opened` (Round), `backed` `{round_id, backer, amount, stake, raised}`, `round_closed` `{round_id, writer, raised, backers}`, `round_cancelled` `{round_id, writer, raised}`, `royalty_distributed` `{round_id, from, amount, to_backers, to_writer, backers_earned, capped}`, `claimed` `{round_id, backer, amount, claimed}`, `refunded` `{round_id, backer, amount}` |
 
 A deposit event looks like
 `EVENT_JSON:{"standard":"skirm_deposits","version":"1.0.0","event":"deposit","data":[{"player":"tyron.testnet","amount":"2000000000000000000000000","receipt":"1","block_height":"…","timestamp_ms":"…"}]}`.

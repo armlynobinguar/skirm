@@ -20,6 +20,7 @@ import { NearRpc, type NearRpcOptions } from './rpc';
 import { NearSeasons, NoopSeasons, type SeasonsChain } from './seasons';
 import { OpsFunctionCaller, type FunctionCaller } from './signer';
 
+export * from './backing';
 export * from './badges';
 export * from './deposits';
 export * from './rentals';
