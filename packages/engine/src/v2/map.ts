@@ -3,6 +3,8 @@
 // beside the rows. The engine only knows effect classes: a map's themed verbs say which class each
 // one is, so one skill works on every map.
 
+import type { ToolKind } from './tools';
+
 export type Team = 'A' | 'B';
 export type Dir = 'N' | 'E' | 'S' | 'W';
 export type Tile = 'wall' | 'grass' | 'tree' | 'dirt' | 'water' | 'lava' | 'fire' | 'item' | 'exit' | 'crate' | 'block' | 'valve' | 'ice';
@@ -87,8 +89,8 @@ export interface MapDefV2 {
   /** Spread every `every` ticks for up to `cap` waves, then recede wave by wave, then grow again. */
   hazards: { kind: HazardKind; every: number; cap: number }[];
   switches: MapSwitch[];
-  /** An extra goal item lands at `at` on `tick`. */
-  drops: { at: [number, number]; tick: number }[];
+  /** An extra goal item lands at `at` on `tick`, with a tool beside it when `tool` is set (or the drop table has one, tools.ts). */
+  drops: { at: [number, number]; tick: number; tool?: ToolKind }[];
   /** Blocks each crew can place with add_solid. */
   blockSupply: number;
   /** Crews see only what their agents see. */

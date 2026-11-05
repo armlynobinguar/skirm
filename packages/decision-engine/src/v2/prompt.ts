@@ -9,6 +9,7 @@ export const MAX_THOUGHT_CHARS = 80;
 /** Longest planner reason kept (the mind panel's planner trace). */
 export const MAX_WHY_CHARS = 200;
 import { distancesFrom, routeHint } from './route';
+import { toolLines } from './tools';
 
 export const RULES = `You control one agent in skirm, a match between two crews on one shared map.
 Goal: your crew wins by delivering the goal number of items to the delivery point (E) first. At time-out, more delivered wins.
@@ -18,6 +19,7 @@ Map key: # wall, . floor, , grass, T tree, d rubble (walk into it to dig: 3 hits
 Hazards spread in waves, then recede. If one reaches you, you are knocked down for 4 ticks, drop what you carry and go back to your start.
 A switch floods the rival crew's lane for 8 ticks. Rival crews can pick up items you drop.
 Talk: "team" reaches your crew anywhere, but rivals near you overhear it. "say" reaches everyone near you. Rivals may lie. Never reveal your skills.
+Tools: a supply drop may carry a tool (sandbags, a pump or a bridge). Step on it with no tool in hand to take it; you carry at most one. "use <tool> <dir>" places it on the tile next to you: sandbags stop water spreading there, a pump drains water around it over a few ticks, a bridge lets you walk across a water tile.
 Bluffs: a rival near you may tell you a middle item is gone, the delivery point is flooding, or your own items are unguarded. What you can see is never a lie; a claim about a tile your crew cannot see may fool you, and then you treat that item as gone for a few ticks. Your crew bluffs rivals the same way when they close on a middle item.`;
 
 /** Longest owner's instructions an agent carries (agents.system_prompt, PATCH /agents/:id). */
@@ -75,6 +77,7 @@ export function viewText(o: Observation): string {
     ...o.rows,
     ...hazardLines(o),
   ];
+  lines.push(...toolLines(o));
   if (o.bluff) {
     const [x, y] = o.bluff.at;
     const item = o.map.item.toLowerCase();

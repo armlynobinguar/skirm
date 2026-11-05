@@ -76,6 +76,12 @@ export const EXTERNAL_REPLY_SCHEMA = {
         { type: 'object', required: ['type', 'dir'], additionalProperties: false, properties: { type: { const: 'move' }, dir: { enum: ['N', 'E', 'S', 'W'] } } },
         { type: 'object', required: ['type', 'verb'], additionalProperties: false, properties: { type: { const: 'verb' }, verb: { type: 'string' }, dir: { enum: ['N', 'E', 'S', 'W'] } } },
         { type: 'object', required: ['type'], additionalProperties: false, properties: { type: { const: 'switch' } } },
+        {
+          type: 'object',
+          required: ['type', 'tool', 'dir'],
+          additionalProperties: false,
+          properties: { type: { const: 'use' }, tool: { enum: ['sandbag', 'pump', 'bridge'] }, dir: { enum: ['N', 'E', 'S', 'W'] } },
+        },
       ],
     },
     say: {
@@ -159,6 +165,7 @@ export function sameAction(a: Action, b: Action): boolean {
   if (a.type !== b.type) return false;
   if (a.type === 'move' && b.type === 'move') return a.dir === b.dir;
   if (a.type === 'verb' && b.type === 'verb') return a.verb === b.verb && (a.dir ?? null) === (b.dir ?? null);
+  if (a.type === 'use' && b.type === 'use') return a.tool === b.tool && a.dir === b.dir;
   return true;
 }
 
