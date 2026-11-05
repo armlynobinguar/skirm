@@ -8,6 +8,7 @@ import { SessionGuard } from './auth';
 import { BenchController } from './controllers/bench.controller';
 import { CampaignController } from './controllers/campaign.controller';
 import { PuzzlesController } from './controllers/puzzles.controller';
+import { CommunityMapsController } from './controllers/community-maps.controller';
 import { CoreController } from './controllers/core.controller';
 import { DailyController } from './controllers/daily.controller';
 import { CosmeticsController } from './controllers/cosmetics.controller';
@@ -58,6 +59,7 @@ export class AppModule {
         PlaybooksController,
         CampaignController,
         PuzzlesController,
+        CommunityMapsController,
       ],
       providers: [
         { provide: DEPS, useValue: deps },

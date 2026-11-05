@@ -107,6 +107,15 @@ const METHODS: (keyof ApiClient)[] = [
   'startPuzzleRun',
   'puzzleRun',
   'puzzleLeaderboard',
+  'communityMaps',
+  'myCommunityMaps',
+  'communityMap',
+  'createCommunityMap',
+  'updateCommunityMap',
+  'deleteCommunityMap',
+  'publishCommunityMap',
+  'testPlayMap',
+  'likeCommunityMap',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {

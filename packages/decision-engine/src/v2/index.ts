@@ -6,6 +6,7 @@ export * from './filter';
 export * from './greedy';
 export * from './route';
 export * from './headless';
+export * from './balance';
 export * from './caster';
 export * from './observed';
 export * from '../llm';

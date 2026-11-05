@@ -9,6 +9,8 @@ import type { MatchDecisions } from './decisions';
 import { ApiError, errorFromBody } from './errors';
 import type { Campaign, CampaignStart } from './campaignTypes';
 import type { PuzzleDetail, PuzzleLeaderboard, PuzzleList, PuzzleRun, PuzzleRunRequest } from './puzzleTypes';
+import type { MapDefV2 } from '@skirm/engine/v2';
+import type { CommunityMap, CommunityMapBody, CommunityMapList, MyCommunityMaps, TestPlayResult } from './communityMapTypes';
 import type { Playbook, PlaybookList, PlaybookWithText } from './playbookTypes';
 import type { CreateTournament, Lobby, LobbySettings, TournamentDetail, TournamentStatus, TournamentSummary } from './lobbyTypes';
 import type {
@@ -247,6 +249,23 @@ export interface ApiClient {
   /** GET /puzzles/:id/leaderboard: each player's best, lowest score first (public). */
   puzzleLeaderboard(puzzleId: string): Promise<PuzzleLeaderboard>;
 
+  /** GET /community-maps: published community maps, newest or most popular first. */
+  communityMaps(sort?: 'new' | 'popular'): Promise<CommunityMapList>;
+  /** GET /community-maps/mine: the caller's drafts and published maps. */
+  myCommunityMaps(): Promise<MyCommunityMaps>;
+  /** GET /community-maps/:id: a published map, or the caller's own draft. */
+  communityMap(id: string): Promise<CommunityMap>;
+  /** POST /community-maps: a new draft (422 `map_limit` at the cap). */
+  createCommunityMap(body: CommunityMapBody & { name: string; map: MapDefV2 }): Promise<CommunityMap>;
+  /** PUT /community-maps/:id: an own draft (409 `map_published` once published). */
+  updateCommunityMap(id: string, body: CommunityMapBody): Promise<CommunityMap>;
+  deleteCommunityMap(id: string): Promise<{ deleted: true }>;
+  /** POST /community-maps/:id/publish (422 `map_invalid`, `map_unbalanced`, `map_refused`; 429 `publish_limit`; 409 `name_taken`). */
+  publishCommunityMap(id: string): Promise<CommunityMap>;
+  /** POST /community-maps/test-play: validation issues, or a greedy balance report. */
+  testPlayMap(map: MapDefV2): Promise<TestPlayResult>;
+  likeCommunityMap(id: string, on: boolean): Promise<{ likes: number; liked: boolean }>;
+
   /** GET /external-agents: the caller's own programs (bring your own agent). */
   externalAgents(): Promise<ExternalAgent[]>;
   /** POST /external-agents: registers one; the secret and token come back this once. */
@@ -434,5 +453,15 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     rotateExternalAgent: (id) => json('POST', `/external-agents/${enc(id)}/rotate`),
     pingExternalAgent: (id) => json('POST', `/external-agents/${enc(id)}/ping`),
     deleteExternalAgent: (id) => json('DELETE', `/external-agents/${enc(id)}`),
+
+    communityMaps: (sort = 'new') => get('/community-maps', { sort }),
+    myCommunityMaps: () => get('/community-maps/mine'),
+    communityMap: (id) => get(`/community-maps/${enc(id)}`),
+    createCommunityMap: (body) => json('POST', '/community-maps', { body }),
+    updateCommunityMap: (id, body) => json('PUT', `/community-maps/${enc(id)}`, { body }),
+    deleteCommunityMap: (id) => json('DELETE', `/community-maps/${enc(id)}`),
+    publishCommunityMap: (id) => json('POST', `/community-maps/${enc(id)}/publish`),
+    testPlayMap: (map) => json('POST', '/community-maps/test-play', { body: { map } }),
+    likeCommunityMap: (id, on) => json(on ? 'POST' : 'DELETE', `/community-maps/${enc(id)}/like`),
   };
 }
