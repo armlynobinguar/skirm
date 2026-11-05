@@ -1,6 +1,6 @@
 // WebSocket protocol on /ws (docs/backend-contract.md, WebSocket). Every client message is checked
 // here before the hub acts on it; anything else gets `{type:'error', code, message}`.
-import { isCommandPreset, isDifficulty } from '@skirm/engine/v2';
+import { isCommandPreset, isDifficulty, parseSteerInput } from '@skirm/engine/v2';
 import { DEFAULTS, campaignMission } from '@skirm/shared';
 import {
   isV2Opponent,
@@ -46,6 +46,8 @@ export type ErrorCode =
   | 'no_commands'
   | 'invalid_command'
   | 'command_refused'
+  | 'control_casual'
+  | 'not_controlling'
   | 'too_many_subscriptions'
   | 'unavailable'
   | 'internal';
@@ -91,6 +93,8 @@ const TYPES = [
   'v2_lobby_ready',
   'v2_command',
   'v2_ban',
+  'v2_control',
+  'v2_steer',
 ] as const;
 const TIERS = ['quiet', 'standard', 'open'] as const;
 
@@ -218,6 +222,19 @@ export function parseClientMessage(raw: unknown): ParseResult {
       if (typeof v.matchId !== 'string' || !ID_RE.test(v.matchId)) return bad('v2_ban.matchId must be an id');
       if (v.skillId !== null && (typeof v.skillId !== 'string' || !ID_RE.test(v.skillId))) return bad('v2_ban.skillId must be a skill id, or null to pass');
       return { ok: true, msg: { type: 'v2_ban', matchId: v.matchId, skillId: v.skillId } };
+    }
+    case 'v2_control': {
+      if (extraKeys(v, ['type', 'matchId', 'agentId'])) return bad('v2_control takes {matchId, agentId}');
+      if (typeof v.matchId !== 'string' || !ID_RE.test(v.matchId)) return bad('v2_control.matchId must be an id');
+      if (v.agentId !== null && (typeof v.agentId !== 'string' || !ID_RE.test(v.agentId))) return bad('v2_control.agentId must be an agent id, or null to hand it back');
+      return { ok: true, msg: { type: 'v2_control', matchId: v.matchId, agentId: v.agentId } };
+    }
+    case 'v2_steer': {
+      if (extraKeys(v, ['type', 'matchId', 'input'])) return bad('v2_steer takes {matchId, input}');
+      if (typeof v.matchId !== 'string' || !ID_RE.test(v.matchId)) return bad('v2_steer.matchId must be an id');
+      const input = parseSteerInput(v.input);
+      if (typeof input === 'string') return bad(`v2_steer.${input}`);
+      return { ok: true, msg: { type: 'v2_steer', matchId: v.matchId, input } };
     }
     case 'v2_lock_in': {
       if (extraKeys(v, ['type', 'matchId', 'tiers', 'crew', 'playbookId'])) return bad('v2_lock_in takes {matchId, tiers, crew?, playbookId?}');

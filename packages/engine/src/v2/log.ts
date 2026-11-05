@@ -36,6 +36,8 @@ export interface LogTick {
   says: SayInput[];
   /** Live commands applied this tick (absent when none, so older logs hash the same). */
   commands?: CrewCommand[];
+  /** Hybrid control: the agents whose action this tick came from their player (absent when none). */
+  controlled?: string[];
 }
 
 export interface MatchLog {

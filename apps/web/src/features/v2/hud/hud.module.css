@@ -79,6 +79,7 @@
 .acard[data-rival] { --c: var(--rival); }
 .acard[data-down] { filter: grayscale(1) brightness(.6); }
 .acard[data-unseen] { cursor: default; }
+.acard[data-steered] { box-shadow: inset 0 0 0 2px var(--amber), 0 0 18px color-mix(in srgb, var(--amber) 45%, transparent); }
 .portrait { display: block; width: 100%; height: 84px; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 22%, transparent), transparent); }
 .unseenFace { display: grid; place-items: center; height: 84px; font: 800 34px/1 var(--font-display); color: var(--faint); }
 .cin { display: grid; gap: 3px; padding: 5px 8px 7px; }
