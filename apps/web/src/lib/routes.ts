@@ -8,7 +8,9 @@ export type RouteDifficulty = 'easy' | 'normal' | 'hard' | 'agentic' | 'mega';
 export const routes = {
   signIn: () => '/', // S01
   home: () => '/play', // S02 Command deck
-  atlas: () => '/maps', // v2 Map atlas
+  atlas: (tab?: 'community') => (tab ? '/maps?tab=community' : '/maps'), // v2 Map atlas (`?tab=community`: community maps)
+  /** The map editor: a new draft, or one of the player's own (`?id=`). */
+  mapEditor: (id?: string) => `/maps/editor${id ? `?id=${e(id)}` : ''}`,
   crew: (mapId: string, difficulty?: RouteDifficulty) =>
     `/maps/${e(mapId)}/crew${difficulty ? `?d=${difficulty}` : ''}`, // S04, v2 casual crew (?d= difficulty)
   /** The v2 crew screen with "Vs Greedy bot" on (`?opponent=bot`), e.g. routes.practice(DEFAULT_PRACTICE). */
@@ -77,6 +79,7 @@ export interface ScreenLabel {
 const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: string | null }[] = [
   { re: /^\/play\/?$/, key: 'home', title: 'Command', sub: '// home', back: null },
   { re: /^\/maps\/[^/]+\/crew\/?$/, key: 'crew', title: 'Lock in', sub: '// crew + talk', back: routes.home() },
+  { re: /^\/maps\/editor\/?$/, key: 'map-editor', title: 'Map editor', sub: '// community maps', back: '/maps?tab=community' },
   { re: /^\/tutorial\/?$/, key: 'tutorial', title: 'Tutorial', sub: '// first match', back: routes.home() },
   { re: /^\/daily\/?$/, key: 'daily', title: 'Daily', sub: '// one seed a day', back: routes.home() },
   { re: /^\/campaign\/?$/, key: 'campaign', title: 'Campaign', sub: '// missions vs the bot', back: routes.home() },

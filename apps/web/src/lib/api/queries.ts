@@ -41,6 +41,12 @@ export const qk = {
     one: (skillId: string, version?: number) => ['skills', 'one', skillId, version ?? null] as const,
   },
   playbooks: ['playbooks'] as const,
+  communityMaps: {
+    all: ['community-maps'] as const,
+    list: (sort: 'new' | 'popular') => ['community-maps', 'list', sort] as const,
+    mine: ['community-maps', 'mine'] as const,
+    one: (id: string) => ['community-maps', 'one', id] as const,
+  },
   market: {
     all: ['market'] as const,
     list: (q: MarketQuery = {}) => ['market', 'list', q.tag ?? null, q.sort ?? 'winrate'] as const,

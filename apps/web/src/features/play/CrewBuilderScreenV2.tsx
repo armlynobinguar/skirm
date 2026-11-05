@@ -11,7 +11,7 @@
 // (`v2_queue { opponent: 'bot' }`): no matchmaking, it starts at once, and it may queue past the
 // hold, since the server decides whether practice costs anything (free on its offline brain).
 // PRACTICE_MAPS are marked quick: greedy against greedy plays them out cleanly.
-import { BOT_HANDLE, DIFF_MODS, DIFFICULTIES, RANKED_DIFFICULTY, holdFor, isDifficulty, isPracticeMap, type Difficulty, type TalkTier } from '@skirm/engine/v2';
+import { BOT_HANDLE, DIFF_MODS, DIFFICULTIES, RANKED_DIFFICULTY, holdFor, isCommunityMapId, isDifficulty, isPracticeMap, type Difficulty, type TalkTier } from '@skirm/engine/v2';
 import { Button, fmt } from '@skirm/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -23,6 +23,7 @@ import { PlaybooksSection } from '@/features/agents/Playbooks';
 import c from '@/features/agents/crew.module.css';
 import { arenaStore } from '@/features/arena/store';
 import { DIFFS, MAPS, diffIndex, mapById } from '@/features/arena/world';
+import { useMapById } from '@/features/maps/hooks';
 import { useNow } from '@/features/pvp/pvpUtil';
 import { v2StoreFor } from '@/features/v2/v2Store';
 import { ButtonLink } from '@/components/ButtonLink';
@@ -81,7 +82,9 @@ export function V2CrewScreen({ mapId, difficulty }: { mapId: string; difficulty?
 function V2CrewData({ mapId, difficulty }: { mapId: string; difficulty?: string }) {
   const me = useMe();
   const vsBot = useSearchParams().get('opponent') === 'bot';
-  const map = mapById(mapId);
+  // A community map is fetched first (and registered, so mapById finds it below).
+  const { map, loading } = useMapById(mapId);
+  if (loading) return <Skeleton rows={6} label="Loading map" />;
   if (!map)
     return (
       <EmptyState action={<ButtonLink href={routes.atlas()}>Back to the atlas</ButtonLink>}>This map does not exist or was removed.</EmptyState>
@@ -121,7 +124,9 @@ function V2Crew({ me, mapId, initialDifficulty, initialBot }: { me: Me; mapId: s
   const [qs, setQs] = useState<{ searchingMs: number; at: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const ranked = mode === 'ranked';
+  /** Community maps play practice and casual only. */
+  const community = isCommunityMapId(mapId);
+  const ranked = mode === 'ranked' && !community;
   /** Practice against the greedy bot: casual only. */
   const practice = !ranked && vsBot;
   const quick = isPracticeMap(mapId);
@@ -286,7 +291,7 @@ function V2Crew({ me, mapId, initialDifficulty, initialBot }: { me: Me; mapId: s
         <div className={`sk-panel ${c.panel}`}>
           <span className="sk-kick">Mode</span>
           <div className={c.seg} role="group" aria-label="Mode" data-testid="s04-mode">
-            {(['ranked', 'casual'] as const).map((m) => (
+            {(community ? (['casual'] as const) : (['ranked', 'casual'] as const)).map((m) => (
               <button
                 key={m}
                 type="button"

@@ -120,6 +120,13 @@
       "when": 1793838065587,
       "tag": "0016_agent_progression",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793839285264,
+      "tag": "0017_community_maps",
+      "breakpoints": true
     }
   ]
 }

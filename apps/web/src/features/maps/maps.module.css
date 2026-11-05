@@ -1,0 +1,71 @@
+/* Map editor (MapEditorScreen.tsx) and the atlas's Community tab (CommunityMaps.tsx). Tokens only. */
+
+.page { padding-block: 8px 32px; }
+.head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 12px; }
+.head h1, .head h2 { margin: 4px 0 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-block: 8px; }
+
+/* Editor: palette | board | settings. */
+.editor { display: grid; grid-template-columns: 200px minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+@media (max-width: 1100px) {
+  .editor { grid-template-columns: minmax(0, 1fr); }
+}
+.palette, .props { display: grid; gap: 8px; padding: 12px; }
+.props fieldset { display: grid; gap: 8px; border: 0; margin: 0; padding: 0; min-width: 0; }
+.brushes { display: grid; gap: 4px; }
+.brushes button, .sizes button {
+  display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 1px solid var(--line); background: transparent;
+  color: var(--ink); text-align: left; font: 500 13px/18px var(--font-sans); cursor: pointer;
+}
+.brushes button[aria-checked='true'], .sizes button[aria-pressed='true'] { border-color: var(--you); background: rgba(52, 224, 200, .12); }
+.brushes button:disabled, .sizes button:disabled { opacity: .5; cursor: default; }
+.brushes i { width: 14px; height: 14px; flex: none; border: 1px solid rgba(0, 0, 0, .4); }
+.sizes { display: grid; gap: 4px; }
+.sizes small { margin-left: auto; color: var(--muted); font-family: var(--font-mono); }
+.check { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+
+.boardWrap { min-width: 0; }
+.board { display: grid; gap: 1px; width: max-content; max-width: 100%; overflow: auto; padding: 4px; background: #11151d; touch-action: none; user-select: none; }
+.cell {
+  width: 24px; height: 24px; display: grid; place-items: center; font: 700 10px/1 var(--font-mono); color: #0b0f16; cursor: crosshair;
+}
+.cell[data-mid] { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25); }
+.cell[data-lane] { box-shadow: inset 0 0 0 3px rgba(178, 139, 255, .85); }
+.cell[data-bad] { outline: 2px solid var(--critical); outline-offset: -2px; }
+.issues { margin-block: 12px; }
+.issues ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+.issues small { color: var(--muted); }
+.report { padding: 12px; margin-block: 8px; }
+.report table { width: 100%; border-collapse: collapse; font: 400 12px/18px var(--font-mono); }
+.report th, .report td { text-align: left; padding: 2px 6px; border-bottom: 1px solid var(--line); }
+
+.field { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+.field input, .field textarea, .field select, .verb input, .verb select {
+  width: 100%; padding: 4px 6px; border: 1px solid var(--line); background: rgba(255, 255, 255, .04); color: var(--ink); font: 400 13px/18px var(--font-sans);
+}
+.nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; align-items: end; }
+.verb { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px; align-items: center; }
+.verb:has(> input:first-child:not([type='radio'])) { grid-template-columns: minmax(0, 1fr) minmax(0, 110px) auto; }
+.verb button { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 16px; }
+
+/* Community tab. */
+.community { max-width: 1200px; margin: 0 auto; padding-block: 12px 32px; }
+.tools { display: flex; gap: 12px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); }
+.seg button { padding: 6px 12px; border: 0; background: transparent; color: var(--ink); cursor: pointer; font: 500 13px/18px var(--font-sans); }
+.seg button[aria-pressed='true'] { background: rgba(52, 224, 200, .16); color: var(--you); }
+.drafts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+.draft { padding: 2px 8px; border: 1px dashed var(--line-strong); font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.card { display: grid; grid-template-rows: 140px auto; background: rgba(7, 11, 18, .8); border: 1px solid var(--line); }
+.art { position: relative; overflow: hidden; }
+.mini { width: 100%; height: 100%; display: block; }
+.body { display: grid; gap: 4px; padding: 10px 12px 12px; }
+.body small { color: var(--muted); font-size: 12px; }
+.body p { margin: 4px 0; font-size: 13px; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+/* Atlas tabs. */
+.tabs { display: flex; justify-content: center; gap: 4px; padding-top: 8px; }
+.tabs a { padding: 6px 16px; border-bottom: 2px solid transparent; text-transform: uppercase; letter-spacing: .2em; font: 600 12px/18px var(--font-sans); text-decoration: none; }
+.tabs a[aria-current='page'] { border-bottom-color: var(--you); color: var(--you); }
