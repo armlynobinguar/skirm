@@ -2,6 +2,7 @@
 // Every method returns the parsed JSON body or throws an ApiError (./errors.ts).
 // Credentials are read per request from the CredentialsStore, so signing in or out needs no new
 // client. In components use `useApi()` (src/lib/providers.tsx), never construct one.
+import type { TraitId } from '@skirm/shared';
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
@@ -19,6 +20,9 @@ import type {
   BenchRun,
   BenchRunDetail,
   BenchRunRequest,
+  DailyAttempt,
+  DailyBoard,
+  DailyToday,
   Cosmetics,
   CreditsWithRows,
   CurrentSeason,
@@ -34,6 +38,7 @@ import type {
   MarketDetail,
   MarketQuery,
   Me,
+  AgentProgressionInfo,
   AgentRecord,
   MyMatch,
   MyRentalOffer,
@@ -95,6 +100,10 @@ export interface ApiClient {
   rent(offerId: string, txHash: string): Promise<{ pass: RentalPass }>;
   /** GET /agents/:id/record: the agent's season and all-time record, bluffs included. */
   agentRecord(agentId: string): Promise<AgentRecord>;
+  /** GET /agents/:id/progression: XP, level, traits and the trait catalogue. */
+  agentProgression(agentId: string): Promise<AgentProgressionInfo>;
+  /** POST /agents/:id/traits: picks a trait into an earned slot; returns the agent. */
+  pickTrait(agentId: string, trait: TraitId): Promise<Agent>;
   /** PATCH /agents/:id: name, look, skills, unlocks, v2 role/vision/comms/tier and `systemPrompt` (≤ 600). */
   patchAgent(agentId: string, patch: AgentPatch): Promise<Agent>;
 
@@ -136,6 +145,13 @@ export interface ApiClient {
   benchRun(runId: string): Promise<BenchRunDetail>;
   /** GET /bench/compare: two runs side by side and a word diff of their prompts. */
   compareBenchRuns(a: string, b: string): Promise<BenchCompare>;
+
+  /** GET /daily: today's challenge, your attempts and the time left. */
+  daily(): Promise<DailyToday>;
+  /** POST /daily/attempts: 202 queued with your crew (default: your first agents); 429 `daily_limit`. */
+  startDailyAttempt(agentIds?: string[]): Promise<DailyAttempt>;
+  /** GET /daily/leaderboard: a day's top attempts (today by default) and your rank. */
+  dailyBoard(date?: string): Promise<DailyBoard>;
 
   /** GET /seasons/current: the open season (opened on demand), its top 10 and the caller's row. */
   currentSeason(): Promise<CurrentSeason>;
@@ -309,6 +325,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
 
     agents: () => get('/agents'),
     agentRecord: (id) => get(`/agents/${enc(id)}/record`),
+    agentProgression: (id) => get(`/agents/${enc(id)}/progression`),
+    pickTrait: (id, trait) => json('POST', `/agents/${enc(id)}/traits`, { body: { trait } }),
     rentalOffers: () => get('/rentals'),
     myRentals: () => get('/rentals/mine'),
     setRentalOffer: (id, priceYocto) => json('PUT', `/agents/${enc(id)}/rental`, { body: { priceYocto } }),
@@ -341,6 +359,10 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     benchRuns: (skillId) => get('/bench/runs', { skillId }),
     benchRun: (id) => get(`/bench/runs/${enc(id)}`),
     compareBenchRuns: (a, b) => get('/bench/compare', { a, b }),
+
+    daily: () => get('/daily'),
+    startDailyAttempt: (agentIds) => json('POST', '/daily/attempts', { body: agentIds ? { agentIds } : {} }),
+    dailyBoard: (date) => get('/daily/leaderboard', { date }),
 
     currentSeason: () => get('/seasons/current'),
     seasonStandings: (id, page = {}) => get(`/seasons/${enc(id)}/standings`, { limit: page.limit, offset: page.offset }),

@@ -1,9 +1,11 @@
 // What one agent knows on its turn: the board as its crew has seen it (fog), itself, the agents in
 // sight, what it heard last tick and its legal actions. This is the only view a decision engine gets.
+import { TRAITS } from '@skirm/shared';
 import type { Dir, Tile } from './map';
 import type { Action, AgentState, MatchState, Role } from './match';
 import { avoidedTile } from './bluff';
 import { legalActions } from './match';
+import { overlaysFor } from './frame';
 import type { HeardMessage, TalkTier } from './talk';
 import { gearView, type ToolKind } from './tools';
 
@@ -24,7 +26,8 @@ export interface Observation {
   map: { id: string; name: string; w: number; h: number; goal: number; item: string; deliverTo: string; exit: [number, number] };
   /** Rows of the board as seen: tile characters, '?' where the crew has never looked. */
   rows: string[];
-  me: { id: string; name: string; team: 'A' | 'B'; role: Role; x: number; y: number; carrying: number; capacity: number; tier: TalkTier; tool?: ToolKind };
+  /** `traits`: what each of its progression traits does (absent when it plays none). `tool`: the supply tool it carries. */
+  me: { id: string; name: string; team: 'A' | 'B'; role: Role; x: number; y: number; carrying: number; capacity: number; tier: TalkTier; traits?: string[]; tool?: ToolKind };
   teammates: SeenAgent[];
   /** Rivals in sight now (all of them on maps without fog). */
   rivals: SeenAgent[];
@@ -38,6 +41,12 @@ export interface Observation {
    */
   bluff?: { by: string; at: [number, number]; believed: boolean; ticksLeft: number };
   legal: Action[];
+  /** Gas tiles in sight (maps with gas vents only). Standing in gas costs every other action. */
+  gas?: [number, number][];
+  /** Electrified water tiles in sight (maps with sparking cables only). On or next to them: stunned. */
+  shock?: [number, number][];
+  /** The agent stands in gas and will lose its next action coughing (maps with gas vents only). */
+  choking?: boolean;
   /**
    * Tools from supply drops: on the ground (step on one with no tool in hand to take it) and placed
    * (sandbags, bridges, running pumps with their ticks left). Absent when there are none.
@@ -46,7 +55,7 @@ export interface Observation {
 }
 
 const CHAR: Record<Tile, string> = {
-  wall: '#', grass: ',', tree: 'T', dirt: 'd', water: '~', lava: 'L', fire: '^', item: '*', exit: 'E', crate: 'c', block: 'B', valve: 'V',
+  wall: '#', grass: ',', tree: 'T', dirt: 'd', water: '~', lava: 'L', fire: '^', item: '*', exit: 'E', crate: 'c', block: 'B', valve: 'V', ice: '=',
 };
 
 /** The board as a crew has seen it ('?' never seen), or as it is when `team` is null. */
@@ -85,7 +94,7 @@ export function observe(s: MatchState, agentId: string): Observation {
     ticksLeft: s.limit - s.tick,
     map: { id: def.id, name: def.name, w, h, goal: def.goal, item: def.item, deliverTo: def.deliverTo, exit: def.exit },
     rows,
-    me: { id: a.id, name: a.name, team: a.team, role: a.role, x: a.x, y: a.y, carrying: a.carrying.length, capacity: a.role === 'Hauler' ? 3 : 2, tier: a.tier, ...(a.tool ? { tool: a.tool } : {}) },
+    me: { id: a.id, name: a.name, team: a.team, role: a.role, x: a.x, y: a.y, carrying: a.carrying.length, capacity: a.role === 'Hauler' ? 3 : 2, tier: a.tier, ...traitView(a), ...(a.tool ? { tool: a.tool } : {}) },
     teammates: s.agents.filter((o) => o !== a && o.team === a.team && !o.out).map(view),
     rivals: s.agents.filter((o) => o.team !== a.team && !o.out && visible[o.y * w + o.x]).map(view),
     score: { mine: s.score[a.team], rival: s.score[rival] },
@@ -94,8 +103,26 @@ export function observe(s: MatchState, agentId: string): Observation {
     heard: a.inbox,
     ...bluffView(s, a),
     legal: legalActions(s, a.id),
+    ...hazardView(s, a),
     ...gearObs(s),
   };
+}
+
+/** The agent's traits in words, for its prompt. */
+function traitView(a: AgentState): { traits?: string[] } {
+  return a.traits?.length ? { traits: a.traits.map((t) => `${TRAITS[t].name} (${TRAITS[t].effect})`) } : {};
+}
+
+/** Gas and electrified water in the crew's sight now, and whether the agent is choking (only on maps that have them). */
+function hazardView(s: MatchState, a: AgentState): Pick<Observation, 'gas' | 'shock' | 'choking'> {
+  const { w, def } = s.map;
+  const o = overlaysFor(s, a.team);
+  const xy = (j: number): [number, number] => [j % w, (j / w) | 0];
+  const out: Pick<Observation, 'gas' | 'shock' | 'choking'> = {};
+  if (o.gas) out.gas = o.gas.map(xy);
+  if (o.shock) out.shock = o.shock.map(xy);
+  if (def.gas?.length) out.choking = !!s.gas[a.y * w + a.x] && !a.gasp && !a.out && !a.down;
+  return out;
 }
 
 /** Ground tools and placed objects, when there are any (public, like the drops). */

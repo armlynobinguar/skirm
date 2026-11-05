@@ -260,6 +260,15 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
             <b data-testid="v2-season-points">Ranked only</b>
           )}
         </Row>
+        {d?.xp?.length ? (
+          <Row label="XP gained">
+            <b data-testid="v2-xp">
+              {d.xp
+                .map((x) => `${x.name} +${fmt(x.gained)}${x.leveledUp ? ` · level ${x.level}!` : ''}${x.traitReady ? ' · trait ready' : ''}`)
+                .join(' · ')}
+            </b>
+          </Row>
+        ) : null}
         <div className={v.verify} data-ok={data.registry === 'written' || undefined} data-testid="v2-registry">
           <span>
             {data.registry === 'written'

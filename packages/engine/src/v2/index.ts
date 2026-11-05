@@ -14,4 +14,6 @@ export * from './practice';
 export * from './commands';
 export * from './highlights';
 export * from './triggers';
+export * from './traits';
+export * from './daily';
 export * from './tools';

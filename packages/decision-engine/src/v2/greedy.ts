@@ -1,7 +1,9 @@
 // A deterministic offline brain for dev, tests and benchmarks without model keys: walk (and dig) to
 // the nearest item the crew has seen, explore when it has seen none, deliver when full or when the
 // crew has enough, and use a switch now and then when next to one. It routes around tiles next to
-// lava (the next wave takes them, and lava removes an agent) when it can. With nothing to do it never
+// lava (the next wave takes them, and lava removes an agent), gas clouds (they cost every other
+// action) and electrified water (it stuns whoever stands on or next to it) when it can, and it
+// plans with ice: a step onto ice lands one tile further unless that tile is blocked. With nothing to do it never
 // idles on the delivery point or next to another agent, where it would block a corridor someone needs. It never speaks except a callout when it delivers.
 // Its plan, reason and inner voice are read off what it does (greedyPlan, greedyThought), for the mind panel.
 // A live command from its player bends it where that is plain to read off the board (greedyCommanded).
@@ -113,7 +115,7 @@ function standAside(o: Observation): Action | undefined {
   const moves = o.legal
     .filter((a): a is Extract<Action, { type: 'move' }> => a.type === 'move')
     .map((a) => ({ a, x: o.me.x + STEP[a.dir][0], y: o.me.y + STEP[a.dir][1] }))
-    .filter((m) => !isExit(m.x, m.y) && o.rows[m.y]?.[m.x] !== 'd' && !nearLava(o, m.x, m.y));
+    .filter((m) => !isExit(m.x, m.y) && o.rows[m.y]?.[m.x] !== 'd' && !nearLava(o, m.x, m.y) && !unsafeTiles(o).has(m.y * o.rows[0]!.length + m.x));
   return (moves.find((m) => !nextToSomeone(m.x, m.y)) ?? moves[0])?.a;
 }
 
@@ -123,17 +125,36 @@ function nearLava(o: Observation, x: number, y: number): boolean {
   return false;
 }
 
-/** The first step toward the nearest goal tile: around lava when possible, else the plain route. */
+/**
+ * Tiles to keep off when there is another way: gas in sight, and electrified water with the tiles
+ * next to it (the shock reaches the bank). Cached per observation.
+ */
+const UNSAFE = new WeakMap<Observation, Set<number>>();
+export function unsafeTiles(o: Observation): Set<number> {
+  let out = UNSAFE.get(o);
+  if (out) return out;
+  const w = o.rows[0]?.length ?? 0;
+  out = new Set<number>();
+  for (const [x, y] of o.gas ?? []) out.add(y * w + x);
+  for (const [x, y] of o.shock ?? []) for (const [dx, dy] of [[0, 0], ...Object.values(STEP)] as [number, number][]) out.add((y + dy) * w + x + dx);
+  UNSAFE.set(o, out);
+  return out;
+}
+
+/** The first step toward the nearest goal tile: around lava, gas and live water when possible, else the plain route. */
 function firstStep(o: Observation, goal: (c: string, x: number, y: number) => boolean): 'N' | 'E' | 'S' | 'W' | null {
   return search(o, goal, true) ?? search(o, goal, false);
 }
 
-/** Breadth-first over the seen map ('?' counts as open), optionally keeping off tiles next to lava. */
+/**
+ * Breadth-first over the seen map ('?' counts as open), optionally keeping off tiles next to lava,
+ * gas and electrified water. A step onto ice ('=') lands one tile further when that tile is open.
+ */
 function search(o: Observation, goal: (c: string, x: number, y: number) => boolean, safe: boolean): 'N' | 'E' | 'S' | 'W' | null {
   const h = o.rows.length;
   const w = o.rows[0]?.length ?? 0;
   const bridges = bridgeTiles(o);
-  const walkable = (c: string, k: number) => c === '.' || c === ',' || c === '*' || c === 'E' || c === 'd' || c === '?' || (c === '~' && bridges.has(k));
+  const walkable = (c: string, k: number) => c === '.' || c === ',' || c === '*' || c === 'E' || c === 'd' || c === '?' || c === '=' || (c === '~' && bridges.has(k));
   const first = new Map<number, 'N' | 'E' | 'S' | 'W'>();
   const start = o.me.y * w + o.me.x;
   const q = [start];
@@ -144,13 +165,24 @@ function search(o: Observation, goal: (c: string, x: number, y: number) => boole
     const y = (j / w) | 0;
     if (j !== start && goal(o.rows[y]![x]!, x, y)) return first.get(j)!;
     for (const d of ['N', 'E', 'S', 'W'] as const) {
-      const nx = x + STEP[d][0];
-      const ny = y + STEP[d][1];
+      let nx = x + STEP[d][0];
+      let ny = y + STEP[d][1];
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      if (!walkable(o.rows[ny]![nx]!, ny * w + nx)) continue;
+      // Ice: the agent slides on to the next tile when it is open (rubble and walls stop it).
+      if (o.rows[ny]![nx] === '=') {
+        const sx = nx + STEP[d][0];
+        const sy = ny + STEP[d][1];
+        const sc = o.rows[sy]?.[sx];
+        if (sx > 0 && sy > 0 && sx < w - 1 && sy < h - 1 && sc !== undefined && sc !== 'd' && walkable(sc, sy * w + sx)) {
+          nx = sx;
+          ny = sy;
+        }
+      }
       const k = ny * w + nx;
       const c = o.rows[ny]![nx]!;
-      // The safe route keeps off tiles next to lava, except the goal tile itself (the last step).
-      if (seen.has(k) || !walkable(c, k) || (safe && nearLava(o, nx, ny) && !goal(c, nx, ny))) continue;
+      // The safe route keeps off tiles next to lava, gas and live water, except the goal tile itself (the last step).
+      if (seen.has(k) || (safe && (nearLava(o, nx, ny) || unsafeTiles(o).has(k)) && !goal(c, nx, ny))) continue;
       seen.add(k);
       first.set(k, j === start ? d : first.get(j)!);
       q.push(k);

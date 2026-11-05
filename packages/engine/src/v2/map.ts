@@ -7,7 +7,7 @@ import type { ToolKind } from './tools';
 
 export type Team = 'A' | 'B';
 export type Dir = 'N' | 'E' | 'S' | 'W';
-export type Tile = 'wall' | 'grass' | 'tree' | 'dirt' | 'water' | 'lava' | 'fire' | 'item' | 'exit' | 'crate' | 'block' | 'valve';
+export type Tile = 'wall' | 'grass' | 'tree' | 'dirt' | 'water' | 'lava' | 'fire' | 'item' | 'exit' | 'crate' | 'block' | 'valve' | 'ice';
 export type HazardKind = 'water' | 'fire' | 'lava';
 export type EffectClass =
   | 'grow'
@@ -51,6 +51,23 @@ export interface MapSwitch {
   lanes: { A: number[]; B: number[] };
 }
 
+/** A gas vent: an open floor tile that puffs a cloud every `every` ticks (match.ts spreadGas). */
+export interface GasVent {
+  at: [number, number];
+  /** Ticks between puffs. */
+  every: number;
+  /** Cloud strength at the vent (2 to 5): it spreads one tile and thins by one each tick. */
+  strength: number;
+}
+
+/** A sparking cable on a wall: every `every` ticks it electrifies the water it touches for `ticks` ticks. */
+export interface SparkSource {
+  at: [number, number];
+  name: string;
+  every: number;
+  ticks: number;
+}
+
 export interface MapDefV2 {
   schema: 'skirm.map/v2';
   id: string;
@@ -82,6 +99,12 @@ export interface MapDefV2 {
   steal: boolean;
   /** Night: vision is one tile shorter. */
   night: boolean;
+  /** Ice patches on open floor: a mover that steps onto ice slides one more tile the same way. Mirrored. */
+  ice?: [number, number][];
+  /** Gas vents (mirrored). */
+  gas?: GasVent[];
+  /** Sparking cables next to water (mirrored). */
+  sparks?: SparkSource[];
 }
 
 const CHAR: Record<string, Tile | null> = {
@@ -98,6 +121,7 @@ const CHAR: Record<string, Tile | null> = {
   c: 'crate',
   B: 'block',
   V: 'valve',
+  '=': 'ice',
 };
 
 export interface ParsedMap {
@@ -148,6 +172,30 @@ export function parseMapV2(def: MapDefV2): ParsedMap {
   }
   for (const s of def.switches) if (at(s.at[0], s.at[1]) !== 'valve') fail(`switch at ${s.at} is not a valve tile`);
   for (const d of def.drops) if (!inside(d.at)) fail(`drop at ${d.at} is outside the map`);
+  // Gas, ice and sparks sit in mirrored pairs (or on the centre column), like everything else.
+  const mirrored = (what: string, list: [number, number][]) => {
+    const keys = new Set(list.map(([x, y]) => `${x},${y}`));
+    for (const [x, y] of list) if (!keys.has(`${w - 1 - x},${y}`)) fail(`${what} at ${x},${y} is not mirrored`);
+  };
+  for (const p of def.ice ?? []) {
+    const start = [...def.starts.A, ...def.starts.B].some(([x, y]) => x === p[0] && y === p[1]);
+    if (!inside(p) || at(p[0], p[1]) !== null || start) fail(`ice at ${p} is not open floor away from the starts`);
+    grid[p[1] * w + p[0]] = 'ice';
+  }
+  mirrored('ice', def.ice ?? []);
+  for (const v of def.gas ?? []) {
+    if (!inside(v.at) || at(v.at[0], v.at[1]) !== null) fail(`gas vent at ${v.at} is not open floor`);
+    if (v.every < 1 || v.strength < 2 || v.strength > 5) fail(`gas vent at ${v.at}: every must be 1 or more, strength 2 to 5`);
+  }
+  mirrored('gas vent', (def.gas ?? []).map((v) => v.at));
+  for (const sp of def.sparks ?? []) {
+    const [x, y] = sp.at;
+    if (at(x, y) !== 'wall') fail(`spark ${sp.name} is not on a wall`);
+    const wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => at(x + dx!, y + dy!) === 'water');
+    if (!wet) fail(`spark ${sp.name} touches no water`);
+    if (sp.every < 1 || sp.ticks < 1 || sp.ticks >= sp.every) fail(`spark ${sp.name}: ticks must be 1 or more and shorter than every`);
+  }
+  mirrored('spark', (def.sparks ?? []).map((sp) => sp.at));
   return { def, w, h, grid };
 }
 

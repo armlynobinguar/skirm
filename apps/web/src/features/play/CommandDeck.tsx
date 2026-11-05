@@ -2,12 +2,13 @@
 // The Command deck (the prototype's lobby): your lead agent on the left, and the main menu on the
 // right. Ranked Skirmish (the hub) is the biggest tile, then the Map Atlas, Crew (the lead agent's
 // editor), Skills, the Ladder (the leaderboards) and Practice: Quick practice against the greedy bot
-// on DEFAULT_PRACTICE (the crew screen with "Vs Greedy bot" on). Nothing here is made up: no
+// on DEFAULT_PRACTICE (the crew screen with "Vs Greedy bot" on), and the Daily challenge (today's
+// seed, the same for everyone, and its global board). Nothing here is made up: no
 // scripted barks and no feed ticker.
 // Every tile shares the header's icon language: a textured plate with its code-drawn icon top right,
-// a large faint copy as a watermark, a serial code (OP·01 to PRC·06), grain and hatching, hazard
+// a large faint copy as a watermark, a serial code (OP·01 to DLY·07), grain and hatching, hazard
 // tape in the corner and a halftone in the tile colour that strengthens on hover. Sits over the arena.
-import { BOT_HANDLE, DEFAULT_PRACTICE } from '@skirm/engine/v2';
+import { BOT_HANDLE, DAILY_TWISTS, DEFAULT_PRACTICE, DIFF_MODS, MAPS_V2, dailyChallenge, dailyDate } from '@skirm/engine/v2';
 import { OUTFIT_COLORS, SKIN_TONES } from '@skirm/shared';
 import { AkIcon, DisplayHeading, type AkIconName } from '@skirm/ui';
 import Link from 'next/link';
@@ -37,6 +38,9 @@ export function CommandDeck({ lead, agents, elo }: CommandDeckProps) {
   const crewNames = (agents ?? []).slice(0, 3).map((a) => a.name);
   const practiceMap = mapById(DEFAULT_PRACTICE.mapId)?.name ?? DEFAULT_PRACTICE.mapId;
   const practiceDiff = DIFFS[diffIndex(DEFAULT_PRACTICE.difficulty)]!.n;
+  const daily = dailyChallenge(dailyDate());
+  const dailyMap = MAPS_V2.find((m) => m.id === daily.mapId)?.name ?? daily.mapId;
+  const dailyDiff = DIFF_MODS[daily.difficulty].name;
 
   return (
     <section className={styles.deck} aria-label="Command deck" data-testid="s02-deck">
@@ -136,6 +140,18 @@ export function CommandDeck({ lead, agents, elo }: CommandDeckProps) {
           i={5}
           testId="s02-tile-practice"
         />
+        <Tile
+          href={routes.daily()}
+          className={styles.daily}
+          tone="var(--amber)"
+          code="One seed a day · global board"
+          name="Daily"
+          sub={`Today: ${dailyMap} · ${dailyDiff} · ${DAILY_TWISTS[daily.twist].name}`}
+          icon="lb"
+          serial="DLY·07"
+          i={6}
+          testId="s02-tile-daily"
+        />
       </nav>
     </section>
   );
@@ -161,7 +177,7 @@ function Tile({
   name: string;
   sub: string;
   icon: AkIconName;
-  /** Serial code under the icon plate (OP·01 to PRC·06). */
+  /** Serial code under the icon plate (OP·01 to DLY·07). */
   serial: string;
   go?: string;
   i: number;

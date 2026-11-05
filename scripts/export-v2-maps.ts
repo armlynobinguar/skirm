@@ -4,7 +4,7 @@
 // these files; rerun this script after changing the prototype's maps, then review the diff.
 //
 //   npx tsx scripts/export-v2-maps.ts
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as proto from '../apps/web/src/features/arena/proto/world';
 
@@ -52,6 +52,10 @@ for (const m of proto.MAPS as any[]) {
     steal: !!A.steal,
     night: !!A.night,
   };
-  writeFileSync(join(OUT, `${m.id}.json`), JSON.stringify(def, null, 2) + '\n');
+  // Gas vents, ice patches and sparking cables are not in the prototype: keep the hand-placed ones.
+  const file = join(OUT, `${m.id}.json`);
+  const prev = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
+  for (const k of ['ice', 'gas', 'sparks'] as const) if (prev[k]) (def as Record<string, unknown>)[k] = prev[k];
+  writeFileSync(file, JSON.stringify(def, null, 2) + '\n');
   console.log(`${m.code} ${m.id}: ${A.w}x${A.h}, goal ${A.n}, ${def.verbs.length} verbs, ${def.switches.length} switches, ${def.drops.length} drops`);
 }

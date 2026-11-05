@@ -52,6 +52,7 @@ const V2_TILE: Record<string, string | null> = {
   c: 'crate',
   B: 'block',
   V: 'valve',
+  '=': 'ice',
   '.': null,
 };
 
@@ -96,9 +97,15 @@ export function composeV2Arena(frame: V2Frame): LiveArena | null {
     };
   });
   const team = frame.view === 'watch' ? undefined : frame.view;
+  // Gas and live water ride on the board as overlays (tile indexes this side can see).
+  const state: ArenaState = { grid, agents };
+  if (frame.gas?.length) state.gas = frame.gas;
+  if (frame.shock?.length) state.shock = frame.shock;
+  const gear = gearOf(frame);
+  if (gear) state.gear = gear;
   return {
     A: { ...A, grid },
-    state: { grid, agents, gear: gearOf(frame) },
+    state,
     vis: fogged ? vis : null,
     light: fogged ? softLight(vis, w, A.h) : null,
     team,

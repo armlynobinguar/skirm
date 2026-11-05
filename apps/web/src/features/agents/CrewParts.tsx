@@ -26,6 +26,7 @@ import {
   verbFit,
 } from './agentView';
 import c from './crew.module.css';
+import { XpBar } from './Progression';
 
 /** Effect class as a label: "add_solid" → "add solid". */
 const effectLabel = (e: string) => e.replace(/_/g, ' ');
@@ -160,6 +161,7 @@ export function CrewCard({ name, agent, map, tier, ranked, disabled, skillMine, 
             <span>{agentVoice(agent)}</span>
           </div>
         ) : null}
+        {agent ? <XpBar agent={agent} compact /> : null}
         <div className={c.talk}>
           <span className="sk-kick">Talk tier</span>
           <TalkTierPicker name={name} value={tier} ranked={ranked} disabled={disabled} onChange={onTier} />
