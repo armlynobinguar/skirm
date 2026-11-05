@@ -151,4 +151,30 @@ describe('parseClientMessage', () => {
     expect(err({ type: 'v2_command', matchId: 'mat_1', preset: 'regroup', tick: 4 })).toBe('bad_message');
     expect(err({ type: 'v2_command', preset: 'regroup' })).toBe('bad_message');
   });
+
+  it('checks v2_control: an own agent id or null to hand it back', () => {
+    expect(ok({ type: 'v2_control', matchId: 'mat_1', agentId: 'agt_1' })).toEqual({ type: 'v2_control', matchId: 'mat_1', agentId: 'agt_1' });
+    expect(ok({ type: 'v2_control', matchId: 'mat_1', agentId: null })).toEqual({ type: 'v2_control', matchId: 'mat_1', agentId: null });
+    expect(err({ type: 'v2_control', matchId: 'mat_1' })).toBe('bad_message');
+    expect(err({ type: 'v2_control', matchId: 'mat_1', agentId: 'bad id!' })).toBe('bad_message');
+    expect(err({ type: 'v2_control', matchId: 'mat_1', agentId: 'agt_1', ranked: true })).toBe('bad_message');
+  });
+
+  it('checks v2_steer: one tick input or a standing order, nothing else', () => {
+    const steer = (input: unknown) => ({ type: 'v2_steer', matchId: 'mat_1', input });
+    expect(ok(steer({ kind: 'move', dir: 'N' }))).toEqual(steer({ kind: 'move', dir: 'N' }));
+    expect(ok(steer({ kind: 'use' }))).toEqual(steer({ kind: 'use' }));
+    expect(ok(steer({ kind: 'use', dir: 'W' }))).toEqual(steer({ kind: 'use', dir: 'W' }));
+    for (const kind of ['wait', 'take', 'deliver', 'stop']) expect(ok(steer({ kind }))).toEqual(steer({ kind }));
+    expect(ok(steer({ kind: 'goto', to: [3, 4] }))).toEqual(steer({ kind: 'goto', to: [3, 4] }));
+    expect(err(steer({ kind: 'move', dir: 'up' }))).toBe('bad_message');
+    expect(err(steer({ kind: 'move' }))).toBe('bad_message');
+    expect(err(steer({ kind: 'goto', to: [3] }))).toBe('bad_message');
+    expect(err(steer({ kind: 'goto', to: [-1, 2] }))).toBe('bad_message');
+    expect(err(steer({ kind: 'goto', to: [1.5, 2] }))).toBe('bad_message');
+    expect(err(steer({ kind: 'take', dir: 'N' }))).toBe('bad_message');
+    expect(err(steer({ kind: 'teleport' }))).toBe('bad_message');
+    expect(err(steer('N'))).toBe('bad_message');
+    expect(err({ type: 'v2_steer', input: { kind: 'wait' } })).toBe('bad_message');
+  });
 });

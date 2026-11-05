@@ -14,6 +14,7 @@ import { drawGear2D } from './gear';
 import * as proto from './proto/world';
 import { cameraFor, easeRateFor, fitBox, sceneForMatchView, sceneForScreen, stepCamera, type ArenaScene, type Camera } from './scene';
 import { liveFx, type LiveArena } from './live';
+import { setArenaProjection } from './pick';
 import { useArena, type ArenaStateSnapshot } from './store';
 import { MAPS, mapById, restingState, type ArenaState, type V2Map } from './world';
 
@@ -171,6 +172,9 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
           oy += (Math.random() - 0.5) * shake * 14;
         }
       }
+      // Hybrid control's click-to-move reads where the flat board was drawn (never the tilted third person).
+      setArenaProjection(lm && inMatch && L.scene !== 'tpv' ? { ox, oy, T, slab: T * 0.13, w: A.w, h: A.h } : null);
+      if (lm && !opts.focus && lm.arena.controlled) opts.focus = lm.arena.controlled;
       if (!proto.drawScenery(ctx, m, A, T, ox, oy, time, vw, vh)) drawBackdrop(ctx, time, vw, vh);
       proto.renderArena(ctx, A, (m as unknown as { pal2: unknown }).pal2, prev, lm ? lm.arena.state : restingState(m), alpha, T, ox, oy, time, opts);
       const gear = lm?.arena.state.gear;

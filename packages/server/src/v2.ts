@@ -1,7 +1,7 @@
 // v2 match messages on /ws. A match goes found → accept (10 s,
 // both crews) → lock-in (30 s: talk tiers and crew changes, the rival hidden) → live (2 s ticks) →
 // end. Each crew gets its own frame through its own fog; watchers get the whole board.
-import type { CommandPreset, Difficulty, MatchResult, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
+import type { CommandPreset, Difficulty, MatchResult, SteerInput, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
 import type { PlayerTier } from '@skirm/shared';
 
 export interface V2CrewEntry {
@@ -138,7 +138,14 @@ export type V2ClientMessage =
    */
   | { type: 'v2_command'; matchId: string; agentId?: string; preset?: CommandPreset; text?: string }
   /** Draft mode, on your turn: ban one of the rival's equipped skills (from v2_draft `pool`), or pass with null. */
-  | { type: 'v2_ban'; matchId: string; skillId: string | null };
+  | { type: 'v2_ban'; matchId: string; skillId: string | null }
+  /**
+   * Hybrid control (casual and practice only): steer one of your own agents by hand (`agentId`), or
+   * hand it back to the brain (null). One at a time. Answered with v2_control_ok.
+   */
+  | { type: 'v2_control'; matchId: string; agentId: string | null }
+  /** Hybrid control: your input for the agent you steer (one tick, or a standing order). No answer; errors only. */
+  | { type: 'v2_steer'; matchId: string; input: SteerInput };
 
 export type V2ServerMessage =
   /**
@@ -166,4 +173,6 @@ export type V2ServerMessage =
   /** A private lobby's players readied or stepped back (sent to both). */
   | { type: 'v2_lobby'; lobbyId: string; ready: { host: boolean; guest: boolean } }
   /** Answer to v2_command, to the sender's crew only: the command is applied on `tick`; `left` remain. */
-  | { type: 'v2_command_ok'; matchId: string; tick: number; left: number };
+  | { type: 'v2_command_ok'; matchId: string; tick: number; left: number }
+  /** Answer to v2_control, to the sender only: the agent now steered (null: the brain runs the whole crew). */
+  | { type: 'v2_control_ok'; matchId: string; agentId: string | null };
