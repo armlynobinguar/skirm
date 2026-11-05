@@ -26,6 +26,7 @@ import type { Dir, EffectClass, HazardKind, MapDefV2, ParsedMap, Team, Tile } fr
 import { middleTiles, parseMapV2 } from './map';
 import { deliverTalk, TALK_TIERS, type HeardMessage, type SayInput, type TalkTier } from './talk';
 import { cooldownFor, digHitsFor, timerFor, visionOf } from './traits';
+import { isBridge, isSandbag, landTool, newGear, pickTool, runPumps, toolActions, useTool, type GearState, type ToolKind } from './tools';
 
 export const TICK_MS = 2000;
 export const MATCH_TICKS = 150;
@@ -82,7 +83,7 @@ export interface MatchOptions {
   lieCap?: Partial<Record<Team, number>>;
 }
 
-export type Action = { type: 'wait' } | { type: 'move'; dir: Dir } | { type: 'verb'; verb: string; dir?: Dir } | { type: 'switch' };
+export type Action = { type: 'wait' } | { type: 'move'; dir: Dir } | { type: 'verb'; verb: string; dir?: Dir } | { type: 'switch' } | { type: 'use'; tool: ToolKind; dir: Dir };
 
 export interface AgentState {
   id: string;
@@ -125,6 +126,8 @@ export interface AgentState {
   bluffs: { told: number; landed: number; seenThrough: number };
   /** Lost last tick's action to gas: it acts this tick even in gas (gas halves an agent's pace). */
   gasp?: boolean;
+  /** The one tool it carries from a supply drop (tools.ts), if any. */
+  tool?: ToolKind;
 }
 
 export type MatchEvent =
@@ -152,7 +155,11 @@ export type MatchEvent =
   /** Electrified water stunned the agent (`by`: the cable's name). */
   | { kind: 'shocked'; agent: string; by: string }
   /** A gas vent puffed. */
-  | { kind: 'gas_vent'; at: [number, number] };
+  | { kind: 'gas_vent'; at: [number, number] }
+  | { kind: 'tool_dropped'; tool: ToolKind; at: [number, number] }
+  | { kind: 'tool_picked'; agent: string; tool: ToolKind; at: [number, number] }
+  | { kind: 'tool_used'; agent: string; tool: ToolKind; at: [number, number] }
+  | { kind: 'pumped'; at: [number, number]; drained: number; done: boolean };
 
 export interface MatchResult {
   winner: Team | 'draw';
@@ -228,6 +235,8 @@ export interface MatchState {
   seen: Record<Team, (Tile | null | undefined)[]>;
   visible: Record<Team, boolean[]>;
   result: MatchResult | null;
+  /** Tools on the ground and placed sandbags, pumps and bridges (tools.ts). */
+  gear?: GearState;
 }
 
 const DIRS: Record<Dir, [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
@@ -311,6 +320,7 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
     seen: { A: new Array(size), B: new Array(size) },
     visible: { A: new Array(size).fill(false), B: new Array(size).fill(false) },
     result: null,
+    gear: newGear(),
   };
   // Both crews know where every item starts (the prototype's known items): fog hides what happens
   // to them later, not where they were laid out.
@@ -347,17 +357,19 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
     for (const j of f.tiles) if (s.grid[j] === f.kind) s.grid[j] = null;
     return false;
   });
-  for (const d of def.drops)
-    if (d.tick === s.tick) {
-      const j = idx(s, d.at);
-      if (s.grid[j] === null) {
-        s.grid[j] = 'item';
-        // Announced to both crews, fog or not (the prototype marks a drop as known to both).
-        s.seen.A[j] = 'item';
-        s.seen.B[j] = 'item';
-      }
-      ev.push({ kind: 'supply_drop', at: d.at });
+  def.drops.forEach((d, k) => {
+    if (d.tick !== s.tick) return;
+    const j = idx(s, d.at);
+    const lands = s.grid[j] === null;
+    if (lands) {
+      s.grid[j] = 'item';
+      // Announced to both crews, fog or not (the prototype marks a drop as known to both).
+      s.seen.A[j] = 'item';
+      s.seen.B[j] = 'item';
     }
+    ev.push({ kind: 'supply_drop', at: d.at });
+    if (lands) landTool(s, k, j, ev);
+  });
 
   // 2. actions. Agents that cannot act this tick: head start, knocked down, stunned, removed.
   const actors: AgentState[] = [];
@@ -401,7 +413,7 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
           if (a.role === 'Digger') used(s, a);
         } else s.dig[j] = hits;
         ev.push({ kind: 'dug', agent: a.id, at: [a.x + dx, a.y + dy], done });
-      } else if (t === null || (t !== undefined && passable(t))) moves.set(a, j);
+      } else if (t === null || (t !== undefined && passable(t)) || (t === 'water' && isBridge(s, j))) moves.set(a, j);
       else ev.push({ kind: 'blocked', agent: a.id });
     } else if (act.type === 'verb') {
       const refused = useVerb(s, a, act.verb, act.dir, ev);
@@ -414,6 +426,9 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
         used(s, a);
         s.tally[a.team].switches++;
       }
+    } else if (act.type === 'use') {
+      const refused = useTool(s, a, act.tool, act.dir, ev);
+      if (refused) ev.push({ kind: 'refused', agent: a.id, reason: refused });
     }
   }
   resolveMoves(s, moves, ev);
@@ -446,10 +461,12 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
       a.tags = [];
       ev.push({ kind: 'delivered', agent: a.id, team: a.team, count: n, score: s.score[a.team] });
     }
+    pickTool(s, a, ev);
   }
 
   // 4. environment
   for (const hz of def.hazards) if (s.tick % hz.every === 0) spreadHazard(s, hz.kind, hz.cap, ev);
+  runPumps(s, ev);
   if (def.gas?.length) spreadGas(s, ev);
   if (def.sparks?.length) electrify(s, ev);
 
@@ -610,14 +627,14 @@ function useSwitch(s: MatchState, a: AgentState, ev: MatchEvent[]): string | nul
   const rival: Team = a.team === 'A' ? 'B' : 'A';
   const { w } = s.map;
   const occ = new Set(s.agents.filter((o) => !o.out).map((o) => o.y * w + o.x));
-  const tiles = sw.lanes[rival].filter((j) => s.grid[j] === null && (sw.kind !== 'dirt' || !occ.has(j)));
+  const tiles = sw.lanes[rival].filter((j) => s.grid[j] === null && (sw.kind !== 'dirt' || !occ.has(j)) && !(sw.kind === 'water' && isSandbag(s, j)));
   for (const j of tiles) s.grid[j] = sw.kind;
   s.floods.push({ team: rival, until: s.tick + FLOOD_TICKS, tiles, kind: sw.kind });
   s.switchReady[k] = s.tick + SWITCH_COOLDOWN;
   ev.push({ kind: 'switch', agent: a.id, name: sw.name, floods: rival, until: s.tick + FLOOD_TICKS });
   if (sw.kind !== 'dirt') {
     const hit = new Set(tiles);
-    for (const o of s.agents) if (!o.out && !o.down && hit.has(o.y * w + o.x)) knockDown(s, o, 'switch', ev);
+    for (const o of s.agents) if (!o.out && !o.down && hit.has(o.y * w + o.x) && !(sw.kind === 'water' && isBridge(s, o.y * w + o.x))) knockDown(s, o, 'switch', ev);
   }
   return null;
 }
@@ -645,7 +662,7 @@ function spreadHazard(s: MatchState, kind: HazardKind, cap: number, ev: MatchEve
       const ny = y + dy;
       if (nx < 1 || ny < 1 || nx >= w - 1 || ny >= h - 1) continue;
       const j = ny * w + nx;
-      if (changed.has(j) || starts.has(j)) continue;
+      if (changed.has(j) || starts.has(j) || (kind === 'water' && isSandbag(s, j))) continue;
       const tt = snap[j]!;
       const catches = kind === 'fire' ? tt === 'grass' || tt === 'tree' || tt === 'crate' : tt === null || tt === 'grass';
       if (catches) changed.set(j, tt);
@@ -658,9 +675,11 @@ function spreadHazard(s: MatchState, kind: HazardKind, cap: number, ev: MatchEve
   ev.push({ kind: 'hazard', hazard: kind, wave: H.waves.length, receding: false });
   for (const a of s.agents) {
     if (a.out || a.down || !changed.has(a.y * w + a.x)) continue;
+    if (kind === 'water' && isBridge(s, a.y * w + a.x)) continue;
     if (kind === 'lava') {
       dropItems(s, a);
       a.out = true;
+      a.tool = undefined;
       s.tally[a.team].swept++;
       ev.push({ kind: 'eliminated', agent: a.id, by: kind });
     } else knockDown(s, a, kind, ev);
@@ -831,8 +850,9 @@ export function legalActions(s: MatchState, agentId: string): Action[] {
   const { w } = s.map;
   for (const dir of DIR_LIST) {
     const [dx, dy] = DIRS[dir];
-    const t = s.grid[(a.y + dy) * w + a.x + dx];
-    if (t === null || t === 'dirt' || (t !== undefined && passable(t))) out.push({ type: 'move', dir });
+    const j = (a.y + dy) * w + a.x + dx;
+    const t = s.grid[j];
+    if (t === null || t === 'dirt' || (t !== undefined && passable(t)) || (t === 'water' && isBridge(s, j))) out.push({ type: 'move', dir });
   }
   for (const v of s.map.def.verbs) {
     if (v.effect === 'take' || v.effect === 'deliver') continue;
@@ -846,6 +866,7 @@ export function legalActions(s: MatchState, agentId: string): Action[] {
   }
   const k = s.map.def.switches.findIndex((sw) => manhattan({ x: sw.at[0], y: sw.at[1] }, a) === 1);
   if (k >= 0 && s.switchReady[k]! <= s.tick + 1) out.push({ type: 'switch' });
+  out.push(...toolActions(s, a));
   return out;
 }
 

@@ -4,6 +4,7 @@
 // model goes wrong; with the distances in front of it the model still chooses, it just does not
 // have to measure.
 import type { Action, Observation } from '@skirm/engine/v2';
+import { bridgeTiles } from './tools';
 
 const STEP: Record<'N' | 'E' | 'S' | 'W', [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
 const OPEN = new Set(['.', ',', '*', 'E', 'd', '?', '=']);
@@ -20,6 +21,7 @@ export function distancesFrom(o: Observation, x0: number, y0: number): Distances
   const w = o.rows[0]?.length ?? 0;
   const out: Distances = { item: null, deliver: null, unseen: null };
   if (x0 < 0 || y0 < 0 || x0 >= w || y0 >= h) return out;
+  const bridges = bridgeTiles(o);
   const dist = new Int32Array(w * h).fill(-1);
   const q = [y0 * w + x0];
   dist[q[0]!] = 0;
@@ -38,7 +40,7 @@ export function distancesFrom(o: Observation, x0: number, y0: number): Distances
       const ny = y + s[1];
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
       const k = ny * w + nx;
-      if (dist[k]! >= 0 || !OPEN.has(o.rows[ny]![nx]!)) continue;
+      if (dist[k]! >= 0 || !(OPEN.has(o.rows[ny]![nx]!) || bridges.has(k))) continue;
       // Rubble takes 3 hits to clear before it can be walked.
       dist[k] = d + (o.rows[ny]![nx] === 'd' ? 3 : 1);
       q.push(k);

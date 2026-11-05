@@ -27,6 +27,7 @@ import type { ArenaState } from '@/features/arena/world';
 import { useSession } from '@/lib/auth/session';
 import type { FrameAgent, V2Frame } from '@/lib/realtime/protocol';
 import { AgentCards, type CardAgent } from './hud/AgentCards';
+import { GearLegend } from './hud/Gear';
 import { CommandBar } from './hud/Commands';
 import { Comms } from './hud/Comms';
 import { ControlBar, TakeControl, useHybridControl } from './hud/Control';
@@ -320,6 +321,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
         <AgentCards team={team} mapId={view.mapId} tick={tick} cards={rivalCards} unseen={unseen} pressed={tpv ?? focus} onPick={onPick} onWatch={enterTpv} className={c.cardsB} />
       </div>
       <CalloutBar callout={callout} />
+      {intro ? null : <GearLegend frame={frame} />}
       {watched ? (
         <ThirdPerson
           agent={watched.agent}

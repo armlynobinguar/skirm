@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { usePreferences } from '@/lib/preferences';
 import { screenOf } from '@/lib/routes';
+import { drawGear2D } from './gear';
 import * as proto from './proto/world';
 import { cameraFor, easeRateFor, fitBox, sceneForMatchView, sceneForScreen, stepCamera, type ArenaScene, type Camera } from './scene';
 import { liveFx, type LiveArena } from './live';
@@ -176,6 +177,8 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
       if (lm && !opts.focus && lm.arena.controlled) opts.focus = lm.arena.controlled;
       if (!proto.drawScenery(ctx, m, A, T, ox, oy, time, vw, vh)) drawBackdrop(ctx, time, vw, vh);
       proto.renderArena(ctx, A, (m as unknown as { pal2: unknown }).pal2, prev, lm ? lm.arena.state : restingState(m), alpha, T, ox, oy, time, opts);
+      const gear = lm?.arena.state.gear;
+      if (gear) drawGear2D(ctx, gear, T, ox, oy, time, opts.light as number[] | null | undefined, A.w);
       proto.drawWeather(ctx, m, time, vw, vh);
     };
 

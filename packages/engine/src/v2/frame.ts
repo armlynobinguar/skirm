@@ -9,6 +9,7 @@ import type { MatchEvent, MatchResult, MatchState, Role } from './match';
 import { rowsFor } from './observe';
 import type { Channel, TalkTier } from './talk';
 import type { SkillTrigger } from './triggers';
+import { gearView, type ToolKind } from './tools';
 
 export type FrameView = Team | 'watch';
 
@@ -52,6 +53,8 @@ export interface FrameAgent {
   skills?: FrameSkill[];
   /** Hybrid control: its player steers it by hand (its actions come from the player, not the brain). */
   controlled?: true;
+  /** The tool it carries from a supply drop (absent: none). */
+  tool?: ToolKind;
 }
 
 /** One equipped skill in the mind panel: public metadata and whether it is active this tick. */
@@ -105,6 +108,10 @@ export interface V2Frame {
    * order it is walking (take, deliver or goto; null: none, it waits for the next input).
    */
   steer?: { agentId: string; standing: SteerInput | null };
+  /** Tools lying on the map, waiting to be picked up (absent: none). Public, like the drops. */
+  tools?: { at: [number, number]; kind: ToolKind }[];
+  /** Placed sandbags, bridges and running pumps (a pump's ticks left). Absent: none. Public. */
+  placed?: { at: [number, number]; kind: ToolKind; ticksLeft?: number }[];
 }
 
 /** What the server knows beside the match state: each agent's current plan. */
@@ -128,6 +135,7 @@ export function frameFor(s: MatchState, view: FrameView, events: MatchEvent[], e
         return tag ? { kind: 'item', origin: tag.origin, tick: tag.tick } : { kind: 'item', origin: null };
       });
       const f: FrameAgent = { id: a.id, name: a.name, team: a.team, role: a.role, x: a.x, y: a.y, items, delivered: a.delivered, down: a.down > 0, out: a.out, tier: a.tier };
+      if (a.tool) f.tool = a.tool;
       if (team && a.team === team) {
         if (extras.planHidden?.includes(a.id)) f.planHidden = true;
         else if (extras.plans?.[a.id]) f.plan = extras.plans[a.id];
@@ -168,6 +176,7 @@ export function frameFor(s: MatchState, view: FrameView, events: MatchEvent[], e
     if ('agent' in e && !mine(e.agent) && !shown.has(e.agent)) continue;
     out.push(e);
   }
+  const gear = gearView(s);
   return {
     view,
     mapId: s.map.def.id,
@@ -188,6 +197,8 @@ export function frameFor(s: MatchState, view: FrameView, events: MatchEvent[], e
       return { kind, waves: H?.waves.length ?? 0, receding: H?.receding ?? false };
     }),
     ...overlaysFor(s, team),
+    ...(gear.ground.length ? { tools: gear.ground } : {}),
+    ...(gear.placed.length ? { placed: gear.placed } : {}),
   };
 }
 

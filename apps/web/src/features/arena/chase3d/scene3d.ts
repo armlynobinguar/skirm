@@ -5,6 +5,7 @@
 // eases the agents, the fog light and the camera.
 import * as THREE from 'three';
 import * as proto from '../proto/world';
+import { TOOL_INFO } from '../gear';
 import type { LiveArena } from '../live';
 import { MAPS, ROTATION_INDEX, mapById, type Arena, type ArenaState } from '../world';
 import type { ChaseCamOptions, ChaseCamState } from './index';
@@ -89,7 +90,7 @@ const TWEEN_MS = 400;
 /** An agent as the arena draws it; live arenas also carry body colours and status. */
 type Agent3 = ArenaState['agents'][number] & { c?: string; bone?: string; out?: boolean; down?: boolean };
 
-type DynKey = 'dirt' | 'crate' | 'block' | 'grass' | 'trunk' | 'canopy' | 'water' | 'lava' | 'fire' | 'flame' | 'item' | 'ice' | 'gas' | 'shock';
+type DynKey = 'dirt' | 'crate' | 'block' | 'grass' | 'trunk' | 'canopy' | 'water' | 'lava' | 'fire' | 'flame' | 'item' | 'ice' | 'gas' | 'shock' | 'sandbag' | 'bridge' | 'pump' | 'tool';
 
 interface AgentRig {
   g: THREE.Group;
@@ -304,6 +305,11 @@ export function buildWorld(arena: LiveArena, look: string): World {
     ice: inst(box, new THREE.MeshPhongMaterial({ color: '#cdeefa', emissive: '#2a4a5a', shininess: 120, transparent: true, opacity: 0.92 }), cap, false),
     gas: inst(new THREE.IcosahedronGeometry(0.4, 1), new THREE.MeshLambertMaterial({ color: '#8fd65e', emissive: '#2c5a14', transparent: true, opacity: 0.38, depthWrite: false }), cap, false),
     shock: inst(box, new THREE.MeshBasicMaterial({ color: '#ffe94a', transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }), cap, false),
+    // Supply tools (../gear): placed sandbags, bridges and pumps, and tools waiting on the ground.
+    sandbag: inst(new THREE.CapsuleGeometry(0.14, 0.5, 4, 8).rotateZ(Math.PI / 2), lambert({ color: TOOL_INFO.sandbag.colour }), cap * 2),
+    bridge: inst(box, lambert({ color: TOOL_INFO.bridge.colour }), cap * 3),
+    pump: inst(new THREE.CylinderGeometry(0.16, 0.2, 0.45, 10).translate(0, 0.225, 0), lambert({ color: '#2a4a5c', emissive: TOOL_INFO.pump.colour, emissiveIntensity: 0.35 }), cap),
+    tool: inst(box, new THREE.MeshBasicMaterial({ color: '#ffd27a' }), cap, true),
   };
 
   // The delivery point: a turning ring and a soft beam.
@@ -502,6 +508,16 @@ function layTiles(w: World, state: ArenaState, seen: ((i: number) => boolean) | 
   // Overlays: electrified water glows over the water, gas hangs as a low green cloud.
   for (const i of state.shock ?? []) put('shock', i % W, 0.02, (i / W) | 0, 1, 0.05, 1);
   for (const i of state.gas ?? []) put('gas', i % W, 0.35, (i / W) | 0, 1.1, 0.7, 1.1, hash(i, 3) * 3);
+  const gear = state.gear;
+  for (const p of gear?.placed ?? []) {
+    const [x, y] = p.at;
+    if (p.kind === 'sandbag') {
+      put('sandbag', x, 0.1, y - 0.12, 1, 1, 1);
+      put('sandbag', x, 0.1, y + 0.12, 1, 1, 1);
+    } else if (p.kind === 'bridge') for (const k of [-0.3, 0, 0.3]) put('bridge', x + k, 0.04, y, 0.24, 0.08, 1.04);
+    else put('pump', x, 0, y, 1, 1, 1);
+  }
+  for (const g of gear?.tools ?? []) put('tool', g.at[0], 0.15, g.at[1], 0.34, 0.3, 0.34, 0.6);
   for (const key of Object.keys(dyn) as DynKey[]) {
     dyn[key].count = n[key] ?? 0;
     dyn[key].instanceMatrix.needsUpdate = true;
