@@ -14,6 +14,7 @@ import { MatchTimelinesRepo } from './match-timelines';
 import { OnboardingRepo } from './onboarding';
 import { OpsRepo } from './ops';
 import { PlaybooksRepo } from './playbooks';
+import { PuzzlesRepo } from './puzzles';
 import { ProofRepo } from './proof';
 import { QuestsRepo } from './quests';
 import { RankedRepo } from './ranked';
@@ -68,6 +69,8 @@ export interface Repos {
   playbooks: PlaybooksRepo;
   /** Campaign progress and chapter rewards. */
   campaign: CampaignRepo;
+  /** Puzzle runs and each player's best solve per puzzle. */
+  puzzles: PuzzlesRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -110,6 +113,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     externalAgents: new ExternalAgentsRepo(db),
     playbooks: new PlaybooksRepo(db),
     campaign: new CampaignRepo(db),
+    puzzles: new PuzzlesRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -118,6 +122,7 @@ export * from './accounts';
 export * from './agents';
 export * from './bench';
 export * from './campaign';
+export * from './puzzles';
 export * from './cosmetics';
 export * from './external-agents';
 export * from './leaderboards';

@@ -10,6 +10,8 @@ import {
   agentSkills,
   campaignProgress,
   campaignRewards,
+  puzzleBests,
+  puzzleRuns,
   agents,
   cosmeticsOwned,
   eloDecays,
@@ -162,6 +164,10 @@ export class AccountsRepo {
       this.db.select().from(campaignProgress).where(eq(campaignProgress.accountId, accountId)),
       this.db.select().from(campaignRewards).where(eq(campaignRewards.accountId, accountId)),
     ]);
+    const [puzzleRunRows, puzzleBestRows] = await Promise.all([
+      this.db.select().from(puzzleRuns).where(eq(puzzleRuns.accountId, accountId)),
+      this.db.select().from(puzzleBests).where(eq(puzzleBests.accountId, accountId)),
+    ]);
     return {
       account: [account],
       agents: myAgents,
@@ -189,6 +195,8 @@ export class AccountsRepo {
       playbooks: playbookRows,
       campaign,
       campaignRewards: campaignRewardRows,
+      puzzleRuns: puzzleRunRows,
+      puzzleBests: puzzleBestRows,
     };
   }
 
