@@ -4,12 +4,13 @@
 // profile), then three cells: credits with the free allowance and held amount, the NEAR wallet
 // (linked account and its balance, read from the chain), and ranked Elo with its rank title. The card
 // stays in the DOM while closed (hidden), so its figures are always readable by tests. Escape, a
-// click outside, a link inside and a route change close it. Signed out, the badge is a Sign in link.
+// click outside, a link inside and a route change close it. The last row signs out and goes to the
+// sign-in screen. Signed out, the badge is a Sign in link.
 // Hidden on the live match and run screens, whose HUD owns the screen. The test ids keep their
 // topbar- names (e2e and the smoke use them).
 import { fmt } from '@skirm/ui';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { TierBadge, tierFrom, tierText } from '@/components/TierBadge';
 import { nearShort, useNearBalance } from '@/features/play/useNearBalance';
@@ -28,7 +29,9 @@ export function AccountDock() {
   const screen = screenOf(pathname);
   const session = useSession();
   const me = useMe();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const panelId = useId();
 
@@ -139,6 +142,26 @@ export function AccountDock() {
           </Link>
           <WalletCell me={me.data} />
           <EloCell me={me.data} />
+        </div>
+        <div className="app-dock-foot">
+          <button
+            type="button"
+            className="app-dock-signout"
+            disabled={signingOut}
+            onClick={async () => {
+              setSigningOut(true);
+              try {
+                await session.signOut();
+              } finally {
+                setSigningOut(false);
+                setOpen(false);
+                router.push(routes.signIn());
+              }
+            }}
+            data-testid="topbar-sign-out"
+          >
+            {signingOut ? 'Signing out…' : 'Sign out'}
+          </button>
         </div>
       </aside>
     </div>
