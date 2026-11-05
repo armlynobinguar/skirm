@@ -156,10 +156,94 @@ fn owner_cannot_mint() {
 }
 
 #[test]
-#[should_panic(expected = "token_id must be unique")]
-fn same_version_cannot_be_minted_twice() {
+fn identical_retry_returns_existing_token_without_minting_again() {
+    let mut c = setup();
+    let first = mint(&mut c, skill());
+    assert_eq!(get_logs().len(), 1);
+    let storage = env::storage_usage();
+
+    let again = mint(&mut c, skill());
+    assert_eq!(again.token_id, first.token_id);
+    assert_eq!(again.owner_id, creator());
+    assert_eq!(again.metadata, first.metadata);
+    // No second nft_mint event, no new storage, no refund receipt, supply unchanged.
+    assert!(get_logs().is_empty());
+    assert_eq!(env::storage_usage(), storage);
+    assert!(get_created_receipts().is_empty());
+    assert_eq!(c.nft_total_supply(), U128(1));
+    assert_eq!(c.nft_supply_for_owner(creator()), U128(1));
+}
+
+#[test]
+fn identical_retry_accepts_reordered_tags_and_explicit_default_royalty() {
+    let mut c = setup();
+    let first = mint(&mut c, skill());
+    let mut s = skill();
+    s.handles_tags = vec!["liquid".to_string(), "spreads".to_string()];
+    s.royalty_bps = Some(DEFAULT_ROYALTY_BPS);
+    let again = mint(&mut c, s);
+    assert_eq!(again.token_id, first.token_id);
+    assert!(get_logs().is_empty());
+}
+
+#[test]
+fn identical_retry_after_transfer_returns_the_current_owner() {
+    let mut c = setup();
+    let t = mint(&mut c, skill());
+    set(creator(), NearToken::from_yoctonear(1));
+    c.nft_transfer(buyer(), t.token_id.clone(), None, None);
+    let again = mint(&mut c, skill());
+    assert_eq!(again.owner_id, buyer());
+    assert_eq!(c.nft_total_supply(), U128(1));
+}
+
+#[test]
+#[should_panic(expected = "This skill version is already minted with different content")]
+fn conflicting_retry_with_other_prompt_hash_panics() {
     let mut c = setup();
     mint(&mut c, skill());
+    let mut s = skill();
+    s.prompt_sha256 = "0".repeat(64);
+    mint(&mut c, s);
+}
+
+#[test]
+#[should_panic(expected = "This skill version is already minted with different content")]
+fn conflicting_retry_with_other_creator_panics() {
+    let mut c = setup();
+    mint(&mut c, skill());
+    let mut s = skill();
+    s.creator = buyer();
+    mint(&mut c, s);
+}
+
+#[test]
+#[should_panic(expected = "This skill version is already minted with different content")]
+fn conflicting_retry_with_other_metadata_panics() {
+    let mut c = setup();
+    mint(&mut c, skill());
+    let mut s = skill();
+    s.summary = Some("A different summary.".to_string());
+    mint(&mut c, s);
+}
+
+#[test]
+#[should_panic(expected = "This skill version is already minted with different content")]
+fn conflicting_retry_with_other_name_panics() {
+    let mut c = setup();
+    mint(&mut c, skill());
+    let mut s = skill();
+    s.name = "Another Name".to_string();
+    mint(&mut c, s);
+}
+
+#[test]
+#[should_panic(expected = "This skill is account-bound and is never minted")]
+fn retry_of_a_skill_marked_account_bound_is_still_refused() {
+    let mut c = setup();
+    mint(&mut c, skill());
+    set(owner(), NearToken::from_yoctonear(1));
+    c.set_account_bound(SKILL_ID.to_string(), true);
     mint(&mut c, skill());
 }
 

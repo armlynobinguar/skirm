@@ -182,7 +182,7 @@ attached, so a function-call key cannot make it.
 | Method | Caller | Deposit | Notes |
 | --- | --- | --- | --- |
 | `new(owner_id, ops_id, metadata?, account_bound_skill_ids?)` | deployer | | Metadata defaults to `nft-1.0.0`, "skirm skills", `SKIRM` |
-| `nft_mint(skill)` → `Token` | ops only | none | Mints to `skill.creator`; contract pays storage |
+| `nft_mint(skill)` → `Token` | ops only | none | Mints to `skill.creator`; contract pays storage. Idempotent: the same version with the same content again returns the existing token (no event, no storage); with different content it panics |
 | `nft_transfer`, `nft_transfer_call`, `nft_token` | NEP-171 | 1 yocto | |
 | `nft_approve`, `nft_revoke`, `nft_revoke_all`, `nft_is_approved` | NEP-178 | storage / 1 yocto | |
 | `nft_total_supply`, `nft_tokens`, `nft_supply_for_owner`, `nft_tokens_for_owner` | NEP-181 | | |
