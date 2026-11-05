@@ -913,6 +913,68 @@ export const skillBenchRuns = pgTable(
   ],
 );
 
+export type DailyAttemptStatus = 'queued' | 'running' | 'done' | 'failed' | 'insufficient_credits';
+
+/** One agent of a daily attempt's crew as it was queued (skills by key; never prompt text). */
+export interface DailyCrewRecord {
+  agentId: string;
+  name: string;
+  role: string;
+  vision: number;
+  comms: number;
+  tier: string;
+  skills: { id: string; version: number; name: string }[];
+}
+
+/**
+ * Daily challenge attempts: a player's crew run headless against the greedy bot on the UTC day's
+ * challenge (@skirm/engine dailyChallenge(date); seed, map, difficulty and twist are copied here
+ * so a row reads on its own). The crew is snapshotted when queued. A finished attempt keeps its
+ * points, outcome, ticks and the match log hash: on the greedy brain the same crew on the same day
+ * replays to the same hash. Free on greedy; with a model it holds and pays the crew's talk rate on
+ * the ledger (hold id `daily-<id>-<attempt>`). Attempts that did not play (failed, short of
+ * credits) do not count towards the day's cap.
+ */
+export const dailyAttempts = pgTable(
+  'daily_attempts',
+  {
+    /** `dly_` + ULID. */
+    id: text('id').primaryKey(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    /** UTC day, `YYYY-MM-DD`. */
+    date: text('date').notNull(),
+    seed: text('seed').notNull(),
+    mapId: text('map_id').notNull(),
+    difficulty: text('difficulty').notNull(),
+    twist: text('twist').notNull(),
+    crew: jsonb('crew').$type<DailyCrewRecord[]>().notNull(),
+    status: text('status').$type<DailyAttemptStatus>().notNull().default('queued'),
+    /** Brain kind that played the crew (greedy or model). */
+    brain: text('brain'),
+    credits: integer('credits').notNull().default(0),
+    /** dailyPoints of the finished match (null until done). */
+    points: integer('points'),
+    outcome: text('outcome'),
+    ticks: integer('ticks'),
+    logHash: text('log_hash'),
+    /** Scores, reason, model calls (no speech text); insufficient_credits: `{ need, have }`. */
+    result: jsonb('result'),
+    error: text('error'),
+    createdAt: createdAt(),
+    finishedAt: ts('finished_at'),
+  },
+  (t) => [
+    index('daily_attempts_account_idx').on(t.accountId, t.date),
+    index('daily_attempts_board_idx').on(t.date, t.points),
+    check(
+      'daily_attempts_status_ck',
+      sql`${t.status} in ('queued', 'running', 'done', 'failed', 'insufficient_credits')`,
+    ),
+  ],
+);
+
 // ---------- Cosmetics ----------
 
 /** Premium cosmetics an account owns (item ids from @skirm/shared COSMETICS). */

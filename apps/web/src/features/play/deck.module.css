@@ -96,6 +96,7 @@
   clip-path: polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px));
 }
 .atlas { grid-column: span 2; grid-row: span 2; background: linear-gradient(160deg, rgba(52, 224, 200, .16), rgba(9, 15, 23, .92) 65%); }
+.daily { grid-column: 1 / -1; background: linear-gradient(100deg, rgba(255, 190, 80, .14), rgba(9, 15, 23, .92) 55%); }
 
 
 @media (max-width: 820px) {
