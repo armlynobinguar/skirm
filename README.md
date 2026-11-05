@@ -54,6 +54,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 - **Campaign**: three chapters of missions against the bot; each chapter cleared unlocks a starter skill
 - **Private lobbies and tournaments**: challenge a friend with a code, or run a 4 to 16 player bracket
 - **Draft mode**: each crew bans one of the rival's skills before the match
+- **Map editor and community maps**: paint your own mirrored map, test-play it greedy vs greedy, publish it, and play other players' maps in practice and casual
 - **Live commands**: three orders a match to steer your crew without taking control
 - **Agent progression**: agents earn XP from matches, level up and pick small traits (casual only; ranked plays base stats)
 - **Gas, ice and live water**: gas clouds that cost every other action, ice that slides you a tile further, and cables that electrify the water (Frostline Depot, Sunken Metro)

@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { ButtonLink } from '@/components/ButtonLink';
 import { arenaStore } from '@/features/arena/store';
 import { MAPS } from '@/features/arena/world';
+import { useMapById } from '@/features/maps/hooks';
 import { useRealtimeMessage } from '@/lib/realtime/hooks';
 import { routes } from '@/lib/routes';
 import { useRealtime } from '@/lib/services';
@@ -43,6 +44,8 @@ export function V2MatchScreen({ matchId }: { matchId: string }) {
   const [lost, setLost] = useState(false);
   // The arena behind every phase is the match's own map.
   const mapId = view?.mapId;
+  // A community map is fetched and registered so the arena and the cards can draw it.
+  useMapById(mapId);
   useEffect(() => {
     const idx = mapId ? MAPS.findIndex((m) => m.id === mapId) : -1;
     if (idx >= 0) arenaStore().setMap(idx);

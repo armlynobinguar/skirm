@@ -18,6 +18,8 @@ import { useArena } from '@/features/arena/store';
 import { DIFFS, MAPS, VERB_ICON, diffIndex, goalOf, isStarter, type DifficultyKey, type EffectClass, type V2Map } from '@/features/arena/world';
 import { routes } from '@/lib/routes';
 import { useSfx } from '@/lib/sfx';
+import { CommunityMaps } from '@/features/maps/CommunityMaps';
+import mapStyles from '@/features/maps/maps.module.css';
 import styles from './atlas.module.css';
 
 /** Ranked always plays this difficulty (both crews chase the same goal). */
@@ -115,7 +117,32 @@ function Ico({ d }: { d: string }) {
   );
 }
 
-export function AtlasScreen() {
+/** The atlas's two tabs: the official ten, and maps players made (`/maps?tab=community`). */
+function AtlasTabs({ tab }: { tab: 'official' | 'community' }) {
+  return (
+    <nav className={mapStyles.tabs} aria-label="Atlas" data-testid="atlas-tabs">
+      <Link href={routes.atlas()} aria-current={tab === 'official' ? 'page' : undefined}>
+        Official
+      </Link>
+      <Link href={routes.atlas('community')} aria-current={tab === 'community' ? 'page' : undefined} data-testid="atlas-tab-community">
+        Community
+      </Link>
+    </nav>
+  );
+}
+
+export function AtlasScreen({ tab = 'official' }: { tab?: 'official' | 'community' }) {
+  if (tab === 'community')
+    return (
+      <div data-testid="screen-atlas">
+        <AtlasTabs tab="community" />
+        <CommunityMaps />
+      </div>
+    );
+  return <OfficialAtlas />;
+}
+
+function OfficialAtlas() {
   const { mapIdx, setMap } = useArena();
   const [details, setDetails] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -158,6 +185,7 @@ export function AtlasScreen() {
     <div className={styles.screen} data-testid="screen-atlas">
       <div className={styles.shade} aria-hidden="true" />
       <h1 className="sk-sr-only">Map atlas</h1>
+      <AtlasTabs tab="official" />
       <div className={styles.grid}>
         <section className={styles.side} aria-labelledby="atlas-starter" data-rise>
           <h2 id="atlas-starter" className={`${styles.sideH} ${styles.teal}`}>

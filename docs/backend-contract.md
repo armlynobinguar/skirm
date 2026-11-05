@@ -83,7 +83,7 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 | GET | `/rentals/mine` | ✓ | `{ offers, passes }`: the caller's active offers and unused one-match passes (each with the rented agent's public stats and owner handle) |
 | POST | `/rentals/:offerId` | ✓ | `{ txHash }` → `{ pass }`. A `market.rent` transaction from the caller's linked account whose `rental` event names this offer (`rental_id` = `<offerId>:<nonce>`), pays the owner's linked account and covers the price (422 `wrong_rental`, `wrong_owner`, `underpaid`, `wrong_sender`; 409 `own_agent`, `duplicate_tx`). Dev mode: `dev:<yocto>[:<nonce>]`. A replay returns the same pass. The pass is used up when a match with that agent ends (a void match keeps it); the agent plays with its owner's skills and its plans are withheld from the renter |
 | DELETE | `/me/near` | | `{ account }` with `nearAccountId: null`. `409 listing_active` while the player has an active listing |
-| GET | `/me/export` | ✓ | Everything skirm holds about the caller, one table per key (account, agents, skills created, ownership, listings, sales, rental offers and passes, ledger, matches with only the caller's debrief side, messages their agents said, standings, prizes, trials, cosmetics, onboarding progress, campaign progress and rewards), plus `skillPrompts`: the caller's own skill prompts decrypted, and `playbookTexts`: their crew playbooks decrypted |
+| GET | `/me/export` | ✓ | Everything skirm holds about the caller, one table per key (account, agents, skills created, ownership, listings, sales, rental offers and passes, ledger, matches with only the caller's debrief side, messages their agents said, standings, prizes, trials, cosmetics, onboarding progress, campaign progress and rewards, community maps), plus `skillPrompts`: the caller's own skill prompts decrypted, and `playbookTexts`: their crew playbooks decrypted |
 | DELETE | `/me` | ✓ | `{ confirm }` (the current handle; 422 `confirm_mismatch`) → `{ deleted: true }`. 409 `agent_busy` mid-match, 409 `listing_active` with an open listing. Clears the Privy id, NEAR link, system prompts and crew playbooks, ends rental offers, sets the handle to `~deleted-<id>` and `deleted_at`; the account never signs in again. Agents, match history, sales and the ledger stay (other players' records and paid rental passes depend on them); credits are forfeited |
 | GET | `/agents` | | `Agent[]`: `{ id, name, elo, matchesPlayed, wins, losses, draws, skills: [{id, version, name}], unlocks, role, vision, comms, tier, systemPrompt, appearance, progression }`; `progression` is `{ xp, level, levelXp, nextLevelXp \| null, maxLevel, traits, traitSlots, nextTraitLevel \| null }` |
 | GET | `/agents/:id/progression` | ✓ | `{ agentId, progression, traits: {id, name, effect}[], traitLevels, maxTraits, rankedTraits }`: the caller's agent's XP, level and traits with the trait catalogue (`DEFAULTS.progression`). 404 for another player's agent |
@@ -177,6 +177,24 @@ A player's crew-level strategy (who hauls, who scouts and calls hazards, who blo
 | PUT | `/playbooks/:id` | `{ name?, text? }` | the playbook. Owner only |
 | DELETE | `/playbooks/:id` | | `{ deleted: true }`. Owner only |
 | POST | `/playbooks/select` | `{ id \| null }` | `{ selected }`: the playbook lock-in starts with (null: none) |
+
+### Community maps
+
+Players' own v2 maps from the web map editor (`/maps/editor`), stored in `community_maps` (`cmp_` + ULID; `map` is the skirm.map/v2 JSON). A draft is its author's alone and may hold anything the editor saves (≤ 32 KB, at most 20 drafts). Publishing runs `validateCommunityMap` (@skirm/engine/v2: parseMapV2 plus a walled border, a tile-for-tile mirrored layout, starts, switch lanes, the delivery point, switches and drops on the centre column, a source tile for every hazard, enough items for the goal, size 11–55 × 9–25) on the map with the server's `id`, `code` (`CM-xxxx`), `label: 'Community'` and the row's name, screens every player-written text with the speech filter, and runs `balanceCheck` (@skirm/decision-engine/v2): 4 seeds (difficulty × crew size), each played greedy vs greedy both ways round, the right-half crew on a mirrored view; it must be fair (neither half wins more than a quarter of the runs over the other) and playable (somebody scores in at least half, no crew wiped out). A published map never changes and cannot be deleted; names are unique among published maps (any case). At most 3 publishes per player per 24 h; `test-play` and `publish` are in the strict rate-limit bucket. Published maps play in practice and casual (`v2_queue { mapId: 'cmp_…' }`), never ranked or in lobbies; each match started counts a play. Account deletion removes drafts; published maps stay.
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| GET | `/community-maps` | `?sort=new\|popular` (popular: plays + 3 × likes) `&limit=` (≤ 48, default 24) `&offset=` | public. `{ sort, maps: CommunityMap[] }`, published only; signed in, each has `liked` |
+| GET | `/community-maps/mine` | | `{ maps: CommunityMap[], maxDrafts, publishPerDay }`: the caller's drafts and published maps |
+| GET | `/community-maps/:id` | | public. A published map, or the caller's own draft (404 otherwise) |
+| POST | `/community-maps` | `{ name, theme?, map }` | the draft (`theme`: an official map id whose look the board borrows). `422 map_limit` at the cap |
+| PUT | `/community-maps/:id` | `{ name?, theme?, map? }` | the draft. Author only (404); `409 map_published` once published |
+| DELETE | `/community-maps/:id` | | `{ deleted: true }`. Author only; `409 map_published` |
+| POST | `/community-maps/test-play` | `{ map }` | `{ valid: false, issues: { message, at? }[] }` or `{ valid: true, issues: [], balance: BalanceReport }`; nothing is saved |
+| POST | `/community-maps/:id/publish` | | the published map. Author only; `422 map_invalid` (`details.issues`), `422 map_refused` (filter), `422 map_unbalanced` (`details.problems`, `details.wins`), `409 name_taken`, `409 map_published`, `429 publish_limit` |
+| POST / DELETE | `/community-maps/:id/like` | | `{ likes, liked }`; published maps only, once per player |
+
+`CommunityMap`: `{ id, name, theme, author, status: 'draft'\|'published', plays, likes, liked?, map, balance?, createdAt, updatedAt, publishedAt }`. `BalanceReport`: `{ runs: { seed, difficulty, size, swapped, winner, side, reason, decidedBy, score, ticks }[], wins: { left, right, draw }, fair, playable, ok, problems }`.
 
 ### Cosmetics and credits
 

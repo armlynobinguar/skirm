@@ -57,6 +57,7 @@ const STRICT: readonly [string, RegExp][] = [
   ['POST', /^\/cosmetics\/[^/]+\/buy$/],
   ['POST', /^\/external-agents\/[^/]+\/ping$/],
   ['POST', /^\/bench\/runs$/],
+  ['POST', /^\/community-maps\/(test-play|[^/]+\/publish)$/],
   ['POST', /^\/daily\/attempts$/],
 ];
 
