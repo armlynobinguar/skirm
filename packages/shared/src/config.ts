@@ -111,6 +111,16 @@ const defaults = {
     runsPerHour: 20,
   },
   /**
+   * Daily challenge: one challenge per UTC day (@skirm/engine dailyChallenge), played headless
+   * against the greedy bot like a bench run (free on the greedy brain, the crew's talk rate with a
+   * model). Attempts that played count towards the cap per account per day (the api's
+   * DAILY_ATTEMPTS overrides it); the board shows the top `boardSize` best attempts.
+   */
+  daily: {
+    attemptsPerDay: 3,
+    boardSize: 50,
+  },
+  /**
    * v2 seasons: 14 days, standings from ranked v2 matches only, top 10 paid 30/20/15 then 5 × 7
    * (bps, the seasons contract's SPLIT_BPS). The pool is funded NEAR plus this share of market fees.
    */

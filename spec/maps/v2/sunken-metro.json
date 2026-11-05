@@ -160,5 +160,43 @@
   "blockSupply": 2,
   "fog": true,
   "steal": true,
-  "night": false
+  "night": false,
+  "gas": [
+    {
+      "at": [
+        12,
+        17
+      ],
+      "every": 9,
+      "strength": 3
+    },
+    {
+      "at": [
+        34,
+        17
+      ],
+      "every": 9,
+      "strength": 3
+    }
+  ],
+  "sparks": [
+    {
+      "at": [
+        10,
+        13
+      ],
+      "name": "West live rail",
+      "every": 12,
+      "ticks": 3
+    },
+    {
+      "at": [
+        36,
+        13
+      ],
+      "name": "East live rail",
+      "every": 12,
+      "ticks": 3
+    }
+  ]
 }

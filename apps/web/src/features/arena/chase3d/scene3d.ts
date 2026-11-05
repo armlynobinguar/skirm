@@ -89,7 +89,7 @@ const TWEEN_MS = 400;
 /** An agent as the arena draws it; live arenas also carry body colours and status. */
 type Agent3 = ArenaState['agents'][number] & { c?: string; bone?: string; out?: boolean; down?: boolean };
 
-type DynKey = 'dirt' | 'crate' | 'block' | 'grass' | 'trunk' | 'canopy' | 'water' | 'lava' | 'fire' | 'flame' | 'item';
+type DynKey = 'dirt' | 'crate' | 'block' | 'grass' | 'trunk' | 'canopy' | 'water' | 'lava' | 'fire' | 'flame' | 'item' | 'ice' | 'gas' | 'shock';
 
 interface AgentRig {
   g: THREE.Group;
@@ -301,6 +301,9 @@ export function buildWorld(arena: LiveArena, look: string): World {
     fire: inst(box, lambert({ color: '#3a1a10', emissive: '#501400' }), cap, false),
     flame: inst(new THREE.ConeGeometry(0.15, 0.5, 6).translate(0, 0.25, 0), new THREE.MeshBasicMaterial({ color: '#ff8a3a' }), cap * 2, false),
     item: inst(new THREE.OctahedronGeometry(0.17), new THREE.MeshBasicMaterial({ color: pal.accent }), cap, true),
+    ice: inst(box, new THREE.MeshPhongMaterial({ color: '#cdeefa', emissive: '#2a4a5a', shininess: 120, transparent: true, opacity: 0.92 }), cap, false),
+    gas: inst(new THREE.IcosahedronGeometry(0.4, 1), new THREE.MeshLambertMaterial({ color: '#8fd65e', emissive: '#2c5a14', transparent: true, opacity: 0.38, depthWrite: false }), cap, false),
+    shock: inst(box, new THREE.MeshBasicMaterial({ color: '#ffe94a', transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }), cap, false),
   };
 
   // The delivery point: a turning ring and a soft beam.
@@ -491,8 +494,14 @@ function layTiles(w: World, state: ArenaState, seen: ((i: number) => boolean) | 
         case 'item':
           w.items.push([x, y, !!seen && !seen(i)]);
           break;
+        case 'ice':
+          put('ice', x, -0.01, y, 0.98, 0.04, 0.98);
+          break;
       }
     }
+  // Overlays: electrified water glows over the water, gas hangs as a low green cloud.
+  for (const i of state.shock ?? []) put('shock', i % W, 0.02, (i / W) | 0, 1, 0.05, 1);
+  for (const i of state.gas ?? []) put('gas', i % W, 0.35, (i / W) | 0, 1.1, 0.7, 1.1, hash(i, 3) * 3);
   for (const key of Object.keys(dyn) as DynKey[]) {
     dyn[key].count = n[key] ?? 0;
     dyn[key].instanceMatrix.needsUpdate = true;
@@ -642,6 +651,8 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
   w.dyn.flame.instanceMatrix.needsUpdate = true;
   (w.dyn.lava.material as THREE.MeshBasicMaterial).color.setHSL(0.04, 1, 0.5 + 0.06 * Math.sin(time * 1.6));
   (w.dyn.water.material as THREE.MeshPhongMaterial).opacity = 0.8 + 0.08 * Math.sin(time * 2.2);
+  (w.dyn.shock.material as THREE.MeshBasicMaterial).opacity = 0.35 + 0.3 * Math.abs(Math.sin(time * 9));
+  (w.dyn.gas.material as THREE.MeshLambertMaterial).opacity = 0.32 + 0.06 * Math.sin(time * 1.4);
   w.beam.material.opacity = 0.16 + 0.08 * Math.sin(time * 3);
   w.ring.rotation.z = time * 0.8;
   for (const wh of w.wheels) wh.rotation.z = time * 1.5;

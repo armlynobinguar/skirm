@@ -87,6 +87,33 @@ function hazardName(def: MapDefV2 | undefined, kind: string): string {
   return HAZARD_NAME[kind] ?? kind;
 }
 
+/** A map's gas, ice or live water, for the HUD's legend: a swatch, a short name and a tooltip. */
+export interface FieldHazard {
+  key: 'gas' | 'ice' | 'shock';
+  name: string;
+  /** What it does, in one line (the tooltip). */
+  hint: string;
+  /** Gas: in sight now. Shock: a cable is live now. Ice is always shown. */
+  live: boolean;
+}
+
+/** The legend for a map's gas vents, ice patches and sparking cables (none on most maps). */
+export function fieldHazards(frame: V2Frame): FieldHazard[] {
+  const def = mapV2(frame.mapId);
+  const out: FieldHazard[] = [];
+  if (def?.ice?.length) out.push({ key: 'ice', name: 'Ice', hint: 'Stepping onto ice slides you one more tile the same way, unless that tile is blocked.', live: true });
+  if (def?.gas?.length)
+    out.push({ key: 'gas', name: 'Gas', hint: 'Vents puff a green cloud that drifts and thins. Inside it an agent loses every other action.', live: !!frame.gas?.length });
+  if (def?.sparks?.length)
+    out.push({
+      key: 'shock',
+      name: 'Live water',
+      hint: `${def.sparks.map((s) => s.name).join(' and ')} electrify the water they touch now and then. On or next to live water an agent is stunned for 2 ticks.`,
+      live: !!frame.shock?.length,
+    });
+  return out;
+}
+
 /** The difficulty's goal as the clock's tag shows it. */
 export function goalTag(mapId: string, difficulty: Difficulty): { name: string; colour: string; title: string; text: string } {
   const g = goalFor(mapId, difficulty);
@@ -109,6 +136,11 @@ export function calloutOf(frame: V2Frame, team: Team): Callout | null {
   let out: Callout | null = null;
   for (const e of frame.events) {
     if (e.kind === 'supply_drop') out = { text: 'Supply drop · middle', side: 'arena' };
+    else if (e.kind === 'sparked') out = { text: `${e.name} · the water is live`, side: 'arena' };
+    else if (e.kind === 'shocked') {
+      const a = agent(e.agent);
+      if (a) out = { text: `${a.name} shocked by live water`, side: side(a.team) };
+    }
     else if (e.kind === 'verb' || e.kind === 'switch') {
       const a = agent(e.agent);
       if (!a) continue;

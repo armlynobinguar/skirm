@@ -63,8 +63,8 @@ describe('migrations', () => {
     // 0005_match_timelines, 0006_skill_triggers, 0007_replay_shares, 0008_lobbies_tournaments,
     // 0009_external_agents, 0010_skill_roles,
     // 0011_crew_playbooks, 0012_skill_bench, 0013_quests_achievements,
-    // 0014_campaign, 0015_agent_progression.
-    expect(embeddedMigrations()).toHaveLength(16);
+    // 0014_campaign, 0015_daily_challenge, 0016_agent_progression.
+    expect(embeddedMigrations()).toHaveLength(17);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {

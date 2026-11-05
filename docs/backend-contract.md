@@ -42,6 +42,7 @@ The single reference for `apps/api`, `apps/worker`, `apps/realtime` and `apps/we
 | `SEED_OFFICIAL_SKILLS` | on | worker: `0` skips the official skills seed at boot |
 | `RANKED_DECAY_DAYS` / `RANKED_DECAY_AMOUNT` | `14` / `25` (`DEFAULTS.ranked.decay`) | worker, api: days without a ranked match before an inactive Diamond+ player loses `amount` Elo (again every `days`); `0` turns decay off. Not part of `loadConfig()`: `rankedDecayFromEnv` in `@skirm/shared` |
 | `BENCH_RUNS_PER_HOUR` | `20` (`DEFAULTS.bench.runsPerHour`) | api: test-bench runs per account per rolling hour |
+| `DAILY_ATTEMPTS` | `3` (`DEFAULTS.daily.attemptsPerDay`) | api: daily challenge attempts per account per UTC day |
 
 ## New account defaults
 
@@ -154,6 +155,16 @@ The web page `/replays/<shareId>` sets Open Graph metadata and a generated previ
 | GET | `/bench/runs/:id` | | one of the caller's runs plus `{ prompt, reflexes, promptHidden }`: the text that played, only when it is the caller's own (a draft they typed or a version they wrote). 404 for another player's run |
 | GET | `/bench/compare` | `?a=&b=` | `{ a, b, prompt }`: two of the caller's runs and a word diff of their prompts (`{ hidden: false, same, diff: {op: same\|del\|add, text}[] }`, or `{ hidden: true }` when either text is not theirs) |
 
+### Daily challenge
+
+One challenge per UTC day, derived from the date alone (`@skirm/engine` `dailyChallenge(date)`, FNV-1a over `skirm.daily/v1:<date>`): a map from `PRACTICE_MAPS`, a difficulty (Easy to Agentic), the bot's crew size (`practiceRival`) and a twist from existing knobs (`none`, `short_clock`: the clock × 0.8, `sly_bot`: bot bluff cap + 3, `eager_bot`: no extra bot start ticks). Points (`dailyPoints`): win 10 000 / draw 5 000 / loss 0, + 100 × (your score − bot score, clamped ±20), + ticks left on the clock on a win (≤ 99). Board order (`compareDaily`): points, then fewer ticks, then finished first. On the greedy brain the same crew on the same day replays to the stored log hash.
+
+| Method | Path | Body / query | Returns |
+| --- | --- | --- | --- |
+| GET | `/daily` | | `{ challenge: {date, seed, mapId, mapName, difficulty, twist, twistName, twistLine, crewSize, ticks, bot: {tier, hold, lieCap}}, brain, free, costCredits, attempts: {perDay, used, left}, msLeft, endsAt, mine: DailyAttempt[] }` (today's, newest first) |
+| POST | `/daily/attempts` | `{ agentIds? }` (1 to `crewSize` of your own agents; default your first `crewSize`) | `202 DailyAttempt` `{ id, date, status: queued\|running\|done\|failed\|insufficient_credits, brain, credits, crew: {name, role, skills[]}[], points, outcome, ticks, logHash, result, shortfall, error, createdAt, finishedAt }`, queued as `benchmarks` `{ kind: 'daily', attemptId }`. The crew is snapshotted (skill keys, never text). `400 invalid_crew` (not yours, listed twice, too many, or played by an external agent), `429 daily_limit` past `DAILY_ATTEMPTS` (failed and unpaid attempts do not count), `503 queue_unavailable` |
+| GET | `/daily/leaderboard` | `?date=YYYY-MM-DD` (default today; not a future day) `&limit=` (≤ 100, default 50) | `{ date, challenge, players, top: Row[], me: Row \| null }`, Row `{ rank, attemptId, handle, you, points, outcome, ticks, logHash, crew, finishedAt }`: each player's best finished attempt of the day |
+
 ### Crew playbooks
 
 A player's crew-level strategy (who hauls, who scouts and calls hazards, who blocks; when to regroup; the goal or denying the rival), separate from any agent's skills. Sealed in the vault like a skill prompt (its own AAD); only the owner reads it back. Limits in `DEFAULTS.playbooks`: text ≤ 800 characters, name ≤ 32, at most 5 kept. Realtime puts the one selected (or picked at lock-in) into the crew planner's prompt whole and each actor's as one line (≤ 160), adds it to the speech filter's secrets, and names it (never the text) on the player's own frames (`V2Frame.playbook`); the rival, spectators, the match log and shared replays never see it. The greedy brain ignores it.
@@ -257,7 +268,7 @@ Besides `bad_request` (400), `unauthenticated` / `no_session` / `invalid_agent_t
 | 403 | `dev_disabled`, `cosmetic_not_owned`, `mission_locked` |
 | 409 | `agent_busy`, `agent_bound`, `external_limit`, `stale_turn`, `too_late`, `already_answered`, `match_live`, `not_ended`, `replay_expired`, `share_limit`, `mint_in_progress`, `quest_incomplete`, `already_claimed`, `allowance_full`, `not_unlocked`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch`, `own_lobby`, `lobby_full`, `lobby_closed`, `lobby_ready`, `tournament_match`, `tournament_full`, `not_open` |
 | 422 | `bad_clip`, `invalid_webhook`, `invalid_action`, `near_account_required`, `near_proof_required`, `near_proof_invalid`, `not_minted`, `invalid_hash`, `underpaid`, `purchase_unverified` |
-| 429 | `trial_limit`, `bench_limit` |
+| 429 | `trial_limit`, `bench_limit`, `daily_limit` |
 | 502 | `mint_failed` |
 | 503 | `relay_unavailable`, `queue_unavailable`, `rpc_unavailable`, `near_unavailable`, `ownership_unavailable` |
 
@@ -291,7 +302,7 @@ Server → client (`WsServerMessage`):
 | `{type:'v2_lockin', matchId, lockMs, rival: {agents}, crewLimit, headStartTicks, free?}` | lock-in started (the rival's crew size only). Re-sent when a crew changes its roster |
 | `{type:'v2_locked', matchId, team}` | a crew locked in |
 | `{type:'v2_start', matchId, team, rival: {handle}, tickMs, holdTicks}` | live: the rival is named, holds are placed |
-| `{type:'v2_frame', matchId, frame}` | one tick: each crew gets its own fogged view (its own plans only), watchers the whole board |
+| `{type:'v2_frame', matchId, frame}` | one tick: each crew gets its own fogged view (its own plans only), watchers the whole board. On maps with gas vents or sparking cables the frame adds `gas` and `shock` (tile indexes `y * w + x` in that view's sight); ice is the `=` tile in `rows`. Their events: `gas_vent {at}`, `choked {agent}` (lost the action in gas), `slid {agent, from, to}` (ice), `sparked {name, at, until, tiles}` and `shocked {agent, by}` (stunned on or next to live water) |
 | `{type:'v2_end', matchId, result, reason, logHash, debrief?}` | the end. `result` is `{winner: 'A'\|'B'\|'draw', reason: 'goal'\|'time'\|'eliminated', decidedBy, score, ticks}` or null for a void match (`reason` `declined`, `accept_timeout`, `credits`, `error`, `aborted`); `logHash` is the sha256 chain head of the match log; `debrief` is this crew's (Elo delta, MVP, goals, talk counts, credits held / used / returned, registry line, per-agent tally, `xp` each agent earned) |
 | `{type:'v2_frames', matchId, frames}` | answer to `v2_replay` |
 | `{type:'v2_lobby', lobbyId, ready: {host, guest}}` | a lobby's player readied a crew or stepped back (sent to both players this instance serves) |
@@ -316,7 +327,7 @@ WS error codes: `bad_json`, `bad_message`, `unknown_type`, `too_large`, `unauthe
 | Queue | Job data | Consumer (worker) |
 | --- | --- | --- |
 | `registry` | `{ kind: 'v2_match', id, seasonId? }` | `record_match` on the registry contract as a `MatchRecordV2` with per-player Elo and the season number, then the row's registry status and tx; retried 10 times |
-| `benchmarks` | `{ kind: 'mint', skillId, version }`, `{ kind: 'trial', trialId }` or `{ kind: 'bench', runId }` | the hidden gauntlet of a minted version, one buyer's trial, or one writer's test-bench run (held and charged on the ledger as `bench-<runId>-<attempt>` with a model brain, free on greedy), on the headless match runner (`playHeadless`) against the greedy bot (below) |
+| `benchmarks` | `{ kind: 'mint', skillId, version }`, `{ kind: 'trial', trialId }`, `{ kind: 'bench', runId }` or `{ kind: 'daily', attemptId }` | the hidden gauntlet of a minted version, one buyer's trial, one writer's test-bench run (held and charged on the ledger as `bench-<runId>-<attempt>` with a model brain, free on greedy), or one player's daily challenge attempt (the crew's talk rate held as `daily-<attemptId>-<attempt>` with a model, free on greedy), on the headless match runner (`playHeadless`) against the greedy bot (below) |
 | `seasons` | `{ kind: 'tick' }`, repeatable every 10 min | opens the current season, locks ended ones, writes payouts, posts the top 10 to the seasons contract |
 | `tournaments` | `{ kind: 'tick' }`, repeatable every minute | settles lobbies whose match ended without realtime settling them; decides bracket matches nobody started within 15 minutes |
 | `ranked` | `{ kind: 'decay' }`, repeatable every hour | the Elo decay pass (ranked tiers above); safe to repeat, a player decays at most once per period |

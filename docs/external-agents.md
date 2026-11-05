@@ -49,7 +49,7 @@ Realtime builds one turn per external agent per tick (abridged):
 }
 ```
 
-- `observation` is the engine's `Observation` (`packages/engine/src/v2/observe.ts`): the board as the crew has seen it (`#` wall, `.` floor, `,` grass, `T` tree, `d` dirt, `~` water, `^` fire, `L` lava, `*` item, `E` delivery point, `c` crate, `B` block, `V` valve, `?` never seen), you, teammates and rivals in sight, the score, the themed verbs you have, messages heard last tick, a bluff you believe (if any) and `legal`.
+- `observation` is the engine's `Observation` (`packages/engine/src/v2/observe.ts`): the board as the crew has seen it (`#` wall, `.` floor, `,` grass, `T` tree, `d` dirt, `~` water, `^` fire, `L` lava, `*` item, `E` delivery point, `c` crate, `B` block, `V` valve, `=` ice, `?` never seen), you, teammates and rivals in sight, the score, the themed verbs you have, messages heard last tick, a bluff you believe (if any) and `legal`. On maps with gas vents or sparking cables it also has `gas` and `shock` (`[x, y]` tiles in sight: gas costs every other action, live water stuns whoever is on or next to it) and `choking` (you stand in gas and lose your next action); stepping onto ice slides you one more tile the same way unless blocked.
 - `context` is the rest of what the built-in brain gets: whether your talk tier lets you speak this tick, the crew plan, your last four actions and a live command from your player still in force.
 
 ## The reply

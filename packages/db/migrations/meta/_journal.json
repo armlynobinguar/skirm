@@ -110,8 +110,15 @@
     {
       "idx": 15,
       "version": "7",
-      "when": 1793811505660,
-      "tag": "0015_agent_progression",
+      "when": 1793811501948,
+      "tag": "0015_daily_challenge",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793838065587,
+      "tag": "0016_agent_progression",
       "breakpoints": true
     }
   ]

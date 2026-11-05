@@ -73,6 +73,7 @@ export function viewText(o: Observation): string {
     o.rivals.length ? `Rivals in sight: ${o.rivals.map(who).join('; ')}.` : 'Rivals in sight: none.',
     'Map (x across, y down, row 0 first):',
     ...o.rows,
+    ...hazardLines(o),
   ];
   if (o.bluff) {
     const [x, y] = o.bluff.at;
@@ -86,6 +87,32 @@ export function viewText(o: Observation): string {
   if (o.heard.length)
     lines.push('Heard last tick:', ...o.heard.map((m) => `- ${m.fromName} (${m.team === o.me.team ? 'crew' : 'rival'}, ${m.overheard ? 'overheard' : m.channel}): ${m.text}`));
   return lines.join('\n');
+}
+
+/** Longest list of gas or live-water tiles spelled out in a prompt. */
+const HAZARD_TILES_MAX = 24;
+const tiles = (xs: [number, number][]) =>
+  xs.slice(0, HAZARD_TILES_MAX).map(([x, y]) => `${x},${y}`).join(' ') + (xs.length > HAZARD_TILES_MAX ? ` and ${xs.length - HAZARD_TILES_MAX} more` : '');
+
+/** Ice, gas and electrified water, in plain words (only on maps that have them). */
+export function hazardLines(o: Observation): string[] {
+  const out: string[] = [];
+  if (o.rows.some((r) => r.includes('=')))
+    out.push('= is ice: stepping onto it slides you one more tile the same way, unless that tile is blocked.');
+  if (o.gas)
+    out.push(
+      o.gas.length
+        ? `Gas cloud in sight at ${tiles(o.gas)}. In gas you lose every other action; go around it.`
+        : 'No gas in sight. Gas vents puff clouds that cost every other action while you stand in them.',
+    );
+  if (o.choking) out.push('You are standing in gas: your next action is lost. Get out of it.');
+  if (o.shock)
+    out.push(
+      o.shock.length
+        ? `Electrified water in sight at ${tiles(o.shock)}. Standing on or next to it stuns you for 2 ticks; keep a tile away until it stops.`
+        : 'No live water in sight. Sparking cables now and then electrify the water they touch; standing on or next to it stuns you.',
+    );
+  return out;
 }
 
 /**

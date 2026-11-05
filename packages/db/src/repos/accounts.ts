@@ -27,6 +27,7 @@ import {
   seasonStandings,
   skillOwnership,
   skillBenchRuns,
+  dailyAttempts,
   skillTrials,
   skillVersions,
   skills,
@@ -121,7 +122,7 @@ export class AccountsRepo {
     const agentIds = myAgents.map((a) => a.id);
     const [
       agentSkillRows, unlockRows, skillRows, ownership, listingRows, saleRows, offers, rentalRows,
-      ledger, ledgerRowsOut, matches, standings, payouts, trials, cosmetics, onboarding, decays, benchRuns, playbookRows,
+      ledger, ledgerRowsOut, matches, standings, payouts, trials, cosmetics, onboarding, decays, benchRuns, playbookRows, daily,
     ] = await Promise.all([
       this.db.select().from(agentSkills).where(agentIds.length ? inArray(agentSkills.agentId, agentIds) : sql`false`),
       this.db.select().from(unlockItems).where(eq(unlockItems.ownerId, accountId)),
@@ -149,6 +150,7 @@ export class AccountsRepo {
         .from(skillBenchRuns)
         .where(eq(skillBenchRuns.accountId, accountId)),
       this.db.select().from(playbooks).where(eq(playbooks.ownerId, accountId)),
+      this.db.select().from(dailyAttempts).where(eq(dailyAttempts.accountId, accountId)),
     ]);
     // A match's debriefs hold both crews' private numbers: keep only the player's own side.
     const ownMatches = matches.map((m) => {
@@ -187,6 +189,7 @@ export class AccountsRepo {
       eloDecays: decays,
       skillBenchRuns: benchRuns,
       playbooks: playbookRows,
+      dailyAttempts: daily,
       campaign,
       campaignRewards: campaignRewardRows,
     };
