@@ -8,6 +8,7 @@
 import { CALLOUTS, type Action, type Observation } from '@skirm/engine/v2';
 import type { V2AgentCommand } from './brain';
 import { distancesFrom } from './route';
+import { bridgeTiles, greedyTool, groundTools, toolThought } from './tools';
 
 const STEP: Record<'N' | 'E' | 'S' | 'W', [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
 
@@ -19,10 +20,17 @@ export function greedyAct(o: Observation, command: Pick<V2AgentCommand, 'preset'
   const need = o.map.goal - o.score.mine;
   const full = o.me.carrying >= o.me.capacity || (o.me.carrying > 0 && o.me.carrying >= need);
   const deliver = (c: string, x: number, y: number) => x === o.map.exit[0] && y === o.map.exit[1];
+  // With no tool in hand, a tool lying on the map counts as something to fetch.
+  const w = o.rows[0]?.length ?? 0;
+  const tools = o.me.tool ? new Map() : groundTools(o);
+  const fetch = (c: string, x: number, y: number) => c === '*' || tools.has(y * w + x);
+  // A tool in hand goes down where it opens or shortens the way (tools.ts).
+  const tool = greedyTool(o, full ? deliver : fetch);
+  if (tool) return tool;
   // Deliver when full; else the nearest seen item; else explore the nearest unseen tile; else deliver.
   const dir =
     (full ? firstStep(o, deliver) : null) ??
-    firstStep(o, (c) => c === '*') ??
+    firstStep(o, fetch) ??
     firstStep(o, (c) => c === '?') ??
     (o.me.carrying ? firstStep(o, deliver) : null);
   // Nothing to fetch or deliver: step out of the way rather than block someone who has.
@@ -124,7 +132,8 @@ function firstStep(o: Observation, goal: (c: string, x: number, y: number) => bo
 function search(o: Observation, goal: (c: string, x: number, y: number) => boolean, safe: boolean): 'N' | 'E' | 'S' | 'W' | null {
   const h = o.rows.length;
   const w = o.rows[0]?.length ?? 0;
-  const walkable = (c: string) => c === '.' || c === ',' || c === '*' || c === 'E' || c === 'd' || c === '?';
+  const bridges = bridgeTiles(o);
+  const walkable = (c: string, k: number) => c === '.' || c === ',' || c === '*' || c === 'E' || c === 'd' || c === '?' || (c === '~' && bridges.has(k));
   const first = new Map<number, 'N' | 'E' | 'S' | 'W'>();
   const start = o.me.y * w + o.me.x;
   const q = [start];
@@ -141,7 +150,7 @@ function search(o: Observation, goal: (c: string, x: number, y: number) => boole
       const k = ny * w + nx;
       const c = o.rows[ny]![nx]!;
       // The safe route keeps off tiles next to lava, except the goal tile itself (the last step).
-      if (seen.has(k) || !walkable(c) || (safe && nearLava(o, nx, ny) && !goal(c, nx, ny))) continue;
+      if (seen.has(k) || !walkable(c, k) || (safe && nearLava(o, nx, ny) && !goal(c, nx, ny))) continue;
       seen.add(k);
       first.set(k, j === start ? d : first.get(j)!);
       q.push(k);
@@ -182,6 +191,7 @@ export function greedyThought(o: Observation, act: Action): string {
   const d = distancesFrom(o, o.me.x, o.me.y);
   let t: string;
   if (act.type === 'switch') t = 'Switch is ready. Flooding their lane.';
+  else if (act.type === 'use') t = toolThought(act.tool);
   else if (o.me.carrying && (o.me.carrying >= o.me.capacity || o.me.carrying >= need)) t = `${o.me.carrying} in hand. ${d.deliver ?? '?'} steps to the ${o.map.deliverTo.toLowerCase()}.`;
   else if (act.type === 'wait') t = o.legal.length > 1 ? 'Someone is in my way. I will let them pass.' : 'Holding here.';
   else if (d.item !== null) t = `${d.item} steps to the nearest ${item}. Going.`;

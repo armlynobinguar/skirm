@@ -39,6 +39,7 @@ export function observedSummary(o: Observation): string {
   if (o.rivals.length) parts.push(`rivals in sight: ${o.rivals.map((r) => r.name).join(', ')}`);
   parts.push(`score ${o.score.mine}–${o.score.rival}`);
   if (o.legal.some((a) => a.type === 'switch')) parts.push('switch at hand');
+  if (o.me.tool) parts.push(`holding ${o.me.tool === 'sandbag' ? 'sandbags' : `a ${o.me.tool}`}`);
   if (o.bluff?.believed) parts.push(`believed ${o.bluff.by}: the ${item} at ${o.bluff.at[0]},${o.bluff.at[1]} is gone`);
   const last = o.heard.at(-1);
   if (last) parts.push(`heard ${last.fromName}: "${cut(last.text, 48)}"`);

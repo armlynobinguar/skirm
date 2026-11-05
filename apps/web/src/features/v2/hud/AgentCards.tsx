@@ -10,6 +10,7 @@ import { agentColours } from '@/features/arena/live';
 import { mapById } from '@/features/arena/world';
 import c from './hud.module.css';
 import { invChange, plural, slotsOf, type InvChange } from './model';
+import { ToolChip } from './Gear';
 import { ItemIcon, SmallSlots } from './parts';
 
 const TIER_TAG = { quiet: 'QUIET', standard: 'STD', open: 'OPEN' } as const;
@@ -109,6 +110,7 @@ function Card({ agent, rival, inSight, slot, tick, mapId, item, accent, pressed,
         data-testid={`v2-card-${agent.id}`}
       >
         <span className={c.tier}>{TIER_TAG[agent.tier]}</span>
+        {inSight ? <ToolChip kind={agent.tool} onCard /> : null}
         <AgentPortrait body={body} head={head} team={agent.team === 'A' ? 'A' : 'B'} label={`${agent.name}, ${agent.role}`} className={c.portrait} />
         <span className={c.cin}>
           <b>{agent.name}</b>

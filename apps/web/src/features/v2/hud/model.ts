@@ -2,6 +2,7 @@
 // its own): the clock line, callouts, inventory changes, the comms filter and the third person's
 // subtitles. Copy and colours follow the prototype's hud(), flushLog(), floatInv() and pushSub().
 import { DIFF_MODS, goalFor, mapV2, type Difficulty, type FrameAgent, type FrameItem, type ItemOrigin, type MapDefV2, type Team, type V2Frame } from '@skirm/engine/v2';
+import { TOOL_INFO } from '@/features/arena/gear';
 import type { V2CommsLine } from '../v2Store';
 
 /** The goal item's icon per map, a 24×24 stroke path (the prototype's ITEM_ICON). */
@@ -109,6 +110,13 @@ export function calloutOf(frame: V2Frame, team: Team): Callout | null {
   let out: Callout | null = null;
   for (const e of frame.events) {
     if (e.kind === 'supply_drop') out = { text: 'Supply drop · middle', side: 'arena' };
+    else if (e.kind === 'tool_dropped') out = { text: `Supply drop · ${TOOL_INFO[e.tool].name.toLowerCase()} inside`, side: 'arena' };
+    else if (e.kind === 'tool_used' || e.kind === 'tool_picked') {
+      const a = agent(e.agent);
+      if (!a) continue;
+      const name = TOOL_INFO[e.tool].name.toLowerCase();
+      out = { text: e.kind === 'tool_used' ? `${a.name} placed the ${name}` : `${a.name} took the ${name}`, side: side(a.team) };
+    }
     else if (e.kind === 'verb' || e.kind === 'switch') {
       const a = agent(e.agent);
       if (!a) continue;

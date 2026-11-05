@@ -5,6 +5,7 @@ import type { Action, AgentState, MatchState, Role } from './match';
 import { avoidedTile } from './bluff';
 import { legalActions } from './match';
 import type { HeardMessage, TalkTier } from './talk';
+import { gearView, type ToolKind } from './tools';
 
 export interface SeenAgent {
   id: string;
@@ -23,7 +24,7 @@ export interface Observation {
   map: { id: string; name: string; w: number; h: number; goal: number; item: string; deliverTo: string; exit: [number, number] };
   /** Rows of the board as seen: tile characters, '?' where the crew has never looked. */
   rows: string[];
-  me: { id: string; name: string; team: 'A' | 'B'; role: Role; x: number; y: number; carrying: number; capacity: number; tier: TalkTier };
+  me: { id: string; name: string; team: 'A' | 'B'; role: Role; x: number; y: number; carrying: number; capacity: number; tier: TalkTier; tool?: ToolKind };
   teammates: SeenAgent[];
   /** Rivals in sight now (all of them on maps without fog). */
   rivals: SeenAgent[];
@@ -37,6 +38,11 @@ export interface Observation {
    */
   bluff?: { by: string; at: [number, number]; believed: boolean; ticksLeft: number };
   legal: Action[];
+  /**
+   * Tools from supply drops: on the ground (step on one with no tool in hand to take it) and placed
+   * (sandbags, bridges, running pumps with their ticks left). Absent when there are none.
+   */
+  gear?: { ground: { at: [number, number]; kind: ToolKind }[]; placed: { at: [number, number]; kind: ToolKind; ticksLeft?: number }[] };
 }
 
 const CHAR: Record<Tile, string> = {
@@ -79,7 +85,7 @@ export function observe(s: MatchState, agentId: string): Observation {
     ticksLeft: s.limit - s.tick,
     map: { id: def.id, name: def.name, w, h, goal: def.goal, item: def.item, deliverTo: def.deliverTo, exit: def.exit },
     rows,
-    me: { id: a.id, name: a.name, team: a.team, role: a.role, x: a.x, y: a.y, carrying: a.carrying.length, capacity: a.role === 'Hauler' ? 3 : 2, tier: a.tier },
+    me: { id: a.id, name: a.name, team: a.team, role: a.role, x: a.x, y: a.y, carrying: a.carrying.length, capacity: a.role === 'Hauler' ? 3 : 2, tier: a.tier, ...(a.tool ? { tool: a.tool } : {}) },
     teammates: s.agents.filter((o) => o !== a && o.team === a.team && !o.out).map(view),
     rivals: s.agents.filter((o) => o.team !== a.team && !o.out && visible[o.y * w + o.x]).map(view),
     score: { mine: s.score[a.team], rival: s.score[rival] },
@@ -88,7 +94,14 @@ export function observe(s: MatchState, agentId: string): Observation {
     heard: a.inbox,
     ...bluffView(s, a),
     legal: legalActions(s, a.id),
+    ...gearObs(s),
   };
+}
+
+/** Ground tools and placed objects, when there are any (public, like the drops). */
+function gearObs(s: MatchState): Pick<Observation, 'gear'> {
+  const g = gearView(s);
+  return g.ground.length || g.placed.length ? { gear: g } : {};
 }
 
 /** A bluff still believed, or one seen through on the tick just played. */
@@ -105,6 +118,7 @@ function bluffView(s: MatchState, a: AgentState): Pick<Observation, 'bluff'> {
 export function actionText(act: Action): string {
   if (act.type === 'move') return `move ${act.dir}`;
   if (act.type === 'verb') return act.dir ? `${act.verb} ${act.dir}` : act.verb;
+  if (act.type === 'use') return `use ${act.tool} ${act.dir}`;
   return act.type;
 }
 

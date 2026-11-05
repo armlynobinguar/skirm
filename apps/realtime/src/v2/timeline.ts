@@ -138,6 +138,12 @@ export class DecisionTimeline {
         case 'supply_drop':
           for (const t of TEAMS) moment(t, { kind: 'supply_drop', team: t, agentId: null, text: `A supply drop landed at ${e.at[0]},${e.at[1]}` });
           break;
+        case 'tool_picked':
+          tag(e.agent, `took the ${e.tool}`);
+          break;
+        case 'tool_used':
+          tag(e.agent, `placed the ${e.tool} at ${e.at[0]},${e.at[1]}`);
+          break;
         default:
           break;
       }
