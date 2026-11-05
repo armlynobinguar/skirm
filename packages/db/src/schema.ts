@@ -65,6 +65,7 @@ export const ledgerNote = pgEnum('ledger_note', [
   'cosmetic',
   'prize_pool',
   'prize',
+  'backing',
 ]);
 export const holdStatus = pgEnum('hold_status', ['held', 'settled', 'aborted']);
 /** `local`: recorded by the NoopRegistry only (NEAR is off in local mode); never onchain. */
@@ -1491,4 +1492,97 @@ export const communityMapLikes = pgTable(
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.mapId, t.accountId] })],
+);
+
+// ---------- Writer backing ----------
+
+/**
+ * A writer's backing round (contracts/backing): backers stake up front and get `share_bps` of the
+ * royalties routed to the round until they together received `cap_multiple_bps / 10^4` × the raise.
+ * `skill_id` null: every skill of the writer. `mode` is where the money moves: `near` (the
+ * backing contract; `chain_round_id` is its round id and the columns mirror its events) or
+ * `credits` (keyless local stack: stakes and payouts in paid credits, royalties from mirrored
+ * sales). Amounts are yoctoNEAR; credits convert at CREDITS_PER_NEAR.
+ */
+export const backingRounds = pgTable(
+  'backing_rounds',
+  {
+    /** `brd_` + ULID. */
+    id: text('id').primaryKey(),
+    writerId: text('writer_id')
+      .notNull()
+      .references(() => accounts.id),
+    skillId: text('skill_id').references(() => skills.id),
+    shareBps: integer('share_bps').notNull(),
+    capMultipleBps: integer('cap_multiple_bps').notNull(),
+    maxRaiseYocto: numeric('max_raise_yocto', { precision: 40, scale: 0 }).notNull(),
+    raisedYocto: numeric('raised_yocto', { precision: 40, scale: 0 }).notNull().default('0'),
+    backers: integer('backers').notNull().default(0),
+    status: text('status').notNull().default('open'),
+    mode: text('mode').notNull(),
+    chainRoundId: text('chain_round_id'),
+    royaltiesInYocto: numeric('royalties_in_yocto', { precision: 40, scale: 0 }).notNull().default('0'),
+    backersEarnedYocto: numeric('backers_earned_yocto', { precision: 40, scale: 0 }).notNull().default('0'),
+    createdAt: createdAt(),
+    closedAt: ts('closed_at'),
+  },
+  (t) => [
+    index('backing_rounds_writer_idx').on(t.writerId, t.createdAt),
+    index('backing_rounds_status_idx').on(t.status, t.createdAt),
+    uniqueIndex('backing_rounds_chain_uq').on(t.chainRoundId).where(sql`${t.chainRoundId} is not null`),
+    check('backing_rounds_status_ck', sql`${t.status} in ('open', 'closed', 'cancelled')`),
+    check('backing_rounds_mode_ck', sql`${t.mode} in ('credits', 'near')`),
+    check('backing_rounds_share_ck', sql`${t.shareBps} between 1 and 5000`),
+    check('backing_rounds_cap_ck', sql`${t.capMultipleBps} between 10000 and 100000`),
+  ],
+);
+
+/** One backer's stake in a round and what they have pulled so far. */
+export const backings = pgTable(
+  'backings',
+  {
+    /** `bkg_` + ULID. */
+    id: text('id').primaryKey(),
+    roundId: text('round_id')
+      .notNull()
+      .references(() => backingRounds.id),
+    backerId: text('backer_id')
+      .notNull()
+      .references(() => accounts.id),
+    stakeYocto: numeric('stake_yocto', { precision: 40, scale: 0 }).notNull(),
+    claimedYocto: numeric('claimed_yocto', { precision: 40, scale: 0 }).notNull().default('0'),
+    refunded: boolean('refunded').notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('backings_round_backer_uq').on(t.roundId, t.backerId),
+    index('backings_backer_idx').on(t.backerId),
+  ],
+);
+
+/**
+ * Royalty income routed to a round: one row per mirrored sale (`credits` mode) or per
+ * `royalty_distributed` event (`near` mode, keyed by its tx hash).
+ */
+export const backingPayouts = pgTable(
+  'backing_payouts',
+  {
+    /** `bpo_` + ULID. */
+    id: text('id').primaryKey(),
+    roundId: text('round_id')
+      .notNull()
+      .references(() => backingRounds.id),
+    saleId: text('sale_id'),
+    txHash: text('tx_hash'),
+    royaltyYocto: numeric('royalty_yocto', { precision: 40, scale: 0 }).notNull(),
+    toBackersYocto: numeric('to_backers_yocto', { precision: 40, scale: 0 }).notNull(),
+    toWriterYocto: numeric('to_writer_yocto', { precision: 40, scale: 0 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('backing_payouts_round_idx').on(t.roundId, t.createdAt),
+    uniqueIndex('backing_payouts_sale_uq').on(t.roundId, t.saleId).where(sql`${t.saleId} is not null`),
+    uniqueIndex('backing_payouts_tx_uq').on(t.txHash).where(sql`${t.txHash} is not null`),
+  ],
 );

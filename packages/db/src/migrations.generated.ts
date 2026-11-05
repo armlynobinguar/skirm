@@ -343,5 +343,30 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE INDEX \"puzzle_bests_board_idx\" ON \"puzzle_bests\" USING btree (\"puzzle_id\",\"score\",\"achieved_at\");",
       "\nCREATE INDEX \"puzzle_runs_account_idx\" ON \"puzzle_runs\" USING btree (\"account_id\",\"created_at\");"
     ]
+  },
+  {
+    "tag": "0019_writer_backing",
+    "folderMillis": 1793845595923,
+    "bps": true,
+    "hash": "e5dfd3c1a4deec11e2a3c2585315a5320680bcc29ba725a586ccbdb4d7ff83ce",
+    "sql": [
+      "ALTER TYPE \"public\".\"ledger_note\" ADD VALUE 'backing';",
+      "\nCREATE TABLE \"backing_payouts\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"round_id\" text NOT NULL,\n\t\"sale_id\" text,\n\t\"tx_hash\" text,\n\t\"royalty_yocto\" numeric(40, 0) NOT NULL,\n\t\"to_backers_yocto\" numeric(40, 0) NOT NULL,\n\t\"to_writer_yocto\" numeric(40, 0) NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL\n);\n",
+      "\nCREATE TABLE \"backing_rounds\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"writer_id\" text NOT NULL,\n\t\"skill_id\" text,\n\t\"share_bps\" integer NOT NULL,\n\t\"cap_multiple_bps\" integer NOT NULL,\n\t\"max_raise_yocto\" numeric(40, 0) NOT NULL,\n\t\"raised_yocto\" numeric(40, 0) DEFAULT '0' NOT NULL,\n\t\"backers\" integer DEFAULT 0 NOT NULL,\n\t\"status\" text DEFAULT 'open' NOT NULL,\n\t\"mode\" text NOT NULL,\n\t\"chain_round_id\" text,\n\t\"royalties_in_yocto\" numeric(40, 0) DEFAULT '0' NOT NULL,\n\t\"backers_earned_yocto\" numeric(40, 0) DEFAULT '0' NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"closed_at\" timestamp with time zone,\n\tCONSTRAINT \"backing_rounds_status_ck\" CHECK (\"backing_rounds\".\"status\" in ('open', 'closed', 'cancelled')),\n\tCONSTRAINT \"backing_rounds_mode_ck\" CHECK (\"backing_rounds\".\"mode\" in ('credits', 'near')),\n\tCONSTRAINT \"backing_rounds_share_ck\" CHECK (\"backing_rounds\".\"share_bps\" between 1 and 5000),\n\tCONSTRAINT \"backing_rounds_cap_ck\" CHECK (\"backing_rounds\".\"cap_multiple_bps\" between 10000 and 100000)\n);\n",
+      "\nCREATE TABLE \"backings\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"round_id\" text NOT NULL,\n\t\"backer_id\" text NOT NULL,\n\t\"stake_yocto\" numeric(40, 0) NOT NULL,\n\t\"claimed_yocto\" numeric(40, 0) DEFAULT '0' NOT NULL,\n\t\"refunded\" boolean DEFAULT false NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL\n);\n",
+      "\nALTER TABLE \"backing_payouts\" ADD CONSTRAINT \"backing_payouts_round_id_backing_rounds_id_fk\" FOREIGN KEY (\"round_id\") REFERENCES \"public\".\"backing_rounds\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"backing_rounds\" ADD CONSTRAINT \"backing_rounds_writer_id_accounts_id_fk\" FOREIGN KEY (\"writer_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"backing_rounds\" ADD CONSTRAINT \"backing_rounds_skill_id_skills_id_fk\" FOREIGN KEY (\"skill_id\") REFERENCES \"public\".\"skills\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"backings\" ADD CONSTRAINT \"backings_round_id_backing_rounds_id_fk\" FOREIGN KEY (\"round_id\") REFERENCES \"public\".\"backing_rounds\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"backings\" ADD CONSTRAINT \"backings_backer_id_accounts_id_fk\" FOREIGN KEY (\"backer_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"backing_payouts_round_idx\" ON \"backing_payouts\" USING btree (\"round_id\",\"created_at\");",
+      "\nCREATE UNIQUE INDEX \"backing_payouts_sale_uq\" ON \"backing_payouts\" USING btree (\"round_id\",\"sale_id\") WHERE \"backing_payouts\".\"sale_id\" is not null;",
+      "\nCREATE UNIQUE INDEX \"backing_payouts_tx_uq\" ON \"backing_payouts\" USING btree (\"tx_hash\") WHERE \"backing_payouts\".\"tx_hash\" is not null;",
+      "\nCREATE INDEX \"backing_rounds_writer_idx\" ON \"backing_rounds\" USING btree (\"writer_id\",\"created_at\");",
+      "\nCREATE INDEX \"backing_rounds_status_idx\" ON \"backing_rounds\" USING btree (\"status\",\"created_at\");",
+      "\nCREATE UNIQUE INDEX \"backing_rounds_chain_uq\" ON \"backing_rounds\" USING btree (\"chain_round_id\") WHERE \"backing_rounds\".\"chain_round_id\" is not null;",
+      "\nCREATE UNIQUE INDEX \"backings_round_backer_uq\" ON \"backings\" USING btree (\"round_id\",\"backer_id\");",
+      "\nCREATE INDEX \"backings_backer_idx\" ON \"backings\" USING btree (\"backer_id\");"
+    ]
   }
 ];

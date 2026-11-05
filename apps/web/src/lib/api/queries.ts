@@ -35,6 +35,13 @@ export const qk = {
   rentalOffers: ['rentals'] as const,
   /** Under `me`, so a match end (qk.me invalidated) refreshes the passes left. */
   myRentals: ['me', 'rentals'] as const,
+  backing: {
+    all: ['backing'] as const,
+    config: ['backing', 'config'] as const,
+    rounds: (q: { writer?: string; skill?: string; status?: string } = {}) =>
+      ['backing', 'rounds', q.writer ?? null, q.skill ?? null, q.status ?? null] as const,
+    mine: ['backing', 'mine'] as const,
+  },
   skills: {
     all: ['skills'] as const,
     list: (tab: 'written' | 'owned') => ['skills', 'list', tab] as const,

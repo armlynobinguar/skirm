@@ -117,6 +117,16 @@ const METHODS: (keyof ApiClient)[] = [
   'publishCommunityMap',
   'testPlayMap',
   'likeCommunityMap',
+  'backingConfig',
+  'backingRounds',
+  'backingRound',
+  'myBacking',
+  'openBackingRound',
+  'backRound',
+  'endBackingRound',
+  'claimBacking',
+  'distributeBacking',
+  'syncBacking',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {

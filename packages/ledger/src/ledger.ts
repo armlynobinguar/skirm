@@ -43,10 +43,10 @@ export interface LedgerRow {
   note?: LedgerNote;
 }
 
-/** What paid credits outside a run bought: a cosmetic, or a tournament's prize pool. */
-export type SpendKind = 'cosmetic' | 'prize_pool';
-/** A credit that is not a deposit: a tournament prize, or a prize pool returned to its creator. */
-export type TopUpKind = 'prize' | 'prize_pool';
+/** What paid credits outside a run bought: a cosmetic, a tournament's prize pool, or a stake in a writer's backing round. */
+export type SpendKind = 'cosmetic' | 'prize_pool' | 'backing';
+/** A credit that is not a deposit: a tournament prize, a prize pool returned to its creator, or backing money (a raise, a royalty share or a refunded stake). */
+export type TopUpKind = 'prize' | 'prize_pool' | 'backing';
 export type LedgerNote = 'entry_fee' | 'reversal' | 'expired' | SpendKind | 'prize';
 
 // ---------- State ----------

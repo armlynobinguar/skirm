@@ -5,6 +5,7 @@ import { Module, type DynamicModule, type INestApplication } from '@nestjs/commo
 import { APP_FILTER, APP_GUARD, NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { SessionGuard } from './auth';
+import { BackingController } from './controllers/backing.controller';
 import { BenchController } from './controllers/bench.controller';
 import { CampaignController } from './controllers/campaign.controller';
 import { PuzzlesController } from './controllers/puzzles.controller';
@@ -60,6 +61,7 @@ export class AppModule {
         CampaignController,
         PuzzlesController,
         CommunityMapsController,
+        BackingController,
       ],
       providers: [
         { provide: DEPS, useValue: deps },

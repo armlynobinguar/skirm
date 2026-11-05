@@ -15,6 +15,7 @@ import { Badge, Button, TextField } from '@skirm/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { describeSkillTrigger, type Tag } from '@skirm/shared';
+import Link from 'next/link';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
 import { EmptyState } from '@/components/states/EmptyState';
@@ -135,7 +136,10 @@ function Marketplace({ initial }: { initial: string | null }) {
         <p className={x.lede}>
           {tab === 'mine'
             ? 'Skills you wrote and skills you hold. Pick one to see its proof, list it or equip it.'
-            : 'Find a skill by proof: its ranked win rate and the benchmark the platform runs at mint, on seeds the seller never sees. You buy the right to use a skill, never its text.'}
+            : 'Find a skill by proof: its ranked win rate and the benchmark the platform runs at mint, on seeds the seller never sees. You buy the right to use a skill, never its text.'}{' '}
+          <Link href={routes.backing()} data-testid="s09-backing">
+            {tab === 'mine' ? 'Raise from backers' : 'Back a writer'}
+          </Link>
         </p>
       </section>
 
