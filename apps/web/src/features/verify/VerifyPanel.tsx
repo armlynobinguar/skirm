@@ -3,8 +3,8 @@
 // not recorded onchain / NEAR unreachable, each check and nearblocks links. Used on the debrief, the
 // shared replay and the standalone /verify page.
 import { Button } from '@skirm/ui';
-import { useMutation } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { ApiError } from '@/lib/api/errors';
 import { config } from '@/lib/config';
 import { routes } from '@/lib/routes';
@@ -26,22 +26,27 @@ const SUMMARY: Record<VerifyStatus, string> = {
   unavailable: 'The log still checks out in your browser; only the onchain comparison is missing.',
 };
 
-/** The button and, once run, the report. `auto` runs it on mount (the /verify page). */
+/** The button and, once run, the report. `auto` runs it at once (the /verify page). Each click runs it afresh. */
 export function VerifyPanel({ matchId, showPageLink = true, auto = false }: { matchId: string; showPageLink?: boolean; auto?: boolean }) {
   const api = useApi();
-  const run = useMutation({ mutationFn: () => verifyMatch(api, matchId) });
-  const { mutate } = run;
-  useEffect(() => {
-    if (auto) mutate();
-  }, [auto, mutate]);
+  const [round, setRound] = useState(auto ? 1 : 0);
+  const run = useQuery({
+    queryKey: ['verify', matchId, round],
+    queryFn: () => verifyMatch(api, matchId),
+    enabled: round > 0,
+    retry: false,
+    staleTime: Infinity,
+    gcTime: 0,
+  });
+  const pending = round > 0 && run.isFetching;
   return (
     <section className={`sk-panel ${s.panel}`} aria-label="Verify on NEAR" data-testid="verify-panel">
       <span className="sk-kick">
         <b>Verify on NEAR</b> · recomputed in your browser, read straight from {config.near.contracts.registry}
       </span>
       <div className={s.actions}>
-        <Button size="sm" variant="primary" onClick={() => run.mutate()} disabled={run.isPending} data-testid="verify-run">
-          {run.isPending ? 'Verifying…' : run.data ? 'Verify again' : 'Verify on NEAR'}
+        <Button size="sm" variant="primary" onClick={() => setRound((n) => n + 1)} disabled={pending} data-testid="verify-run">
+          {pending ? 'Verifying…' : run.data ? 'Verify again' : 'Verify on NEAR'}
         </Button>
         {showPageLink ? (
           <a className={s.link} href={routes.verify(matchId)}>

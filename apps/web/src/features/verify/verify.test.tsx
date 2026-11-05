@@ -197,18 +197,16 @@ describe('VerifyPanel and /verify', () => {
     expect(matchIdFrom('https://playskirm.xyz/verify?id=mat_2')).toBe('mat_2');
     expect(matchIdFrom('mat_3')).toBe('mat_3');
 
-    testRouter.reset('/verify', '');
     const api = createFakeApi();
-    const { unmount } = renderWithProviders(<VerifyScreen />, { api });
+    const { unmount } = renderWithProviders(<VerifyScreen />, { api, path: '/verify' });
     fireEvent.change(screen.getByTestId('verify-input'), { target: { value: 'https://x/matches/mat_v2' } });
     fireEvent.click(screen.getByTestId('verify-submit'));
     expect(testRouter.replace).toHaveBeenCalledWith('/verify?id=mat_v2');
     unmount();
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(rpc(() => viewResult(record())).fetch);
-    testRouter.reset('/verify', '?id=mat_v2');
     const api2 = createFakeApi({ v2Match: async () => match(), v2MatchLog: async () => served() });
-    renderWithProviders(<VerifyScreen />, { api: api2 });
+    renderWithProviders(<VerifyScreen />, { api: api2, path: '/verify', search: '?id=mat_v2' });
     expect(await screen.findByTestId('verify-status')).toHaveTextContent('Verified on NEAR');
     expect(screen.getByTestId('verify-tx')).toHaveAttribute('href', 'https://testnet.nearblocks.io/txns/Fx9abc');
     fetchSpy.mockRestore();
