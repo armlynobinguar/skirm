@@ -56,6 +56,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 - **Draft mode**: each crew bans one of the rival's skills before the match
 - **Map editor and community maps**: paint your own mirrored map, test-play it greedy vs greedy, publish it, and play other players' maps in practice and casual
 - **Live commands**: three orders a match to steer your crew without taking control
+- **Hybrid control**: in casual and practice, steer one of your agents yourself (keys or click-to-move) while the AI runs the rest
 - **Agent progression**: agents earn XP from matches, level up and pick small traits (casual only; ranked plays base stats)
 - **Gas, ice and live water**: gas clouds that cost every other action, ice that slides you a tile further, and cables that electrify the water (Frostline Depot, Sunken Metro)
 - **Supply tools**: drops on water maps can carry sandbags, a pump or a bridge to hold back or cross a flood

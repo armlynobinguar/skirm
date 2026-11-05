@@ -181,6 +181,8 @@ export class RealtimeHub {
           // Nobody left to play the match: stop searching. A found match plays on and the player
           // can reconnect to it.
           this.v2.dropSearch(c.user.accountId);
+          // Nobody left to steer either: a steered agent goes back to its brain.
+          this.v2.releaseControl(c.user.accountId);
         }
       }
     };
@@ -237,6 +239,14 @@ export class RealtimeHub {
         this.send(c, { type: 'v2_command_ok', matchId: msg.matchId, tick: r.tick, left: r.left });
         return;
       }
+      case 'v2_control': {
+        const r = this.v2.control(this.requireUser(c).accountId, msg.matchId, msg.agentId);
+        this.send(c, { type: 'v2_control_ok', matchId: msg.matchId, agentId: r.agentId });
+        return;
+      }
+      case 'v2_steer':
+        // No answer: the next frame shows the move (refusals come back as errors).
+        return this.v2.steer(this.requireUser(c).accountId, msg.matchId, msg.input);
       case 'v2_watch':
         return this.watch(c, msg.matchId);
       case 'v2_unwatch': {
