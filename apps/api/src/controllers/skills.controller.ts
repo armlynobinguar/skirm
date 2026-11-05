@@ -116,8 +116,11 @@ export class SkillsController {
    * nft_mint through the ops key (Noop without NEAR_OPS_*). Never gated on a test: the version's
    * hidden benchmark is queued first (the worker plays it; offline it ends `needs_model`) and the
    * response carries its status. One request at a time mints a draft (409 `mint_in_progress` for
-   * the others). When the chain call errors but the token exists onchain (the call landed, the
-   * answer was lost), the version is recorded as minted.
+   * the others). nft_mint is idempotent onchain, so the minter resends a call whose answer was
+   * lost and a retried mint of an already-minted version returns the existing token as success.
+   * When the chain call still errors but the token exists onchain (the call landed, the answer was
+   * lost; or a skills contract from before the idempotent mint refused the repeat), the version is
+   * recorded as minted.
    */
   @Post(':id/mint')
   @HttpCode(200)

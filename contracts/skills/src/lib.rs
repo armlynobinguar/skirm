@@ -217,6 +217,11 @@ impl Contract {
 
     /// Mint one skill version to its creator. Ops only; no deposit (storage is paid by this
     /// contract). Token id is `<skill id>:<version>`.
+    ///
+    /// Idempotent: when the version is already minted with the same content (creator, royalty,
+    /// prompt hash, tags, actions, created_at, name and summary), the existing token is returned
+    /// with no new storage and no second `nft_mint` event, so the platform can safely retry a
+    /// call whose answer was lost. The same version with different content panics.
     pub fn nft_mint(&mut self, skill: SkillMint) -> Token {
         require!(
             env::predecessor_account_id() == self.ops_id,
@@ -227,6 +232,21 @@ impl Contract {
             !self.account_bound.contains(&info.skill_id),
             "This skill is account-bound and is never minted"
         );
+        if let Some(existing) = self.skill_info.get(&info.token_id) {
+            let token = self
+                .tokens
+                .nft_token(info.token_id.clone())
+                .unwrap_or_else(|| env::panic_str("Skill info without a token"));
+            let same_metadata = token.metadata.as_ref().is_some_and(|md| {
+                md.title.as_deref() == Some(skill.name.as_str())
+                    && md.description == skill.summary
+            });
+            require!(
+                existing == &info && same_metadata,
+                "This skill version is already minted with different content"
+            );
+            return token;
+        }
         if let Some(creator) = self.skill_creator.get(&info.skill_id) {
             require!(
                 creator == &info.creator,

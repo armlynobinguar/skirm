@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CompositeDepositVerifier,
   DevDepositVerifier,
+  NearCallError,
   NearMinter,
   NearOwnershipReader,
   NearRegistry,
@@ -362,6 +363,52 @@ describe('registry and minter', () => {
       created_at: '2026-11-03T08:15:00Z',
       creator: 'ana.testnet',
     });
+  });
+
+  it('minter resends nft_mint once after a lost answer (the contract is idempotent)', async () => {
+    const skill = {
+      id: 'skl_01JB7Z3K9QX4M2T8V6N5R1C0DE',
+      version: 1,
+      name: 'Flood Warden',
+      summary: null,
+      creator: 'ana.testnet',
+      royaltyBps: 500,
+      requiresActions: [],
+      handlesTags: ['spreads' as const],
+      promptSha256: 'a'.repeat(64),
+      createdAt: '2026-11-03T08:15:00Z',
+    };
+    const flaky = (failures: Error[]) => {
+      const calls: Record<string, unknown>[] = [];
+      const c: FunctionCaller = {
+        async call(_contractId, _methodName, args) {
+          calls.push(args);
+          const err = failures.shift();
+          if (err) throw err;
+          return { txHash: 'HASH2', value: { token_id: 'skl_01JB7Z3K9QX4M2T8V6N5R1C0DE:1' } };
+        },
+      };
+      return { c, calls };
+    };
+    // Timeout (no tx hash): sent again with the same args; the existing token is success.
+    const lost = flaky([new NearCallError('nft_mint on skills failed (TimeoutError)')]);
+    expect(await new NearMinter(lost.c, 'skills.playskirm.testnet').mint(skill)).toEqual({
+      tokenId: 'skl_01JB7Z3K9QX4M2T8V6N5R1C0DE:1',
+      status: 'minted',
+      txHash: 'HASH2',
+    });
+    expect(lost.calls).toHaveLength(2);
+    expect(lost.calls[1]).toEqual(lost.calls[0]);
+    // Failed onchain (a tx hash: such as conflicting content): not resent.
+    const onchain = flaky([new NearCallError('nft_mint on skills failed onchain', 'TX')]);
+    await expect(
+      new NearMinter(onchain.c, 'skills.playskirm.testnet').mint(skill),
+    ).rejects.toBeInstanceOf(NearCallError);
+    expect(onchain.calls).toHaveLength(1);
+    // Retries are bounded.
+    const down = flaky([new NearCallError('a'), new NearCallError('b'), new NearCallError('c')]);
+    await expect(new NearMinter(down.c, 'skills.playskirm.testnet').mint(skill)).rejects.toThrow('b');
+    expect(down.calls).toHaveLength(2);
   });
 
   it('createNearAdapters picks Noop without ops keys and Near with them', () => {
