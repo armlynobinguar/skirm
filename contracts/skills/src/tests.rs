@@ -162,12 +162,13 @@ fn identical_retry_returns_existing_token_without_minting_again() {
     assert_eq!(get_logs().len(), 1);
     let storage = env::storage_usage();
 
-    let again = mint(&mut c, skill());
+    // Same call context (testing_env! would reset storage_usage), so storage growth is measurable.
+    let again = c.nft_mint(skill());
     assert_eq!(again.token_id, first.token_id);
     assert_eq!(again.owner_id, creator());
     assert_eq!(again.metadata, first.metadata);
     // No second nft_mint event, no new storage, no refund receipt, supply unchanged.
-    assert!(get_logs().is_empty());
+    assert_eq!(get_logs().len(), 1);
     assert_eq!(env::storage_usage(), storage);
     assert!(get_created_receipts().is_empty());
     assert_eq!(c.nft_total_supply(), U128(1));
