@@ -4,6 +4,9 @@ import {
   appearanceOr,
   isAppearance,
   normalizeSkillRoles,
+  progressionOf,
+  traitPickError,
+  isTraitId,
   skillFitsRole,
   skillRolesLabel,
   type AgentAppearance,
@@ -118,7 +121,34 @@ export class AgentsRepo {
       tier: (V2_TALK_TIERS as readonly string[]).includes(r.tier) ? (r.tier as V2TalkTier) : 'standard',
       systemPrompt: r.systemPrompt ?? null,
       appearance: appearanceOr(r.appearance, r.id),
+      progression: progressionOf(r.xp, r.traits),
     }));
+  }
+
+  /**
+   * The owner picks a trait for an agent (one per trait level reached, each once, at most
+   * DEFAULTS.progression.maxTraits). Refused while the agent is in a live match, so a crew plays the
+   * traits it queued with. Kept in pick order; a match plays them in catalogue order.
+   */
+  async pickTrait(ownerId: string, agentId: string, trait: string): Promise<AgentView> {
+    if (!isTraitId(trait)) throw new RepoError('invalid_trait', 'no such trait');
+    await tx(this.db, async (t) => {
+      const [agent] = await t
+        .select()
+        .from(agents)
+        .where(and(eq(agents.id, agentId), eq(agents.ownerId, ownerId)))
+        .for('update');
+      if (!agent) throw new RepoError('not_found', 'agent not found');
+      if ((await new AgentsRepo(t).busyAgents([agentId])).length > 0)
+        throw new RepoError('agent_busy', 'agent is in a live match');
+      const why = traitPickError(progressionOf(agent.xp, agent.traits), trait);
+      if (why) throw new RepoError(why.includes('already') ? 'trait_taken' : 'no_trait_slot', why);
+      await t
+        .update(agents)
+        .set({ traits: [...(agent.traits ?? []), trait] })
+        .where(eq(agents.id, agentId));
+    });
+    return (await this.view(agentId))!;
   }
 
   async unlocksOf(ownerId: string): Promise<UnlockItemView[]> {

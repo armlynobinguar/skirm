@@ -1,5 +1,5 @@
 // Shapes shared by the repositories and their callers (api, worker, realtime, @skirm/server).
-import type { ActionKind, AgentAppearance, Tag, Unlock } from '@skirm/shared';
+import type { ActionKind, AgentAppearance, AgentProgression, Tag, Unlock } from '@skirm/shared';
 
 /** Envelope-encrypted skill text (Spec §9, arch.md Secrets). Produced by @skirm/server's vault. */
 export interface SealedSkill {
@@ -61,6 +61,8 @@ export interface AgentView {
   systemPrompt: string | null;
   /** Stored look, or the agent's default when none is stored. */
   appearance: AgentAppearance;
+  /** XP, level and traits (@skirm/shared progressionOf). */
+  progression: AgentProgression;
 }
 
 export interface UnlockItemView {

@@ -43,6 +43,7 @@ describe('config', () => {
       'model',
       'playbooks',
       'price',
+      'progression',
       'ranked',
       'season',
       'talk',

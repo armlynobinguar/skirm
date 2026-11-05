@@ -1,5 +1,6 @@
 // What one agent knows on its turn: the board as its crew has seen it (fog), itself, the agents in
 // sight, what it heard last tick and its legal actions. This is the only view a decision engine gets.
+import { TRAITS } from '@skirm/shared';
 import type { Dir, Tile } from './map';
 import type { Action, AgentState, MatchState, Role } from './match';
 import { avoidedTile } from './bluff';
@@ -24,7 +25,8 @@ export interface Observation {
   map: { id: string; name: string; w: number; h: number; goal: number; item: string; deliverTo: string; exit: [number, number] };
   /** Rows of the board as seen: tile characters, '?' where the crew has never looked. */
   rows: string[];
-  me: { id: string; name: string; team: 'A' | 'B'; role: Role; x: number; y: number; carrying: number; capacity: number; tier: TalkTier };
+  /** `traits`: what each of its progression traits does (absent when it plays none). */
+  me: { id: string; name: string; team: 'A' | 'B'; role: Role; x: number; y: number; carrying: number; capacity: number; tier: TalkTier; traits?: string[] };
   teammates: SeenAgent[];
   /** Rivals in sight now (all of them on maps without fog). */
   rivals: SeenAgent[];
@@ -86,7 +88,7 @@ export function observe(s: MatchState, agentId: string): Observation {
     ticksLeft: s.limit - s.tick,
     map: { id: def.id, name: def.name, w, h, goal: def.goal, item: def.item, deliverTo: def.deliverTo, exit: def.exit },
     rows,
-    me: { id: a.id, name: a.name, team: a.team, role: a.role, x: a.x, y: a.y, carrying: a.carrying.length, capacity: a.role === 'Hauler' ? 3 : 2, tier: a.tier },
+    me: { id: a.id, name: a.name, team: a.team, role: a.role, x: a.x, y: a.y, carrying: a.carrying.length, capacity: a.role === 'Hauler' ? 3 : 2, tier: a.tier, ...traitView(a) },
     teammates: s.agents.filter((o) => o !== a && o.team === a.team && !o.out).map(view),
     rivals: s.agents.filter((o) => o.team !== a.team && !o.out && visible[o.y * w + o.x]).map(view),
     score: { mine: s.score[a.team], rival: s.score[rival] },
@@ -97,6 +99,11 @@ export function observe(s: MatchState, agentId: string): Observation {
     legal: legalActions(s, a.id),
     ...hazardView(s, a),
   };
+}
+
+/** The agent's traits in words, for its prompt. */
+function traitView(a: AgentState): { traits?: string[] } {
+  return a.traits?.length ? { traits: a.traits.map((t) => `${TRAITS[t].name} (${TRAITS[t].effect})`) } : {};
 }
 
 /** Gas and electrified water in the crew's sight now, and whether the agent is choking (only on maps that have them). */

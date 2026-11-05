@@ -5,7 +5,7 @@
 //
 // Game types (SkillPublic, Tag, …) come from @skirm/shared (type-only imports,
 // browser-safe).
-import type { ActionKind, AgentAppearance, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, SkillRole, SkillTrigger, Tag, Unlock } from '@skirm/shared';
+import type { ActionKind, AgentAppearance, AgentProgression, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, SkillRole, SkillTrigger, Tag, TraitInfo, Unlock } from '@skirm/shared';
 
 import type { Difficulty, V2Debrief, V2Frame } from '../realtime/protocol';
 
@@ -85,6 +85,20 @@ export interface Agent {
   tier: 'quiet' | 'standard' | 'open';
   /** v2: the owner's instructions put ahead of the agent's skills (≤ 600 characters). Owner only. */
   systemPrompt?: string | null;
+  /** XP, level and traits (absent from an older server). */
+  progression?: AgentProgression;
+}
+
+/** GET /agents/:id/progression: the agent's progression and the trait catalogue. */
+export interface AgentProgressionInfo {
+  agentId: string;
+  progression: AgentProgression;
+  traits: TraitInfo[];
+  /** Levels that earn a trait pick. */
+  traitLevels: number[];
+  maxTraits: number;
+  /** Whether ranked plays traits (by default every agent plays its base stats there). */
+  rankedTraits: boolean;
 }
 
 export interface UnlockItem {

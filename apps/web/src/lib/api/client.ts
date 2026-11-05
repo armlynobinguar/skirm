@@ -2,6 +2,7 @@
 // Every method returns the parsed JSON body or throws an ApiError (./errors.ts).
 // Credentials are read per request from the CredentialsStore, so signing in or out needs no new
 // client. In components use `useApi()` (src/lib/providers.tsx), never construct one.
+import type { TraitId } from '@skirm/shared';
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
@@ -37,6 +38,7 @@ import type {
   MarketDetail,
   MarketQuery,
   Me,
+  AgentProgressionInfo,
   AgentRecord,
   MyMatch,
   MyRentalOffer,
@@ -98,6 +100,10 @@ export interface ApiClient {
   rent(offerId: string, txHash: string): Promise<{ pass: RentalPass }>;
   /** GET /agents/:id/record: the agent's season and all-time record, bluffs included. */
   agentRecord(agentId: string): Promise<AgentRecord>;
+  /** GET /agents/:id/progression: XP, level, traits and the trait catalogue. */
+  agentProgression(agentId: string): Promise<AgentProgressionInfo>;
+  /** POST /agents/:id/traits: picks a trait into an earned slot; returns the agent. */
+  pickTrait(agentId: string, trait: TraitId): Promise<Agent>;
   /** PATCH /agents/:id: name, look, skills, unlocks, v2 role/vision/comms/tier and `systemPrompt` (≤ 600). */
   patchAgent(agentId: string, patch: AgentPatch): Promise<Agent>;
 
@@ -319,6 +325,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
 
     agents: () => get('/agents'),
     agentRecord: (id) => get(`/agents/${enc(id)}/record`),
+    agentProgression: (id) => get(`/agents/${enc(id)}/progression`),
+    pickTrait: (id, trait) => json('POST', `/agents/${enc(id)}/traits`, { body: { trait } }),
     rentalOffers: () => get('/rentals'),
     myRentals: () => get('/rentals/mine'),
     setRentalOffer: (id, priceYocto) => json('PUT', `/agents/${enc(id)}/rental`, { body: { priceYocto } }),

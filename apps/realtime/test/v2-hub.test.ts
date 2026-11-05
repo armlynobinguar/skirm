@@ -86,6 +86,9 @@ describe('v2 matches over the hub', () => {
     expect(end.debrief!.season).toEqual({ number: 1, points: seasonPoints(outcome) });
     expect((await deps.repos.v2Matches.get(found.matchId))!.debriefs?.A?.season).toEqual(end.debrief!.season);
     expect(deps.registryJobs).toContainEqual({ kind: 'v2_match', id: found.matchId });
+    // Ana's agent earned ranked XP, written with the result and told in her debrief.
+    expect(end.debrief!.xp).toEqual([expect.objectContaining({ agentId: ana.agents[0]!.id, gained: expect.any(Number), level: expect.any(Number) })]);
+    expect((await deps.repos.agents.view(ana.agents[0]!.id))!.progression.xp).toBe(end.debrief!.xp![0]!.xp);
     // Rook runs the starter skill, which Ana did not write: her plan is withheld.
     const own = ana.inbox.ofType('v2_frame').flatMap((f) => f.frame.agents.filter((a) => a.team === 'A'));
     expect(own.every((a) => a.planHidden === true)).toBe(true);

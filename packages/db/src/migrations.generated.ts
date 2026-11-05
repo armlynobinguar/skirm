@@ -303,5 +303,15 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE INDEX \"daily_attempts_account_idx\" ON \"daily_attempts\" USING btree (\"account_id\",\"date\");",
       "\nCREATE INDEX \"daily_attempts_board_idx\" ON \"daily_attempts\" USING btree (\"date\",\"points\");"
     ]
+  },
+  {
+    "tag": "0016_agent_progression",
+    "folderMillis": 1793838065587,
+    "bps": true,
+    "hash": "f998158f7fa03cc306ff33bfcd5929a012f0e3a8d9aae7436d8b7140f73da043",
+    "sql": [
+      "ALTER TABLE \"agents\" ADD COLUMN \"xp\" integer DEFAULT 0 NOT NULL;",
+      "\nALTER TABLE \"agents\" ADD COLUMN \"traits\" jsonb DEFAULT '[]'::jsonb NOT NULL;"
+    ]
   }
 ];

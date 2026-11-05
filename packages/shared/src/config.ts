@@ -167,6 +167,24 @@ const defaults = {
     maxSaved: 5,
     actorLineChars: 160,
   },
+  /**
+   * Agent progression (progression.ts): each agent earns XP from the matches it plays to the end
+   * (ranked and casual; practice against the bot and void matches give none, as for the agent's
+   * record). Per match: the kind's base, plus `win` or `draw`, plus `perDelivered` per item it
+   * delivered (at most `maxDelivered` items count). Level L → L+1 costs `levelBase + levelStep ×
+   * (L − 1)` XP, up to `maxLevel`. At each of `traitLevels` the owner picks one trait (engine
+   * traits.ts: one small step on one stat), at most `maxTraits` per agent. Ranked plays every agent
+   * on its base stats unless `rankedTraits` is on.
+   */
+  progression: {
+    xp: { ranked: 40, casual: 25, practice: 0, win: 20, draw: 10, perDelivered: 2, maxDelivered: 10 },
+    levelBase: 100,
+    levelStep: 50,
+    maxLevel: 10,
+    traitLevels: [3, 6] as number[],
+    maxTraits: 2,
+    rankedTraits: false,
+  },
   season: {
     days: 14,
     splitBps: [3000, 2000, 1500, 500, 500, 500, 500, 500, 500, 500],

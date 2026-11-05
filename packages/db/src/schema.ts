@@ -135,6 +135,9 @@ export const agents = pgTable(
     systemPrompt: text('system_prompt'),
     /** Cosmetic look on the 3D board (AgentAppearance); null until the owner changes it. */
     appearance: jsonb('appearance'),
+    /** Progression (@skirm/shared progression.ts): XP from matches played (the level follows from it) and the traits picked, in pick order. */
+    xp: integer('xp').notNull().default(0),
+    traits: jsonb('traits').$type<string[]>().notNull().default([]),
     createdAt: createdAt(),
   },
   (t) => [
@@ -493,6 +496,20 @@ export interface V2CrewRecord {
   skills?: { id: string; version: number }[];
   /** Played by its player's own program (bring your own agent): never in a ranked match. */
   external?: true;
+  /** Progression traits it played with (the log header's; absent when none). */
+  traits?: readonly string[];
+}
+
+/** XP one agent earned from a match (V2Debrief.xp), with its total and level after it. */
+export interface V2DebriefXpRecord {
+  agentId: string;
+  name: string;
+  gained: number;
+  xp: number;
+  level: number;
+  leveledUp: boolean;
+  /** A trait pick is waiting (earned and not yet taken). */
+  traitReady: boolean;
 }
 
 export interface V2EloDeltaRecord {
@@ -538,6 +555,8 @@ export interface V2DebriefRecord {
   difficulty?: string;
   /** Ranked: the season this result counted towards and the standings points it gave (set by finish). */
   season?: { number: number; points: number };
+  /** XP each of the crew's agents earned (set by finish; absent when none was earned). */
+  xp?: V2DebriefXpRecord[];
   /** The crew's own live commands (V2Debrief.commands); absent when none were sent. */
   commands?: { tick: number; agents: { id: string; name: string }[]; preset: string | null; text: string | null }[];
   /** Draft mode: every ban step, both crews' (V2Debrief.draft); absent outside draft mode. */
