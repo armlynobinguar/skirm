@@ -3,6 +3,7 @@
 // overheard) and its own refusals; a watcher sees everything. Plans: own-crew plans only; skills
 // only by public name and trigger (own crew), never their prompts.
 import type { FrameCommands } from './commands';
+import type { SteerInput } from './steer';
 import type { HazardKind, Team } from './map';
 import type { MatchEvent, MatchResult, MatchState, Role } from './match';
 import { rowsFor } from './observe';
@@ -49,6 +50,8 @@ export interface FrameAgent {
    * (the skill was in its prompt). Own crew only; never the prompt. Absent: no skills.
    */
   skills?: FrameSkill[];
+  /** Hybrid control: its player steers it by hand (its actions come from the player, not the brain). */
+  controlled?: true;
 }
 
 /** One equipped skill in the mind panel: public metadata and whether it is active this tick. */
@@ -93,6 +96,11 @@ export interface V2Frame {
   commands?: FrameCommands;
   /** The viewing crew's crew playbook for this match, by its name (its own frames only; never the text). */
   playbook?: string;
+  /**
+   * Hybrid control, the viewing crew's own frames only: the agent its player steers and the standing
+   * order it is walking (take, deliver or goto; null: none, it waits for the next input).
+   */
+  steer?: { agentId: string; standing: SteerInput | null };
 }
 
 /** What the server knows beside the match state: each agent's current plan. */

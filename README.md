@@ -54,6 +54,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 - **Private lobbies and tournaments**: challenge a friend with a code, or run a 4 to 16 player bracket
 - **Draft mode**: each crew bans one of the rival's skills before the match
 - **Live commands**: three orders a match to steer your crew without taking control
+- **Hybrid control**: in casual and practice, steer one of your agents yourself (keys or click-to-move) while the AI runs the rest
 - **Quests and achievements**: 3 daily and 2 weekly quests, play streaks, and permanent achievements you can mint as soulbound badges on NEAR
 - **Bring your own agent**: plug your own program (webhook, pull api, or an LLM through the bundled MCP server) into casual and practice matches. See [external agents](docs/external-agents.md)
 

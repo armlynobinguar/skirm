@@ -1,10 +1,10 @@
 // WebSocket messages of apps/realtime (path /ws). Mirrors WsClientMessage / WsServerMessage in
 // packages/server/src/queues.ts and the parser in apps/realtime/src/protocol.ts; copied here because
 // @skirm/server is Node-only (bullmq, ioredis). Keep in sync.
-import type { CommandPreset, Difficulty, FrameAgent, FrameCommand, FrameItem, ItemOrigin, MatchResult, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
+import type { CommandPreset, Difficulty, FrameAgent, FrameCommand, FrameItem, ItemOrigin, MatchResult, SteerInput, TalkTier, Team, V2Frame } from '@skirm/engine/v2';
 import type { PlayerTier, Side } from '@skirm/shared';
 
-export type { Side, V2Frame, FrameAgent, FrameCommand, FrameItem, ItemOrigin, TalkTier, Team, MatchResult, Difficulty, CommandPreset };
+export type { Side, V2Frame, FrameAgent, FrameCommand, FrameItem, ItemOrigin, TalkTier, Team, MatchResult, Difficulty, CommandPreset, SteerInput };
 
 /** v2 (packages/server/src/v2.ts): found → accept (10 s) → lock-in (30 s) → live (2 s ticks) → end. */
 /** Who a v2_queue plays: absent for a matchmade rival, 'bot' for practice against the greedy bot. */
@@ -104,7 +104,11 @@ export type V2ClientMessage =
   /** A live command to your own crew: one agent or all of it, a preset and/or free text. Answered with v2_command_ok. */
   | { type: 'v2_command'; matchId: string; agentId?: string; preset?: CommandPreset; text?: string }
   /** Draft mode, on your turn: ban one of the rival's skills from the v2_draft pool, or pass (null). */
-  | { type: 'v2_ban'; matchId: string; skillId: string | null };
+  | { type: 'v2_ban'; matchId: string; skillId: string | null }
+  /** Hybrid control (casual and practice only): steer one of your agents by hand, or hand it back (null). Answered with v2_control_ok. */
+  | { type: 'v2_control'; matchId: string; agentId: string | null }
+  /** Hybrid control: your input for the agent you steer (one tick, or a standing order). No answer. */
+  | { type: 'v2_steer'; matchId: string; input: SteerInput };
 
 /** What practice adds to v2_found and v2_lockin. */
 export interface V2PracticeFlags {
@@ -137,7 +141,9 @@ export type V2ServerMessage =
   /** A private lobby's players readied or stepped back. */
   | { type: 'v2_lobby'; lobbyId: string; ready: { host: boolean; guest: boolean } }
   /** The command is applied on `tick`; `left` remain this match. */
-  | { type: 'v2_command_ok'; matchId: string; tick: number; left: number };
+  | { type: 'v2_command_ok'; matchId: string; tick: number; left: number }
+  /** Hybrid control: the agent you now steer (null: the brain runs the whole crew). */
+  | { type: 'v2_control_ok'; matchId: string; agentId: string | null };
 
 export type WsClientMessage = { type: 'auth'; token?: string; devUser?: string } | V2ClientMessage;
 
@@ -173,6 +179,8 @@ export type WsErrorCode =
   | 'rate_limited'
   | 'invalid_command'
   | 'command_refused'
+  | 'control_casual'
+  | 'not_controlling'
   | 'too_many_subscriptions'
   | 'unavailable'
   | 'internal'

@@ -153,8 +153,10 @@ export function parseReply(text: string, legal: Action[], canSpeak: boolean, ski
   return { action, say, thought, ...(skill ? { skill } : {}) };
 }
 
-export function planPrompt(o: Observation): string {
-  return `${viewText(o)}\n\nWrite your crew's plan for the next minute in at most 4 short lines: who goes where, which items, when to deliver, how to handle the rival. Then one last line "WHY: <one sentence on why this plan>".`;
+export function planPrompt(o: Observation, controlled: string | null = null): string {
+  // Hybrid control: one agent is steered by its player, so the plan works around it instead of ordering it.
+  const steer = controlled ? `\n\nYour player is steering ${controlled} by hand: give ${controlled} no orders; plan the others around where ${controlled} goes.` : '';
+  return `${viewText(o)}${steer}\n\nWrite your crew's plan for the next minute in at most 4 short lines: who goes where, which items, when to deliver, how to handle the rival. Then one last line "WHY: <one sentence on why this plan>".`;
 }
 
 /** The plan without its WHY line, and the WHY line (the planner trace) on its own. */

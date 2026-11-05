@@ -94,13 +94,19 @@ export interface V2AgentCommand {
   targets?: [number, number][];
 }
 
+/** What the planner is given: the crew's skills, instructions and playbook, and who its player steers. */
+export type V2PlanContext = Pick<V2AgentContext, 'skills' | 'skillTriggers' | 'instructions' | 'playbook'> & {
+  /** Hybrid control: the name of the crew's agent its player steers by hand (plan around it, never for it). */
+  controlled?: string | null;
+};
+
 export interface V2Brain {
   /** external: a player's own program (bring your own agent), greedy on any tick it misses. */
   readonly kind: 'model' | 'greedy' | 'external';
   readonly model: string;
   act(o: Observation, ctx: V2AgentContext): Promise<V2Decision>;
   /** A short crew plan (null when the brain does not plan). */
-  plan(o: Observation, ctx: Pick<V2AgentContext, 'skills' | 'skillTriggers' | 'instructions' | 'playbook'>): Promise<V2Plan>;
+  plan(o: Observation, ctx: V2PlanContext): Promise<V2Plan>;
 }
 
 /** The skills whose triggers hold on this observation, in order (skills without a trigger always do). */
@@ -198,7 +204,7 @@ export function createModelBrain(opts: ModelBrainOptions = {}): V2Brain {
       };
     },
     async plan(o, ctx) {
-      const r = await call('planner', systemPrompt(activeSkills(o, ctx), ctx.instructions, { text: ctx.playbook ?? null }), planPrompt(o), V2_PLANNER_MAX_TOKENS, V2_PLANNER_DEADLINE_MS);
+      const r = await call('planner', systemPrompt(activeSkills(o, ctx), ctx.instructions, { text: ctx.playbook ?? null }), planPrompt(o, ctx.controlled ?? null), V2_PLANNER_MAX_TOKENS, V2_PLANNER_DEADLINE_MS);
       if (!r.text) return { text: null, why: null, call: r.call };
       const { plan, why } = parsePlan(r.text);
       return { text: plan, why, call: r.call };

@@ -5,12 +5,15 @@
 //   right   → the comms feed, filtered All / Team / Say / overheard / Mind (plan changes).
 //   bottom  → agent cards (carry slots with origin stripes, pickup and delivery floats; click to
 //             follow, double-click for third person) and the controls; above them, for a player
-//             only, the live commands (hud/Commands.tsx).
+//             only, the live commands (hud/Commands.tsx). In casual and practice, "Take control"
+//             under your cards steers that agent by hand (hud/Control.tsx; the AI runs the rest).
 //   over it → the intro cutscene, the 3-2-1-GO count, callouts, and the VICTORY / DEFEAT banner.
 // The match is server-paced: Pause freezes this view only (resume jumps back to live), Story keeps
 // third person subtitles up for their full time, and the speed control shows only for a replay.
 // Keys: Space pause, V third person, ← → next agent in third person, Enter / Esc skip the intro,
-// Esc leaves third person, 1 / 2 / 4 replay speed.
+// Esc leaves third person, 1 / 2 / 4 replay speed. While you steer an agent: WASD / arrows step, E
+// use, T take, G deliver, X stop, Esc hands it back (third person's Esc comes first), a click on the
+// board walks there.
 // Spectating (a watch view): the whole board, both crews' cards and talk, the crews named by letter
 // (never "you"), and no intro (the banner and debrief are the match screen's, not this HUD's).
 import { AkIcon, Button, Segmented, type SegmentedOption } from '@skirm/ui';
@@ -26,6 +29,7 @@ import type { FrameAgent, V2Frame } from '@/lib/realtime/protocol';
 import { AgentCards, type CardAgent } from './hud/AgentCards';
 import { CommandBar } from './hud/Commands';
 import { Comms } from './hud/Comms';
+import { ControlBar, TakeControl, useHybridControl } from './hud/Control';
 import c from './hud/hud.module.css';
 import { Intro } from './hud/Intro';
 import { MatchTop } from './hud/MatchTop';
@@ -98,6 +102,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   const [banner, setBanner] = useState<'VICTORY' | 'DEFEAT' | 'DRAW' | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const later = useCallback((ms: number, f: () => void) => void timers.current.push(setTimeout(f, ms)), []);
+  const control = useHybridControl(view, frame, !replay);
 
   useEffect(() => {
     if (intro) introPlayed.add(view.matchId);
@@ -209,6 +214,8 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
     if (e.key === 'Escape' && tpv) {
       take();
       exitTpv();
+    } else if (control.onKey(e)) {
+      take();
     } else if (e.key === ' ') {
       if (t?.tagName === 'BUTTON') return; // Space on a focused button presses it
       take();
@@ -275,7 +282,18 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
       <Comms lines={comms} team={team} filter={filter} onFilter={setFilter} tickMs={view.tickMs} />
       <div className={c.mbot}>
         {!watch && !replay && view.phase === 'live' ? <CommandBar view={view} frame={frame} /> : null}
-        <AgentCards team={team} mapId={view.mapId} tick={tick} cards={own} pressed={tpv ?? focus} onPick={onPick} onWatch={enterTpv} />
+        <ControlBar control={control} frame={frame} />
+        <AgentCards
+          team={team}
+          mapId={view.mapId}
+          tick={tick}
+          cards={own}
+          pressed={tpv ?? focus}
+          onPick={onPick}
+          onWatch={enterTpv}
+          controlled={control.controlled}
+          extra={(a) => <TakeControl agentId={a.id} name={a.name} control={control} out={a.out} />}
+        />
         <div className={`sk-panel ${c.ctrl}`}>
           <Button size="sm" onClick={onPause} disabled={ended} aria-label={paused ? 'Resume' : 'Pause'} title={replay ? 'Pause (Space)' : 'Pause the view; the match goes on (Space)'} data-testid="v2-pause">
             <AkIcon name={paused ? 'resume' : 'pause'} />

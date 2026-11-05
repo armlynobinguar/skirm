@@ -4,10 +4,11 @@
 // above the card. Click follows the agent (again to stop); double-click opens third person.
 // Rivals show once seen; out of sight their slots are "?", and rivals never seen are blank cards.
 import { carryOf, mapV2, type FrameAgent, type Team } from '@skirm/engine/v2';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AgentPortrait } from '@/features/arena/AgentPortrait';
 import { agentColours } from '@/features/arena/live';
 import { mapById } from '@/features/arena/world';
+import { controlStyles } from './Control';
 import c from './hud.module.css';
 import { invChange, plural, slotsOf, type InvChange } from './model';
 import { ItemIcon, SmallSlots } from './parts';
@@ -33,9 +34,13 @@ export interface AgentCardsProps {
   onPick: (id: string) => void;
   onWatch: (id: string) => void;
   className?: string;
+  /** Hybrid control: the agent its player steers (tagged on its card). */
+  controlled?: string | null;
+  /** Hybrid control: drawn under each card (the "Take control" button). */
+  extra?: (agent: FrameAgent) => ReactNode;
 }
 
-export function AgentCards({ team, mapId, tick, cards, unseen = 0, pressed, onPick, onWatch, className }: AgentCardsProps) {
+export function AgentCards({ team, mapId, tick, cards, unseen = 0, pressed, onPick, onWatch, className, controlled, extra }: AgentCardsProps) {
   const def = mapV2(mapId);
   const item = def?.item ?? 'Item';
   const accent = mapById(mapId) ? (mapById(mapId) as unknown as { pal: { accent: string } }).pal.accent : 'var(--amber)';
@@ -55,6 +60,8 @@ export function AgentCards({ team, mapId, tick, cards, unseen = 0, pressed, onPi
           pressed={pressed === agent.id}
           onPick={onPick}
           onWatch={onWatch}
+          steered={!!agent.controlled || controlled === agent.id}
+          extra={extra?.(agent)}
         />
       ))}
       {Array.from({ length: unseen }, (_, i) => (
@@ -87,20 +94,28 @@ interface CardProps {
   pressed: boolean;
   onPick: (id: string) => void;
   onWatch: (id: string) => void;
+  steered?: boolean;
+  extra?: ReactNode;
 }
 
-function Card({ agent, rival, inSight, slot, tick, mapId, item, accent, pressed, onPick, onWatch }: CardProps) {
+function Card({ agent, rival, inSight, slot, tick, mapId, item, accent, pressed, onPick, onWatch, steered, extra }: CardProps) {
   const float = useInvFloat(agent, inSight);
   const { body, head } = agentColours(agent.team, slot);
   const status = agent.out ? 'out' : agent.down ? 'swept' : `${agent.delivered} dlv`;
   return (
     <div className={c.cardWrap}>
       {float ? <InvFloat key={float.key} change={float.change} rival={rival} mapId={mapId} item={item} /> : null}
+      {steered ? (
+        <span className={controlStyles.steered} data-testid={`v2-steered-${agent.id}`}>
+          {rival ? 'Player' : 'You'}
+        </span>
+      ) : null}
       <button
         type="button"
         className={c.acard}
         data-rival={rival || undefined}
         data-down={agent.out || agent.down || undefined}
+        data-steered={steered || undefined}
         aria-pressed={pressed}
         title={`Follow ${agent.name} · double-click or V for third person`}
         style={rival ? undefined : ({ '--c': body } as CSSProperties)}
@@ -119,6 +134,7 @@ function Card({ agent, rival, inSight, slot, tick, mapId, item, accent, pressed,
           <SmallSlots slots={slotsOf(agent, carryOf(agent.role), inSight, tick)} mapId={mapId} item={item} accent={accent} />
         </span>
       </button>
+      {extra}
     </div>
   );
 }

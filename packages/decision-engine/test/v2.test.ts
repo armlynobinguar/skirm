@@ -76,6 +76,9 @@ describe('v2 prompts', () => {
     expect(parseReply(`ACTION: 1\nTHINK: ${'x'.repeat(200)}`, o.legal, false).thought).toHaveLength(MAX_THOUGHT_CHARS);
 
     expect(planPrompt(o)).toContain('WHY:');
+    // Hybrid control: the planner is told who its player steers, and nothing when nobody is.
+    expect(planPrompt(o, 'Wick')).toContain('Your player is steering Wick by hand');
+    expect(planPrompt(o)).not.toContain('steering');
     expect(parsePlan('Wick shores the left.\nMoss digs.\nWHY: the pump floods the right first.')).toEqual({
       plan: 'Wick shores the left.\nMoss digs.',
       why: 'the pump floods the right first.',
