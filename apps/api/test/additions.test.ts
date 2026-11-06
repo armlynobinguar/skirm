@@ -59,6 +59,11 @@ describe('DELETE /me/near and royalties', () => {
     const blocked = await ana.del('/me/near');
     expect(blocked.status).toBe(409);
     expect(blocked.body.error.code).toBe('listing_active');
+    // Changing wallets is refused the same way, and the link stays.
+    const relink = await h.http().post('/auth/session').set('x-dev-user', 'ana').send({ nearAccountId: 'ana2.testnet' });
+    expect(relink.status).toBe(409);
+    expect(relink.body.error.code).toBe('listing_active');
+    expect((await ana.get('/me')).body.account.nearAccountId).toBe('ana.testnet');
 
     // Primary sale: no royalty.
     expect((await ben.post(`/market/${skillId}/purchase`, { txHash: `dev:${price}` })).status).toBe(200);

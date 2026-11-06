@@ -139,7 +139,7 @@ export function errorCopy(e: unknown): { title: string; message: string; code?: 
     case 'listing_active':
       return {
         title: 'Listing still open',
-        message: 'Cancel your market listings, then unlink your NEAR account.',
+        message: 'Cancel your market listings first, then unlink or change your NEAR account.',
         code: e.code,
       };
     case 'not_found':
