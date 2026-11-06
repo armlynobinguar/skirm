@@ -12,6 +12,9 @@
 //                  when you wrote it, encrypted when bought
 //   talk tier      the agent's default for unranked play (ranked is always Standard)
 //   rent out       offer the agent to other players at a price per match (./RentOut.tsx)
+//   agent account  the agent's own custodial NEAR account with a per-match spend cap: create,
+//                  fund from the wallet, withdraw (./AgentAccountCard.tsx; hidden when the server
+//                  has agent accounts off)
 //   record         this season's record (all time when no season is open) from GET /agents/:id/record:
 //                  win rate, matches, deliveries per match, bluffs landed of told and rival bluffs seen
 //                  through; the agent's own counters until it loads or if it fails
@@ -30,6 +33,7 @@ import { MAPS, mapById, type V2Map } from '@/features/arena/world';
 import { SkillArt } from '@/features/skills/parts';
 import { RoleTag, roleBlockReason } from '@/features/skills/RoleTag';
 import { ProgressionPanel } from './Progression';
+import { AgentAccountCard } from './AgentAccountCard';
 import { RentOut } from './RentOut';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
@@ -560,6 +564,7 @@ function AgentEditor({
         </section>
 
         <RentOut agentId={agent.id} agentName={agent.name} linked={linked} />
+        <AgentAccountCard agentId={agent.id} agentName={agent.name} />
 
         <ButtonLink href={backHref} variant="primary" className={e.back} data-testid="agent-back">
           {from ? 'Back to crew ▸' : 'Back to Command ▸'}

@@ -58,6 +58,8 @@ import type {
   AgentRecord,
   MyMatch,
   MyRentalOffer,
+  AgentAccount,
+  AgentAccountStatus,
   Onboarding,
   SkillTemplateView,
   TutorialUpdate,
@@ -118,6 +120,17 @@ export interface ApiClient {
   rent(offerId: string, txHash: string): Promise<{ pass: RentalPass }>;
   /** POST /rentals/:offerId `{ credits, key }`: pays in paid credits; a retry with the same key returns the same pass. */
   rentWithCredits(offerId: string, key: string): Promise<{ pass: RentalPass; credits: number }>;
+  /** GET /agents/:id/account: the agent's own NEAR account, or `enabled: false` when the server has them off. */
+  agentAccount(agentId: string): Promise<AgentAccountStatus>;
+  /** POST /agents/:id/account: creates the agent's custodial NEAR account. */
+  createAgentAccount(agentId: string): Promise<{ account: AgentAccount }>;
+  /** PUT /agents/:id/account/cap: what the account may spend per match. */
+  setAgentAccountCap(agentId: string, capYocto: string): Promise<{ account: AgentAccount }>;
+  /** POST /agents/:id/account/withdraw: sends the rest (or `amountYocto`) to the linked NEAR account. */
+  withdrawAgentAccount(
+    agentId: string,
+    amountYocto?: string,
+  ): Promise<{ txHash: string; amountYocto: string; to: string; account: AgentAccount }>;
   /** GET /agents/:id/record: the agent's season and all-time record, bluffs included. */
   agentRecord(agentId: string): Promise<AgentRecord>;
   /** GET /agents/:id/progression: XP, level, traits and the trait catalogue. */
@@ -416,6 +429,11 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     setRentalOffer: (id, priceYocto) => json('PUT', `/agents/${enc(id)}/rental`, { body: { priceYocto } }),
     rent: (offerId, txHash) => json('POST', `/rentals/${enc(offerId)}`, { body: { txHash } }),
     rentWithCredits: (offerId, key) => json('POST', `/rentals/${enc(offerId)}`, { body: { credits: true, key } }),
+    agentAccount: (id) => get(`/agents/${enc(id)}/account`),
+    createAgentAccount: (id) => json('POST', `/agents/${enc(id)}/account`, { body: {} }),
+    setAgentAccountCap: (id, capYocto) => json('PUT', `/agents/${enc(id)}/account/cap`, { body: { capYocto } }),
+    withdrawAgentAccount: (id, amountYocto) =>
+      json('POST', `/agents/${enc(id)}/account/withdraw`, { body: amountYocto ? { amountYocto } : {} }),
     patchAgent: (id, patch) => json('PATCH', `/agents/${enc(id)}`, { body: patch }),
 
     skills: (tab = 'written') => get('/skills', { tab }),

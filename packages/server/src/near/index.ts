@@ -1,4 +1,5 @@
 import type { ServerConfig } from '../config';
+import { NearAgentAccounts, type AgentAccountsChain } from './agent-accounts';
 import { NearBadges, NoopBadges, type BadgeMinter } from './badges';
 import { NearCosmetics, type CosmeticsChain } from './cosmetics';
 import {
@@ -23,6 +24,7 @@ import { NearSeasons, NoopSeasons, type SeasonsChain } from './seasons';
 import { NearMetaTxRelayer, type MetaTxRelayer } from './relayer';
 import { OpsFunctionCaller, type FunctionCaller } from './signer';
 
+export * from './agent-accounts';
 export * from './backing';
 export * from './badges';
 export * from './cosmetics';
@@ -54,6 +56,8 @@ export interface NearAdapters {
   cosmetics?: CosmeticsChain;
   /** Gasless onboarding's relayer (NEP-366); absent unless RELAYER_ACCOUNT_ID and _PRIVATE_KEY are set. */
   relayer?: MetaTxRelayer;
+  /** Agents' own custodial NEAR accounts; absent while AGENT_ACCOUNTS_PARENT is unset (feature off). */
+  agentAccounts?: AgentAccountsChain;
 }
 
 export interface NearAdapterOptions extends NearRpcOptions {
@@ -75,7 +79,7 @@ type NearConfig = Pick<
   | 'CREDITS_PER_NEAR'
   | 'nearRpcUrls'
 > &
-  Partial<Pick<ServerConfig, 'RELAYER_ACCOUNT_ID' | 'RELAYER_PRIVATE_KEY' | 'NEAR_CONTRACT_COSMETICS'>>;
+  Partial<Pick<ServerConfig, 'RELAYER_ACCOUNT_ID' | 'RELAYER_PRIVATE_KEY' | 'NEAR_CONTRACT_COSMETICS' | 'AGENT_ACCOUNTS_PARENT' | 'AGENT_ACCOUNTS_PARENT_KEY'>>;
 
 /**
  * Registry/Minter/OwnershipReader/Seasons/Badges are Near* when the ops signer is configured, Noop*
@@ -124,5 +128,8 @@ export function createNearAdapters(
       new RpcRentalVerifier(rpc, config.NEAR_CONTRACT_MARKET, relayers),
       config.AUTH_MODE === 'dev' ? new DevRentalVerifier() : undefined,
     ),
+    ...(config.AGENT_ACCOUNTS_PARENT && config.AGENT_ACCOUNTS_PARENT_KEY
+      ? { agentAccounts: new NearAgentAccounts(config.AGENT_ACCOUNTS_PARENT, config.AGENT_ACCOUNTS_PARENT_KEY, rpc) }
+      : {}),
   };
 }

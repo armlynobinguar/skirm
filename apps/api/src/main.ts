@@ -77,6 +77,7 @@ async function main(): Promise<void> {
       // NEP-245 cosmetics only with NEAR_CONTRACT_COSMETICS set (off by default: credits-only).
       ...(near.cosmetics ? { cosmetics: near.cosmetics } : {}),
       keys: new RpcNearKeyChecker(near.rpc),
+      ...(near.agentAccounts ? { agentAccounts: near.agentAccounts } : {}),
       ...(backingContract ? { backing: new RpcBackingTxReader(near.rpc, backingContract) } : {}),
     },
     // Gasless onboarding: only with RELAYER_ACCOUNT_ID and RELAYER_PRIVATE_KEY set (docs/gasless.md).

@@ -8,6 +8,7 @@ import type { ReplayFrameReader } from './replays';
 import type { RateLimitStore, RateLimits } from './rate-limit';
 import type { RelayDeps } from './relay';
 import type {
+  AgentAccountsChain,
   BackingTxReader,
   BadgeMinter,
   BenchmarkJobData,
@@ -56,6 +57,7 @@ export type ApiConfig = Pick<
       | 'LLM_PRICE_OUTPUT_USD'
       | 'llmModels'
       | 'NEAR_RENTALS_ONCHAIN'
+      | 'NEAR_CONTRACT_MARKET'
     >
   > & {
     V2_BRAIN?: string | undefined;
@@ -98,6 +100,11 @@ export interface ApiDeps {
     keys?: NearKeyChecker;
     /** Reads backing-contract transactions (set with BACKING_CONTRACT). */
     backing?: BackingTxReader;
+    /**
+     * Agents' own custodial NEAR accounts (AGENT_ACCOUNTS_PARENT set). Absent: the feature is off,
+     * GET /agents/:id/account says so and the other agent-account routes answer 503.
+     */
+    agentAccounts?: AgentAccountsChain;
   };
   /**
    * Gasless onboarding (POST /relay, docs/gasless.md): the relayer, skirm's contract ids and the

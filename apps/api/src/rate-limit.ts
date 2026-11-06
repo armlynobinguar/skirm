@@ -75,6 +75,8 @@ const STRICT: readonly [string, RegExp][] = [
   ['POST', /^\/auth\/session$/],
   ['POST', /^\/credits\/deposits$/],
   ['POST', /^\/rentals\/[^/]+$/],
+  ['POST', /^\/agents\/[^/]+\/account(\/withdraw)?$/],
+  ['PUT', /^\/agents\/[^/]+\/account\/cap$/],
   ['POST', /^\/market\/[^/]+\/(purchase|listing|trial)$/],
   ['POST', /^\/skills\/[^/]+\/mint$/],
   ['POST', /^\/cosmetics\/[^/]+\/(buy|mint)$/],

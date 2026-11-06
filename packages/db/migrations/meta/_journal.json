@@ -169,6 +169,13 @@
       "when": 1793939119411,
       "tag": "0023_cosmetic_items",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793941797635,
+      "tag": "0024_agent_accounts",
+      "breakpoints": true
     }
   ]
 }

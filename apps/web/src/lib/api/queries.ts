@@ -38,6 +38,8 @@ export const qk = {
   myRentals: ['me', 'rentals'] as const,
   /** The operator's model catalog (GET /v2/models). */
   v2Models: ['v2', 'models'] as const,
+  /** Under `me`, so a match end refreshes what the agent account committed. */
+  agentAccount: (agentId: string) => ['me', 'agent-account', agentId] as const,
   backing: {
     all: ['backing'] as const,
     config: ['backing', 'config'] as const,
