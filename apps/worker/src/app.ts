@@ -36,6 +36,7 @@ import { processRegistry } from './registry-processor';
 import { processSeasonTick } from './season-processor';
 import { seedOfficialSkills } from './seed';
 import { processTournamentTick } from './tournament-processor';
+import { sweepWorkerHolds } from './hold-sweep';
 
 type Redis = ReturnType<typeof createRedis>;
 
@@ -96,7 +97,16 @@ export function startConsumers(
     { ...(opts.benchmarksConcurrency ? { concurrency: opts.benchmarksConcurrency } : {}) },
   );
   const seasons = createWorker(QUEUE_SEASONS, () => processSeasonTick(deps), connection);
-  const tournaments = createWorker(QUEUE_TOURNAMENTS, () => processTournamentTick(deps), connection);
+  const tournaments = createWorker(
+    QUEUE_TOURNAMENTS,
+    async () => {
+      const out = await processTournamentTick(deps);
+      // The same housekeeping tick refunds credit holds left behind by crashed bench/daily/puzzle jobs.
+      await sweepWorkerHolds(deps).catch((err) => deps.logger.warn('stale hold sweep failed', { code: errorCode(err) }));
+      return out;
+    },
+    connection,
+  );
   const ranked = createWorker(QUEUE_RANKED, () => processRankedDecay(deps, opts.decay), connection);
   for (const [name, w] of [
     ['registry', registry],

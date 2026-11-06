@@ -246,7 +246,13 @@ export class TournamentsRepo {
    */
   async decide(lobby: LobbyRow): Promise<void> {
     if (!lobby.tournamentId || lobby.round === null || lobby.slot === null || !lobby.winnerId || !lobby.guestId) return;
-    const t = this.db;
+    // Its own transaction (a savepoint inside the caller's), so the tournament row lock below holds
+    // until the bracket and prizes are written even when a caller forgets to open one.
+    await tx(this.db, (t) => this.decideIn(t, lobby));
+  }
+
+  private async decideIn(t: Executor, lobby: LobbyRow): Promise<void> {
+    if (!lobby.tournamentId || lobby.round === null || lobby.slot === null || !lobby.winnerId || !lobby.guestId) return;
     const row = await this.locked(t, lobby.tournamentId);
     if (row.status !== 'running') return;
     const winnerId = lobby.winnerId;
