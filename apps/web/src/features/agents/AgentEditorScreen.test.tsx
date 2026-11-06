@@ -155,6 +155,34 @@ describe('agent editor', () => {
     expect(screen.getByTestId('agent-prompt')).toHaveAttribute('placeholder', expect.stringMatching(/^You are Wick, a Builder/));
   });
 
+  it('renames the agent from its plate, refusing names the api would refuse', async () => {
+    const { user, api } = setup();
+    await user.click(await screen.findByTestId('agent-rename'));
+    const input = screen.getByTestId('agent-rename-input');
+    expect(input).toHaveValue('Wick');
+    // Unchanged: nothing to save.
+    expect(screen.getByTestId('agent-rename-save')).toBeDisabled();
+    await user.clear(input);
+    expect(screen.getByRole('alert')).toHaveTextContent('Give your agent a name.');
+    await user.type(input, '-Bad');
+    expect(screen.getByRole('alert')).toHaveTextContent('Start with a letter or digit');
+    expect(screen.getByTestId('agent-rename-save')).toBeDisabled();
+    await user.clear(input);
+    await user.type(input, '  Ember Wick  {Enter}');
+    expect(api.patchAgent).toHaveBeenCalledWith(WICK.id, { name: 'Ember Wick' });
+    expect(await screen.findByText('Your agent is now Ember Wick.')).toBeInTheDocument();
+    expect(screen.queryByTestId('agent-rename-form')).toBeNull();
+  });
+
+  it('cancels a rename with Escape and keeps the old name', async () => {
+    const { user, api } = setup();
+    await user.click(await screen.findByTestId('agent-rename'));
+    await user.type(screen.getByTestId('agent-rename-input'), 'zzz{Escape}');
+    expect(screen.queryByTestId('agent-rename-form')).toBeNull();
+    expect(screen.getByTestId('agent-rename')).toHaveAccessibleName('Rename Wick');
+    expect(api.patchAgent).not.toHaveBeenCalled();
+  });
+
   it('caps the prompt at 600 characters', async () => {
     setup();
     const prompt = await screen.findByTestId('agent-prompt');
