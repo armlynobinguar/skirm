@@ -29,6 +29,14 @@
 # <env>-openrouter-api-key (OPENROUTER_API_KEY); LLM_API_KEY wins when both exist.
 # Custom domain: PUBLIC_API_URL, PUBLIC_WS_URL (default the run.app URLs; baked into the web image)
 # and CORS_ORIGINS (comma-separated browser origins; default the web run.app URL).
+# Also passed through when set (.env.example): LLM_MODELS, BACKING_CONTRACT, NEAR_RENTALS_ONCHAIN,
+# RELAYER_ACCOUNT_ID, RELAYER_FREE_TXS; RELAYER_PRIVATE_KEY is the <env>-relayer-private-key secret
+# (api only). SAMPLE_MATCH_ID is baked into the web image as NEXT_PUBLIC_SAMPLE_MATCH_ID.
+#
+# Env vars and secrets are merged into each service (--update-env-vars / --update-secrets), so a
+# value set by hand on a service survives a deploy. The flip side: unsetting a variable here does not
+# remove it from the service; do that once by hand, e.g.
+#   gcloud run services update api-staging --region=us-central1 --remove-env-vars=LLM_MODEL
 set -euo pipefail
 
 : "${PROJECT:?set PROJECT to the GCP project id}"
@@ -132,7 +140,7 @@ if [ "${SKIP_BUILD:-}" != 1 ]; then
   fi
   if deploying web && ! has_image "web-$ENV"; then
     g builds submit --region="$R" --config=docker/cloudbuild.web.yaml \
-      --substitutions="_REG=$REG,_TAG=$TAG,_IMAGE=web-$ENV,_API_URL=$API_URL,_WS_URL=$WS_URL,_PRIVY_APP_ID=$PRIVY_APP_ID,_NEAR_NETWORK=$NEAR_NETWORK" .
+      --substitutions="_REG=$REG,_TAG=$TAG,_IMAGE=web-$ENV,_API_URL=$API_URL,_WS_URL=$WS_URL,_PRIVY_APP_ID=$PRIVY_APP_ID,_NEAR_NETWORK=$NEAR_NETWORK,_SAMPLE_MATCH_ID=${SAMPLE_MATCH_ID:-}" .
   fi
 fi
 
@@ -146,8 +154,13 @@ ENV_VARS="NODE_ENV=production@AUTH_MODE=privy@PRIVY_APP_ID=$PRIVY_APP_ID@V2_BRAI
 ENV_VARS+="@REDIS_URL=redis://$REDIS_HOST:6379@NEAR_NETWORK=$NEAR_NETWORK"
 ENV_VARS+="@SKILL_KEK_KMS=projects/$PROJECT/locations/$R/keyRings/skill-vault/cryptoKeys/skill-prompt-kek-$ENV"
 ENV_VARS+="@PUBLIC_API_URL=$API_URL@PUBLIC_WS_URL=$WS_URL@CORS_ORIGINS=$CORS"
-for v in LLM_BASE_URL LLM_MODEL LLM_PLANNER_MODEL LLM_PRICE_INPUT_USD LLM_PRICE_OUTPUT_USD; do
-  if [ -n "${!v:-}" ]; then ENV_VARS+="@$v=${!v}"; fi
+for v in LLM_BASE_URL LLM_MODEL LLM_PLANNER_MODEL LLM_PRICE_INPUT_USD LLM_PRICE_OUTPUT_USD LLM_MODELS \
+  BACKING_CONTRACT NEAR_RENTALS_ONCHAIN RELAYER_ACCOUNT_ID RELAYER_FREE_TXS; do
+  if [ -n "${!v:-}" ]; then
+    # '@' is the list delimiter; a value holding one would split into a bogus variable.
+    if [[ ${!v} == *@* ]]; then echo "$v must not contain '@'" >&2; exit 1; fi
+    ENV_VARS+="@$v=${!v}"
+  fi
 done
 # Never SKILL_KEK here: Cloud KMS (SKILL_KEK_KMS) seals the skill vault (docs/deploy.md).
 SECRETS="DATABASE_URL=$ENV-database-url:latest"
@@ -164,6 +177,15 @@ if has_secret near-ops-key; then ENV_VARS+="@NEAR_OPS_ACCOUNT=${NEAR_OPS_ACCOUNT
 # Only the api reads OPS_TOKEN (GET /ops/stats for the skirm-ops dashboard); without the secret the route is off.
 API_SECRETS=$SECRETS
 if has_secret ops-token; then API_SECRETS+=",OPS_TOKEN=$ENV-ops-token:latest"; fi
+# Gasless relay (api only): the api refuses to start with just one of RELAYER_ACCOUNT_ID and
+# RELAYER_PRIVATE_KEY, so require both or neither here.
+if has_secret relayer-private-key; then
+  : "${RELAYER_ACCOUNT_ID:?set RELAYER_ACCOUNT_ID (the $ENV-relayer-private-key secret exists)}"
+  API_SECRETS+=",RELAYER_PRIVATE_KEY=$ENV-relayer-private-key:latest"
+elif [ -n "${RELAYER_ACCOUNT_ID:-}" ]; then
+  echo "RELAYER_ACCOUNT_ID is set but the $ENV-relayer-private-key secret does not exist" >&2
+  exit 1
+fi
 # Cloud Run sets PORT itself; the apps read API_PORT / REALTIME_PORT, which default to the ports below.
 
 # ---------- 1. migrations ----------
@@ -177,15 +199,16 @@ fi
 if deploying api; then
   g run deploy "api-$ENV" --image="$REG/api:$TAG" "${NET[@]}" "${NOVOL[@]}" --port=4000 \
     --allow-unauthenticated --min-instances=0 --max-instances=1 --concurrency=80 \
-    --set-env-vars="^@^$ENV_VARS" --set-secrets="$API_SECRETS"
+    --update-env-vars="^@^$ENV_VARS" --update-secrets="$API_SECRETS"
 fi
 
 # ---------- 3. worker ----------
 # gcloud manages worker pools over gRPC. Behind a proxy that only passes HTTP/1.1, fall back to the
 # Cloud Run v2 REST API with api-$ENV's env, secrets and network (the env and secrets are the same
-# for every piece, so api-$ENV has them whether or not it was redeployed this run).
+# for every piece, so api-$ENV has them whether or not it was redeployed this run), minus the api-only
+# secrets.
 if deploying worker && ! g run worker-pools deploy "worker-$ENV" --image="$REG/worker:$TAG" "${NET[@]}" \
-  --instances=1 --set-env-vars="^@^$ENV_VARS" --set-secrets="$SECRETS"; then
+  --instances=1 --update-env-vars="^@^$ENV_VARS" --update-secrets="$SECRETS"; then
   echo "gcloud run worker-pools failed; using the REST API" >&2
   RUN=https://run.googleapis.com/v2/projects/$PROJECT/locations/$R
   AUTH="Authorization: Bearer ${CLOUDSDK_AUTH_ACCESS_TOKEN:-$(gcloud auth print-access-token)}"
@@ -194,7 +217,9 @@ import json, sys
 t = json.load(sys.stdin)["template"]; c = t["containers"][0]
 print(json.dumps({"launchStage": "BETA", "scaling": {"manualInstanceCount": 1}, "template": {
   "serviceAccount": t["serviceAccount"], "vpcAccess": t["vpcAccess"],
-  "containers": [{"image": sys.argv[1], "env": c["env"],
+  # api-only secrets stay on the api.
+  "containers": [{"image": sys.argv[1],
+                  "env": [e for e in c["env"] if e["name"] not in ("OPS_TOKEN", "RELAYER_PRIVATE_KEY")],
                   "resources": {"limits": c["resources"]["limits"]}}]}}))' "$REG/worker:$TAG")
   if curl -fsS -o /dev/null -H "$AUTH" "$RUN/workerPools/worker-$ENV"; then
     op=$(curl -fsS -X PATCH -H "$AUTH" -H 'Content-Type: application/json' -d "$body" "$RUN/workerPools/worker-$ENV")
@@ -223,7 +248,7 @@ fi
 if deploying realtime; then
   g run deploy "realtime-$ENV" --image="$REG/realtime:$TAG" "${NET[@]}" "${NOVOL[@]}" --port=4001 \
     --allow-unauthenticated --min-instances=1 --max-instances=1 --concurrency=1000 --timeout=3600 \
-    --session-affinity --no-cpu-throttling --set-env-vars="^@^$ENV_VARS" --set-secrets="$SECRETS"
+    --session-affinity --no-cpu-throttling --update-env-vars="^@^$ENV_VARS" --update-secrets="$SECRETS"
 fi
 
 echo

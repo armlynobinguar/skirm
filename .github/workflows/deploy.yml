@@ -61,5 +61,18 @@ jobs:
           LLM_PLANNER_MODEL: ${{ vars.LLM_PLANNER_MODEL }}
           LLM_PRICE_INPUT_USD: ${{ vars.LLM_PRICE_INPUT_USD }}
           LLM_PRICE_OUTPUT_USD: ${{ vars.LLM_PRICE_OUTPUT_USD }}
+          # Per-agent model catalog (JSON array, .env.example); empty: LLM_MODEL only.
+          LLM_MODELS: ${{ vars.LLM_MODELS }}
+          # Writer backing contract; empty keeps backing off on staging.
+          BACKING_CONTRACT: ${{ vars.BACKING_CONTRACT }}
+          # true: agent rentals through market.rent; empty or false: paid in credits.
+          NEAR_RENTALS_ONCHAIN: ${{ vars.NEAR_RENTALS_ONCHAIN }}
+          # Gasless relay: the key is the <env>-relayer-private-key secret in Secret Manager, never
+          # a GitHub secret; the account is required when that secret exists.
+          RELAYER_ACCOUNT_ID: ${{ vars.RELAYER_ACCOUNT_ID }}
+          RELAYER_FREE_TXS: ${{ vars.RELAYER_FREE_TXS }}
+          # Baked into the web image (NEXT_PUBLIC_SAMPLE_MATCH_ID). An image built for a commit is
+          # reused, so a new value lands on the next commit deployed with services=web (or all).
+          SAMPLE_MATCH_ID: ${{ vars.SAMPLE_MATCH_ID }}
           # Pushes deploy only the pieces whose inputs changed (scripts/deploy-gcp.sh, "Only what changed").
           SERVICES: ${{ inputs.services || 'auto' }}
