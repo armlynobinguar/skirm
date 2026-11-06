@@ -1,0 +1,16 @@
+[package]
+name = "skirm-cosmetics"
+description = "skirm cosmetics contract: NEP-245 multi-token cosmetic items (agent skins, trails, nameplates), item types minted by owner/ops"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }
