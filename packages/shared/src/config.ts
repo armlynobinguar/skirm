@@ -73,6 +73,11 @@ const defaults = {
     provisionalMatches: 20,
     k: 16,
     floor: 100,
+    /**
+     * Largest change one ranked match may apply. The registry contract rejects `|delta| > 32`
+     * (contracts/registry ELO_MAX_DELTA), so a placement K of 48 is clamped to this bound.
+     */
+    maxDelta: 32,
   },
   /**
    * Ranked tiers from Elo (lowest first, `min` is the tier floor). A tier is shown once a player has

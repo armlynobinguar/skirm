@@ -50,6 +50,11 @@ export class Matchmaker<T> {
     return this.entries.get(key);
   }
 
+  /** Every search still waiting to pair. */
+  list(): QueueEntry<T>[] {
+    return [...this.entries.values()];
+  }
+
   rangeOf(e: QueueEntry<T>, now = this.scheduler.now()): number {
     return eloRange(this.timing, now - e.enqueuedAt);
   }

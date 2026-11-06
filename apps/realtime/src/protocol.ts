@@ -49,6 +49,8 @@ export type ErrorCode =
   | 'control_casual'
   | 'not_controlling'
   | 'too_many_subscriptions'
+  /** An agent-token socket sent a message outside its scope (docs/external-agents.md). */
+  | 'forbidden'
   | 'unavailable'
   | 'internal';
 

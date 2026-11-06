@@ -553,3 +553,45 @@ describe('v2 credits on the ledger', () => {
     expect((await repos.ledger.balance(account.id)).available).toBe(after.available);
   });
 });
+
+describe('v2 match: a failing charge does not void the match', () => {
+  it('logs a thrown charge and plays the match to a result, counting only accepted charges', async () => {
+    class ThrowingCredits extends FakeCredits {
+      calls = 0;
+      override async charge(team: Team, n: number): Promise<boolean | void> {
+        this.calls++;
+        // The first charge of crew A hits a dropped DB connection.
+        if (team === 'A' && this.calls === 1) throw new Error('connection terminated');
+        return super.charge(team, n);
+      }
+    }
+    const errors: string[] = [];
+    const credits = new ThrowingCredits();
+    const h = harness({
+      credits,
+      log: { ...silentLogger, error: (m: string) => errors.push(m) },
+      send: (t, msg) => (h.inbox[t].push(msg), h.answer(t, msg)),
+    });
+    const end = await h.m.play();
+    expect(end.result).not.toBeNull();
+    expect(end.reason).not.toBe('aborted');
+    expect(h.inbox.A.at(-1)).toMatchObject({ type: 'v2_end' });
+    expect(errors.some((e) => e.includes('charge of') && e.includes('connection terminated'))).toBe(true);
+    expect(credits.calls).toBeGreaterThan(1);
+    expect(end.stats.A.charged).toBe(credits.charged.A);
+  });
+
+  it('logs a hold_exceeded refusal as an error, not silently', async () => {
+    const errors: string[] = [];
+    const ledger = {
+      hold: async () => ({ ok: true as const }),
+      chargeTurns: async () => ({ ok: false as const, error: 'hold_exceeded' as const, message: 'over' }),
+      settle: async () => ({ ok: true as const }),
+      abort: async () => ({ ok: true as const }),
+    };
+    const c = new LedgerV2Credits(ledger as never, 'mat_hx', { ...silentLogger, error: (m: string) => errors.push(m) });
+    expect(await c.charge('A', 2)).toBe(false);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('hold_exceeded');
+  });
+});

@@ -27,6 +27,14 @@ export function eloDelta(ratingA: number, ratingB: number, result: EloResult, k:
   return Math.floor(k * (result - expectedScore(ratingA, ratingB)) + 0.5);
 }
 
+/**
+ * Clamps a rating change to ±`max` (the registry contract's `|delta| ≤ 32`). Placement K is 48, so
+ * an unclamped delta could exceed what the chain accepts and the match would never be recorded.
+ */
+export function clampEloDelta(delta: number, max: number = DEFAULTS.elo.maxDelta): number {
+  return Math.max(-max, Math.min(max, delta));
+}
+
 /** Integer rating after a change, never below the floor. */
 export function applyElo(
   rating: number,
@@ -56,7 +64,8 @@ export interface EloAgentUpdate {
 
 /**
  * Updates every agent of both crews after a ranked match. Each agent gets K·(S − E) with E from
- * the crew means; with equal K across the crew every agent gets the same change.
+ * the crew means; with equal K across the crew every agent gets the same change. The change is
+ * clamped to ±`cfg.maxDelta` and then to the floor.
  */
 export function updateMatch(
   sideA: readonly EloAgent[],
@@ -73,7 +82,8 @@ export function updateMatch(
     theirs: number,
     result: EloResult,
   ): EloAgentUpdate => {
-    const delta = eloDelta(mine, theirs, result, kFactor(agent.rankedMatches, cfg));
+    // Clamp before applying, so the stored delta, the stored rating and the registry write agree.
+    const delta = clampEloDelta(eloDelta(mine, theirs, result, kFactor(agent.rankedMatches, cfg)), cfg.maxDelta);
     const after = applyElo(agent.rating, delta, cfg.floor);
     return { before: agent.rating, delta: after - agent.rating, after };
   };

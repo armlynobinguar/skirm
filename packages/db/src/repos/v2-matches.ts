@@ -2,7 +2,7 @@
 // to the 20th ranked match, then 16, floor 100). Elo moves only for ranked matches that end with a
 // result, in the same transaction that closes the match; that transaction also adds the season
 // standings and the skill versions' ranked records, and stamps each player's last ranked result.
-import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
 import { levelOf, matchXp, progressionOf, seasonPoints, updateMatch, type EloResult } from '@skirm/shared';
 import type { Executor } from '../client';
 import { newId } from '../ids';
@@ -138,8 +138,9 @@ export class V2MatchesRepo {
     await this.db.update(v2Matches).set({ heartbeatAt: at }).where(and(eq(v2Matches.id, id), eq(v2Matches.status, 'live')));
   }
 
-  async listLive(limit = 50): Promise<V2MatchRow[]> {
-    return this.db.select().from(v2Matches).where(eq(v2Matches.status, 'live')).orderBy(desc(v2Matches.createdAt)).limit(limit);
+  async listLive(limit = 50, order: 'newest' | 'oldest' = 'newest'): Promise<V2MatchRow[]> {
+    const by = order === 'oldest' ? asc(v2Matches.createdAt) : desc(v2Matches.createdAt);
+    return this.db.select().from(v2Matches).where(eq(v2Matches.status, 'live')).orderBy(by).limit(limit);
   }
 
   /** A player's latest matches, newest first. */

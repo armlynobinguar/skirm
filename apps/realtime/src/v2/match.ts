@@ -182,6 +182,8 @@ export interface V2Finish {
   season?: Partial<Record<Team, NonNullable<V2Debrief['season']>>>;
   /** XP each crew's agents earned (from the stored debriefs). */
   xp?: Partial<Record<Team, NonNullable<V2Debrief['xp']>>>;
+  /** The result could not be stored: v2_end goes out void rather than announce a result that is not kept. */
+  unrecorded?: true;
 }
 
 /** Most agents a crew fields on this map (both sides start from the same number of tiles). */
@@ -535,8 +537,10 @@ export class V2Match {
         this.deps.log.error(`v2 match ${this.matchId}: finish failed: ${(err as Error).message}`);
         return fin;
       });
-    const base = { type: 'v2_end' as const, matchId: this.matchId, result: end.result, reason: end.reason, logHash: end.log && end.result ? logHash(end.log) : null };
-    for (const t of TEAMS) this.deps.send(t, { ...base, debrief: this.debrief(t, end, fin) });
+    // A result that was not stored is not announced: the players are told the match ended void.
+    const shown: V2MatchEnd = fin.unrecorded && end.result ? { ...end, result: null, reason: 'error' } : end;
+    const base = { type: 'v2_end' as const, matchId: this.matchId, result: shown.result, reason: shown.reason, logHash: shown.log && shown.result ? logHash(shown.log) : null };
+    for (const t of TEAMS) this.deps.send(t, { ...base, debrief: this.debrief(t, shown, fin) });
     this.deps.watch?.(base);
     return end;
   }
@@ -841,7 +845,13 @@ export class V2Match {
         const due = chargeDue(cum100[t], this.stats[t].charged);
         if (due > 0) {
           // Only what the ledger accepted counts, so the debrief never shows credits that were not charged.
-          if ((await this.deps.credits.charge(t, due)) !== false) this.stats[t].charged += due;
+          // A ledger error (a lost DB connection) must not void the match: log it like a failed
+          // settle or heartbeat and keep playing; the uncharged credits are not counted.
+          try {
+            if ((await this.deps.credits.charge(t, due)) !== false) this.stats[t].charged += due;
+          } catch (err) {
+            this.deps.log.error(`v2 match ${this.matchId} ${t}: charge of ${due} failed: ${(err as Error).message}`);
+          }
         }
       }
       this.publish(ev);
