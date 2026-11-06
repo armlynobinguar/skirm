@@ -2,6 +2,7 @@
 // One agent drawn the arena way (the isometric block figure in its role's look, figure2d.ts): body
 // in the agent's colour, head in its "bone" colour, standing on a small pad, idling. Used by the
 // look editor, the crew lock-in and the match cards. Reduced motion draws one still frame.
+import type { Dress } from '@skirm/ui';
 import { useEffect, useRef } from 'react';
 import { usePreferences } from '@/lib/preferences';
 import * as proto from './proto/world';
@@ -17,13 +18,15 @@ export interface AgentPortraitProps {
   label: string;
   /** The agent's role (Builder, Digger, ...): its hat, tools and pack. Omit for the generic look. */
   role?: string;
+  /** How its owner dressed it (hair, trousers, build, headgear). Omit for the role's plain look. */
+  dress?: Dress;
   /** `hero`: the Command deck's lead agent (smaller figure left of centre, pulsing rings, a floating block). */
   variant?: 'portrait' | 'hero';
   className?: string;
   'data-testid'?: string;
 }
 
-export function AgentPortrait({ body, head, team, label, role, variant = 'portrait', className, 'data-testid': testId }: AgentPortraitProps) {
+export function AgentPortrait({ body, head, team, label, role, dress, variant = 'portrait', className, 'data-testid': testId }: AgentPortraitProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const { reducedMotion } = usePreferences();
 
@@ -64,7 +67,7 @@ export function AgentPortrait({ body, head, team, label, role, variant = 'portra
         sx,
         b,
         T,
-        { c: body, bone: head, team: team ?? 'A', slot: 0, inv: [], role },
+        { c: body, bone: head, team: team ?? 'A', slot: 0, inv: [], role, ...(dress ? { dress } : {}) },
         time * 0.6,
         0,
         { ...(team ? { team: team === 'A' ? '#34e0c8' : '#ff4655' } : {}), still: reducedMotion },
@@ -79,7 +82,9 @@ export function AgentPortrait({ body, head, team, label, role, variant = 'portra
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [body, head, team, role, variant, reducedMotion]);
+    // The dress is compared by value: callers build a fresh object each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [body, head, team, role, variant, reducedMotion, dress ? JSON.stringify(dress) : '']);
 
   return <canvas ref={ref} role="img" aria-label={label} className={className} data-testid={testId} />;
 }

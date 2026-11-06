@@ -4,6 +4,7 @@
 // above the card. Click follows the agent (again to stop); double-click opens third person.
 // Rivals show once seen; out of sight their slots are "?", and rivals never seen share one slim strip.
 import { carryOf, mapV2, type FrameAgent, type Team } from '@skirm/engine/v2';
+import { lookColours } from '@skirm/shared';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AgentPortrait } from '@/features/arena/AgentPortrait';
 import { agentColours } from '@/features/arena/live';
@@ -107,7 +108,9 @@ interface CardProps {
 
 function Card({ agent, rival, inSight, slot, tick, mapId, item, accent, pressed, onPick, onWatch, steered, extra }: CardProps) {
   const float = useInvFloat(agent, inSight);
-  const { body, head } = agentColours(agent.team, slot);
+  // The owner's look when the frame carries one, so the card matches the figure on the board.
+  const own = agent.look ? lookColours(agent.look) : null;
+  const { body, head } = own ?? agentColours(agent.team, slot);
   const status = agent.out ? 'out' : agent.down ? 'swept' : `${agent.delivered} dlv`;
   return (
     <div className={c.cardWrap}>
@@ -132,7 +135,7 @@ function Card({ agent, rival, inSight, slot, tick, mapId, item, accent, pressed,
       >
         <span className={c.tier}>{TIER_TAG[agent.tier]}</span>
         {inSight ? <ToolChip kind={agent.tool} onCard /> : null}
-        <AgentPortrait body={body} head={head} team={agent.team === 'A' ? 'A' : 'B'} label={`${agent.name}, ${agent.role}`} role={agent.role} className={c.portrait} />
+        <AgentPortrait body={body} head={head} {...(own ? { dress: own.dress } : {})} team={agent.team === 'A' ? 'A' : 'B'} label={`${agent.name}, ${agent.role}`} role={agent.role} className={c.portrait} />
         <span className={c.cin}>
           <b>{agent.name}</b>
           <span className={c.st}>

@@ -51,6 +51,7 @@ import {
   TIER_INFO,
   TIER_ORDER,
   agentBone,
+  agentDress,
   agentColour,
   agentComms,
   agentEditorHref,
@@ -282,7 +283,7 @@ function AgentEditor({
 
       {/* Centre: the agent on its light beam, its inner voice as a bark, ‹ › under it. */}
       <div className={e.stage}>
-        <AgentPortrait body={colour} head={agentBone(agent)} team="A" label={`${agent.name}, ${role}`} role={role} variant="hero" className={e.hero} />
+        <AgentPortrait body={colour} head={agentBone(agent)} dress={agentDress(agent)} team="A" label={`${agent.name}, ${role}`} role={role} variant="hero" className={e.hero} />
         <div className={`${e.bark} ${out ? e.barkOut : ''}`} role="status" data-testid="agent-bark">
           <small>
             <em>THINKS</em>

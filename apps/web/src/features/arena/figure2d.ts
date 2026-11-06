@@ -4,11 +4,13 @@
 // crew ring, carried items and the verb's effect. The prototype's drawAgent calls this.
 import {
   ISO_V,
+  dressLook,
   isoPolys,
   lookFor,
   lookTop,
   poseAt,
   poseKind,
+  type Dress,
   type Pose,
   type RoleLook,
 } from '@skirm/ui';
@@ -28,6 +30,14 @@ export interface Figure2DAgent {
   /** Delivered this frame. */
   cheer?: boolean;
   inv?: readonly unknown[];
+  /** How its owner dressed it (hair, trousers, build, headgear). Absent: the role's plain look. */
+  dress?: Dress;
+}
+
+/** The look this agent wears: its role's, dressed when its owner chose a look. */
+export function figureLook(a: Pick<Figure2DAgent, 'role' | 'dress'>): RoleLook {
+  const base = lookFor(a.role);
+  return a.dress ? dressLook(base, a.dress) : base;
 }
 
 export interface Figure2DOpts {
@@ -107,7 +117,7 @@ export function drawFigure(
   opts: Figure2DOpts = {},
 ) {
   const ba = opts.alpha ?? 1;
-  const look = lookFor(a.role);
+  const look = figureLook(a);
   const pose = figurePose(a, look, time, opts);
   const still = !!opts.still;
   const dir: 1 | -1 = a.team === 'B' ? -1 : 1;
@@ -150,7 +160,8 @@ export function drawFigure(
   const y0 = b - hop - pose.lift * T * ISO_V;
   c.translate(sx, y0);
   if (pose.tilt) c.rotate(pose.tilt * dir);
-  for (const q of isoPolys(look, { body: a.c ?? '#34e0c8', head: a.bone ?? '#ece8e1' }, dir, pose))
+  const team = opts.team ?? (a.team === 'B' ? '#ff4655' : '#34e0c8');
+  for (const q of isoPolys(look, { body: a.c ?? '#34e0c8', head: a.bone ?? '#ece8e1', team }, dir, pose))
     fill(c, q.pts, T, q.fill);
   c.restore();
   c.save();

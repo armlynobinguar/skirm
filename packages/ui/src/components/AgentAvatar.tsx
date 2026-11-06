@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { agentGlyph } from '../glyphs';
-import { isoPolys, lookFor, polyBounds } from '../looks';
+import { dressLook, isoPolys, lookFor, polyBounds, type Dress } from '../looks';
 import type { AgentState, Crew } from '../types';
 import { cx } from '../util';
 
@@ -19,6 +19,8 @@ export interface AgentAvatarProps {
   body?: string;
   /** Head (skin) colour for the figure. */
   head?: string;
+  /** How its owner dressed it (hair, trousers, build, headgear); omit for the role's plain look. */
+  dress?: Dress;
   className?: string;
 }
 
@@ -31,16 +33,21 @@ function RoleFigure({
   head,
   crew,
   lost,
+  dress,
 }: {
   role: string;
   body: string;
   head: string;
   crew?: Crew;
   lost: boolean;
+  dress?: Dress;
 }) {
+  const dressKey = dress ? JSON.stringify(dress) : '';
   const polys = React.useMemo(
-    () => isoPolys(lookFor(role), { body, head }, crew === 'b' ? -1 : 1),
-    [role, body, head, crew],
+    () =>
+      isoPolys(dress ? dressLook(lookFor(role), dress) : lookFor(role), { body, head, team: CREW_RING[crew ?? 'a'] }, crew === 'b' ? -1 : 1),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [role, body, head, crew, dressKey],
   );
   const [x0, y0, x1, y1] = polyBounds(polys);
   // Fit the whole figure (it is taller than wide) into the box, feet near the bottom.
@@ -80,6 +87,7 @@ export function AgentAvatar({
   role,
   body,
   head,
+  dress,
   className,
 }: AgentAvatarProps): React.ReactElement {
   const detail = size >= 20 ? 'full' : 'compact';
@@ -107,6 +115,7 @@ export function AgentAvatar({
             head={head ?? '#ece8e1'}
             crew={crew}
             lost={state === 'lost'}
+            {...(dress ? { dress } : {})}
           />
         ) : (
           agentGlyph({

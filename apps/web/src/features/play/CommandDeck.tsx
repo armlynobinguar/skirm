@@ -9,7 +9,7 @@
 // a large faint copy as a watermark, a serial code (OP·01 to DLY·07), grain and hatching, hazard
 // tape in the corner and a halftone in the tile colour that strengthens on hover. Sits over the arena.
 import { BOT_HANDLE, DAILY_TWISTS, DEFAULT_PRACTICE, DIFF_MODS, MAPS_V2, dailyChallenge, dailyDate } from '@skirm/engine/v2';
-import { OUTFIT_COLORS, SKIN_TONES } from '@skirm/shared';
+import { OUTFIT_COLORS, SKIN_TONES, lookColours } from '@skirm/shared';
 import { AkIcon, DisplayHeading, type AkIconName } from '@skirm/ui';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
@@ -49,6 +49,7 @@ export function CommandDeck({ lead, agents, elo }: CommandDeckProps) {
           <AgentPortrait
             body={OUTFIT_COLORS[lead.appearance.outfit] ?? OUTFIT_COLORS[0]}
             head={SKIN_TONES[lead.appearance.skin] ?? SKIN_TONES[0]}
+            dress={lookColours(lead.appearance).dress}
             team="A"
             label={`Your lead agent, ${lead.name}`}
             role={lead.role}

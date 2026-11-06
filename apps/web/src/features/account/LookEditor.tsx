@@ -18,6 +18,7 @@ import {
   PANTS_COLORS,
   SKIN_TONES,
   defaultAppearance,
+  lookColours,
   premiumItemsIn,
   type AgentAppearance,
   type CosmeticItem,
@@ -198,6 +199,7 @@ export function LookEditor({ agentId, name, unlocks, initial, saving, onSave, on
           team="A"
           label={`${name}, ${role}, preview`}
           role={role}
+          dress={lookColours(look).dress}
           className={s.lookCanvas}
         />
         <div className={s.lookCaption}>

@@ -53,6 +53,7 @@ export {
 export {
   ROLE_LOOKS,
   lookFor,
+  dressLook,
   genericLook,
   lookParts,
   lookTop,
@@ -77,4 +78,5 @@ export {
   type PoseKind,
   type PoseInput,
   type IsoPoly,
+  type Dress,
 } from './looks';

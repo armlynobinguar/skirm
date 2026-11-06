@@ -133,3 +133,37 @@ export function isAppearance(raw: unknown): raw is AgentAppearance {
 export function appearanceOr(raw: unknown, agentId: string): AgentAppearance {
   return isAppearance(raw) ? { ...raw } : defaultAppearance(agentId);
 }
+
+/** An appearance as frames carry it: the same fields, with style names as plain strings. */
+export interface LooseAppearance {
+  skin: number;
+  hair: string;
+  hairColor: number;
+  outfit: number;
+  pants: number;
+  build: string;
+  headgear: string;
+}
+
+/**
+ * The colours and styles a renderer draws for an appearance: outfit (body) and skin (head) hex, and
+ * the dress (@skirm/ui `Dress`: hair, hair colour, trousers, build, headgear). Indexes outside a
+ * palette fall back to its first entry, so a stale or hand-made look still draws.
+ */
+export function lookColours(a: LooseAppearance): {
+  body: string;
+  head: string;
+  dress: { hair: string; hairColor: string; pants: string; build: string; headgear: string };
+} {
+  return {
+    body: OUTFIT_COLORS[a.outfit] ?? OUTFIT_COLORS[0],
+    head: SKIN_TONES[a.skin] ?? SKIN_TONES[0],
+    dress: {
+      hair: a.hair,
+      hairColor: HAIR_COLORS[a.hairColor] ?? HAIR_COLORS[0],
+      pants: PANTS_COLORS[a.pants] ?? PANTS_COLORS[0],
+      build: a.build,
+      headgear: a.headgear,
+    },
+  };
+}

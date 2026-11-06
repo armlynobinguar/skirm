@@ -50,6 +50,8 @@ export interface RoleLook {
   carry: number;
   /** Draw the carried count beside the items (Haulers). */
   count?: boolean;
+  /** Trouser colour on the legs, with a dark sole under each (dressed looks; default: plain boots). */
+  pants?: string;
 }
 
 const p = (
@@ -283,9 +285,16 @@ function buildParts(look: RoleLook): LookPart[] {
   const [fw, fd] = look.foot ?? [0.13, 0.3];
   const fx = Math.max(fw / 2 + 0.01, tw / 4.4);
   const boot = look.boot ?? 'boot';
+  const legs: LookPart[] = look.pants
+    ? [
+        p('footL', [-fx, 0, 0], [fw, 0.05, fd], 'boot'),
+        p('footR', [fx, 0, 0], [fw, 0.05, fd], 'boot'),
+        p('footL', [-fx, 0.05, 0], [fw, 0.15, fd * 0.8], look.pants as LookFill),
+        p('footR', [fx, 0.05, 0], [fw, 0.15, fd * 0.8], look.pants as LookFill),
+      ]
+    : [p('footL', [-fx, 0, 0], [fw, 0.2, fd], boot), p('footR', [fx, 0, 0], [fw, 0.2, fd], boot)];
   return [
-    p('footL', [-fx, 0, 0], [fw, 0.2, fd], boot),
-    p('footR', [fx, 0, 0], [fw, 0.2, fd], boot),
+    ...legs,
     p('body', [0, 0.2, 0], [tw, th, td], 'body'),
     p('head', [0, 0.5, 0], [0.36, 0.28, 0.36], 'head'),
     ...(look.visor ?? [
@@ -298,6 +307,112 @@ function buildParts(look: RoleLook): LookPart[] {
       ? { ...q, at: [q.at[0], q.at[1] + th - 0.3, q.at[2]] as const }
       : q,
   );
+}
+
+/* ───────────── dressed looks (the look editor's appearance) ───────────── */
+
+/**
+ * How an owner dressed an agent (@skirm/shared AgentAppearance with its palette colours resolved):
+ * hair style and colour, trousers, build and headgear. Outfit and skin are the agent's own body and
+ * head colours (LookColours), so they are not here.
+ */
+export interface Dress {
+  hair: 'short' | 'long' | 'bun' | 'buzz' | 'ponytail' | 'none' | (string & {});
+  hairColor: string;
+  pants: string;
+  build: 'slim' | 'regular' | 'sturdy' | (string & {});
+  /** `role` keeps the role's own hat and gear; the rest replace it. */
+  headgear: 'role' | 'none' | 'cap' | 'bandana' | 'beanie' | (string & {});
+}
+
+const BUILD_SCALE: Readonly<Record<string, readonly [number, number]>> = {
+  slim: [0.86, 0.94],
+  regular: [1, 1],
+  sturdy: [1.17, 1.08],
+};
+
+/** Hair boxes for a style; `covered` drops what a hat hides (the top and a bun). */
+function hairParts(style: string, col: LookFill, covered: boolean): LookPart[] {
+  const top = covered ? [] : [p('head', [0, HEAD_TOP - 0.01, -0.01], [0.38, 0.05, 0.38], col)];
+  const back = p('head', [0, 0.6, -0.175], [0.38, 0.16, 0.05], col);
+  switch (style) {
+    case 'buzz':
+      return covered ? [] : [p('head', [0, HEAD_TOP - 0.005, 0], [0.37, 0.02, 0.37], col)];
+    case 'short':
+      return [...top, back];
+    case 'long':
+      return [
+        ...top,
+        p('head', [0, 0.44, -0.18], [0.38, 0.34, 0.05], col),
+        p('head', [-0.185, 0.48, -0.1], [0.03, 0.26, 0.14], col),
+        p('head', [0.185, 0.48, -0.1], [0.03, 0.26, 0.14], col),
+      ];
+    case 'bun':
+      return covered ? [back] : [...top, back, p('head', [0, HEAD_TOP + 0.03, -0.1], [0.15, 0.12, 0.15], col)];
+    case 'ponytail':
+      return [...top, back, p('head', [0, 0.42, -0.22], [0.09, 0.24, 0.08], col)];
+    default:
+      return [];
+  }
+}
+
+/** Headgear boxes in the role's accent colour. */
+function headgearParts(kind: string, accent: LookFill): LookPart[] {
+  switch (kind) {
+    case 'cap':
+      return [
+        p('head', [0, HEAD_TOP - 0.02, -0.01], [0.39, 0.1, 0.39], accent),
+        p('head', [0, HEAD_TOP - 0.015, 0.25], [0.34, 0.025, 0.16], accent),
+      ];
+    case 'bandana':
+      return [
+        band('head', 0.68, [0.385, 0.06, 0.385], accent),
+        p('head', [0, 0.64, -0.215], [0.08, 0.1, 0.04], accent),
+      ];
+    case 'beanie':
+      return [
+        p('head', [0, HEAD_TOP - 0.05, 0], [0.4, 0.14, 0.4], accent),
+        p('head', [0, HEAD_TOP + 0.09, 0], [0.1, 0.06, 0.1], '#ece8e1'),
+      ];
+    default:
+      return [];
+  }
+}
+
+const dressed = new Map<RoleLook, Map<string, RoleLook>>();
+/**
+ * A role's look dressed the way its owner chose: the build scales the torso, the trousers colour
+ * the legs, a crew sash keeps the side readable whatever the outfit, and any headgear but `role`
+ * swaps the role's hat (and its antenna) for the chosen one. Tools, packs and visors stay. Cached
+ * per look and dress, so renderers can call it every frame.
+ */
+export function dressLook(look: RoleLook, d: Dress): RoleLook {
+  const key = `${d.hair}|${d.hairColor}|${d.pants}|${d.build}|${d.headgear}`;
+  let per = dressed.get(look);
+  if (!per) dressed.set(look, (per = new Map()));
+  const hit = per.get(key);
+  if (hit) return hit;
+  const [sw, sd] = BUILD_SCALE[d.build] ?? [1, 1];
+  const [tw, th, td] = look.torso;
+  const torso = [tw * sw, th, td * sd] as const;
+  const ownHat = d.headgear === 'role';
+  // The role's hat: head parts at or above the forehead, plus antenna tips. Visors sit lower.
+  const kept = look.parts.filter((q) => ownHat || !((q.group === 'head' && q.at[1] >= 0.66) || q.group === 'tip'));
+  const covered = d.headgear === 'cap' || d.headgear === 'beanie' || ownHat;
+  const hair = hairParts(d.hair, d.hairColor as LookFill, covered);
+  const out: RoleLook = {
+    ...look,
+    torso,
+    pants: d.pants,
+    parts: [
+      ...hair,
+      band('body', 0.38, [torso[0] + 0.012, 0.045, torso[2] + 0.012], 'team'),
+      ...kept,
+      ...(ownHat ? [] : headgearParts(d.headgear, look.accent as LookFill)),
+    ],
+  };
+  per.set(key, out);
+  return out;
 }
 
 /** Height of the figure's highest point (hat, antenna): carried items float just over it. */

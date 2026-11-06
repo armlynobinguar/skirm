@@ -80,3 +80,18 @@ describe('soft fog', () => {
     expect(liveFx().intro).toBe(false);
   });
 });
+
+describe('owner looks on live agents', () => {
+  it('draws an agent in its owner look and the rest in crew colours', () => {
+    const frame = v2FrameFixture();
+    const [first, ...rest] = frame.agents;
+    const look = { skin: 1, hair: 'long', hairColor: 4, outfit: 3, pants: 2, build: 'slim', headgear: 'beanie' };
+    const arena = composeV2Arena({ ...frame, agents: [{ ...first!, look }, ...rest] })!;
+    const a = arena.state.agents.find((g) => g.id === first!.id)!;
+    expect(a.c).toBe('#4cae6e');
+    expect(a.bone).toBe('#eec39a');
+    expect(a.dress).toEqual({ hair: 'long', hairColor: '#d9b26b', pants: '#2e4a3a', build: 'slim', headgear: 'beanie' });
+    const b = arena.state.agents.find((g) => g.id === rest[0]?.id);
+    if (b) expect(b.dress).toBeUndefined();
+  });
+});

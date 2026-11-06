@@ -40,6 +40,7 @@ import {
   practiceRival,
   validateCommunityMap,
   type AgentSpec,
+  type FrameLook,
   type Difficulty,
   type FrameView,
   type MapDefV2,
@@ -692,11 +693,13 @@ export class V2Hub {
     const skillNames: string[][] = [];
     const bought: boolean[] = [];
     const instructions: (string | null)[] = [];
+    const looks: (FrameLook | null)[] = [];
     for (const c of entries) {
       const v = await repos.agents.view(c.agentId);
       if (!v) throw new V2HubError('invalid_crew', 'an agent no longer exists');
       // Progression traits travel with the agent (a rented one plays its owner's); ranked drops them in the engine.
       const traits = v.progression?.traits ?? [];
+      looks.push(v.appearance ?? null);
       crew.push({ id: v.id, name: v.name, role: v.role, vision: v.vision, comms: v.comms, tier: c.tier, ...(traits.length ? { traits } : {}), ...this.modelOf(c, match.ranked) });
       const prompts: string[] = [];
       const keys: { id: string; version: number }[] = [];
@@ -756,6 +759,7 @@ export class V2Hub {
       instructions,
       ...(brains ? { brains } : {}),
       ...(cosmetics.some((c) => c) ? { cosmetics } : {}),
+      ...(looks.some((l) => l) ? { looks } : {}),
     };
   }
 
