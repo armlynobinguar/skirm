@@ -103,8 +103,8 @@ export async function setup(
     now?: string;
     /** Turn request rate limits on (off by default: the harness signs many players in a minute). */
     rateLimit?: ApiDeps['rateLimit'];
-    /** Extra deps (the external agent relay and webhook transport). */
-    deps?: Partial<Pick<ApiDeps, 'externalTurns' | 'externalPost'>>;
+    /** Extra deps (the external agent relay and webhook transport; gasless onboarding's relay). */
+    deps?: Partial<Pick<ApiDeps, 'externalTurns' | 'externalPost' | 'relay'>>;
     /** Stored frames for shared replays and the caster (default: none, template caster). */
     replayFrames?: ApiDeps['replayFrames'];
     caster?: ApiDeps['caster'];

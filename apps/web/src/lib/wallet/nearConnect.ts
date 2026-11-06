@@ -1,7 +1,9 @@
 // NearWallet over NEAR Connect (@hot-labs/near-connect), the wallet connector docs.near.org
 // recommends (HOT, Meteor, MyNearWallet, Intear, Nightly, OKX, NEAR Mobile, ...; each wallet's code
 // runs in a sandboxed iframe, so the app ships no per-wallet packages). The library is imported on
-// first use only, so dev mode and pages that never sign load none of it.
+// first use only, so dev mode and pages that never sign load none of it. Wallets whose manifest
+// lists `signDelegateActions` can also sign NEP-366 delegate actions for gasless onboarding
+// (./gasless.ts); the picker does not require it, so every other wallet keeps working as before.
 import type { NearNetwork } from '../config';
 import {
   WalletError,
@@ -27,6 +29,14 @@ interface ConnectorWallet {
     network?: NearNetwork;
     signerId?: string;
   }): Promise<unknown[]>;
+  /** NEP-366 (gasless onboarding): the manifest says whether the wallet implements it. */
+  manifest?: { features?: { signDelegateActions?: boolean } };
+  /** Resolves with one base64 borsh SignedDelegate per delegate action. */
+  signDelegateActions?(p: {
+    delegateActions: NearTransaction[];
+    network?: NearNetwork;
+    signerId?: string;
+  }): Promise<{ signedDelegateActions: string[] }>;
 }
 interface ManifestFeatures {
   signInAndSignMessage?: boolean;
@@ -238,6 +248,30 @@ export function createNearConnectWallet(opts: {
         throw walletError(err);
       }
       return outcomes.map((o) => ({ txHash: txHashOf(o) }));
+    },
+    async canSignDelegate() {
+      if (typeof window === 'undefined') return false;
+      try {
+        const w = await connectedWallet();
+        return Boolean(w.manifest?.features?.signDelegateActions) && typeof w.signDelegateActions === 'function';
+      } catch {
+        return false;
+      }
+    },
+    async signDelegateAction(tx) {
+      const w = await connectedWallet();
+      if (typeof w.signDelegateActions !== 'function')
+        throw new WalletError('wallet_unsupported', 'This wallet cannot sign gas-free transactions.');
+      let res: { signedDelegateActions?: unknown[] } | undefined;
+      try {
+        res = await w.signDelegateActions({ delegateActions: [tx], network: opts.network, ...signer() });
+      } catch (err) {
+        throw walletError(err);
+      }
+      const signed = res?.signedDelegateActions?.[0];
+      if (typeof signed !== 'string' || !signed)
+        throw new WalletError('wallet_failed', 'The wallet did not return a signed transaction.');
+      return signed;
     },
   };
 }

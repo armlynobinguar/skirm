@@ -5,6 +5,7 @@
 //   renderWithProviders(<CreditsScreen />, { authMode: 'privy', token: 'jwt', wallet });
 //   expect(wallet.sent[0]).toEqual(depositTx(config.near.contracts, '1000…'));
 //   wallet.reject('signAndSendTransaction');                      // next call: user cancelled
+//   new FakeWallet({ delegates: true })                           // can sign NEP-366 delegates (gasless)
 import { vi } from 'vitest';
 import {
   WalletError,
@@ -29,17 +30,22 @@ export class FakeWallet implements NearWallet {
   current: string | null;
   readonly sent: NearTransaction[] = [];
   readonly signed: SignMessageInput[] = [];
+  /** Transactions signed as delegate actions (gasless onboarding); each gets `signed_delegate_<n>`. */
+  readonly delegated: NearTransaction[] = [];
+  /** Can sign delegate actions (off by default, like most wallets today). */
+  delegates: boolean;
   private n = 0;
   private readonly subs = new Set<(id: string | null) => void>();
   private readonly rejections = new Set<string>();
 
-  constructor(opts: { account?: string; connected?: boolean } = {}) {
+  constructor(opts: { account?: string; connected?: boolean; delegates?: boolean } = {}) {
     this.account = opts.account ?? 'ada.testnet';
     this.current = opts.connected ? this.account : null;
+    this.delegates = opts.delegates ?? false;
   }
 
   /** The next call of `method` fails as if the user cancelled in the wallet. */
-  reject(method: 'connect' | 'connectAndSign' | 'signMessage' | 'signAndSendTransaction'): void {
+  reject(method: 'connect' | 'connectAndSign' | 'signMessage' | 'signAndSendTransaction' | 'signDelegateAction'): void {
     this.rejections.add(method);
   }
 
@@ -110,6 +116,15 @@ export class FakeWallet implements NearWallet {
     if (!this.current) throw new WalletError('wallet_no_account', 'No NEAR wallet is connected.');
     this.sent.push(tx);
     return { txHash: `tx_${++this.n}` };
+  });
+
+  canSignDelegate = vi.fn(async () => this.delegates);
+
+  signDelegateAction = vi.fn(async (tx: NearTransaction) => {
+    this.take('signDelegateAction');
+    if (!this.current) throw new WalletError('wallet_no_account', 'No NEAR wallet is connected.');
+    this.delegated.push(tx);
+    return btoa(`signed_delegate_${this.delegated.length}`);
   });
 
   signAndSendTransactions = vi.fn(async (txs: NearTransaction[]) => {

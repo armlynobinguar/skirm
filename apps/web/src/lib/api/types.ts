@@ -206,6 +206,20 @@ export interface DepositResponse {
   amountYocto: string;
 }
 
+/** GET /relay: gasless onboarding for the caller (`enabled: false` until a relayer is configured). */
+export interface RelayStatus {
+  enabled: boolean;
+  freeTxs: number;
+  used: number;
+  remaining: number;
+}
+
+/** POST /relay: the relayer's transaction hash (post it to the usual confirm route). */
+export interface RelayResponse {
+  txHash: string;
+  remaining: number;
+}
+
 // ---------- Skills ----------
 
 /** `Starter`: account-bound starter skill (Flood Warden), never minted. */

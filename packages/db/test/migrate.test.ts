@@ -53,6 +53,7 @@ describe('migrations', () => {
         'elo_decays',
         'campaign_progress',
         'campaign_rewards',
+        'relayed_txs',
       ]),
     );
     const applied = await db.execute(
@@ -64,8 +65,8 @@ describe('migrations', () => {
     // 0009_external_agents, 0010_skill_roles,
     // 0011_crew_playbooks, 0012_skill_bench, 0013_quests_achievements,
     // 0014_campaign, 0015_daily_challenge, 0016_agent_progression, 0017_community_maps,
-    // 0018_puzzles, 0019_writer_backing, 0020_rental_credits, 0021_match_heartbeat.
-    expect(embeddedMigrations()).toHaveLength(22);
+    // 0018_puzzles, 0019_writer_backing, 0020_rental_credits, 0021_match_heartbeat, 0022_gasless_relay.
+    expect(embeddedMigrations()).toHaveLength(23);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {

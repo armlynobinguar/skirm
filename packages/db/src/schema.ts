@@ -1593,3 +1593,39 @@ export const backingPayouts = pgTable(
     uniqueIndex('backing_payouts_tx_uq').on(t.txHash).where(sql`${t.txHash} is not null`),
   ],
 );
+
+// ---------- Gasless onboarding ----------
+
+/**
+ * Meta-transactions (NEP-366) the api relayed for a player, paid by skirm's relayer account
+ * (docs/gasless.md). One row per SignedDelegate (`delegate_hash`, sha256 hex, is unique, so the
+ * same delegate is never relayed twice). A row counts towards the player's free quota while it is
+ * `pending` or `sent`; `failed` means the relayer's transaction never reached the chain, so the
+ * slot is given back. The quota counts the skirm account and the NEAR account alike, so
+ * relinking the NEAR account to a new skirm account does not reset it.
+ */
+export const relayedTxs = pgTable(
+  'relayed_txs',
+  {
+    /** `rly_` + ULID. */
+    id: text('id').primaryKey(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    nearAccountId: text('near_account_id').notNull(),
+    receiverId: text('receiver_id').notNull(),
+    /** The delegate's method names, comma-separated. */
+    methods: text('methods').notNull(),
+    delegateHash: text('delegate_hash').notNull(),
+    status: text('status').notNull().default('pending'),
+    txHash: text('tx_hash'),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('relayed_txs_delegate_uq').on(t.delegateHash),
+    index('relayed_txs_account_idx').on(t.accountId),
+    index('relayed_txs_near_idx').on(t.nearAccountId),
+    check('relayed_txs_status_ck', sql`${t.status} in ('pending', 'sent', 'failed')`),
+  ],
+);

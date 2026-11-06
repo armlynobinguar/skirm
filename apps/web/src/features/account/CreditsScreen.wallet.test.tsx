@@ -53,6 +53,49 @@ describe('S15 top-up with a NEAR wallet', () => {
     );
   });
 
+  it('gasless onboarding: signs a delegate, the relay sends it, and says skirm paid the gas', async () => {
+    const wallet = new FakeWallet({ account: 'ada.testnet', connected: true, delegates: true });
+    const { user, api } = renderWithProviders(<CreditsScreen />, {
+      authMode: 'privy',
+      token: 'jwt_1',
+      wallet,
+      api: {
+        ...base,
+        relayStatus: async () => ({ enabled: true, freeTxs: 3, used: 0, remaining: 3 }),
+        relay: async () => ({ txHash: 'RELAYHASH', remaining: 2 }),
+        deposit: async () => ({ credited: 1000, balance: 1000, amountYocto: ONE_NEAR }),
+      },
+    });
+    await screen.findByTestId('s15-balance-available');
+    await user.click(screen.getByRole('button', { name: 'Top up 1 NEAR' }));
+    await user.click(screen.getByTestId('m02-confirm'));
+    await waitFor(() => expect(api.deposit).toHaveBeenCalledWith('RELAYHASH'));
+    expect(wallet.delegated).toEqual([depositTx(config.near.contracts, ONE_NEAR)]);
+    expect(wallet.sent).toEqual([]);
+    expect(await screen.findByText('Gas paid by skirm')).toBeInTheDocument();
+  });
+
+  it('gasless onboarding off: the same wallet sends the usual transaction, with no note', async () => {
+    const wallet = new FakeWallet({ account: 'ada.testnet', connected: true, delegates: true });
+    const { user, api } = renderWithProviders(<CreditsScreen />, {
+      authMode: 'privy',
+      token: 'jwt_1',
+      wallet,
+      api: {
+        ...base,
+        relayStatus: async () => ({ enabled: false, freeTxs: 0, used: 0, remaining: 0 }),
+        deposit: async () => ({ credited: 1000, balance: 1000, amountYocto: ONE_NEAR }),
+      },
+    });
+    await screen.findByTestId('s15-balance-available');
+    await user.click(screen.getByRole('button', { name: 'Top up 1 NEAR' }));
+    await user.click(screen.getByTestId('m02-confirm'));
+    await waitFor(() => expect(api.deposit).toHaveBeenCalledWith('tx_1'));
+    expect(wallet.delegated).toEqual([]);
+    expect(api.relay).not.toHaveBeenCalled();
+    expect(screen.queryByText('Gas paid by skirm')).not.toBeInTheDocument();
+  });
+
   it('re-sends the signed hash on Try again instead of paying twice', async () => {
     const wallet = new FakeWallet({ account: 'ada.testnet', connected: true });
     let calls = 0;

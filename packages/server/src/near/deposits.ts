@@ -2,7 +2,7 @@
 // checks the receiver, signer and amount from the contract's NEP-297 `deposit` event. Dev mode
 // accepts `dev:<yocto>[:<nonce>]` hashes. Each receipt is credited once by the ledger (unique index).
 import type { NearRpc } from './rpc';
-import { eventsOf, isSuccess, NearRpcError, type TxStatus } from './rpc';
+import { callSucceeded, effectiveCall, eventsOf, NearRpcError, txStatusOf, type TxStatus } from './rpc';
 
 export const YOCTO_PER_NEAR = 10n ** 24n;
 
@@ -77,6 +77,8 @@ export class RpcDepositVerifier implements DepositVerifier {
     private readonly rpc: NearRpc,
     private readonly depositsContract: string,
     private readonly creditsPerNear: number,
+    /** Relayer accounts whose meta-transactions count as the player's own (docs/gasless.md). */
+    private readonly relayers: readonly string[] = [],
   ) {}
 
   async verify(
@@ -88,7 +90,7 @@ export class RpcDepositVerifier implements DepositVerifier {
       throw new DepositError('sender_required', 'link a NEAR account before topping up');
     let tx: TxStatus;
     try {
-      tx = await this.rpc.txStatus(txHash, opts.senderId);
+      tx = await txStatusOf(this.rpc, txHash, opts.senderId, this.relayers);
     } catch (err) {
       if (err instanceof NearRpcError && err.code === 'not_found')
         throw new DepositError('not_found', 'transaction not found');
@@ -96,16 +98,17 @@ export class RpcDepositVerifier implements DepositVerifier {
         throw new DepositError('rpc_unavailable', 'NEAR RPC is unavailable, try again');
       throw new DepositError('not_found', 'transaction could not be read');
     }
-    if (tx.transaction.receiver_id !== this.depositsContract)
+    const call0 = effectiveCall(tx, this.relayers);
+    if (call0.receiverId !== this.depositsContract)
       throw new DepositError(
         'wrong_receiver',
         'transaction is not a deposit to the deposits contract',
       );
-    if (tx.transaction.signer_id !== opts.senderId)
+    if (call0.signerId !== opts.senderId)
       throw new DepositError('wrong_sender', 'transaction was signed by another account');
-    if (!isSuccess(tx.status)) throw new DepositError('failed', 'deposit transaction failed');
+    if (!callSucceeded(tx, call0)) throw new DepositError('failed', 'deposit transaction failed');
 
-    const call = tx.transaction.actions
+    const call = call0.actions
       .map((a) => (typeof a === 'object' ? a.FunctionCall : undefined))
       .find((f) => f?.method_name === 'deposit');
     if (!call) throw new DepositError('no_deposit', 'transaction does not call deposit()');

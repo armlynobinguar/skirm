@@ -197,3 +197,77 @@ export function isSuccess(status: ExecutionStatus | string | undefined): boolean
     ('SuccessValue' in status || 'SuccessReceiptId' in status)
   );
 }
+
+/**
+ * A NEP-366 meta-transaction as `EXPERIMENTAL_tx_status` shows it: one `Delegate` action whose
+ * `delegate_action` names the player (sender), the contract (receiver) and the player's actions.
+ */
+interface DelegateActionView {
+  sender_id: string;
+  receiver_id: string;
+  actions: (TxAction | string)[];
+}
+
+/** Who made a transaction's call, to which contract, with which actions. */
+export interface EffectiveCall {
+  signerId: string;
+  receiverId: string;
+  actions: (TxAction | string)[];
+  /** True when one of the trusted relayers sent it for the player (gasless onboarding). */
+  relayed: boolean;
+}
+
+/**
+ * The call a transaction makes. A plain transaction is its own call. A meta-transaction that one of
+ * `relayers` (skirm's own relayer account, docs/gasless.md) sent is the call inside its delegate:
+ * the player signed that, the relayer only paid the gas. Relayers outside the list are not
+ * unwrapped, so their transactions keep failing the signer check exactly as before.
+ */
+export function effectiveCall(tx: TxStatus, relayers: readonly string[] = []): EffectiveCall {
+  const t = tx.transaction;
+  const plain: EffectiveCall = { signerId: t.signer_id, receiverId: t.receiver_id, actions: t.actions, relayed: false };
+  if (!relayers.includes(t.signer_id) || t.actions.length !== 1) return plain;
+  const a = t.actions[0];
+  const d = typeof a === 'object' ? (a.Delegate as { delegate_action?: DelegateActionView } | undefined)?.delegate_action : undefined;
+  // The relayer's transaction goes to the delegate's sender (NEP-366).
+  if (!d || typeof d.sender_id !== 'string' || d.sender_id !== t.receiver_id || !Array.isArray(d.actions)) return plain;
+  return { signerId: d.sender_id, receiverId: d.receiver_id, actions: d.actions, relayed: true };
+}
+
+/**
+ * Did the call succeed? A plain transaction's status says so. A meta-transaction's own status only
+ * says the delegate was accepted, so for a relayed call this looks at the receipts the contract
+ * executed: at least one, and none failed.
+ */
+export function callSucceeded(tx: TxStatus, call: EffectiveCall): boolean {
+  if (!call.relayed) return isSuccess(tx.status);
+  const mine = (tx.receipts_outcome ?? []).filter((r) => r.outcome.executor_id === call.receiverId);
+  return isSuccess(tx.status) && mine.length > 0 && mine.every((r) => isSuccess(r.outcome.status));
+}
+
+/**
+ * `txStatus` that also finds a transaction a relayer signed: RPC looks a transaction up by its
+ * signer, which for a relayed one is the relayer, not the player.
+ */
+export async function txStatusOf(
+  rpc: Pick<NearRpc, 'txStatus'>,
+  txHash: string,
+  senderId: string,
+  relayers: readonly string[] = [],
+): Promise<TxStatus> {
+  try {
+    return await rpc.txStatus(txHash, senderId);
+  } catch (err) {
+    if (!(err instanceof NearRpcError) || err.code !== 'not_found' || relayers.length === 0) throw err;
+    let last: unknown = err;
+    for (const r of relayers) {
+      if (r === senderId) continue;
+      try {
+        return await rpc.txStatus(txHash, r);
+      } catch (e) {
+        last = e;
+      }
+    }
+    throw last;
+  }
+}

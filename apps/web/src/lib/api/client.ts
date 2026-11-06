@@ -66,6 +66,8 @@ import type {
   PlayerLadder,
   SkillLadder,
   PurchaseResponse,
+  RelayResponse,
+  RelayStatus,
   QuestBoard,
   QuestClaimResponse,
   Season,
@@ -302,6 +304,11 @@ export interface ApiClient {
   /** POST /backing/sync: mirrors a signed backing-contract transaction. */
   syncBacking(txHash: string): Promise<{ rounds: BackingRound[] }>;
 
+  /** GET /relay: is gasless onboarding on, and how many free transactions the caller has left. */
+  relayStatus(): Promise<RelayStatus>;
+  /** POST /relay: a base64 SignedDelegate the relayer sends and pays the gas for (docs/gasless.md). */
+  relay(signedDelegate: string): Promise<RelayResponse>;
+
   /** GET /external-agents: the caller's own programs (bring your own agent). */
   externalAgents(): Promise<ExternalAgent[]>;
   /** POST /external-agents: registers one; the secret and token come back this once. */
@@ -514,5 +521,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     claimBacking: (id) => json('POST', `/backing/rounds/${enc(id)}/claim`),
     distributeBacking: (id) => json('POST', `/backing/rounds/${enc(id)}/distribute`, { body: {} }),
     syncBacking: (txHash) => json('POST', '/backing/sync', { body: { txHash } }),
+
+    relayStatus: () => get('/relay'),
+    relay: (signedDelegate) => json('POST', '/relay', { body: { signedDelegate } }),
   };
 }
