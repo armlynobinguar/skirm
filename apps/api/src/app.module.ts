@@ -67,7 +67,7 @@ export class AppModule {
         { provide: DEPS, useValue: deps },
         // Rate limits first, so a flood is turned away before any session work.
         ...(deps.rateLimit
-          ? [{ provide: APP_GUARD, useValue: new RateLimitGuard(deps.rateLimit.store, { ...DEFAULT_RATE_LIMITS, ...deps.rateLimit.limits }) }]
+          ? [{ provide: APP_GUARD, useValue: new RateLimitGuard(deps.rateLimit.store, { ...DEFAULT_RATE_LIMITS, ...deps.rateLimit.limits }, deps.rateLimit.trustedHops) }]
           : []),
         { provide: APP_GUARD, useClass: SessionGuard },
         { provide: APP_FILTER, useClass: ApiExceptionFilter },

@@ -95,7 +95,7 @@ export interface ApiDeps {
   /** Allowed CORS origins (default http://localhost:3000). */
   corsOrigins?: string[];
   /** Request rate limits (./rate-limit.ts): Redis counters in production; absent, no limits (tests). */
-  rateLimit?: { store: RateLimitStore; limits?: Partial<RateLimits> };
+  rateLimit?: { store: RateLimitStore; limits?: Partial<RateLimits>; trustedHops?: number };
   /** Bring your own agent: the pull relay shared with realtime (Redis; absent: /agent/v1/turn and /action answer 503). */
   externalTurns?: ExternalTurnStore;
   /** Tests only: the webhook transport for pings (default: the SSRF-safe safePostJson). */

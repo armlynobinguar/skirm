@@ -1,5 +1,5 @@
-// Request rate limits. Every request counts against its client (the first X-Forwarded-For hop on
-// Cloud Run, else the socket address) in fixed one-minute windows: a tight bucket for the routes
+// Request rate limits. Every request counts against its client (the X-Forwarded-For entry appended by
+// the trusted proxy in front of the api, else the socket address) in fixed one-minute windows: a tight bucket for the routes
 // that call NEAR RPC or start paid work, a loose one for everything else. Over the limit: 429
 // `rate_limited` with Retry-After. Counters live in Redis in production (shared by every
 // instance), in memory in tests and local runs. Edge protection (Cloud Armor) still belongs in
@@ -59,17 +59,34 @@ const STRICT: readonly [string, RegExp][] = [
   ['POST', /^\/bench\/runs$/],
   ['POST', /^\/community-maps\/(test-play|[^/]+\/publish)$/],
   ['POST', /^\/daily\/attempts$/],
+  ['POST', /^\/puzzles\/[^/]+\/runs$/],
+  ['POST', /^\/backing\/sync$/],
+  ['POST', /^\/backing\/rounds\/[^/]+\/back$/],
+  ['POST', /^\/achievements\/[^/]+\/badge$/],
+  ['POST', /^\/tournaments$/],
 ];
 
 export function bucketOf(method: string, path: string): 'strict' | 'general' {
   return STRICT.some(([m, re]) => m === method && re.test(path)) ? 'strict' : 'general';
 }
 
-/** The client a request counts against: the first X-Forwarded-For hop (Cloud Run's front end sets it), else the socket. */
-export function clientOf(req: { headers: Record<string, string | string[] | undefined>; ip?: string; socket?: { remoteAddress?: string } }): string {
+/**
+ * The client a request counts against. Proxies append to X-Forwarded-For, so everything before the
+ * entries our own proxies added is whatever the client chose to send. With `trustedHops` proxies in
+ * front of the api (1 on plain Cloud Run, 2 behind an external load balancer) the client is the entry
+ * that many places from the end. Falls back to the socket address.
+ */
+export function clientOf(
+  req: { headers: Record<string, string | string[] | undefined>; ip?: string; socket?: { remoteAddress?: string } },
+  trustedHops = 1,
+): string {
   const fwd = req.headers['x-forwarded-for'];
-  const first = (Array.isArray(fwd) ? fwd[0] : fwd)?.split(',')[0]?.trim();
-  return first || req.ip || req.socket?.remoteAddress || 'unknown';
+  const hops = (Array.isArray(fwd) ? fwd.join(',') : (fwd ?? ''))
+    .split(',')
+    .map((h) => h.trim())
+    .filter(Boolean);
+  const client = hops.length ? hops[Math.max(0, hops.length - Math.max(1, trustedHops))] : undefined;
+  return client || req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
 const WINDOW_MS = 60_000;
@@ -79,6 +96,8 @@ export class RateLimitGuard implements CanActivate {
   constructor(
     private readonly store: RateLimitStore,
     private readonly limits: RateLimits,
+    /** Proxies in front of the api that append to X-Forwarded-For (see clientOf). */
+    private readonly trustedHops = 1,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -89,7 +108,7 @@ export class RateLimitGuard implements CanActivate {
     const limit = this.limits[bucket];
     let n: number;
     try {
-      n = await this.store.hit(`${bucket}:${clientOf(req)}`, WINDOW_MS);
+      n = await this.store.hit(`${bucket}:${clientOf(req, this.trustedHops)}`, WINDOW_MS);
     } catch {
       // A counter outage must not take the api down with it: let the request through.
       return true;

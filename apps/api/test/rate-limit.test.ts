@@ -9,6 +9,12 @@ describe('rate limit buckets', () => {
     expect(bucketOf('POST', '/auth/session')).toBe('strict');
     expect(bucketOf('POST', '/credits/deposits')).toBe('strict');
     expect(bucketOf('POST', '/rentals/rof_1')).toBe('strict');
+    expect(bucketOf('POST', '/puzzles/pz_1/runs')).toBe('strict');
+    expect(bucketOf('POST', '/backing/sync')).toBe('strict');
+    expect(bucketOf('POST', '/backing/rounds/br_1/back')).toBe('strict');
+    expect(bucketOf('POST', '/achievements/first_win/badge')).toBe('strict');
+    expect(bucketOf('POST', '/tournaments')).toBe('strict');
+    expect(bucketOf('POST', '/tournaments/t_1/join')).toBe('general');
     expect(bucketOf('POST', '/market/skl_1/purchase')).toBe('strict');
     expect(bucketOf('POST', '/market/skl_1/trial')).toBe('strict');
     expect(bucketOf('POST', '/skills/skl_1/mint')).toBe('strict');
@@ -17,7 +23,11 @@ describe('rate limit buckets', () => {
   });
 
   it('counts the first forwarded hop, else the socket address', () => {
-    expect(clientOf({ headers: { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' }, ip: '10.0.0.1' })).toBe('203.0.113.7');
+    // The client-supplied entries come first; the trusted proxy appends the real address last.
+    expect(clientOf({ headers: { 'x-forwarded-for': '1.2.3.4, 203.0.113.7' }, ip: '10.0.0.1' })).toBe('203.0.113.7');
+    expect(clientOf({ headers: { 'x-forwarded-for': '203.0.113.7' }, ip: '10.0.0.1' })).toBe('203.0.113.7');
+    // Behind a load balancer (2 hops) the client is the second entry from the end.
+    expect(clientOf({ headers: { 'x-forwarded-for': '9.9.9.9, 203.0.113.7, 10.0.0.1' }, ip: '10.0.0.1' }, 2)).toBe('203.0.113.7');
     expect(clientOf({ headers: {}, ip: '198.51.100.2' })).toBe('198.51.100.2');
   });
 
