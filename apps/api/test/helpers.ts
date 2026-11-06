@@ -108,6 +108,8 @@ export async function setup(
     /** Stored frames for shared replays and the caster (default: none, template caster). */
     replayFrames?: ApiDeps['replayFrames'];
     caster?: ApiDeps['caster'];
+    /** Agent accounts' chain (e.g. MemoryAgentAccounts); absent, the feature is off. */
+    agentAccounts?: ApiDeps['near']['agentAccounts'];
   } = {},
 ): Promise<Harness> {
   const db = opts.db ?? (await createTestDb());
@@ -141,6 +143,7 @@ export async function setup(
       ownership,
       badges,
       ...(opts.nearKeys ? { keys: opts.nearKeys } : {}),
+      ...(opts.agentAccounts ? { agentAccounts: opts.agentAccounts } : {}),
     },
     benchmarkQueue: benchmarks,
     costs,

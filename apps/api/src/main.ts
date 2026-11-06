@@ -74,6 +74,7 @@ async function main(): Promise<void> {
       ownership: near.ownership,
       badges: near.badges,
       keys: new RpcNearKeyChecker(near.rpc),
+      ...(near.agentAccounts ? { agentAccounts: near.agentAccounts } : {}),
       ...(backingContract ? { backing: new RpcBackingTxReader(near.rpc, backingContract) } : {}),
     },
     benchmarkQueue,
