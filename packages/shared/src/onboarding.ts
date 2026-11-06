@@ -44,7 +44,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     phase: 'brief',
     topic: 'roles',
     title: 'Roles',
-    body: 'A role decides the special verb an agent may use. A Builder places blocks, a Digger clears rubble, a Firefighter puts out fire and a Scout repels rivals nearby; Runners and Haulers just move and carry (a Hauler carries 3). Pick roles that answer the map’s hazards.',
+    body: 'A role decides the special verb an agent may use. A Builder places blocks, a Digger clears rubble, a Firefighter puts out fire and a Scout repels rivals nearby; Runners and Haulers just move and carry (a Hauler carries 3). Outside ranked, a Medic gets knocked-down crewmates up sooner, an Engineer works valves from afar and lays bridges, a Saboteur plants fake items and a Courier moves twice as far but carries one. Pick roles that answer the map’s hazards.',
   },
   {
     id: 'talk',

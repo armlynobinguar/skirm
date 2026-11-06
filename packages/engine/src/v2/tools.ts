@@ -10,6 +10,9 @@
 //   pump     on any tile that is not solid: it drains water around it for PUMP_TICKS ticks, a ring
 //            wider each tick (radius 1, then 2, then 2), after the hazards spread. Then it is spent.
 //
+// An Engineer (roles.ts) also has ENGINEER_BRIDGES bridges of its own: `use bridge <dir>` lays one
+// as above without its tool slot, after any bridge it holds.
+//
 // Ground tools and placed objects are public, like the drops themselves. Everything here is a pure
 // function of the match state, so a match with tools replays exactly from its log.
 import type { Dir, MapDefV2 } from './map';
@@ -95,9 +98,12 @@ export function pickTool(s: MatchState, a: AgentState, ev: MatchEvent[]) {
   ev.push({ kind: 'tool_picked', agent: a.id, tool, at: [a.x, a.y] });
 }
 
+/** An Engineer with a bridge of its own left (roles.ts ENGINEER_BRIDGES): it lays one without holding the tool. */
+export const kitBridge = (a: Pick<AgentState, 'role' | 'kit'>) => a.role === 'Engineer' && (a.kit ?? 0) > 0;
+
 /** Why `tool` cannot go toward `dir`, or null when it can. */
 export function toolRefusal(s: MatchState, a: AgentState, tool: ToolKind, dir: Dir | undefined): string | null {
-  if (a.tool !== tool) return a.tool ? `you carry ${TOOL_TEXT[a.tool].name.toLowerCase()}, not ${TOOL_TEXT[tool].name.toLowerCase()}` : 'you carry no tool';
+  if (a.tool !== tool && !(tool === 'bridge' && kitBridge(a))) return a.tool ? `you carry ${TOOL_TEXT[a.tool].name.toLowerCase()}, not ${TOOL_TEXT[tool].name.toLowerCase()}` : 'you carry no tool';
   if (!dir) return `${TOOL_TEXT[tool].name} needs a direction`;
   const { w, h } = s.map;
   const x = a.x + DIRS[dir][0];
@@ -124,7 +130,9 @@ export function useTool(s: MatchState, a: AgentState, tool: ToolKind, dir: Dir |
   const y = a.y + DIRS[dir!][1];
   const j = y * s.map.w + x;
   gearOf(s).placed[j] = tool === 'pump' ? { kind: tool, team: a.team, ran: 0 } : { kind: tool, team: a.team };
-  a.tool = undefined;
+  // An Engineer lays a carried bridge first, then its own (roles.ts); its tool slot stays as it was.
+  if (a.tool === tool) a.tool = undefined;
+  else a.kit = (a.kit ?? 0) - 1;
   ev.push({ kind: 'tool_used', agent: a.id, tool, at: [x, y] });
   return null;
 }
@@ -176,9 +184,10 @@ export function gearView(s: MatchState): { ground: { at: [number, number]; kind:
   };
 }
 
-/** The legal tool actions for an agent (none without a tool). */
+/** The legal tool actions for an agent (none without a tool, unless it is an Engineer with bridges of its own). */
 export function toolActions(s: MatchState, a: AgentState): { type: 'use'; tool: ToolKind; dir: Dir }[] {
-  const tool = a.tool;
-  if (!tool) return [];
-  return (['N', 'E', 'S', 'W'] as const).filter((dir) => toolRefusal(s, a, tool, dir) === null).map((dir) => ({ type: 'use', tool, dir }));
+  const tools: ToolKind[] = a.tool ? [a.tool] : [];
+  // An Engineer's own bridges, after the tool it holds (once: a held bridge already lists them).
+  if (a.tool !== 'bridge' && kitBridge(a)) tools.push('bridge');
+  return tools.flatMap((tool) => (['N', 'E', 'S', 'W'] as const).filter((dir) => toolRefusal(s, a, tool, dir) === null).map((dir) => ({ type: 'use' as const, tool, dir })));
 }

@@ -86,7 +86,10 @@ export function steerAction(o: Observation, input: SteerInput): { action: Action
     case 'use': {
       const verbs = o.legal.filter((a): a is Extract<Action, { type: 'verb' }> => a.type === 'verb');
       const verb = input.dir ? verbs.find((a) => a.dir === input.dir) ?? verbs.find((a) => !a.dir) : verbs[0];
-      return { action: verb ?? o.legal.find((a) => a.type === 'switch') ?? wait, done: true };
+      // A Medic's tend or a Saboteur's plant (toward `dir` when given) stands in for the verb the new roles lack.
+      const own = o.legal.filter((a) => a.type === 'tend' || a.type === 'plant');
+      const role = (input.dir ? own.find((a) => a.type === 'plant' && a.dir === input.dir) : undefined) ?? own[0];
+      return { action: verb ?? role ?? o.legal.find((a) => a.type === 'switch') ?? wait, done: true };
     }
     case 'take': {
       if (o.me.carrying >= o.me.capacity) return { action: wait, done: true };

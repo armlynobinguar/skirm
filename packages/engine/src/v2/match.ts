@@ -15,9 +15,14 @@
 //   6. talk: messages sent this tick are delivered to whoever hears them, bluffs among them (bluff.ts,
 //      judged on what the crews see now), then the goal check
 //
+// Roles: Builder, Digger, Firefighter and Scout each unlock one gated verb class; Runners carry 2,
+// Haulers 3. The newer Medic (tend), Engineer (valve reach 2, own bridges), Saboteur (decoys) and
+// Courier (2-tile moves, carries 1) have their rules in roles.ts: Couriers stride after the ice
+// slides in step 2, decoys spring in step 3 and read as items in the rival's sight in step 5.
+//
 // A difficulty level (difficulty.ts) rewrites the map's rules before the first tick. Each crew keeps
 // a running tally (middle items, verbs, switches, steals, knock-downs, talk) for goals and the debrief.
-import { DEFAULTS, RATE_BPS_ONE, normalizeTraits, scaledRatePer100, talkHold, type TraitId } from '@skirm/shared';
+import { DEFAULTS, RATE_BPS_ONE, normalizeTraits, rankedRoleRefusal, scaledRatePer100, talkHold, type TraitId } from '@skirm/shared';
 import { avoidedTile, BLUFF_CAP, judgeBluffs, planBluffs } from './bluff';
 import type { Difficulty } from './difficulty';
 import { DIFF_MODS, RANKED_DIFFICULTY, withDifficulty } from './difficulty';
@@ -27,6 +32,7 @@ import { middleTiles, parseMapV2 } from './map';
 import { deliverTalk, TALK_TIERS, type HeardMessage, type SayInput, type TalkTier } from './talk';
 import { cooldownFor, digHitsFor, timerFor, visionOf } from './traits';
 import { isBridge, isSandbag, landTool, newGear, pickTool, runPumps, toolActions, useTool, type GearState, type ToolKind } from './tools';
+import { courierStride, decoyFor, kitOf, plantActions, plantDecoy, pruneDecoys, springDecoy, switchReach, tend, tendActions } from './roles';
 
 export const TICK_MS = 2000;
 export const MATCH_TICKS = 150;
@@ -42,9 +48,19 @@ export const DIG_HITS = 3;
 /** Ticks an agent on or next to electrified water is stunned. */
 export const SHOCK_STUN = 2;
 
-export type Role = 'Builder' | 'Digger' | 'Firefighter' | 'Scout' | 'Runner' | 'Hauler';
-export const ROLES: readonly Role[] = ['Builder', 'Digger', 'Firefighter', 'Scout', 'Runner', 'Hauler'];
-/** The effect class only this role can use. Verbs of other classes are open to everyone. */
+export type ClassicRole = 'Builder' | 'Digger' | 'Firefighter' | 'Scout' | 'Runner' | 'Hauler';
+/** Roles added after the first six (roles.ts has their rules). Ranked plays them only with DEFAULTS.roles.rankedNewRoles. */
+export type NewRole = 'Medic' | 'Engineer' | 'Saboteur' | 'Courier';
+export type Role = ClassicRole | NewRole;
+/** The six roles every match before the new roles was played with. */
+export const CLASSIC_ROLES: readonly ClassicRole[] = ['Builder', 'Digger', 'Firefighter', 'Scout', 'Runner', 'Hauler'];
+export const NEW_ROLES: readonly NewRole[] = ['Medic', 'Engineer', 'Saboteur', 'Courier'];
+/** Every role, the original six first in their old order (botCrew takes the first ones). */
+export const ROLES: readonly Role[] = [...CLASSIC_ROLES, ...NEW_ROLES];
+/**
+ * The effect class only this role can use. Verbs of other classes are open to everyone. The new
+ * roles gate no map verb: their abilities are actions of their own (roles.ts).
+ */
 export const ROLE_EFFECT: Readonly<Record<Role, EffectClass | null>> = {
   Builder: 'add_solid',
   Digger: 'remove_solid',
@@ -52,10 +68,14 @@ export const ROLE_EFFECT: Readonly<Record<Role, EffectClass | null>> = {
   Scout: 'area_repel',
   Runner: null,
   Hauler: null,
+  Medic: null,
+  Engineer: null,
+  Saboteur: null,
+  Courier: null,
 };
 const GATED = new Set<EffectClass>(['add_solid', 'remove_solid', 'extinguish', 'area_repel']);
-/** Items an agent can carry: Haulers carry 3. */
-export const carryOf = (role: Role) => (role === 'Hauler' ? 3 : 2);
+/** Items an agent can carry: Haulers carry 3, Couriers 1 (the price of their stride), everyone else 2. */
+export const carryOf = (role: Role) => (role === 'Hauler' ? 3 : role === 'Courier' ? 1 : 2);
 
 export interface AgentSpec {
   id: string;
@@ -89,7 +109,16 @@ export interface MatchOptions {
   lieCap?: Partial<Record<Team, number>>;
 }
 
-export type Action = { type: 'wait' } | { type: 'move'; dir: Dir } | { type: 'verb'; verb: string; dir?: Dir } | { type: 'switch' } | { type: 'use'; tool: ToolKind; dir: Dir };
+export type Action =
+  | { type: 'wait' }
+  | { type: 'move'; dir: Dir }
+  | { type: 'verb'; verb: string; dir?: Dir }
+  | { type: 'switch' }
+  | { type: 'use'; tool: ToolKind; dir: Dir }
+  /** Medic: tend the named crewmate next to it (roles.ts tend). */
+  | { type: 'tend'; agent: string }
+  /** Saboteur: plant a decoy item on the open tile toward `dir` (roles.ts plantDecoy). */
+  | { type: 'plant'; dir: Dir };
 
 export interface AgentState {
   id: string;
@@ -137,6 +166,10 @@ export interface AgentState {
   gasp?: boolean;
   /** The one tool it carries from a supply drop (tools.ts), if any. */
   tool?: ToolKind;
+  /** Its role's own stock (roles.ts): bridges left for an Engineer, decoys left for a Saboteur. Absent for every other role. */
+  kit?: number;
+  /** Medic: the tick it can tend again (absent: it has not tended yet). */
+  tendReady?: number;
 }
 
 export type MatchEvent =
@@ -168,7 +201,15 @@ export type MatchEvent =
   | { kind: 'tool_dropped'; tool: ToolKind; at: [number, number] }
   | { kind: 'tool_picked'; agent: string; tool: ToolKind; at: [number, number] }
   | { kind: 'tool_used'; agent: string; tool: ToolKind; at: [number, number] }
-  | { kind: 'pumped'; at: [number, number]; drained: number; done: boolean };
+  | { kind: 'pumped'; at: [number, number]; drained: number; done: boolean }
+  /** A Medic tended a crewmate: `was` what it cut short (a knock-down by 2 ticks, or a stun cleared). */
+  | { kind: 'tended'; agent: string; target: string; was: 'down' | 'stunned' }
+  /** A Saboteur planted a decoy (its own crew's frames only: the rival sees an item there). */
+  | { kind: 'planted'; agent: string; at: [number, number] }
+  /** A rival stepped on a decoy reaching for it: the decoy is gone and `agent` loses its next action. `team`: the crew that planted it. */
+  | { kind: 'decoy_sprung'; agent: string; team: Team; at: [number, number] }
+  /** A Courier's second tile of a move on open ground. */
+  | { kind: 'strode'; agent: string; from: [number, number]; to: [number, number] };
 
 export interface MatchResult {
   winner: Team | 'draw';
@@ -206,6 +247,8 @@ export interface CrewTally {
   lies: number;
   /** Of those, the ones the rival believed. */
   believed: number;
+  /** Decoys its Saboteurs planted (absent until one is): each uses one of the crew's bluffs (lieCap). */
+  decoys?: number;
 }
 
 export interface MatchState {
@@ -246,6 +289,8 @@ export interface MatchState {
   result: MatchResult | null;
   /** Tools on the ground and placed sandbags, pumps and bridges (tools.ts). */
   gear?: GearState;
+  /** Saboteur decoys by tile index, and the crew that planted each (roles.ts). Absent until one is planted. */
+  decoys?: Record<number, Team>;
 }
 
 const DIRS: Record<Dir, [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
@@ -260,6 +305,9 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
     const n = crews[T].length;
     if (n < 1 || n > 3) throw new Error(`crew ${T} must field 1 to 3 agents`);
     if (n > def.starts[T].length) throw new Error(`${def.id} has ${def.starts[T].length} starts for crew ${T}`);
+    // Ranked takes the original six roles unless DEFAULTS.roles.rankedNewRoles (realtime refuses such a crew before this).
+    const refused = opts.ranked ? rankedRoleRefusal(crews[T].map((a) => a.role)) : null;
+    if (refused) throw new Error(refused);
   }
   const ids = new Set<string>();
   const agents: AgentState[] = [];
@@ -298,6 +346,7 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
         avoid: null,
         heardBluff: null,
         bluffs: { told: 0, landed: 0, seenThrough: 0 },
+        ...kitOf(spec.role),
       });
     });
   const diff = crews.A.length - crews.B.length;
@@ -440,6 +489,10 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
     } else if (act.type === 'use') {
       const refused = useTool(s, a, act.tool, act.dir, ev);
       if (refused) ev.push({ kind: 'refused', agent: a.id, reason: refused });
+    } else if (act.type === 'tend' || act.type === 'plant') {
+      const refused = act.type === 'tend' ? tend(s, a, act.agent, ev) : plantDecoy(s, a, act.dir, ev);
+      if (refused) ev.push({ kind: 'refused', agent: a.id, reason: refused });
+      else used(s, a);
     }
   }
   resolveMoves(s, moves, ev);
@@ -449,6 +502,8 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
   for (const a of s.agents) {
     if (a.out || a.down) continue;
     const j = a.y * w + a.x;
+    // A rival's decoy: reaching for it springs it (roles.ts springDecoy). Nothing is picked up.
+    if (s.decoys) springDecoy(s, a, j, ev);
     // A fooled agent walks over the item it was told is gone.
     if (s.grid[j] === 'item' && a.carrying.length < carryOf(a.role) && avoidedTile(s, a) !== j) {
       s.grid[j] = null;
@@ -555,6 +610,8 @@ function resolveMoves(s: MatchState, moves: Map<AgentState, number>, ev: MatchEv
     a.x = x;
     a.y = y;
   }
+  // Couriers take a second tile on open ground (roles.ts courierStride), in agent order, after the slides.
+  for (const [a, t] of moves) if (a.role === 'Courier') courierStride(s, a, t, from.get(a)!, ev);
 }
 
 /** Uses a themed verb toward `dir` (or around the agent for area_repel). Returns why not, or null. */
@@ -631,8 +688,8 @@ function useVerb(s: MatchState, a: AgentState, verbId: string, dir: Dir | undefi
 
 /** Operates an adjacent shared switch: the rival crew's lane floods, burns or fills for 8 ticks. */
 function useSwitch(s: MatchState, a: AgentState, ev: MatchEvent[]): string | null {
-  const k = s.map.def.switches.findIndex((sw) => manhattan({ x: sw.at[0], y: sw.at[1] }, a) === 1);
-  if (k < 0) return 'no switch next to the agent';
+  const k = switchReach(s, a);
+  if (k < 0) return a.role === 'Engineer' ? 'no switch within 2 tiles' : 'no switch next to the agent';
   if (s.switchReady[k]! > s.tick) return 'the switch is resetting';
   const sw = s.map.def.switches[k]!;
   const rival: Team = a.team === 'A' ? 'B' : 'A';
@@ -809,6 +866,8 @@ function dropItems(s: MatchState, a: AgentState): number {
 
 function updateSight(s: MatchState) {
   const { w, h } = s.map;
+  // A decoy whose tile stopped being open floor (a hazard, a block, a dropped item) is gone.
+  if (s.decoys) pruneDecoys(s);
   for (const T of ['A', 'B'] as const) {
     const v = s.visible[T];
     v.fill(!s.map.def.fog);
@@ -824,7 +883,8 @@ function updateSight(s: MatchState) {
           }
       }
     const seen = s.seen[T];
-    for (let i = 0; i < v.length; i++) if (v[i]) seen[i] = s.grid[i];
+    // A rival's decoy reads as an item to this crew, wherever it looks (fog decides when it looks).
+    for (let i = 0; i < v.length; i++) if (v[i]) seen[i] = s.decoys && decoyFor(s, i, T) ? 'item' : s.grid[i];
   }
 }
 
@@ -875,9 +935,12 @@ export function legalActions(s: MatchState, agentId: string): Action[] {
     }
     for (const dir of DIR_LIST) if (verbFits(s, a, v.effect, dir)) out.push({ type: 'verb', verb: v.id, dir });
   }
-  const k = s.map.def.switches.findIndex((sw) => manhattan({ x: sw.at[0], y: sw.at[1] }, a) === 1);
+  const k = switchReach(s, a);
   if (k >= 0 && s.switchReady[k]! <= s.tick + 1) out.push({ type: 'switch' });
   out.push(...toolActions(s, a));
+  // The new roles' own actions come last, so the original roles' legal lists are exactly as they were.
+  if (a.role === 'Medic') out.push(...tendActions(s, a));
+  if (a.role === 'Saboteur') out.push(...plantActions(s, a));
   return out;
 }
 
