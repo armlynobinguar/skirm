@@ -20,13 +20,15 @@ export interface AgentPortraitProps {
   role?: string;
   /** How its owner dressed it (hair, trousers, build, headgear). Omit for the role's plain look. */
   dress?: Dress;
+  /** The match is over: loop the victory or defeat pose (the debrief crew line). */
+  result?: 'victory' | 'defeat';
   /** `hero`: the Command deck's lead agent (smaller figure left of centre, pulsing rings, a floating block). */
   variant?: 'portrait' | 'hero';
   className?: string;
   'data-testid'?: string;
 }
 
-export function AgentPortrait({ body, head, team, label, role, dress, variant = 'portrait', className, 'data-testid': testId }: AgentPortraitProps) {
+export function AgentPortrait({ body, head, team, label, role, dress, result, variant = 'portrait', className, 'data-testid': testId }: AgentPortraitProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const { reducedMotion } = usePreferences();
 
@@ -67,7 +69,7 @@ export function AgentPortrait({ body, head, team, label, role, dress, variant = 
         sx,
         b,
         T,
-        { c: body, bone: head, team: team ?? 'A', slot: 0, inv: [], role, ...(dress ? { dress } : {}) },
+        { c: body, bone: head, team: team ?? 'A', slot: 0, inv: [], role, ...(dress ? { dress } : {}), ...(result ? { result } : {}) },
         time * 0.6,
         0,
         { ...(team ? { team: team === 'A' ? '#34e0c8' : '#ff4655' } : {}), still: reducedMotion },
@@ -84,7 +86,7 @@ export function AgentPortrait({ body, head, team, label, role, dress, variant = 
     return () => cancelAnimationFrame(raf);
     // The dress is compared by value: callers build a fresh object each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [body, head, team, role, variant, reducedMotion, dress ? JSON.stringify(dress) : '']);
+  }, [body, head, team, role, variant, result, reducedMotion, dress ? JSON.stringify(dress) : '']);
 
   return <canvas ref={ref} role="img" aria-label={label} className={className} data-testid={testId} />;
 }

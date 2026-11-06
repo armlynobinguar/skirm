@@ -424,8 +424,11 @@ export function lookTop(look: RoleLook): number {
 
 /* ───────────── poses ───────────── */
 
-/** What an agent is doing, by priority: out (hidden), knocked down, stunned, celebrating, using a verb, walking, carrying, idle. */
-export type PoseKind = 'out' | 'down' | 'stun' | 'cheer' | 'act' | 'walk' | 'carry' | 'idle';
+/**
+ * What an agent is doing, by priority: out (hidden), the match result (victory or defeat, on the
+ * debrief), knocked down, stunned, celebrating, using a verb, walking, carrying, idle.
+ */
+export type PoseKind = 'out' | 'victory' | 'defeat' | 'down' | 'stun' | 'cheer' | 'act' | 'walk' | 'carry' | 'idle';
 
 /** The status a renderer knows about an agent this frame. */
 export interface PoseInput {
@@ -440,10 +443,13 @@ export interface PoseInput {
   carrying?: number;
   /** Stepping between tiles right now. */
   moving?: boolean;
+  /** The match is over: a looping victory or defeat pose (debrief portraits). */
+  result?: 'victory' | 'defeat' | null;
 }
 
 export function poseKind(a: PoseInput): PoseKind {
   if (a.out) return 'out';
+  if (a.result) return a.result;
   if (a.down) return 'down';
   if (a.stun) return 'stun';
   if (a.cheer) return 'cheer';
@@ -492,6 +498,23 @@ export function poseAt(
   const stride = look.stride ?? 1;
   switch (kind) {
     case 'out':
+      return pose;
+    case 'victory': {
+      // Arms up, a hop every beat, the celebration's stars throughout.
+      const ph = (t * 1.4 + seed * 0.37) % 1;
+      pose.lift = still ? 0 : Math.max(0, Math.sin(ph * Math.PI * 2)) * 0.16;
+      pose.off.hand = [0, 0.34, 0.02];
+      pose.off.head = [0, still ? 0.01 : Math.max(0, Math.sin(ph * Math.PI * 2)) * 0.02, 0];
+      pose.fx = 1;
+      return pose;
+    }
+    case 'defeat':
+      // Slumped: leaning forward, head down, hands low, a slow sway.
+      pose.lean = 0.28;
+      pose.off.head = [0, -0.035, 0.03];
+      pose.off.hand = [0, -0.04, -0.02];
+      pose.tilt = still ? 0 : Math.sin(t * 1.2 + seed) * 0.03;
+      pose.fx = 1;
       return pose;
     case 'down':
       pose.tilt = 1.35 * (still ? 1 : 1 - Math.pow(1 - clamp01(o.age / FALL_S), 3));

@@ -225,3 +225,18 @@ describe('dressed looks', () => {
     expect(isoPolys(dressLook(l, dress), { body: '#e2574c', head: '#d9a477', team: '#34e0c8' }, 1).length).toBeGreaterThan(0);
   });
 });
+
+describe('result poses', () => {
+  it('ranks the match result over everything but out, and poses it', () => {
+    expect(poseKind({ result: 'victory', down: true, act: 'x' })).toBe('victory');
+    expect(poseKind({ result: 'defeat', out: true })).toBe('out');
+    const look = lookFor('Builder');
+    const win = poseAt('victory', look, { time: 0.1, age: 0 });
+    expect(win.off.hand?.[1]).toBeGreaterThan(0.3);
+    expect(win.fx).toBe(1);
+    const loss = poseAt('defeat', look, { time: 0, age: 0, still: true });
+    expect(loss.lean).toBeGreaterThan(0.2);
+    expect(loss.off.head?.[1]).toBeLessThan(0);
+    expect(loss.tilt).toBe(0);
+  });
+});

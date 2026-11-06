@@ -8,7 +8,7 @@
 // queues practice again. Last, a player's decision timeline (Decisions: "why did it do that?").
 //   Ended          → on the match screen (a void match, or after the banner when the route did not move).
 //   V2ResultScreen → /matches/[id]/result: this tab's v2 store, else GET /v2/matches/:id.
-import { DIFF_MODS, TICK_MS, mapV2 } from '@skirm/engine/v2';
+import { DIFF_MODS, TICK_MS, mapV2, type FrameAgent } from '@skirm/engine/v2';
 import { Button, fmt } from '@skirm/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
@@ -28,6 +28,7 @@ import { VerifyPanel } from '../verify/VerifyPanel';
 import { PracticeBadge, other } from './common';
 import { BanList } from './Draft';
 import { Decisions } from './Decisions';
+import { CrewPoses, posedCrew } from './hud/CrewPoses';
 import { debriefOf, mvpOf, type DebriefData } from './hud/debrief';
 import { clock, feedTag } from './hud/model';
 import v from './v2.module.css';
@@ -66,7 +67,7 @@ function useResultArena(view: V2MatchView | undefined, mapId: string | undefined
 export function Ended({ view, onReplay }: { view: V2MatchView; onReplay?: () => void }) {
   useResultArena(view, view.mapId);
   const data = debriefOf(view, undefined)!;
-  return <Debrief data={data} onReplay={onReplay} />;
+  return <Debrief data={data} onReplay={onReplay} frameAgents={view.frame?.agents} />;
 }
 
 export function V2ResultScreen({ matchId }: { matchId: string }) {
@@ -98,10 +99,21 @@ export function V2ResultScreen({ matchId }: { matchId: string }) {
         </ButtonLink>
       </div>
     );
-  return <Debrief data={data} replayHref={`${routes.match(matchId)}#replay`} />;
+  return <Debrief data={data} replayHref={`${routes.match(matchId)}#replay`} frameAgents={view?.frame?.agents} />;
 }
 
-function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?: () => void; replayHref?: string }) {
+function Debrief({
+  data,
+  onReplay,
+  replayHref,
+  frameAgents,
+}: {
+  data: DebriefData;
+  onReplay?: () => void;
+  replayHref?: string;
+  /** The last frame's agents this tab saw (their looks for the crew line); absent for a cold load. */
+  frameAgents?: readonly FrameAgent[] | null;
+}) {
   // Where the match was started from (campaign, a lobby, a bracket), read after mount: it lives in
   // this tab's session storage, which the server render cannot see.
   const [origin, setOrigin] = useState<MatchOrigin | null>(null);
@@ -127,6 +139,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
   const watch = data.watch;
   const win = r.winner === me;
   const nameOf = (t: typeof me) => data.handles[t] ?? `Crew ${t}`;
+  const outcome = r.winner === 'draw' ? 'draw' : win ? 'victory' : 'defeat';
   const verdict = r.winner === 'draw' ? 'Draw' : watch ? `${nameOf(r.winner)} wins` : win ? 'Victory' : 'Defeat';
   const D = DIFF_MODS[data.difficulty];
   const d = data.debrief;
@@ -164,6 +177,13 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
           <span className={v.sb}>{r.score[them]}</span>
           <small>DELIVERED · FIRST TO {data.goal}</small>
         </div>
+        {!watch && d ? (
+          <CrewPoses
+            crew={posedCrew(d.agents, frameAgents, me, outcome, d.mvp ?? mvp?.agentId ?? null)}
+            outcome={outcome}
+            team={me}
+          />
+        ) : null}
         <p className={v.note}>
           {r.score[me]} – {r.score[them]} after {r.ticks} ticks, {REASON[r.reason] ?? r.reason} ({DECIDED[r.decidedBy] ?? r.decidedBy}).
           {watch ? ` ${nameOf('A')} vs ${nameOf('B')}.` : data.rivalHandle ? ` Rival: ${data.rivalHandle}.` : ''}
