@@ -19,7 +19,8 @@
 .menu {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-auto-rows: minmax(96px, 1fr);
+  /* Rows grow with a tile's text (kicker, name, line) instead of letting it run over itself. */
+  grid-auto-rows: minmax(auto, 1fr);
   gap: 10px;
   align-content: center;
   align-self: center;
@@ -32,7 +33,8 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 14px 16px;
+  min-height: 96px;
+  padding: 12px 16px 14px;
   overflow: hidden;
   text-align: left;
   text-decoration: none;
@@ -57,9 +59,12 @@
 .tile:hover { transform: translateY(-3px); background: rgba(16, 26, 38, .94); color: var(--ink); }
 .tile:hover::before { transform: scaleY(1); }
 .tile:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.code { position: absolute; top: 12px; left: 16px; font: 500 10px/14px var(--font-mono); letter-spacing: .24em; text-transform: uppercase; color: var(--muted); }
+/* The kicker sits at the top in the flow (never under the name), and every line keeps clear of the
+   icon plate in the top-right corner. */
+.code { position: relative; margin-bottom: auto; padding-bottom: 8px; padding-right: 72px; font: 500 10px/14px var(--font-mono); letter-spacing: .24em; text-transform: uppercase; color: var(--muted); }
 .code, .go { z-index: 1; }
 .name, .sub { position: relative; z-index: 1; }
+.sub { padding-right: 72px; }
 .name { font: 800 clamp(26px, 2.6vw, 38px)/.9 var(--font-display); text-transform: uppercase; color: var(--bone); }
 .sub { margin-top: 4px; font-size: 13px; line-height: 18px; color: var(--muted); }
 
@@ -82,7 +87,7 @@
 .rk .twm { width: 240px; height: 240px; right: -30px; bottom: -50px; }
 .rk { --tc: var(--rival); grid-column: span 4; grid-row: span 2; background: linear-gradient(135deg, rgba(255, 70, 85, .2), rgba(9, 15, 23, .92) 62%); }
 .rk .name { font-size: clamp(46px, 5.4vw, 78px); }
-.rk .sub { max-width: calc(100% - 110px); }
+.rk .code, .rk .sub { padding-right: 88px; }
 .go {
   position: absolute;
   right: 16px;
@@ -111,5 +116,6 @@
   .tile .tgl :global(.sk-ak), .rk .tgl :global(.sk-ak) { width: 32px; height: 32px; }
   .tser { display: none; }
   .twm, .rk .twm { width: 110px; height: 110px; }
-  .code { position: static; min-height: 40px; margin-bottom: auto; padding-bottom: 6px; padding-right: 40px; }
+  .code, .sub, .rk .code, .rk .sub { padding-right: 44px; }
+  .code { min-height: 40px; padding-bottom: 6px; }
 }
