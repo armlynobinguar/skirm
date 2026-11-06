@@ -386,5 +386,23 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     "sql": [
       "ALTER TABLE \"v2_matches\" ADD COLUMN \"heartbeat_at\" timestamp with time zone;"
     ]
+  },
+  {
+    "tag": "0022_agent_accounts",
+    "folderMillis": 1793930912821,
+    "bps": true,
+    "hash": "8d27999f70eb4ddf11c01eefc44c91d11e6f972b091a223a35aa58e661a03ea4",
+    "sql": [
+      "CREATE TABLE \"agent_account_spends\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"agent_id\" text NOT NULL,\n\t\"kind\" text NOT NULL,\n\t\"amount_yocto\" numeric(40, 0) NOT NULL,\n\t\"status\" text DEFAULT 'pending' NOT NULL,\n\t\"offer_id\" text,\n\t\"rental_id\" text,\n\t\"tx_hash\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"settled_at\" timestamp with time zone,\n\tCONSTRAINT \"agent_account_spends_kind_ck\" CHECK (\"agent_account_spends\".\"kind\" in ('rent', 'withdraw')),\n\tCONSTRAINT \"agent_account_spends_status_ck\" CHECK (\"agent_account_spends\".\"status\" in ('pending', 'sent', 'failed', 'unknown')),\n\tCONSTRAINT \"agent_account_spends_amount_ck\" CHECK (\"agent_account_spends\".\"amount_yocto\" > 0)\n);\n",
+      "\nCREATE TABLE \"agent_accounts\" (\n\t\"agent_id\" text PRIMARY KEY NOT NULL,\n\t\"owner_id\" text NOT NULL,\n\t\"near_account_id\" text NOT NULL,\n\t\"public_key\" text NOT NULL,\n\t\"key_ciphertext\" \"bytea\" NOT NULL,\n\t\"key_iv\" \"bytea\" NOT NULL,\n\t\"key_auth_tag\" \"bytea\" NOT NULL,\n\t\"key_wrapped\" \"bytea\" NOT NULL,\n\t\"key_key_id\" text NOT NULL,\n\t\"cap_yocto\" numeric(40, 0) DEFAULT '0' NOT NULL,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"agent_accounts_cap_ck\" CHECK (\"agent_accounts\".\"cap_yocto\" >= 0)\n);\n",
+      "\nALTER TABLE \"agent_account_spends\" ADD CONSTRAINT \"agent_account_spends_agent_id_agent_accounts_agent_id_fk\" FOREIGN KEY (\"agent_id\") REFERENCES \"public\".\"agent_accounts\"(\"agent_id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"agent_account_spends\" ADD CONSTRAINT \"agent_account_spends_offer_id_rental_offers_id_fk\" FOREIGN KEY (\"offer_id\") REFERENCES \"public\".\"rental_offers\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"agent_account_spends\" ADD CONSTRAINT \"agent_account_spends_rental_id_rentals_id_fk\" FOREIGN KEY (\"rental_id\") REFERENCES \"public\".\"rentals\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"agent_accounts\" ADD CONSTRAINT \"agent_accounts_agent_id_agents_id_fk\" FOREIGN KEY (\"agent_id\") REFERENCES \"public\".\"agents\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"agent_accounts\" ADD CONSTRAINT \"agent_accounts_owner_id_accounts_id_fk\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE INDEX \"agent_account_spends_agent_idx\" ON \"agent_account_spends\" USING btree (\"agent_id\",\"status\");",
+      "\nCREATE UNIQUE INDEX \"agent_accounts_near_uq\" ON \"agent_accounts\" USING btree (\"near_account_id\");",
+      "\nCREATE INDEX \"agent_accounts_owner_idx\" ON \"agent_accounts\" USING btree (\"owner_id\");"
+    ]
   }
 ];

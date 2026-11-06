@@ -1,5 +1,6 @@
 import type { Executor } from '../client';
 import { AccountsRepo } from './accounts';
+import { AgentAccountsRepo } from './agent-accounts';
 import { AgentsRepo } from './agents';
 import { BackingRepo } from './backing';
 import { BenchRepo } from './bench';
@@ -80,6 +81,8 @@ export interface Repos {
   communityMaps: CommunityMapsRepo;
   /** Writer backing rounds, backers' stakes and the royalties routed to them. */
   backing: BackingRepo;
+  /** Agents' own custodial NEAR accounts, their spend caps and payments. */
+  agentAccounts: AgentAccountsRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -126,11 +129,13 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     puzzles: new PuzzlesRepo(db),
     communityMaps: new CommunityMapsRepo(db),
     backing: new BackingRepo(db),
+    agentAccounts: new AgentAccountsRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
 
 export * from './accounts';
+export * from './agent-accounts';
 export * from './agents';
 export * from './backing';
 export * from './bench';

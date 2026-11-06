@@ -150,6 +150,16 @@ export const envSchema = z
       .enum(['true', 'false', ''])
       .optional()
       .transform((v) => v === 'true'),
+    /**
+     * Agent accounts (docs/agent-accounts.md): the parent account that creates each agent's own
+     * NEAR account (`<agent>.<parent>`) and its full-access key. Both unset: the feature is off.
+     * CUSTODIAL: the server holds every agent account's key (sealed with the KEK).
+     */
+    AGENT_ACCOUNTS_PARENT: optional().refine(
+      (v) => v === undefined || /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/.test(v.trim()),
+      { message: 'must be a NEAR account id' },
+    ),
+    AGENT_ACCOUNTS_PARENT_KEY: optional(),
     CREDITS_PER_NEAR: z
       .string()
       .optional()
@@ -204,6 +214,27 @@ export const envSchema = z
         code: 'custom',
         path: ['NEAR_OPS_KEY'],
         message: 'NEAR_OPS_ACCOUNT and NEAR_OPS_KEY are set together',
+      });
+    if (!!env.AGENT_ACCOUNTS_PARENT !== !!env.AGENT_ACCOUNTS_PARENT_KEY)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AGENT_ACCOUNTS_PARENT_KEY'],
+        message: 'AGENT_ACCOUNTS_PARENT and AGENT_ACCOUNTS_PARENT_KEY are set together',
+      });
+    if (env.AGENT_ACCOUNTS_PARENT && env.AGENT_ACCOUNTS_PARENT.trim().length > 64 - 31)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AGENT_ACCOUNTS_PARENT'],
+        message: 'must be at most 33 characters (agent accounts are <agent id>.<parent>, 64 at most)',
+      });
+    if (
+      env.AGENT_ACCOUNTS_PARENT_KEY &&
+      !/^ed25519:[1-9A-HJ-NP-Za-km-z]{40,100}$/.test(env.AGENT_ACCOUNTS_PARENT_KEY.trim())
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AGENT_ACCOUNTS_PARENT_KEY'],
+        message: 'must be an ed25519:<base58> secret key',
       });
     if (env.NEAR_OPS_KEY && !/^ed25519:[1-9A-HJ-NP-Za-km-z]{40,100}$/.test(env.NEAR_OPS_KEY))
       ctx.addIssue({
@@ -283,5 +314,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     warnings,
     nearOpsConfigured: !!(c.NEAR_OPS_ACCOUNT && c.NEAR_OPS_KEY),
     nearRpcUrls: [...new Set([c.NEAR_RPC_URL, c.NEAR_RPC_FALLBACK_URL])],
+    AGENT_ACCOUNTS_PARENT: c.AGENT_ACCOUNTS_PARENT?.trim(),
+    AGENT_ACCOUNTS_PARENT_KEY: c.AGENT_ACCOUNTS_PARENT_KEY?.trim(),
   };
 }

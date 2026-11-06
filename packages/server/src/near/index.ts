@@ -1,4 +1,5 @@
 import type { ServerConfig } from '../config';
+import { NearAgentAccounts, type AgentAccountsChain } from './agent-accounts';
 import { NearBadges, NoopBadges, type BadgeMinter } from './badges';
 import {
   CompositeDepositVerifier,
@@ -20,6 +21,7 @@ import { NearRpc, type NearRpcOptions } from './rpc';
 import { NearSeasons, NoopSeasons, type SeasonsChain } from './seasons';
 import { OpsFunctionCaller, type FunctionCaller } from './signer';
 
+export * from './agent-accounts';
 export * from './backing';
 export * from './badges';
 export * from './deposits';
@@ -41,6 +43,8 @@ export interface NearAdapters {
   seasons: SeasonsChain;
   /** Soulbound achievement badges (`badges` contract). */
   badges: BadgeMinter;
+  /** Agents' own custodial NEAR accounts; absent while AGENT_ACCOUNTS_PARENT is unset (feature off). */
+  agentAccounts?: AgentAccountsChain;
 }
 
 export interface NearAdapterOptions extends NearRpcOptions {
@@ -61,7 +65,8 @@ type NearConfig = Pick<
   | 'NEAR_CONTRACT_BADGES'
   | 'CREDITS_PER_NEAR'
   | 'nearRpcUrls'
->;
+> &
+  Partial<Pick<ServerConfig, 'AGENT_ACCOUNTS_PARENT' | 'AGENT_ACCOUNTS_PARENT_KEY'>>;
 
 /**
  * Registry/Minter/OwnershipReader/Seasons/Badges are Near* when the ops signer is configured, Noop*
@@ -97,5 +102,8 @@ export function createNearAdapters(
       new RpcRentalVerifier(rpc, config.NEAR_CONTRACT_MARKET),
       config.AUTH_MODE === 'dev' ? new DevRentalVerifier() : undefined,
     ),
+    ...(config.AGENT_ACCOUNTS_PARENT && config.AGENT_ACCOUNTS_PARENT_KEY
+      ? { agentAccounts: new NearAgentAccounts(config.AGENT_ACCOUNTS_PARENT, config.AGENT_ACCOUNTS_PARENT_KEY, rpc) }
+      : {}),
   };
 }

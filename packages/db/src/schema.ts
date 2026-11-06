@@ -408,6 +408,71 @@ export const rentals = pgTable(
   ],
 );
 
+// ---------- Agent accounts ----------
+
+/**
+ * An agent's own NEAR account (docs/agent-accounts.md). CUSTODIAL: the server created it and holds
+ * its full-access key, sealed with the vault's KEK (AAD `skirm/secret/v1:agent-key:<near id>`); the
+ * key never leaves the api in plain form. `cap_yocto` is the owner's per-match spend cap: what the
+ * account may commit to passes for a match not played yet (0 = spending off).
+ */
+export const agentAccounts = pgTable(
+  'agent_accounts',
+  {
+    agentId: text('agent_id')
+      .primaryKey()
+      .references(() => agents.id),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => accounts.id),
+    nearAccountId: text('near_account_id').notNull(),
+    publicKey: text('public_key').notNull(),
+    keyCiphertext: bytea('key_ciphertext').notNull(),
+    keyIv: bytea('key_iv').notNull(),
+    keyAuthTag: bytea('key_auth_tag').notNull(),
+    keyWrapped: bytea('key_wrapped').notNull(),
+    keyKeyId: text('key_key_id').notNull(),
+    capYocto: numeric('cap_yocto', { precision: 40, scale: 0 }).notNull().default('0'),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('agent_accounts_near_uq').on(t.nearAccountId),
+    index('agent_accounts_owner_idx').on(t.ownerId),
+    check('agent_accounts_cap_ck', sql`${t.capYocto} >= 0`),
+  ],
+);
+
+/**
+ * One payment an agent account makes. Reserved (`pending`) inside the same transaction that checks
+ * the cap, then `sent` with its tx hash and the pass it bought, or `failed`. `unknown` (the signer
+ * gave no answer) keeps counting against the cap until an operator settles it.
+ */
+export const agentAccountSpends = pgTable(
+  'agent_account_spends',
+  {
+    /** `aas_` + ULID; also the `market.rent` nonce. */
+    id: text('id').primaryKey(),
+    agentId: text('agent_id')
+      .notNull()
+      .references(() => agentAccounts.agentId),
+    kind: text('kind').notNull(),
+    amountYocto: numeric('amount_yocto', { precision: 40, scale: 0 }).notNull(),
+    status: text('status').notNull().default('pending'),
+    offerId: text('offer_id').references(() => rentalOffers.id),
+    rentalId: text('rental_id').references(() => rentals.id),
+    txHash: text('tx_hash'),
+    createdAt: createdAt(),
+    settledAt: ts('settled_at'),
+  },
+  (t) => [
+    index('agent_account_spends_agent_idx').on(t.agentId, t.status),
+    check('agent_account_spends_kind_ck', sql`${t.kind} in ('rent', 'withdraw')`),
+    check('agent_account_spends_status_ck', sql`${t.status} in ('pending', 'sent', 'failed', 'unknown')`),
+    check('agent_account_spends_amount_ck', sql`${t.amountYocto} > 0`),
+  ],
+);
+
 // ---------- Credits ledger ----------
 
 export const ledgerAccounts = pgTable('ledger_accounts', {

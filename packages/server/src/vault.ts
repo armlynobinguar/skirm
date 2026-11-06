@@ -446,7 +446,66 @@ export class Vault implements SkillSealer {
       throw new VaultError('tampered', 'the sha256 does not match the sealed playbook');
     return text;
   }
+
+  /** Seals a server-held secret (an agent account's NEAR key) for `label` (see SealedSecret). */
+  async encryptSecret(label: string, secret: string): Promise<SealedSecret> {
+    const dataKey = randomBytes(32);
+    try {
+      const iv = randomBytes(IV_BYTES);
+      const c = createCipheriv('aes-256-gcm', dataKey, iv);
+      c.setAAD(secretAad(label));
+      const ciphertext = Buffer.concat([c.update(secret, 'utf8'), c.final()]);
+      return {
+        ciphertext: new Uint8Array(ciphertext),
+        iv: new Uint8Array(iv),
+        authTag: new Uint8Array(c.getAuthTag()),
+        wrappedKey: await this.wrapper.wrap(dataKey),
+        keyId: this.wrapper.keyId,
+      };
+    } finally {
+      dataKey.fill(0);
+    }
+  }
+
+  /**
+   * Opens a secret sealed by encryptSecret under the same `label`. Only the agent-account signer in
+   * the api calls this, right before it signs; the result is never logged or returned.
+   */
+  async decryptSecret(label: string, sealed: SealedSecret): Promise<string> {
+    const opener = this.openers.get(sealed.keyId);
+    if (!opener) throw new VaultError('wrong_key', 'sealed with a different key-encryption key');
+    if (sealed.iv.length !== IV_BYTES || sealed.authTag.length !== TAG_BYTES)
+      throw new VaultError('tampered', 'secret failed authentication');
+    const dataKey = Buffer.from(await opener.unwrap(sealed.wrappedKey));
+    try {
+      const d = createDecipheriv('aes-256-gcm', dataKey, Buffer.from(sealed.iv), {
+        authTagLength: TAG_BYTES,
+      });
+      d.setAAD(secretAad(label));
+      d.setAuthTag(Buffer.from(sealed.authTag));
+      return Buffer.concat([d.update(Buffer.from(sealed.ciphertext)), d.final()]).toString('utf8');
+    } catch {
+      throw new VaultError('tampered', 'secret failed authentication');
+    } finally {
+      dataKey.fill(0);
+    }
+  }
 }
+
+/**
+ * A server-held secret (an agent account's NEAR key), sealed like a skill: a fresh data key under
+ * the KEK, the text under AES-256-GCM with an AAD naming what the secret belongs to (`label`), so a
+ * sealed row moved to another account fails to open.
+ */
+export interface SealedSecret {
+  ciphertext: Uint8Array;
+  iv: Uint8Array;
+  authTag: Uint8Array;
+  wrappedKey: Uint8Array;
+  keyId: string;
+}
+
+const secretAad = (label: string) => Buffer.from(`skirm/secret/v1:${label}`);
 
 /**
  * Vault from config. kekMode 'kms' (SKILL_KEK unset, SKILL_KEK_KMS set): Cloud KMS seals, behind a
