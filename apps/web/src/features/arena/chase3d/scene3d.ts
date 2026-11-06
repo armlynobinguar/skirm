@@ -4,7 +4,10 @@
 // weather), the tiles that change are re-laid when a new frame arrives, and every animation frame
 // eases the agents, the fog light and the camera.
 import * as THREE from 'three';
-import { fillOf, lookFor, lookParts, lookTop, poseAt, poseKind, type LookGroup, type RoleLook } from '@skirm/ui';
+import type { AgentCosmetics } from '@skirm/shared';
+import { dressLook, fillOf, lookFor, lookParts, lookTop, poseAt, poseKind, type LookGroup, type RoleLook } from '@skirm/ui';
+import { trailOf, trailSteps } from '../cosmetics';
+import { PATTERN_R, patternMarks, rigSignature, skinOf, tagColours } from './cosmetics3d';
 import * as proto from '../proto/world';
 import { TOOL_INFO } from '../gear';
 import type { LiveArena } from '../live';
@@ -109,6 +112,11 @@ interface AgentRig {
   mats: THREE.Material[];
   /** Heading the agent faces (radians around y, 0 = +z). */
   face: number;
+  /** What the figure was built from (rigSignature): a change rebuilds it. */
+  sig: string;
+  /** Trail marks on the floor (world space, outside `g`), reused frame to frame. */
+  trail: THREE.Mesh[];
+  trailMat: THREE.MeshBasicMaterial | null;
 }
 
 /** One wall tile: position, standing height, and whether it is cut away right now. */
@@ -181,7 +189,7 @@ function lambert(o: THREE.MeshLambertMaterialParameters = {}) {
 }
 
 /** A name tag over an agent: the team colour edge and the name, on a canvas texture. */
-function nameSprite(text: string, colour: string): THREE.Sprite | null {
+function nameSprite(text: string, tag: { fg: string; bg: string; stripe: string; border: string | null }): THREE.Sprite | null {
   const cv = document.createElement('canvas');
   cv.width = 256;
   cv.height = 64;
@@ -193,11 +201,16 @@ function nameSprite(text: string, colour: string): THREE.Sprite | null {
   }
   if (!g) return null;
   const font = getComputedStyle(document.documentElement).getPropertyValue('--font-sans').trim() || 'Barlow, sans-serif';
-  g.fillStyle = 'rgba(5,8,13,.85)';
+  g.fillStyle = tag.bg;
   g.fillRect(28, 10, 200, 44);
-  g.fillStyle = colour;
+  if (tag.border) {
+    g.strokeStyle = tag.border;
+    g.lineWidth = 3;
+    g.strokeRect(29.5, 11.5, 197, 41);
+  }
+  g.fillStyle = tag.stripe;
   g.fillRect(28, 10, 6, 44);
-  g.fillStyle = '#ece8e1';
+  g.fillStyle = tag.fg;
   g.font = `600 30px ${font}`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
@@ -441,12 +454,12 @@ const GROUPS: readonly LookGroup[] = ['footL', 'footR', 'body', 'head', 'hand', 
 const carryY = (look: RoleLook) => (lookTop(look) + 0.12) * 1.1;
 
 /** The agent in its role's look (@skirm/ui ROLE_LOOKS), with a team ring, name tag, carry slots and effects. */
-function agentRig(w: World, a: Agent3): AgentRig {
+function agentRig(w: World, a: Agent3, worn: AgentCosmetics | undefined): AgentRig {
   const g = new THREE.Group();
   const body = new THREE.Group();
   g.add(body);
   const team = TEAM_RING[a.team];
-  const look = lookFor(a.role);
+  const look = a.dress ? dressLook(lookFor(a.role), a.dress) : lookFor(a.role);
   const colours = { body: a.c ?? BODY[a.team][a.slot % 3]!, head: a.bone ?? '#ece8e1', team };
   const mats: THREE.Material[] = [];
   const byFill = new Map<string, THREE.Material>();
@@ -484,7 +497,20 @@ function agentRig(w: World, a: Agent3): AgentRig {
   tr.rotation.x = -Math.PI / 2;
   tr.position.y = 0.02;
   g.add(tr);
-  const tag = nameSprite(a.name, team);
+  // The skin's pattern as a ring of marks just outside the crew ring.
+  const skin = skinOf(worn);
+  const marks = patternMarks(skin);
+  if (skin && marks.length) {
+    const markMat = new THREE.MeshBasicMaterial({ color: skin.accent, transparent: true, opacity: 0.9, depthWrite: false });
+    mats.push(markMat);
+    for (const k of marks) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(k.along, k.across), markMat);
+      m.rotation.set(-Math.PI / 2, 0, -k.angle - Math.PI / 2);
+      m.position.set(Math.cos(k.angle) * PATTERN_R, 0.025, Math.sin(k.angle) * PATTERN_R);
+      g.add(m);
+    }
+  }
+  const tag = nameSprite(a.name, tagColours(worn, team));
   if (tag) {
     tag.position.y = Math.max(1.32, carryY(look) + 0.42);
     g.add(tag);
@@ -522,7 +548,76 @@ function agentRig(w: World, a: Agent3): AgentRig {
   });
   w.scene.add(g);
   // Crews start facing the middle.
-  return { g, body, look, parts, inv, count, shown: -1, fx: { ring, bits, bitMat, ringMat: fxRingMat }, mats, face: a.team === 'A' ? Math.PI / 2 : -Math.PI / 2 };
+  // Trail marks: a few flat marks in the trail's colour, placed each frame on the tiles just walked.
+  const tr2 = trailOf(worn);
+  const trailMat = tr2 ? new THREE.MeshBasicMaterial({ color: tr2.color, transparent: true, depthWrite: false, side: THREE.DoubleSide }) : null;
+  const trailGeo = tr2?.style === 'sparks' ? new THREE.OctahedronGeometry(0.05) : new THREE.CircleGeometry(tr2?.style === 'ribbon' ? 0.16 : 0.12, 16);
+  const trail = trailMat
+    ? Array.from({ length: TRAIL_MARKS }, () => {
+        const m = new THREE.Mesh(trailGeo, trailMat);
+        if (tr2?.style !== 'sparks') m.rotation.x = -Math.PI / 2;
+        m.visible = false;
+        w.scene.add(m);
+        return m;
+      })
+    : [];
+  return {
+    g,
+    body,
+    look,
+    parts,
+    inv,
+    count,
+    shown: -1,
+    fx: { ring, bits, bitMat, ringMat: fxRingMat },
+    mats,
+    face: a.team === 'A' ? Math.PI / 2 : -Math.PI / 2,
+    sig: rigSignature(a, worn),
+    trail,
+    trailMat,
+  };
+}
+
+/** Trail marks per agent (the 2D trail keeps up to six tiles; sparks use three marks per tile). */
+const TRAIL_MARKS = 15;
+
+/** Takes a rig out of the scene and frees what only it uses (shared geometry stays). */
+function dropRig(w: World, ag: AgentRig) {
+  w.scene.remove(ag.g);
+  for (const m of ag.trail) w.scene.remove(m);
+  ag.trailMat?.dispose();
+  for (const m of ag.mats) m.dispose();
+}
+
+/** Places an agent's trail marks on the tiles it walked in the last moments, fading with age. */
+function placeTrail(ag: AgentRig, a: Agent3, worn: AgentCosmetics | undefined, key: string, now: number, opacity: number, still: boolean) {
+  const t = trailOf(worn);
+  if (!t || !ag.trailMat || still || a.out) {
+    for (const m of ag.trail) m.visible = false;
+    return;
+  }
+  const steps = trailSteps(a.id, key, a.x, a.y, now).slice(0, -1);
+  let n = 0;
+  steps.forEach(([x, y, at], j) => {
+    const age = 1 - (now - at) / 1600;
+    if (age <= 0) return;
+    const per = t.style === 'sparks' ? 3 : 1;
+    for (let s = 0; s < per; s++) {
+      const m = ag.trail[n++];
+      if (!m) return;
+      m.visible = true;
+      if (t.style === 'sparks') {
+        const ang = j + s * 2.1 + at / 300;
+        m.position.set(x + Math.cos(ang) * 0.18, 0.12 + 0.1 * age, y + Math.sin(ang) * 0.18);
+        m.rotation.y = at / 200 + s;
+      } else {
+        m.position.set(x, 0.03 + j * 0.001, y);
+        m.scale.setScalar(t.style === 'ribbon' ? 0.6 + 0.6 * age : 0.5 + 0.5 * age);
+      }
+    }
+  });
+  for (; n < ag.trail.length; n++) ag.trail[n]!.visible = false;
+  ag.trailMat.opacity = 0.7 * opacity;
 }
 
 /** Poses one agent's figure and its effects for this moment (poseAt in @skirm/ui). */
@@ -715,7 +810,21 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
     }
     w.snap = cur;
   }
-  for (const a of agents) if (!w.agents.has(a.id)) w.agents.set(a.id, agentRig(w, a));
+  const worn = state.arena.cosmetics;
+  for (const a of agents) {
+    const has = w.agents.get(a.id);
+    // A figure is rebuilt when its look changes mid-match (a skin equipped, a new outfit).
+    if (has && has.sig === rigSignature(a, worn?.[a.id])) continue;
+    const face = has?.face;
+    if (has) dropRig(w, has);
+    const ag = agentRig(w, a, worn?.[a.id]);
+    if (face != null) {
+      ag.face = face;
+      ag.g.rotation.y = face;
+    }
+    w.agents.set(a.id, ag);
+  }
+  const trailKey = `${state.arena.A.w}x${state.arena.A.h}`;
 
   if (rig.target !== state.focus) {
     rig.target = state.focus;
@@ -753,6 +862,7 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
       m.transparent = op < 1;
       m.opacity = op;
     }
+    placeTrail(ag, a, worn?.[a.id], trailKey, f.now, ag.g.visible ? af : 0, still);
     const carried = a.down ? 0 : a.inv.length;
     ag.inv.forEach((o, j) => {
       o.visible = j < carried;
@@ -766,7 +876,11 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
     if (a.id === state.focus) focus = ag.g.position;
   });
   // Rivals that left sight are not in the frame at all.
-  for (const [id, ag] of w.agents) if (!present.has(id)) ag.g.visible = false;
+  for (const [id, ag] of w.agents)
+    if (!present.has(id)) {
+      ag.g.visible = false;
+      for (const m of ag.trail) m.visible = false;
+    }
 
   // Fog light on the floor and walls, eased every frame.
   let FL: ArrayLike<number> | null = null;
