@@ -204,3 +204,16 @@
 .lookActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: var(--space-2); }
 .lookSpacer { flex: 1; }
 @media (max-width: 720px) { .lookEditor { grid-template-columns: 1fr; } .lookPreview { aspect-ratio: 4 / 3; } }
+
+/* Customize agent: arena style (CosmeticsEditor.tsx) */
+.styleList { display: flex; flex-direction: column; gap: 6px; }
+.styleRow { display: flex; align-items: center; gap: 8px; }
+.styleItem { flex: 1; display: grid; grid-template-columns: 28px auto 1fr; align-items: center; gap: 4px 10px; min-width: 0; padding: 6px 10px; border: 0; background: var(--ink-2); color: inherit; text-align: left; cursor: pointer; box-shadow: inset 0 0 0 1px var(--line); }
+.styleItem[aria-checked='true'] { box-shadow: inset 0 0 0 2px var(--you); }
+.styleItem:disabled { cursor: default; opacity: .75; }
+.styleItem:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.styleItem small { grid-column: 3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.styleName { font-weight: 600; white-space: nowrap; }
+.styleSwatch { width: 28px; height: 18px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .3); }
+.stylePlate { display: inline-grid; place-items: center; width: 28px; height: 18px; font: 600 10px/1 var(--font-mono); }
+@media (max-width: 720px) { .styleItem { grid-template-columns: 28px 1fr; } .styleItem small { grid-column: 1 / -1; } }

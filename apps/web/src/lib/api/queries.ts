@@ -12,6 +12,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../auth/session';
 import { useApi } from '../services';
+import type { CosmeticSlot } from '@skirm/shared';
 import type { Cosmetics, MarketQuery, QuestBoard, QuestView, Trial, TrialRequest } from './types';
 
 /** Query keys. Prefix-shaped so `invalidateQueries({ queryKey: qk.skills.all })` clears a family. */
@@ -206,11 +207,38 @@ export function useBuyCosmetic() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (itemId: string) => api.buyCosmetic(itemId),
-    onSuccess: ({ owned }) => {
-      qc.setQueryData<Cosmetics>(qk.cosmetics, (c) => (c ? { ...c, owned } : c));
+    onSuccess: ({ owned, mint }, itemId) => {
+      qc.setQueryData<Cosmetics>(qk.cosmetics, (c) =>
+        c ? { ...c, owned, ...(mint ? { mints: { ...c.mints, [itemId]: mint } } : {}) } : c,
+      );
       void qc.invalidateQueries({ queryKey: qk.me, exact: true });
       void qc.invalidateQueries({ queryKey: qk.credits });
     },
+  });
+}
+
+/** PUT /agents/:id/cosmetics/:slot: stores what the agent wears now. */
+export function useEquipCosmetic() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { agentId: string; slot: CosmeticSlot; itemId: string | null }) =>
+      api.equipCosmetic(v.agentId, v.slot, v.itemId),
+    onSuccess: ({ cosmetics }, { agentId }) => {
+      qc.setQueryData<Cosmetics>(qk.cosmetics, (c) =>
+        c ? { ...c, equipped: { ...c.equipped, [agentId]: cosmetics } } : c,
+      );
+    },
+  });
+}
+
+/** POST /cosmetics/:id/mint: mints an owned item as a NEP-245 token. */
+export function useMintCosmetic() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => api.mintCosmetic(itemId),
+    onSettled: () => void qc.invalidateQueries({ queryKey: qk.cosmetics }),
   });
 }
 

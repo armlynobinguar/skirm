@@ -60,6 +60,8 @@ const METHODS: (keyof ApiClient)[] = [
   'seasons',
   'cosmetics',
   'buyCosmetic',
+  'mintCosmetic',
+  'equipCosmetic',
   'quests',
   'claimQuest',
   'achievements',

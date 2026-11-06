@@ -1,7 +1,7 @@
 // Small, valid response objects for tests. Override any field: meFixture({ cosmetics: [] }).
 // Values follow a fresh dev account (contract "New account defaults") and Copper Hollow.
 import { createMatch, frameFor, mapV2, type AgentSpec, type FrameView } from '@skirm/engine/v2';
-import { COSMETICS, SEASON, defaultAppearance, rankTitle } from '@skirm/shared';
+import { COSMETICS, EQUIP_COSMETICS, SEASON, defaultAppearance, rankTitle } from '@skirm/shared';
 import type {
   Agent,
   Cosmetics,
@@ -237,5 +237,13 @@ export function v2LiveMatchFixture(o: Partial<V2LiveMatch> = {}): V2LiveMatch {
 }
 
 export function cosmeticsFixture(o: Partial<Cosmetics> = {}): Cosmetics {
-  return { items: COSMETICS.map((c) => ({ ...c })), owned: [], ...o };
+  return {
+    items: COSMETICS.map((c) => ({ ...c })),
+    owned: [],
+    equip: EQUIP_COSMETICS.map((c) => ({ ...c })),
+    equipped: {},
+    mints: {},
+    onchain: null,
+    ...o,
+  };
 }

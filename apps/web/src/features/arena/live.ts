@@ -1,6 +1,8 @@
 // Live v2 matches as the arena draws them: one crew's frame (or a spectator's whole board) on the
 // map's own arena, under soft fog, with this tick's talk as bubbles.
 import type { Team, V2Frame } from '@skirm/engine/v2';
+import type { AgentCosmetics } from '@skirm/shared';
+import { cosmeticsOf, tintAgents } from './cosmetics';
 import { gearOf } from './gear';
 import { mapById, type Arena, type ArenaState } from './world';
 
@@ -22,6 +24,8 @@ export interface LiveArena {
   barks?: Record<string, LiveBark> | null;
   /** Hybrid control: the agent its player steers (ringed when the camera follows no one). */
   controlled?: string;
+  /** What agents wear (skin, trail, nameplate ids) by agent id; drawn by ./cosmetics. Absent: nobody. */
+  cosmetics?: Record<string, AgentCosmetics>;
 }
 
 /** A line an agent said this tick, drawn as a bubble over it for 2.6 s. */
@@ -98,6 +102,9 @@ export function composeV2Arena(frame: V2Frame): LiveArena | null {
       bone: HEAD[g.team],
     };
   });
+  // Equipped cosmetics (rendering only): the skin's palette on the body, the rest drawn by ./cosmetics.
+  const cosmetics = cosmeticsOf(frame);
+  if (cosmetics) tintAgents(agents as { id: string; c?: string; bone?: string }[], cosmetics);
   const team = frame.view === 'watch' ? undefined : frame.view;
   // Hybrid control: the agent this crew's player steers gets the ring (a watcher sees any steered agent).
   const controlled = frame.agents.find((g) => g.controlled && (!team || g.team === team))?.id;
@@ -116,6 +123,7 @@ export function composeV2Arena(frame: V2Frame): LiveArena | null {
     tick: frame.tick,
     barks: barksOf(frame),
     ...(controlled ? { controlled } : {}),
+    ...(cosmetics ? { cosmetics } : {}),
   };
 }
 
