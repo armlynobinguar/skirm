@@ -3,7 +3,8 @@
 //   N       toggles the design notes (notes.ts).
 //   Escape  closes the top-most thing, in order: an open modal (the @skirm/ui Modal closes itself),
 //           then an escape layer a screen registered with useEscapeLayer (the match-found takeover,
-//           the match intro, third person), then a screen's own Escape handler (it calls
+//           the match intro, third person, and last the live match itself, which only swallows the
+//           key so Escape never leaves a match in play), then a screen's own Escape handler (it calls
 //           preventDefault, e.g. a skill picker or a queue search), and only then goes Back
 //           (screenOf(path).back, the same target as the top bar's Back button).
 // Keys typed into a field, or pressed with Ctrl/Cmd/Alt, are left alone.
@@ -18,7 +19,7 @@ import { matchBack } from '@/lib/match-origin';
 import { config } from '@/lib/config';
 
 /** Escape layers, handled first to last: the first active one takes the key. */
-export const ESCAPE_LAYERS = ['takeover', 'intro', 'tpv'] as const;
+export const ESCAPE_LAYERS = ['takeover', 'intro', 'tpv', 'match'] as const;
 export type EscapeLayer = (typeof ESCAPE_LAYERS)[number];
 
 interface LayerEntry {

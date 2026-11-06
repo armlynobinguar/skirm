@@ -20,6 +20,7 @@
 import { AkIcon, Button, Segmented, type SegmentedOption } from '@skirm/ui';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEscapeLayer } from '@/components/shell/GlobalKeys';
 import { useToast } from '@/components/toast/ToastProvider';
 import type { ChaseCamState } from '@/features/arena/chase3d';
 import { composeV2Arena, liveFx, setLiveFx } from '@/features/arena/live';
@@ -197,6 +198,12 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
     });
   };
 
+  // Escape goes to the shell's escape layers (GlobalKeys): the intro, then third person, and in a live
+  // match it is swallowed, so it never takes the player Back out of a match in play.
+  useEscapeLayer('intro', intro, endIntro);
+  useEscapeLayer('tpv', !!tpv && !intro, exitTpv);
+  useEscapeLayer('match', !watch && !replay && !ended && view.phase === 'live');
+
   // Keys (capture phase, so Esc closes the intro or third person before the shell goes back).
   const keys = useRef<(e: KeyboardEvent) => void>(() => {});
   keys.current = (e: KeyboardEvent) => {
@@ -206,7 +213,10 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
       e.preventDefault();
       e.stopPropagation();
     };
+    // The shell's escape layer already closed the intro or third person with this Escape.
+    const escTaken = e.key === 'Escape' && e.defaultPrevented;
     if (intro) {
+      if (escTaken) return;
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
         take();
         endIntro();
@@ -214,6 +224,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
       return;
     }
     if (e.key === 'Escape' && tpv) {
+      if (escTaken) return;
       take();
       exitTpv();
     } else if (control.onKey(e)) {
