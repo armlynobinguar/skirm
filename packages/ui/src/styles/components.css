@@ -69,6 +69,8 @@ textarea.sk-input { resize: vertical; min-height: 88px; }
 
 /* ---------- Tabs ---------- */
 .sk-tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+/* Phones: tabs wrap onto a second row rather than hiding the last ones off-screen. */
+@media (max-width: 480px) { .sk-tabs { flex-wrap: wrap; overflow-x: visible; } }
 .sk-tab { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 10px var(--space-4); background: none; border: 0; border-radius: 0; color: var(--ink-muted); font: 700 18px/20px var(--font-display); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
 .sk-tab:hover { color: var(--ink); background: var(--chalk-soft); }
 .sk-tab.is-selected { color: var(--ink); }

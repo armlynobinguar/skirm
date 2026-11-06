@@ -14,7 +14,7 @@
 /* Grid + drawer */
 .mk { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 18px; align-items: start; }
 .list { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.drawer { position: sticky; top: 72px; max-height: calc(100dvh - 88px); overflow: auto; overscroll-behavior: contain; padding: 18px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.drawer { position: sticky; top: 72px; max-height: calc(100dvh - 88px); overflow: hidden auto; overscroll-behavior: contain; padding: 18px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .drawer:focus { outline: none; }
 .drawer:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
 .pick { margin: 0; }
@@ -53,6 +53,13 @@
 /* Drawer body (P .drawer) */
 .dr { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .drView { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* Nothing inside the drawer may be wider than it (it never scrolls sideways): forms, selects,
+   the sales table and long ids shrink or wrap instead. */
+.dr > *, .drView > * { min-width: 0; max-width: 100%; }
+.drawer select { min-width: 0; max-width: 100%; }
+.drawer table { table-layout: fixed; width: 100%; }
+.drawer td, .drawer th { overflow-wrap: anywhere; white-space: normal; }
+.drawer code, .drawer dd { overflow-wrap: anywhere; }
 .drTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .rarKick { color: var(--rc); }
 .close { display: grid; place-items: center; flex: none; width: 36px; height: 36px; margin: -6px -6px 0 0; padding: 0; border: 0; color: var(--bone); background: none; box-shadow: inset 0 0 0 1px var(--line-strong); cursor: pointer; }
@@ -74,7 +81,7 @@
 
 /* Proof blocks (P .proof) */
 .proofBox { display: grid; gap: 8px; padding: 12px; box-shadow: inset 0 0 0 1px var(--line); background: rgba(0, 0, 0, .18); min-width: 0; }
-.proofHead { margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font: 700 19px/1.1 var(--font-display); letter-spacing: .04em; text-transform: uppercase; color: var(--bone); }
+.proofHead { margin: 0; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 8px; font: 700 19px/1.1 var(--font-display); letter-spacing: .04em; text-transform: uppercase; color: var(--bone); }
 .proofHead small { font: 400 10px/14px var(--font-mono); letter-spacing: .12em; color: var(--muted); text-align: right; }
 .proofBox p { margin: 0; font-size: 13px; color: var(--muted); }
 
@@ -97,7 +104,7 @@
 
 /* Wide screens: the page fits the viewport (under the top bar and the main column's padding) and
    only the card grid and the drawer scroll, so the head, the filters and the drawer stay in view. */
-@media (min-width: 761px) {
+@media (min-width: 761px) and (min-height: 700px) {
   .page { height: calc(100dvh - 128px); min-height: 520px; }
   .mk { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
   .list { min-height: 0; }
@@ -105,7 +112,7 @@
   .drawer { position: static; align-self: start; max-height: 100%; }
 }
 /* The top bar takes a second row for the tabs here. */
-@media (min-width: 761px) and (max-width: 1040px) { .page { height: calc(100dvh - 172px); } }
+@media (min-width: 761px) and (max-width: 1040px) and (min-height: 700px) { .page { height: calc(100dvh - 172px); } }
 
 @media (max-width: 1180px) {
   .mk { grid-template-columns: minmax(0, 1fr) minmax(0, 360px); }
