@@ -54,7 +54,7 @@ import type { Logger, RegistryQueue } from '../deps';
 import { Matchmaker, type Lane, type QueueEntry } from '../matchmaker';
 import type { WsServerMessage } from '../protocol';
 import type { PubSub, Unsubscribe } from '../pubsub';
-import type { QueueTiming, Scheduler } from '../timing';
+import { sleep, type QueueTiming, type Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
 import { ExternalBrain, isExternalBrain, type WebhookPost } from './external';
 import { DEFAULT_V2_TIMING, TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2ControlError, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Playbook, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
@@ -941,10 +941,15 @@ export class V2Hub {
   private async finish(end: V2MatchEnd, match: V2Match): Promise<V2Finish> {
     const { log } = this.deps;
     const out: V2Finish = { eloDelta: {}, registry: null };
-    const row = await this.record(end, match).catch((err: unknown) => {
-      log.error(`v2 match ${end.matchId}: record failed: ${(err as Error).message}`);
-      return null;
-    });
+    const row = await this.recordRetrying(end, match);
+    // A result is announced only once it is stored: a row that could not be written (or that was
+    // voided meanwhile) would show a win the sweep then voids, so v2_end goes out void instead.
+    if (end.result && row?.status !== 'ended') {
+      log.error(`v2 match ${end.matchId}: result not stored (${row ? `row is ${row.status}` : 'record failed'}), ending it void`);
+      this.campaignMatches.delete(end.matchId);
+      await this.recordExternal(end.matchId, match);
+      return { ...out, unrecorded: true };
+    }
     if (row) for (const d of row.eloDeltas ?? []) out.eloDelta[d.team] = d.delta;
     // The decision timelines, before v2_end goes out, so the debrief can ask for them at once.
     if (row?.status === 'ended')
@@ -1010,6 +1015,21 @@ export class V2Hub {
       }
   }
 
+  /** record(), retried a few times (a transient DB error must not cost a player their result); null when it never succeeded. */
+  private async recordRetrying(end: V2MatchEnd, match: V2Match): Promise<V2MatchRow | null> {
+    const { log } = this.deps;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.record(end, match);
+      } catch (err) {
+        log.error(`v2 match ${end.matchId}: record failed (attempt ${attempt + 1} of ${RECORD_RETRY_MS.length + 1}): ${(err as Error).message}`);
+        const wait = RECORD_RETRY_MS[attempt];
+        if (wait === undefined) return null;
+        await sleep(this.deps.scheduler, wait);
+      }
+    }
+  }
+
   private async record(end: V2MatchEnd, match: V2Match) {
     const r = end.result;
     const { sides } = match.setup;
@@ -1068,6 +1088,9 @@ export class V2Hub {
     return voided;
   }
 }
+
+/** Waits between attempts to store a match result (so three attempts in all). */
+export const RECORD_RETRY_MS = [250, 1_000];
 
 /** A live match whose last heartbeat is older than this is treated as orphaned. */
 export const HEARTBEAT_STALE_MS = 3 * 60_000;
