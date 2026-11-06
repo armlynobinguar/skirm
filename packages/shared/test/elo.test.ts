@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyElo, crewRating, eloDelta, expectedScore, kFactor, updateMatch } from '../src/index';
+import { applyElo, clampEloDelta, crewRating, eloDelta, expectedScore, kFactor, updateMatch } from '../src/index';
 
 describe('§7 Elo', () => {
   it('E_A = 0.360 for 1,200 vs 1,300', () => {
@@ -87,5 +87,16 @@ describe('§7 Elo', () => {
       0,
     );
     expect(low.a[0]).toEqual({ before: 110, delta: -10, after: 100 });
+  });
+
+  it('clamps a placement delta to the registry bound of ±32', () => {
+    // 48 × (1 − E) for a 1,200 underdog beating 1,600 is 48 × 0.909 = 43.6 → would be +44.
+    expect(eloDelta(1200, 1600, 1, 48)).toBe(44);
+    const r = updateMatch([{ rating: 1200, rankedMatches: 0 }], [{ rating: 1600, rankedMatches: 0 }], 1);
+    expect(r.a[0]).toEqual({ before: 1200, delta: 32, after: 1232 });
+    expect(r.b[0]).toEqual({ before: 1600, delta: -32, after: 1568 });
+    for (const x of [...r.a, ...r.b]) expect(Math.abs(x.delta)).toBeLessThanOrEqual(32);
+    expect(clampEloDelta(-44)).toBe(-32);
+    expect(clampEloDelta(20)).toBe(20);
   });
 });

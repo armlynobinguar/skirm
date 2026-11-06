@@ -5,10 +5,11 @@
 //! its storage from its own balance (arch.md, Secrets and keys; Open questions: storage).
 //!
 //! * `record_match` stores a v2 match (`MatchRecordV2`). For a ranked match with a result it
-//!   applies the Elo change per player computed by the backend (Formulas §7: start 1,200, K 32
-//!   then 16, floor 100) and, when the match belongs to a season, the season points (win 25, draw
-//!   12, loss 5) in the same write. The contract enforces the floor, `|delta| ≤ 32`, and that
-//!   winners do not lose and losers do not gain rating. Unranked and void matches carry no Elo.
+//!   applies the Elo change per player computed by the backend (Formulas §7: start 1,200, K 48
+//!   placement, 32, then 16, clamped by the backend to ±32, floor 100) and, when the match
+//!   belongs to a season, the season points (win 25, draw 12, loss 5) in the same write. The
+//!   contract enforces the floor, `|delta| ≤ 32`, and that winners do not lose and losers do not
+//!   gain rating. Unranked and void matches carry no Elo.
 //! * The write is idempotent: re-sending the same record (the worker retries the write as its own
 //!   job) returns the stored record; a different record under the same id is rejected.
 
