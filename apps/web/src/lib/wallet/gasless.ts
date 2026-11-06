@@ -16,7 +16,19 @@
 // pay twice.
 import { ApiError } from '../api/errors';
 import type { RelayResponse, RelayStatus } from '../api/types';
+import { config } from '../config';
 import { WalletError, isWalletError, type NearTransaction, type NearWallet } from './types';
+
+/**
+ * What the api's relayer pays for (apps/api/src/relay.ts allowedMethods): anything else (a delist,
+ * a backing stake) goes straight to the usual transaction, so the player is never asked to sign a
+ * delegate the relayer will refuse and then asked again.
+ */
+export function relayable(tx: NearTransaction, c: { deposits: string; market: string; skills: string } = config.near.contracts): boolean {
+  const allowed: Record<string, readonly string[]> = { [c.deposits]: ['deposit'], [c.market]: ['buy', 'rent'], [c.skills]: ['nft_approve'] };
+  const methods = allowed[tx.receiverId];
+  return !!methods && tx.actions.length > 0 && tx.actions.every((a) => a.type === 'FunctionCall' && methods.includes(a.params.methodName));
+}
 
 export interface RelayApi {
   relayStatus(): Promise<RelayStatus>;
@@ -51,7 +63,7 @@ async function gaslessAvailable(wallet: NearWallet, api: RelayApi): Promise<bool
  * be signed in as the linked account (useNearSigner checks that first).
  */
 export async function sendTransaction(wallet: NearWallet, api: RelayApi, tx: NearTransaction): Promise<SentTransaction> {
-  if (await gaslessAvailable(wallet, api)) {
+  if (relayable(tx) && (await gaslessAvailable(wallet, api))) {
     let signed: string | null = null;
     try {
       signed = await wallet.signDelegateAction!(tx);
