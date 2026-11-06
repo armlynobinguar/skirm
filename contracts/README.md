@@ -1,6 +1,7 @@
 # skirm NEAR contracts
 
-Rust contracts (near-sdk 5.29, near-contract-standards 5.29) for the MVP onchain systems in arch.md
+Rust contracts (near-sdk 5.29, near-contract-standards 5.29) for skirm's onchain systems (skill NFTs,
+the skill market, match registry, credit top-ups, writer backing and badges)
 and the season prize pools. The stretch `pool` contract is not included.
 
 | Crate | Account (testnet) | What it does |
@@ -51,7 +52,8 @@ cargo test                                                   # unit tests, every
 ```
 
 The unit tests use near-sdk `unit-testing` and `testing_env!`. They cover every method,
-access control, Formulas §6 arithmetic and the market callback outcomes:
+access control, the sale-split arithmetic (fee + royalty + seller = price) and the market callback
+outcomes:
 
 * 5 NEAR resale gives a 0.25 fee, 0.25 royalty and 4.5 to the seller. A 5 NEAR primary sale
   gives a 0.25 fee, 0 royalty and 4.75 to the creator.
@@ -197,7 +199,8 @@ attached, so a function-call key cannot make it.
 | `skill_info(token_id)`, `skill_token(skill_id, version)`, `is_account_bound(skill_id)`, `get_config()` | view | | |
 | `set_ops`, `set_owner`, `set_account_bound(skill_id, bound)` | owner | 1 yocto | |
 
-`skill` is the public part of `skirm.skill/v0` (Spec §9), validated on chain:
+`skill` is the public part of `skirm.skill/v0` (`SkillPublic` in packages/shared/src/types.ts),
+validated on chain:
 
 * `id`: `skl_` + 26-char ULID.
 * `version` ≥ 1.
@@ -215,11 +218,11 @@ Token id is `<skill id>:<version>`. Token metadata:
 * `title` = name, `description` = summary, `issued_at` = created_at, `copies` = 1.
 * `extra` = JSON
   `{"schema":"skirm.skill/v0","id","version","creator","royalty_bps","prompt_sha256","requires_actions","handles_tags"}`.
-  Tag and action lists are stored in spec order.
+  Tag and action lists are stored in canonical order (`TAGS`, `GATED_ACTIONS` in skills/src/lib.rs).
 
 The creator of a skill id is fixed by its first minted version. The prompt is never on chain.
 
-Payout (Formulas §6): the owner gets `balance − royalty`, with `royalty = floor(balance × royalty_bps / 10^4)`
+Payout: the owner gets `balance − royalty`, with `royalty = floor(balance × royalty_bps / 10^4)`
 going to the creator. On the creator's own (primary) sale the royalty is 0.
 
 ### market
@@ -311,7 +314,7 @@ Ratings are per player.
 | `fund(season_id?)` → `U128` | anyone (the market) | the amount | Adds the deposit to the given or current `Open` season. Panics when no season is open |
 | `lock_season(id)` | owner or ops | | Once block time ≥ `ends_at_ms` |
 | `post_standings(id, standings: [{player, near?, points}])` | owner or ops | | `Locked` seasons only, at most 10 rows, rank = index + 1. Identical retry is a no-op; different data panics |
-| `claim(id)` | the standing's `near` account | | Once per standing; transfers the share |
+| `claim(id)` | the standing's `near` account | | Once per standing; transfers the share. If the transfer fails, the private callback `on_prize_transferred` makes the share claimable again (or adds it to the carry if the season was closed meanwhile); the result is the amount sent, or 0 |
 | `close_season(id)` | owner or ops | | `Locked` with standings: unclaimed shares go to the carry, status becomes `Paid` |
 | `get_season`, `current_season`, `get_config`, `get_carry` | view | | |
 | `set_ops`, `set_owner` | owner | 1 yocto | |
@@ -345,7 +348,7 @@ ops function-call key for `nft_mint`; nothing deploys it yet.
 | --- | --- | --- | --- |
 | `new(owner_id, treasury_id, min_deposit?)` | deployer | | `min_deposit` default 0.01 NEAR |
 | `deposit()` → receipt number | player wallet | ≥ min | Logs the event below |
-| `withdraw(amount?)` | owner | 1 yocto | Sends to the treasury; keeps storage cost + 0.1 NEAR on the contract |
+| `withdraw(amount?)` | owner | 1 yocto | Sends to the treasury; keeps storage cost + 0.1 NEAR on the contract. The private callback `on_withdrawn` emits `withdraw` on success, or reverts `total_withdrawn` and emits `withdraw_failed` |
 | `get_deposit(receipt)`, `total_deposited_by(account_id)`, `withdrawable()`, `get_config()` | view | | |
 | `set_treasury`, `set_min_deposit`, `set_owner` | owner | 1 yocto | |
 
@@ -381,8 +384,8 @@ needs no ops key (every call is signed by a player's wallet).
 | `nep171` | `nft_mint`, `nft_transfer` (emitted by skills; badges emits `nft_mint` only, memo `soulbound`) |
 | `skirm_market` | `list` (listing), `delist`, `update_price`, `sale` `{token_id, seller, buyer, price, fee, fee_bps, season_share, treasury_share, royalties{account: amount}, seller_proceeds, refund, payout_fallback}`, `purchase_failed` `{token_id, seller, buyer, refund}`, `rental` `{rental_id, owner, renter, price, fee, fee_bps, season_share, treasury_share, owner_proceeds, refund}`, `season_share_forwarded` `{amount, treasury_id, season_pool_id}`, `fee_proposed` `{old_bps, new_bps, effective_at_ms, by}`, `fee_updated` `{old_bps, new_bps, by}`, `treasury_updated` / `owner_updated` / `governance_updated` / `season_pool_updated` `{old, new, by}` |
 | `skirm_registry` | `match_recorded` (MatchRecordV2) |
-| `skirm_seasons` | `season_opened`, `season_funded`, `season_locked`, `standings_posted`, `prize_claimed`, `season_closed`, `carry_rolled`, `ops_updated`, `owner_updated` |
-| `skirm_deposits` | `deposit` `{receipt, player, amount, block_height, timestamp_ms}`, `withdraw` `{treasury, amount}` |
+| `skirm_seasons` | `season_opened`, `season_funded`, `season_locked`, `standings_posted`, `prize_claimed` (after the transfer succeeded), `prize_transfer_failed`, `season_closed`, `carry_rolled`, `ops_updated`, `owner_updated` |
+| `skirm_deposits` | `deposit` `{receipt, player, amount, block_height, timestamp_ms}`, `withdraw` `{treasury, amount}` (after the transfer succeeded), `withdraw_failed` `{treasury, amount}` |
 | `skirm_backing` | `round_opened` (Round), `backed` `{round_id, backer, amount, stake, raised}`, `round_closed` `{round_id, writer, raised, backers}`, `round_cancelled` `{round_id, writer, raised}`, `royalty_distributed` `{round_id, from, amount, to_backers, to_writer, backers_earned, capped}`, `claimed` `{round_id, backer, amount, claimed}`, `refunded` `{round_id, backer, amount}` |
 
 A deposit event looks like

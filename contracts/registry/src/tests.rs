@@ -167,7 +167,7 @@ fn enums_serialize_as_spec_strings() {
 
 #[test]
 fn record_match_applies_formulas_worked_example() {
-    // Formulas §7: a new player (1,200) beats a 1,300 player with K = 32: +21 -> 1,221.
+    // Elo (packages/shared/src/elo.ts): a new player (1,200) beats a 1,300 player with K = 32: +21 -> 1,221.
     let mut c = setup();
     c.ratings
         .insert(s("jev.testnet"), rating(1300, 25, 15, 10, 0));

@@ -390,6 +390,8 @@ async fn deposit_logs_event_and_owner_withdraws() -> anyhow::Result<()> {
         .call(env.deposits.id(), "withdraw")
         .args_json(json!({ "amount": near(2).to_string() }))
         .deposit(NearToken::from_yoctonear(1))
+        // The transfer plus the on_withdrawn callback need more than the 10 TGas default.
+        .gas(Gas::from_tgas(30))
         .transact()
         .await?
         .into_result()?;
@@ -397,8 +399,8 @@ async fn deposit_logs_event_and_owner_withdraws() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Measures the storage each platform write costs the paying contract (arch.md open question:
-/// how much NEAR `skills` and `registry` need). 1 byte = 10^19 yoctoNEAR.
+/// Measures the storage each platform write costs the paying contract (to size how much
+/// NEAR `skills` and `registry` need). 1 byte = 10^19 yoctoNEAR.
 #[tokio::test]
 async fn storage_cost_per_platform_write() -> anyhow::Result<()> {
     let env = setup().await?;

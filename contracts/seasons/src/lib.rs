@@ -12,7 +12,9 @@
 //! * `post_standings`: up to 10 rows; rank = index + 1; place i gets
 //!   `floor(pool · SPLIT_BPS[i] / 10^4)`. Shares of places without a NEAR account, empty places
 //!   and the rounding dust go to the carry. An identical retry is a no-op.
-//! * `claim`: pull payout. The winner's NEAR account claims its share once.
+//! * `claim`: pull payout. The winner's NEAR account claims its share once. If the transfer
+//!   fails, `on_prize_transferred` marks the share unclaimed again (or adds it to the carry when
+//!   the season was closed meanwhile), so a failed transfer never strands NEAR.
 //! * `close_season`: unclaimed shares go to the carry and the season is paid.
 //!
 //! The ops writes are idempotent so the worker can retry a write whose response was lost:
@@ -24,8 +26,8 @@ use near_sdk::json_types::U128;
 use near_sdk::serde_json::{self, json};
 use near_sdk::store::LookupMap;
 use near_sdk::{
-    assert_one_yocto, env, near, require, AccountId, BorshStorageKey, NearToken, PanicOnDefault,
-    Promise,
+    assert_one_yocto, env, near, require, AccountId, BorshStorageKey, Gas, NearToken,
+    PanicOnDefault, Promise, PromiseError,
 };
 
 pub const BPS_DENOMINATOR: u128 = 10_000;
@@ -35,6 +37,8 @@ pub const MAX_STANDINGS: usize = SPLIT_BPS.len();
 pub const MAX_NAME_LEN: usize = 64;
 pub const MAX_ID_LEN: usize = 64;
 pub const EVENT_STANDARD: &str = "skirm_seasons";
+/// Gas reserved for `on_prize_transferred`, the callback of a prize transfer.
+pub const GAS_FOR_ON_PRIZE_TRANSFERRED: Gas = Gas::from_tgas(10);
 
 /// `floor(amount · bps / 10^4)` without overflowing u128 (same as the market contract).
 pub fn bps_of(amount: u128, bps: u16) -> u128 {
@@ -345,9 +349,11 @@ impl Contract {
         season
     }
 
-    /// The caller's NEAR account claims its prize of a locked season, once. Returns the amount
-    /// sent.
-    pub fn claim(&mut self, id: u32) -> U128 {
+    /// The caller's NEAR account claims its prize of a locked season, once. The share is marked
+    /// claimed before the transfer so it cannot be claimed twice while the transfer is in flight;
+    /// `on_prize_transferred` undoes that if the transfer fails. The transaction's result is the
+    /// callback's: the amount sent, or 0 when the transfer failed.
+    pub fn claim(&mut self, id: u32) -> Promise {
         let mut season = self.expect_season(id);
         require!(
             season.status == SeasonStatus::Locked && season.standings_posted,
@@ -364,24 +370,83 @@ impl Contract {
         let amount = standing.share.0;
         require!(amount > 0, "Nothing to claim");
         standing.claimed = true;
-        let (rank, player) = (standing.rank, standing.player.clone());
+        let rank = standing.rank;
         season.paid_total = U128(season.paid_total.0 + amount);
         self.seasons.insert(id, season);
 
         Promise::new(who.clone())
             .transfer(NearToken::from_yoctonear(amount))
-            .detach();
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_ON_PRIZE_TRANSFERRED)
+                    .on_prize_transferred(id, rank, who, U128(amount)),
+            )
+    }
+
+    /// Callback of the prize transfer started by `claim`. On success emits `prize_claimed` and
+    /// returns the amount. A failed transfer refunds the NEAR to this contract: the share is
+    /// marked unclaimed again so the winner can retry, or, when the season was closed in the
+    /// meantime (`close_season` counted the share as claimed), it goes to the carry. Emits
+    /// `prize_transfer_failed` and returns 0 then.
+    #[private]
+    pub fn on_prize_transferred(
+        &mut self,
+        id: u32,
+        rank: u32,
+        near: AccountId,
+        amount: U128,
+    ) -> U128 {
+        // Same check as #[private]; repeated in the body so unit tests exercise it.
+        require!(
+            env::predecessor_account_id() == env::current_account_id(),
+            "Method on_prize_transferred is private"
+        );
+        let mut season = self.expect_season(id);
+        // rank = index + 1 (see post_standings).
+        let i = (rank as usize).saturating_sub(1);
+        require!(
+            rank >= 1 && season.standings.get(i).and_then(|s| s.near.as_ref()) == Some(&near),
+            "Standing not found"
+        );
+        // A transfer returns no data; only a failed transfer is an error.
+        let failed = matches!(
+            env::promise_result_checked(0, 0),
+            Err(PromiseError::Failed)
+        );
+        let player = season.standings[i].player.clone();
+        if !failed {
+            emit_event(
+                "prize_claimed",
+                json!({
+                    "season_id": id,
+                    "rank": rank,
+                    "player": player,
+                    "near": near,
+                    "amount": amount,
+                }),
+            );
+            return amount;
+        }
+        let to_carry = season.status == SeasonStatus::Paid;
+        if to_carry {
+            self.carry += amount.0;
+        }
+        season.standings[i].claimed = false;
+        season.paid_total = U128(season.paid_total.0.saturating_sub(amount.0));
+        self.seasons.insert(id, season);
         emit_event(
-            "prize_claimed",
+            "prize_transfer_failed",
             json!({
                 "season_id": id,
                 "rank": rank,
                 "player": player,
-                "near": who,
-                "amount": U128(amount),
+                "near": near,
+                "amount": amount,
+                "to_carry": to_carry,
+                "carry": U128(self.carry),
             }),
         );
-        U128(amount)
+        U128(0)
     }
 
     /// Close a locked season with posted standings. Owner or ops. Unclaimed shares go to the

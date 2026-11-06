@@ -115,7 +115,7 @@ fn event(name: &str) -> serde_json::Value {
     v["data"][0].clone()
 }
 
-// ---------- settlement arithmetic (Formulas §6) ----------
+// ---------- settlement arithmetic ----------
 
 #[test]
 fn resale_of_5_near_pays_fee_025_royalty_025_seller_45() {

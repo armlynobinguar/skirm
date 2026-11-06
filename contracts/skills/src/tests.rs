@@ -424,7 +424,7 @@ fn bad_created_at_rejected() {
     expect_invalid(|s| s.created_at = "3 Nov 2026".into());
 }
 
-// ---------- NEP-199 payout arithmetic (Formulas §6) ----------
+// ---------- NEP-199 payout arithmetic ----------
 
 #[test]
 fn bps_math_is_floor_and_overflow_safe() {
