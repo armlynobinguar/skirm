@@ -118,6 +118,7 @@ const METHODS: (keyof ApiClient)[] = [
   'publishCommunityMap',
   'testPlayMap',
   'likeCommunityMap',
+  'v2Models',
   'backingConfig',
   'backingRounds',
   'backingRound',

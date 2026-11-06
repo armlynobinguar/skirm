@@ -2,7 +2,7 @@
 // Every method returns the parsed JSON body or throws an ApiError (./errors.ts).
 // Credentials are read per request from the CredentialsStore, so signing in or out needs no new
 // client. In components use `useApi()` (src/lib/providers.tsx), never construct one.
-import type { TraitId } from '@skirm/shared';
+import type { ModelChoice, TraitId } from '@skirm/shared';
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
@@ -281,6 +281,9 @@ export interface ApiClient {
   testPlayMap(map: MapDefV2): Promise<TestPlayResult>;
   likeCommunityMap(id: string, on: boolean): Promise<{ likes: number; liked: boolean }>;
 
+  /** GET /v2/models: the models a crew may pick per agent outside ranked, the default first at 1.0x. */
+  v2Models(): Promise<{ default: string; models: ModelChoice[] }>;
+
   /** GET /backing/config: where backing money moves (near, credits or off) and the limits. */
   backingConfig(): Promise<BackingConfig>;
   /** GET /backing/rounds: by writer handle, skill (its writer's all-skill rounds too) or status. */
@@ -498,6 +501,8 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     publishCommunityMap: (id) => json('POST', `/community-maps/${enc(id)}/publish`),
     testPlayMap: (map) => json('POST', '/community-maps/test-play', { body: { map } }),
     likeCommunityMap: (id, on) => json(on ? 'POST' : 'DELETE', `/community-maps/${enc(id)}/like`),
+
+    v2Models: () => get('/v2/models'),
 
     backingConfig: () => get('/backing/config'),
     backingRounds: (q = {}) => get('/backing/rounds', q),

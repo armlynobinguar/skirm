@@ -11,10 +11,10 @@ const WICK = agentFixture({ id: 'agt_wick', name: 'Wick', role: 'Builder', visio
 const MOSS = agentFixture({ id: 'agt_moss', name: 'Moss', role: 'Runner', vision: 3, comms: 3, tier: 'open', skills: [{ id: 'skl_bought', version: 5, name: 'Clean Sweep' }] });
 const ROOK = agentFixture({ id: 'agt_rook', name: 'Rook', role: 'Scout', vision: 5, comms: 4, tier: 'quiet' });
 
-function setup({ ranked = false, crewLimit, difficulty }: { ranked?: boolean; crewLimit?: number; difficulty?: 'hard' | 'mega' } = {}) {
+function setup({ ranked = false, crewLimit, difficulty, wickModel }: { ranked?: boolean; crewLimit?: number; difficulty?: 'hard' | 'mega'; wickModel?: { model: string; rateBps: number } } = {}) {
   const rt = new FakeRealtime();
   v2StoreFor(rt).queued = [
-    { agentId: WICK.id, name: 'Wick', tier: 'standard' },
+    { agentId: WICK.id, name: 'Wick', tier: 'standard', ...wickModel },
     { agentId: MOSS.id, name: 'Moss', tier: 'open' },
   ];
   const r = renderWithProviders(<V2MatchScreen matchId="mat_lk" />, {
@@ -82,6 +82,17 @@ describe('v2 lock-in', () => {
       },
     ]);
     expect(screen.getByTestId('v2-lockin')).toHaveTextContent('Locked · waiting for the rival');
+  });
+
+  it('prices an agent queued with a catalog model, and keeps its model on a crew change', async () => {
+    const { rt, user } = setup({ wickModel: { model: 'x/big', rateBps: 15000 } });
+    await screen.findByTestId(`v2-card-${WICK.id}`);
+    // Wick Standard × 1.5 = 0.30, Moss Open 0.40: 150 × 0.70 = 105.
+    expect(screen.getByTestId('v2-hold')).toHaveTextContent('Hold 105 credits · 0.70 per tick');
+    expect(screen.getByTestId('v2-lockin')).toHaveTextContent('150 ticks × (0.30 + 0.40) credits per tick');
+    await user.click(screen.getByRole('button', { name: 'Remove Moss' }));
+    await user.click(screen.getByTestId('v2-lock'));
+    expect(rt.sentOf('v2_lock_in')[0]!.crew).toEqual([{ agentId: WICK.id, tier: 'standard', model: 'x/big' }]);
   });
 
   it('keeps the crew limit and at least one agent', async () => {

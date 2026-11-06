@@ -1,9 +1,10 @@
 'use client';
 // The crew pieces the casual crew screen (/maps/[mapId]/crew) and the match lock-in share, from the
 // prototype's #s-crew: one card per agent (portrait, role icon, verb fit on the map, skill, vision and
-// comms pips, voice, talk tier), the empty "Add agent" slot, the roster strip, the credit estimate,
-// the difficulty picker and the goal box.
-import { TICK_MS, type TalkTier } from '@skirm/engine/v2';
+// comms pips, voice, talk tier and, when the operator offers several, the model), the empty "Add
+// agent" slot, the roster strip, the credit estimate, the difficulty picker and the goal box.
+import { TICK_MS, agentRatePer100, type TalkTier } from '@skirm/engine/v2';
+import { fmtMultiplier, type ModelChoice } from '@skirm/shared';
 import { Pips, fmt } from '@skirm/ui';
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
@@ -75,6 +76,50 @@ export function TalkTierPicker({
   );
 }
 
+/**
+ * The model one agent acts with, from the operator's catalog (GET /v2/models), with what it does to
+ * the agent's rate. Ranked plays the default model only. The server prices the pick; this is display.
+ */
+export function ModelPicker({
+  name,
+  models,
+  value,
+  tier,
+  ranked,
+  disabled,
+  onChange,
+}: {
+  name: string;
+  models: readonly ModelChoice[];
+  value: string;
+  tier: TalkTier;
+  ranked: boolean;
+  disabled?: boolean;
+  onChange?: (id: string) => void;
+}) {
+  const current = (ranked ? undefined : models.find((m) => m.id === value)) ?? models[0]!;
+  const rate = agentRatePer100({ tier, rateBps: current.rateMultiplierBps }, ranked) / 100;
+  return (
+    <div className={c.talk}>
+      <span className="sk-kick">Model</span>
+      <select
+        className={c.model}
+        aria-label={`Model for ${name}`}
+        value={current.id}
+        disabled={disabled || ranked || !onChange}
+        onChange={(e) => onChange?.(e.target.value)}
+      >
+        {models.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.label} · {fmtMultiplier(m.rateMultiplierBps)}
+          </option>
+        ))}
+      </select>
+      <small className={c.modelRate}>{ranked ? 'Ranked plays the default model' : `${fmtRate(rate)} credits per tick`}</small>
+    </div>
+  );
+}
+
 export interface CrewCardProps {
   /** The agent's name (known even before /me loads, from the queued crew). */
   name: string;
@@ -88,6 +133,8 @@ export interface CrewCardProps {
   /** The equipped skill is the player's own (its prompt is readable); null while unknown. */
   skillMine?: boolean | null;
   onTier: (t: TalkTier) => void;
+  /** The model choice, shown only when the catalog offers more than one (no onChange: read-only). */
+  model?: { models: readonly ModelChoice[]; value: string; onChange?: (id: string) => void };
   /** Omit for no remove button. */
   onRemove?: () => void;
   /** The agent editor, when leaving this screen is safe. */
@@ -97,7 +144,7 @@ export interface CrewCardProps {
 }
 
 /** One agent of the crew, the prototype's `.op` card. */
-export function CrewCard({ name, agent, map, tier, ranked, disabled, skillMine, onTier, onRemove, editHref, index, 'data-testid': testId }: CrewCardProps) {
+export function CrewCard({ name, agent, map, tier, ranked, disabled, skillMine, onTier, model, onRemove, editHref, index, 'data-testid': testId }: CrewCardProps) {
   const role = agent ? agentRole(agent) : null;
   const fit = role ? verbFit(role, map) : null;
   const colour = agent ? agentColour(agent) : 'var(--you)';
@@ -166,6 +213,9 @@ export function CrewCard({ name, agent, map, tier, ranked, disabled, skillMine, 
           <span className="sk-kick">Talk tier</span>
           <TalkTierPicker name={name} value={tier} ranked={ranked} disabled={disabled} onChange={onTier} />
         </div>
+        {model && model.models.length > 1 ? (
+          <ModelPicker name={name} models={model.models} value={model.value} tier={tier} ranked={ranked} disabled={disabled} {...(model.onChange ? { onChange: model.onChange } : {})} />
+        ) : null}
       </div>
     </div>
   );
