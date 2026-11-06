@@ -1,13 +1,15 @@
 'use client';
-// HUD top bar (v2 Arena look, the prototype's #top). There is no bar: Back, logo, the section tabs
-// and the SFX and Notes toggles are separate chips floating over the arena, in three groups. Tabs
-// carry a code-drawn icon (AkIcon) and a serial code (PLY·01 to LDR·05). Groups: Back, logo and a
-// crumb naming the screen; the nav; and the toggles with the account badge last (AccountDock.tsx:
-// handle and credits; a click opens the card with network, credits, wallet and Elo). Every screen
-// except S01 renders it via AppShell.
+// HUD top bar (v2 Arena look, the prototype's #top). Back, logo, the section tabs and the SFX and
+// Notes toggles are separate chips over the arena, in three groups, on a dark glass band so scrolled
+// content never shows through behind them. Tabs carry a code-drawn icon (AkIcon) and a serial code
+// (PLY·01 to LDR·05). Groups: Back, logo and a crumb naming the screen; the nav; and the toggles with
+// the account badge last (AccountDock.tsx: handle and credits; a click opens the card with network,
+// credits, wallet and Elo). Under 720px the five tabs fold into a Menu button that drops them as a
+// list, and the toggles show their icon only. Every screen except S01 renders it via AppShell.
 import { AkIcon, Logo, type AkIconName } from '@skirm/ui';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { usePreferences } from '@/lib/preferences';
 import { navGroupOf, routes, screenOf, type NavGroup } from '@/lib/routes';
 import { sfxEngine, useSfx } from '@/lib/sfx';
@@ -32,6 +34,30 @@ export function TopBar() {
   const { prefs, set } = usePreferences();
   const sfx = useSfx();
   const notesOpen = useNotesOpen();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRoot = useRef<HTMLDivElement>(null);
+  const activeLabel = NAV.find((n) => n.id === active)?.label;
+
+  // The narrow-screen menu closes on navigation, on Escape and on a press outside it.
+  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      // Taken here, like the account card, so Escape does not also go Back (GlobalKeys).
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      e.preventDefault();
+      setMenuOpen(false);
+    };
+    const onDown = (e: PointerEvent) => {
+      if (menuRoot.current && !menuRoot.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onDown);
+    };
+  }, [menuOpen]);
 
   return (
     <header className="app-topbar" data-testid="topbar">
@@ -60,31 +86,52 @@ export function TopBar() {
           </span>
         ) : null}
       </div>
-      <nav aria-label="Main" className="app-topbar-grp app-topbar-nav">
-        {NAV.map((item) => (
-          <Link
-            key={item.id}
-            href={item.href}
-            className="app-topbar-link app-topbar-chip"
-            data-testid={`nav-${item.id}`}
-            {...(active === item.id ? { 'aria-current': 'page' as const } : {})}
-          >
-            <span className="sk-ni">
-              <AkIcon name={item.icon} />
-            </span>
-            <span>{item.label}</span>
-            <i className="app-topbar-serial" aria-hidden="true">
-              {item.serial}
-            </i>
-          </Link>
-        ))}
-      </nav>
+      <div className="app-topbar-navwrap" ref={menuRoot}>
+        <button
+          type="button"
+          className="app-topbar-menu app-topbar-chip"
+          aria-expanded={menuOpen}
+          aria-controls="app-topbar-nav"
+          aria-label={activeLabel ? `Menu, now on ${activeLabel}` : 'Menu'}
+          data-testid="topbar-menu"
+          onClick={() => {
+            sfx.play('click');
+            setMenuOpen((o) => !o);
+          }}
+        >
+          <svg viewBox="0 0 18 14" width="18" height="14" aria-hidden="true">
+            <path d={menuOpen ? 'M3 1l12 12M15 1L3 13' : 'M1 1h16M1 7h16M1 13h16'} stroke="currentColor" strokeWidth="2" fill="none" />
+          </svg>
+          <span>{activeLabel ?? 'Menu'}</span>
+        </button>
+        <nav aria-label="Main" id="app-topbar-nav" className="app-topbar-grp app-topbar-nav" data-open={menuOpen ? '' : undefined}>
+          {NAV.map((item) => (
+            <Link
+              key={item.id}
+              href={item.href}
+              className="app-topbar-link app-topbar-chip"
+              data-testid={`nav-${item.id}`}
+              onClick={() => setMenuOpen(false)}
+              {...(active === item.id ? { 'aria-current': 'page' as const } : {})}
+            >
+              <span className="sk-ni">
+                <AkIcon name={item.icon} />
+              </span>
+              <span>{item.label}</span>
+              <i className="app-topbar-serial" aria-hidden="true">
+                {item.serial}
+              </i>
+            </Link>
+          ))}
+        </nav>
+      </div>
       <div className="app-topbar-grp app-topbar-right">
         <button
           type="button"
           className="app-topbar-toggle app-topbar-chip"
           aria-pressed={prefs.sfx}
-          title="Sound effects"
+          aria-label="Sound effects"
+          title={prefs.sfx ? 'Sound effects: on' : 'Sound effects: off'}
           data-testid="topbar-sfx"
           onClick={() => {
             // Confirm with a click when turning sound on; turning it off is silent.
@@ -93,13 +140,14 @@ export function TopBar() {
           }}
         >
           <AkIcon name="sfx" />
-          SFX
+          <span className="app-topbar-toggle-label">SFX</span>
         </button>
         {config.designNotes ? (
           <button
             type="button"
-            className="app-topbar-toggle app-topbar-chip"
+            className="app-topbar-toggle app-topbar-notes app-topbar-chip"
             aria-pressed={notesOpen}
+            aria-label="Design notes"
             title="Design notes (N)"
             data-testid="topbar-notes"
             onClick={() => {
@@ -108,7 +156,7 @@ export function TopBar() {
             }}
           >
             <AkIcon name="notes" />
-            Notes
+            <span className="app-topbar-toggle-label">Notes</span>
           </button>
         ) : null}
         <AccountDock />
@@ -116,4 +164,3 @@ export function TopBar() {
     </header>
   );
 }
-
