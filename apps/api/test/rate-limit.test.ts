@@ -18,6 +18,8 @@ describe('rate limit buckets', () => {
     expect(bucketOf('POST', '/market/skl_1/purchase')).toBe('strict');
     expect(bucketOf('POST', '/market/skl_1/trial')).toBe('strict');
     expect(bucketOf('POST', '/skills/skl_1/mint')).toBe('strict');
+    expect(bucketOf('POST', '/relay')).toBe('strict');
+    expect(bucketOf('GET', '/relay')).toBe('general');
     expect(bucketOf('GET', '/rentals')).toBe('general');
     expect(bucketOf('GET', '/market/skl_1')).toBe('general');
   });

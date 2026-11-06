@@ -26,6 +26,7 @@ import { PublicController } from './controllers/public.controller';
 import { QuestsController } from './controllers/quests.controller';
 import { ReplaysController } from './controllers/replays.controller';
 import { RankedController } from './controllers/ranked.controller';
+import { RelayController } from './controllers/relay.controller';
 import { SeasonsController } from './controllers/seasons.controller';
 import { SkillsController } from './controllers/skills.controller';
 import { DEPS, type ApiDeps } from './deps';
@@ -62,6 +63,7 @@ export class AppModule {
         PuzzlesController,
         CommunityMapsController,
         BackingController,
+        RelayController,
       ],
       providers: [
         { provide: DEPS, useValue: deps },

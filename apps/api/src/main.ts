@@ -76,6 +76,20 @@ async function main(): Promise<void> {
       keys: new RpcNearKeyChecker(near.rpc),
       ...(backingContract ? { backing: new RpcBackingTxReader(near.rpc, backingContract) } : {}),
     },
+    // Gasless onboarding: only with RELAYER_ACCOUNT_ID and RELAYER_PRIVATE_KEY set (docs/gasless.md).
+    ...(near.relayer
+      ? {
+          relay: {
+            relayer: near.relayer,
+            contracts: {
+              deposits: config.NEAR_CONTRACT_DEPOSITS,
+              market: config.NEAR_CONTRACT_MARKET,
+              skills: config.NEAR_CONTRACT_SKILLS,
+            },
+            freeTxs: config.RELAYER_FREE_TXS,
+          },
+        }
+      : {}),
     benchmarkQueue,
     costs: new RedisDailyCosts(readRedis),
     // Bring your own agent: pull turns realtime publishes, shared through Redis.
@@ -103,7 +117,7 @@ async function main(): Promise<void> {
   const app = await createApp(deps, { logger: ['log', 'error', 'warn'] });
   await app.listen(config.API_PORT, '0.0.0.0');
   console.log(
-    `[api] listening on :${config.API_PORT} (auth ${config.AUTH_MODE}, near ${near.minter.kind})`,
+    `[api] listening on :${config.API_PORT} (auth ${config.AUTH_MODE}, near ${near.minter.kind}, gasless ${near.relayer ? 'on' : 'off'})`,
   );
 
   let stopping = false;

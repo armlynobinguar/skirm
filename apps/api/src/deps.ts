@@ -6,6 +6,7 @@ import type { RankedDecayConfig } from '@skirm/shared';
 import type { NearKeyChecker } from './near-link';
 import type { ReplayFrameReader } from './replays';
 import type { RateLimitStore, RateLimits } from './rate-limit';
+import type { RelayDeps } from './relay';
 import type {
   BackingTxReader,
   BadgeMinter,
@@ -88,6 +89,11 @@ export interface ApiDeps {
     /** Reads backing-contract transactions (set with BACKING_CONTRACT). */
     backing?: BackingTxReader;
   };
+  /**
+   * Gasless onboarding (POST /relay, docs/gasless.md): the relayer, skirm's contract ids and the
+   * free quota. Absent (RELAYER_* unset): the relay routes are off and nothing else changes.
+   */
+  relay?: RelayDeps;
   /** Benchmarks queued at mint and buyers' trials (the worker plays them). */
   benchmarkQueue: BenchmarkQueue;
   /** Daily model spend for GET /ops/stats (absent: the route reports it as unavailable). */
