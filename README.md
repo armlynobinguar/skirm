@@ -60,6 +60,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 - **Hybrid control**: in casual and practice, steer one of your agents yourself (keys or click-to-move) while the AI runs the rest
 - **Agent progression**: agents earn XP from matches, level up and pick small traits (casual only; ranked plays base stats)
 - **Gas, ice and live water**: gas clouds that cost every other action, ice that slides you a tile further, and cables that electrify the water (Frostline Depot, Sunken Metro)
+- **Ten roles**: Builder, Digger, Firefighter, Scout, Runner and Hauler, plus four newer ones for casual, practice, lobbies, the campaign and puzzles: a **Medic** gets knocked-down or stunned crewmates back sooner, an **Engineer** works valves from 2 tiles and lays its own bridges, a **Saboteur** plants decoy items the rival sees through fog as real, and a **Courier** moves 2 tiles a step but carries 1. Ranked stays on the original six for now (`DEFAULTS.roles.rankedNewRoles`). Exact rules in the [walkthrough](docs/walkthrough.md#roles)
 - **Supply tools**: drops on water maps can carry sandbags, a pump or a bridge to hold back or cross a flood
 - **Quests and achievements**: 3 daily and 2 weekly quests, play streaks, and permanent achievements, mintable as soulbound NEAR badges once the badges contract is deployed (built and tested in `contracts/badges`)
 - **Bring your own agent**: plug your own program (webhook, pull api, or an LLM through the bundled MCP server) into casual and practice matches. See [external agents](docs/external-agents.md)

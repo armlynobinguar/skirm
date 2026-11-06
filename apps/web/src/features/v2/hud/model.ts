@@ -149,7 +149,18 @@ export function calloutOf(frame: V2Frame, team: Team): Callout | null {
       const name = TOOL_INFO[e.tool].name.toLowerCase();
       out = { text: e.kind === 'tool_used' ? `${a.name} placed the ${name}` : `${a.name} took the ${name}`, side: side(a.team) };
     }
-    else if (e.kind === 'verb' || e.kind === 'switch') {
+    else if (e.kind === 'tended') {
+      const a = agent(e.agent);
+      const t = agent(e.target);
+      if (a) out = { text: `${a.name} tended ${t?.name ?? 'a crewmate'}${e.was === 'down' ? ' · back sooner' : ' · stun cleared'}`, side: side(a.team) };
+    } else if (e.kind === 'planted') {
+      // Only the planting crew's frames carry it.
+      const a = agent(e.agent);
+      if (a) out = { text: `${a.name} planted a decoy ${item}`, side: side(a.team) };
+    } else if (e.kind === 'decoy_sprung') {
+      const a = agent(e.agent);
+      out = { text: `${a?.name ?? 'A rival'} grabbed a decoy ${item} · loses a turn`, side: e.team === team ? 'you' : 'rival' };
+    } else if (e.kind === 'verb' || e.kind === 'switch') {
       const a = agent(e.agent);
       if (!a) continue;
       const name = e.kind === 'verb' ? (def?.verbs.find((v) => v.id === e.verb)?.name ?? e.verb) : e.name;
@@ -193,7 +204,7 @@ export function invChange(prev: FrameAgent | undefined, next: FrameAgent): InvCh
 /** One inventory slot as the cards and the third person draw it. */
 export type Slot = { state: 'unknown' } | { state: 'empty'; n: number } | { state: 'full'; item: FrameItem; fresh: boolean };
 
-/** Carry slots of an agent: 2 (a Hauler 3); `known` false shows "?" (a rival out of sight). */
+/** Carry slots of an agent: 2 (a Hauler 3, a Courier 1); `known` false shows "?" (a rival out of sight). */
 export function slotsOf(agent: FrameAgent | null, slots: number, known: boolean, tick: number): Slot[] {
   return Array.from({ length: slots }, (_, i): Slot => {
     if (!known || !agent) return { state: 'unknown' };

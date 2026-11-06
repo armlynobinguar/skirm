@@ -38,7 +38,7 @@ describe('inner voice', () => {
   });
 
   it('has a starter persona for every role, in the agent name', () => {
-    for (const r of ROLES) expect(starterPersona('Nox', r)).toMatch(new RegExp(`^You are Nox, a ${r}`));
+    for (const r of ROLES) expect(starterPersona('Nox', r)).toMatch(new RegExp(`^You are Nox, an? ${r}`));
     for (const r of ROLES) expect(starterPersona('Nox', r).length).toBeLessThanOrEqual(600);
   });
 });

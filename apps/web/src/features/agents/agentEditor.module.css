@@ -172,6 +172,8 @@ button.act:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px;
 .seg button:hover:not([aria-pressed='true']):not(:disabled) { color: var(--bone); }
 .seg button:disabled { cursor: default; }
 .seg button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* The role picker: ten roles, two rows of five. */
+.roleGrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
 .back { align-self: flex-end; margin-top: auto; }
 

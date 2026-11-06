@@ -185,6 +185,29 @@ describe('agent editor', () => {
     expect(api.patchAgent).toHaveBeenLastCalledWith(MOSS.id, { tier: 'quiet' });
   });
 
+  it('picks any of the ten roles, says what it does, and flags the new ones as unranked', async () => {
+    const { user, api } = setup(MOSS.id);
+    const picker = await screen.findByTestId('agent-role-picker');
+    const roles = within(picker).getByRole('group', { name: 'Role' });
+    expect(within(roles).getAllByRole('button').map((b) => b.textContent)).toEqual(['Builder', 'Digger', 'Firefighter', 'Scout', 'Runner', 'Hauler', 'Medic', 'Engineer', 'Saboteur', 'Courier']);
+    expect(within(roles).getByRole('button', { name: 'Runner' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('agent-role-does')).toHaveTextContent('carries 2 items');
+    expect(screen.getByTestId('agent-role-does')).not.toHaveTextContent('ranked');
+    await user.click(within(roles).getByRole('button', { name: 'Courier' }));
+    expect(api.patchAgent).toHaveBeenLastCalledWith(MOSS.id, { role: 'Courier' });
+  });
+
+  it('shows a new role as casual-only', async () => {
+    const MEDIC = agentFixture({ ...MOSS, id: 'agt_medic', name: 'Patch', role: 'Medic' });
+    renderWithProviders(<AgentEditorScreen agentId={MEDIC.id} />, {
+      handle: 'ada',
+      path: `/agents/${MEDIC.id}`,
+      api: { me: async () => meFixture({ agents: [MEDIC] }), skills: async () => [] },
+    });
+    expect(await screen.findByTestId('agent-role-does')).toHaveTextContent('Tends a knocked-down or stunned crewmate');
+    expect(screen.getByTestId('agent-role-does')).toHaveTextContent('ranked plays the original six');
+  });
+
   it('lists skills for another role last and disabled with the reason, and tags the equipped skill', async () => {
     const SCOUT = skillRowFixture({ id: 'skl_scout', version: 1, name: 'Scout Sweep', roles: ['Scout'] });
     const { user, api } = renderWithProviders(<AgentEditorScreen agentId={MOSS.id} />, {
