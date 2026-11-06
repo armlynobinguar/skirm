@@ -7,6 +7,7 @@ import {
   appendTick,
   createMatch,
   frameFor,
+  agentRatePer100,
   holdFor,
   legalActions,
   logHash,
@@ -273,6 +274,26 @@ describe('v2 match: talk', () => {
     expect(holdFor([agent('a'), agent('b'), agent('c')], true)).toBe(90);
     expect(holdFor([agent('a', 'Runner', { tier: 'open' }), agent('b', 'Runner', { tier: 'open' })], false)).toBe(120);
     expect(holdFor([agent('a', 'Runner', { tier: 'open' }), agent('q', 'Runner', { tier: 'quiet' })], false, 135)).toBe(81);
+  });
+
+  it('scales an agent rate by its model multiplier (rounded up), the same in the hold and the tick cost; ranked drops it', () => {
+    const big = agent('a', 'Runner', { model: 'x/big', rateBps: 15000 });
+    const odd = agent('o', 'Runner', { tier: 'open', model: 'x/odd', rateBps: 12345 });
+    expect(agentRatePer100(big)).toBe(30);
+    expect(agentRatePer100(odd)).toBe(50); // 40 × 1.2345 = 49.38 → 50
+    expect(agentRatePer100(big, true)).toBe(20);
+    expect(agentRatePer100(agent('d'))).toBe(20);
+    expect(holdFor([big, odd], false)).toBe(120); // 150 × 80 / 100
+    expect(holdFor([big, odd], true)).toBe(60);
+    const s = createMatch(testMap(OPEN), { A: [big, odd], B: [agent('b')] });
+    expect(s.agents.map((a) => [a.model, a.rateBps])).toEqual([['x/big', 15000], ['x/odd', 12345], [undefined, undefined]]);
+    expect(tickCostPer100(s, 'A')).toBe(80);
+    const r = createMatch(testMap(OPEN), { A: [big, odd], B: [agent('b')] }, { ranked: true });
+    expect(r.agents.some((a) => 'model' in a || 'rateBps' in a)).toBe(false);
+    expect(tickCostPer100(r, 'A')).toBe(40);
+    // 1.0x adds nothing to the state.
+    const one = createMatch(testMap(OPEN), { A: [agent('a', 'Runner', { rateBps: 10000 })], B: [agent('b')] });
+    expect('rateBps' in one.agents[0]!).toBe(false);
   });
 });
 

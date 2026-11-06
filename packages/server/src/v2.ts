@@ -7,6 +7,8 @@ import type { PlayerTier } from '@skirm/shared';
 export interface V2CrewEntry {
   agentId: string;
   tier: TalkTier;
+  /** A model from the operator's catalog (GET /v2/models) to act with; absent: the default. Ignored in ranked. */
+  model?: string;
 }
 
 /** Who a v2_queue plays: absent for a matchmade rival, 'bot' for practice against the greedy bot. */

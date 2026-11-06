@@ -22,9 +22,13 @@
 // A campaign mission (@skirm/shared CAMPAIGN_CHAPTERS) is practice with `mission`: the mission fixes
 // the map, difficulty and largest crew, it must be unlocked for the player, and its result is
 // recorded (CampaignRepo.record, which grants a completed chapter's rewards) before v2_end goes out.
+//
+// Model choice per agent: a crew entry may name a model from the operator's catalog (LLM_MODELS,
+// `models` below). An id the catalog does not list is refused; a known one is priced here from the
+// catalog (AgentSpec.rateBps), never from the client. Ranked plays the default model whatever is sent.
 import { SYSTEM_ACCOUNT_ID, newId, sealedSecretOf, type LobbyRow, type Repos, type V2CrewRecord, type V2MatchRow } from '@skirm/db';
-import { campaignMission, forcedTier, isLobbyTalkRule, missionUnlocked } from '@skirm/shared';
-import { createGreedyBrain, type V2Brain } from '@skirm/decision-engine/v2';
+import { campaignMission, forcedTier, isLobbyTalkRule, missionUnlocked, parseModelCatalog, resolveModel, type ModelChoice } from '@skirm/shared';
+import { DEFAULT_LLM_MODEL, createGreedyBrain, type V2Brain } from '@skirm/decision-engine/v2';
 import {
   BOT_HANDLE,
   DEFAULT_PRACTICE,
@@ -130,6 +134,8 @@ export interface V2HubDeps {
   externalTurns?: ExternalTurnStore;
   /** Tests only: the webhook transport (default: the SSRF-safe safePostJson). */
   externalPost?: WebhookPost;
+  /** The models a crew entry may pick (config llmModels), the default first. Absent: DEFAULT_LLM_MODEL alone. */
+  models?: readonly ModelChoice[];
   log: Logger;
 }
 
@@ -158,6 +164,8 @@ export class V2HubError extends Error {
 }
 
 /** The matchmaker keeps one queue per lane. */
+/** The catalog when the operator lists none: the default model alone at 1.0x. */
+const DEFAULT_MODELS: readonly ModelChoice[] = parseModelCatalog(undefined, DEFAULT_LLM_MODEL);
 const lane = (ranked: boolean): Lane => (ranked ? 'ranked' : 'casual');
 
 export class V2Hub {
@@ -267,6 +275,24 @@ export class V2Hub {
     }
     const busy = await repos.agents.busyAgents(crew.map((c) => c.agentId), matchId !== undefined ? { exceptMatch: matchId } : {});
     if (busy.length) throw new V2HubError('agent_busy', 'an agent is in a match that has not ended');
+    this.knownModels(crew);
+  }
+
+  /** The operator's model catalog, the default first. */
+  get models(): readonly ModelChoice[] {
+    return this.deps.models?.length ? this.deps.models : DEFAULT_MODELS;
+  }
+
+  /** Every model a crew entry names is in the catalog (checked in every mode; ranked then plays the default). */
+  private knownModels(crew: V2CrewEntry[]): void {
+    const unknown = crew.find((c) => c.model !== undefined && !resolveModel(this.models, c.model, false).known);
+    if (unknown) throw new V2HubError('invalid_crew', `model ${unknown.model} is not offered here`);
+  }
+
+  /** The model fields of an agent's spec: none for the default (or in ranked), else the id and its catalog price. */
+  private modelOf(entry: V2CrewEntry, ranked: boolean): Pick<AgentSpec, 'model' | 'rateBps'> {
+    const { model } = resolveModel(this.models, entry.model, ranked);
+    return model.id === this.models[0]!.id ? {} : { model: model.id, rateBps: model.rateMultiplierBps };
   }
 
   /** Ranked is for the built-in brain only: no agent of the crew may be played by an external agent. */
@@ -620,7 +646,7 @@ export class V2Hub {
       if (!v) throw new V2HubError('invalid_crew', 'an agent no longer exists');
       // Progression traits travel with the agent (a rented one plays its owner's); ranked drops them in the engine.
       const traits = v.progression?.traits ?? [];
-      crew.push({ id: v.id, name: v.name, role: v.role, vision: v.vision, comms: v.comms, tier: c.tier, ...(traits.length ? { traits } : {}) });
+      crew.push({ id: v.id, name: v.name, role: v.role, vision: v.vision, comms: v.comms, tier: c.tier, ...(traits.length ? { traits } : {}), ...this.modelOf(c, match.ranked) });
       const prompts: string[] = [];
       const keys: { id: string; version: number }[] = [];
       const names: string[] = [];
@@ -922,7 +948,7 @@ export class V2Hub {
     const { sides } = match.setup;
     // The crews as they played (lock-in changes included), even for a void with no log, with the
     // skill versions each agent ran (kept out of the hashed log header).
-    const played = (t: Team) => end.log!.header.crews[t].map((a) => ({ ...a, skills: skillsOf(sides[t], a.id), ...externalOf(sides[t], a.id) }));
+    const played = (t: Team) => end.log!.header.crews[t].map((a) => ({ ...a, skills: skillsOf(sides[t], a.id), ...externalOf(sides[t], a.id), ...modelRec(sides[t], a.id) }));
     const crews = end.log ? { A: played('A'), B: played('B') } : { A: crewRecords(sides.A), B: crewRecords(sides.B) };
     return this.deps.repos.v2Matches.finish(end.matchId, {
       winner: r?.winner ?? null,
@@ -1002,7 +1028,17 @@ export function v2EndOf(row: V2MatchRow): Extract<V2ServerMessage, { type: 'v2_e
   return { type: 'v2_end', matchId: row.id, result, reason: (row.reason ?? 'aborted') as V2EndReason, logHash: row.logHash };
 }
 
-const rec = (a: AgentSpec) => ({ id: a.id, name: a.name, role: a.role, vision: a.vision, comms: a.comms, tier: a.tier, ...(a.traits?.length ? { traits: [...a.traits] } : {}) });
+const rec = (a: AgentSpec) => ({
+  id: a.id,
+  name: a.name,
+  role: a.role,
+  vision: a.vision,
+  comms: a.comms,
+  tier: a.tier,
+  ...(a.traits?.length ? { traits: [...a.traits] } : {}),
+  ...(a.model ? { model: a.model } : {}),
+  ...(a.rateBps !== undefined ? { rateBps: a.rateBps } : {}),
+});
 
 /** The skill versions an agent of this crew runs. */
 const skillsOf = (side: V2Roster, agentId: string) => side.skillKeys?.[side.crew.findIndex((a) => a.id === agentId)] ?? [];
@@ -1012,4 +1048,9 @@ const externalOf = (side: V2Roster, agentId: string): { external?: true } =>
   isExternalBrain(side.brains?.[side.crew.findIndex((a) => a.id === agentId)]) ? { external: true } : {};
 
 /** A crew as v2_matches.crews records it. */
+/** The model an agent played with when not the default (kept out of the hashed log header, like the skills). */
+const modelRec = (side: V2Roster, agentId: string): Pick<V2CrewRecord, 'model' | 'rateBps'> => {
+  const a = side.crew.find((x) => x.id === agentId);
+  return { ...(a?.model ? { model: a.model } : {}), ...(a?.rateBps !== undefined ? { rateBps: a.rateBps } : {}) };
+};
 const crewRecords = (side: V2Roster): V2CrewRecord[] => side.crew.map((a) => ({ ...rec(a), skills: skillsOf(side, a.id), ...externalOf(side, a.id) }));

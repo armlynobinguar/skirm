@@ -17,7 +17,7 @@
 //
 // A difficulty level (difficulty.ts) rewrites the map's rules before the first tick. Each crew keeps
 // a running tally (middle items, verbs, switches, steals, knock-downs, talk) for goals and the debrief.
-import { DEFAULTS, normalizeTraits, talkHold, type TraitId } from '@skirm/shared';
+import { DEFAULTS, RATE_BPS_ONE, normalizeTraits, scaledRatePer100, talkHold, type TraitId } from '@skirm/shared';
 import { avoidedTile, BLUFF_CAP, judgeBluffs, planBluffs } from './bluff';
 import type { Difficulty } from './difficulty';
 import { DIFF_MODS, RANKED_DIFFICULTY, withDifficulty } from './difficulty';
@@ -68,6 +68,12 @@ export interface AgentSpec {
   tier: TalkTier;
   /** Progression traits (traits.ts): one small step on a stat each. Ignored in ranked unless DEFAULTS.progression.rankedTraits. */
   traits?: readonly TraitId[];
+  /**
+   * The model it plays (a catalog id, @skirm/shared models.ts) and that model's talk-rate multiplier
+   * in basis points, both resolved by the server. Absent: the default model at 1.0x. Ignored in ranked.
+   */
+  model?: string;
+  rateBps?: number;
 }
 
 export interface MatchOptions {
@@ -96,6 +102,9 @@ export interface AgentState {
   tier: TalkTier;
   /** Traits in play (normalised; absent when none). vision and comms above are the base stats. */
   traits?: TraitId[];
+  /** A model other than the default and its rate multiplier (AgentSpec.model; absent: default, 1.0x, and always in ranked). */
+  model?: string;
+  rateBps?: number;
   x: number;
   y: number;
   start: [number, number];
@@ -270,6 +279,8 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
         comms: clamp(spec.comms, 1, 5),
         tier: opts.ranked ? 'standard' : spec.tier,
         ...(traits.length ? { traits } : {}),
+        ...(!opts.ranked && spec.model ? { model: spec.model } : {}),
+        ...(!opts.ranked && spec.rateBps !== undefined && spec.rateBps !== RATE_BPS_ONE ? { rateBps: spec.rateBps } : {}),
         x,
         y,
         start: [x, y],
@@ -901,16 +912,25 @@ function verbFits(s: MatchState, a: AgentState, effect: EffectClass, dir: Dir): 
 }
 
 /**
- * What a crew spends this tick in hundredths of a credit: the sum of its live agents' talk tier
- * ratePer100. The caller accumulates it and charges whole credits with chargeDue.
+ * One agent's rate in hundredths of a credit per tick: its talk tier's ratePer100 scaled by its
+ * model multiplier, rounded up (scaledRatePer100). Ranked plays Standard at 1.0x. holdFor and
+ * tickCostPer100 both price agents here, so the charges never exceed the hold.
  */
-export function tickCostPer100(s: MatchState, team: Team): number {
-  return s.agents.filter((a) => a.team === team && !a.out).reduce((n, a) => n + TALK_TIERS[a.tier].ratePer100, 0);
+export function agentRatePer100(a: Pick<AgentSpec, 'tier' | 'rateBps'>, ranked = false): number {
+  return ranked ? TALK_TIERS.standard.ratePer100 : scaledRatePer100(TALK_TIERS[a.tier].ratePer100, a.rateBps ?? RATE_BPS_ONE);
 }
 
-/** Whole credits held up front for a crew: every tick at its rate, rounded up once (ranked is all Standard). */
-export function holdFor(crew: readonly Pick<AgentSpec, 'tier'>[], ranked: boolean, ticks = MATCH_TICKS): number {
-  return talkHold(crew.map((a) => TALK_TIERS[ranked ? 'standard' : a.tier].ratePer100), ticks);
+/**
+ * What a crew spends this tick in hundredths of a credit: the sum of its live agents' rates
+ * (agentRatePer100). The caller accumulates it and charges whole credits with chargeDue.
+ */
+export function tickCostPer100(s: MatchState, team: Team): number {
+  return s.agents.filter((a) => a.team === team && !a.out).reduce((n, a) => n + agentRatePer100(a), 0);
+}
+
+/** Whole credits held up front for a crew: every tick at its rate, rounded up once (ranked is all Standard at 1.0x). */
+export function holdFor(crew: readonly Pick<AgentSpec, 'tier' | 'rateBps'>[], ranked: boolean, ticks = MATCH_TICKS): number {
+  return talkHold(crew.map((a) => agentRatePer100(a, ranked)), ticks);
 }
 
 export function idx(s: MatchState, [x, y]: [number, number]): number {

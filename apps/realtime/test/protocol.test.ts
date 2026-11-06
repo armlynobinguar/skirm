@@ -55,6 +55,8 @@ describe('parseClientMessage', () => {
     expect(err({ type: 'v2_queue', ranked: true, crew: [{ agentId: 'a1', tier: 'open', unlocks: [] }] })).toBe('bad_message');
     expect(err({ type: 'v2_queue', ranked: true, crew: [1, 2, 3, 4].map((i) => ({ agentId: `a${i}`, tier: 'open' })) })).toBe('bad_message');
     expect(err({ type: 'v2_queue', ranked: true, crew: [crew[0], crew[0]] })).toBe('bad_message');
+    expect(err({ type: 'v2_queue', ranked: false, crew: [{ agentId: 'a1', tier: 'open', model: 5 }] })).toBe('bad_message');
+    expect(err({ type: 'v2_queue', ranked: false, crew: [{ agentId: 'a1', tier: 'open', model: 'bad id' }] })).toBe('bad_message');
     expect(err({ type: 'v2_lock_in', matchId: 'mat_1', tiers: ['quiet', 'quiet', 'quiet', 'quiet'] })).toBe('bad_message');
     expect(err(JSON.stringify({ type: 'auth', devUser: 'a', pad: 'x'.repeat(20_000) }))).toBe('too_large');
     expect(parseClientMessage(null)).toMatchObject({ ok: false, code: 'bad_message' });
@@ -116,6 +118,13 @@ describe('parseClientMessage', () => {
       matchId: 'mat_1',
     });
     expect(err({ type: 'v2_replay', matchId: 'mat_1', speed: 2 })).toBe('bad_message');
+  });
+
+  it('carries a crew entry model id (its shape only: the hub checks the catalog)', () => {
+    expect(ok({ type: 'v2_queue', ranked: false, crew: [{ agentId: 'a1', tier: 'open', model: 'openai/gpt-5-mini' }] })).toMatchObject({
+      crew: [{ agentId: 'a1', tier: 'open', model: 'openai/gpt-5-mini' }],
+    });
+    expect(ok({ type: 'v2_queue', ranked: false, crew: [{ agentId: 'a1', tier: 'open' }] })).toEqual({ type: 'v2_queue', ranked: false, crew: [{ agentId: 'a1', tier: 'open' }] });
   });
 
   it('accepts a lobby ready with a crew, and nothing else', () => {

@@ -41,6 +41,7 @@ async function bootstrap(): Promise<void> {
   // offline brain), else the greedy brain; its spend goes to the same CostMonitor.
   const v2Brain = createRealtimeV2Brain(process.env, costs, log);
   log.info(`v2 brain: ${v2Brain.kind} (${v2Brain.model})`);
+  if (config.llmModels.length > 1) log.info(`v2 models: ${config.llmModels.map((m) => `${m.id} ${m.rateMultiplierBps}bps`).join(', ')}`);
   // Fail at boot on a bad V2_TICK_MS.
   const v2TickMs = parseV2TickMs(process.env.V2_TICK_MS);
   log.info(`v2 tick: ${v2TickMs} ms`);
@@ -59,6 +60,7 @@ async function bootstrap(): Promise<void> {
     pubsub,
     registry: { enqueue: (data) => enqueueRegistry(registryQueue, data) },
     v2Brain,
+    v2Models: config.llmModels,
     v2Timing: { tickMs: v2TickMs },
     // Bring your own agent: pull turns go through Redis, so any api instance serves them.
     externalTurns: new RedisExternalTurnStore(redis),

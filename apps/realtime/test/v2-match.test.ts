@@ -222,10 +222,22 @@ describe('v2 match: whole-credit charges never exceed the hold', () => {
     }
   }
 
-  async function playClock(o: { tiers: Record<Team, AgentSpec['tier'][]>; difficulty: Difficulty; ranked?: boolean; outAt?: { tick: number; agent: string }; credits?: RecordingCredits }) {
+  async function playClock(o: {
+    tiers: Record<Team, AgentSpec['tier'][]>;
+    difficulty: Difficulty;
+    ranked?: boolean;
+    outAt?: { tick: number; agent: string };
+    credits?: RecordingCredits;
+    /** Per agent, the model multiplier in basis points the hub priced it at (absent: 1.0x). */
+    bps?: Partial<Record<Team, (number | undefined)[]>>;
+  }) {
     const credits = o.credits ?? new RecordingCredits();
     const sides = setup().sides;
-    const crew = (t: Team) => o.tiers[t].map((tier, i) => spec(`${t.toLowerCase()}${i}`, 'Runner', tier));
+    const crew = (t: Team) =>
+      o.tiers[t].map((tier, i) => {
+        const bps = o.bps?.[t]?.[i];
+        return { ...spec(`${t.toLowerCase()}${i}`, 'Runner', tier), ...(bps !== undefined ? { model: `x/m${bps}`, rateBps: bps } : {}) };
+      });
     const h = harness(
       {
         brains: both(idle),
@@ -279,6 +291,62 @@ describe('v2 match: whole-credit charges never exceed the hold', () => {
       }
     });
   }
+
+  it('scales the hold and the charges by each agent model multiplier, and charges never exceed the hold', { timeout: 30_000 }, async () => {
+    const cases: { tiers: Record<Team, AgentSpec['tier'][]>; bps: Record<Team, (number | undefined)[]> }[] = [
+      { tiers: { A: ['standard'], B: ['open'] }, bps: { A: [15000], B: [12345] } },
+      { tiers: { A: ['quiet', 'open', 'standard'], B: ['open', 'quiet'] }, bps: { A: [33333, undefined, 5000], B: [27777, 100000] } },
+    ];
+    for (const difficulty of ['normal', 'hard'] as const)
+      for (const c of cases) {
+        const { end, credits, s } = await playClock({ ...c, difficulty });
+        for (const t of TEAMS) {
+          const mine = s.agents.filter((a) => a.team === t);
+          const hold = holdFor(mine, false, s.limit);
+          expect(credits.holds[t]).toBe(hold);
+          // The multiplier really moved the price (every case has at least one non-1.0x agent per crew).
+          expect(hold).not.toBe(holdFor(mine.map((a) => ({ tier: a.tier })), false, s.limit));
+          const sum = credits.calls[t].reduce((n, x) => n + x, 0);
+          expect(credits.calls[t].every((n) => Number.isInteger(n) && n > 0)).toBe(true);
+          expect(sum).toBe(end.stats[t].charged);
+          expect(sum).toBe(hold);
+        }
+      }
+  });
+
+  it("asks the brain with each agent's own model, and with none for the default", async () => {
+    const seen = new Map<string, string | null | undefined>();
+    const sides = setup().sides;
+    const brain: V2Brain = {
+      ...idle,
+      act: async (o, ctx) => {
+        seen.set(o.me.id, ctx.model);
+        return { action: { type: 'wait' }, reason: 'chosen', say: null };
+      },
+    };
+    const h = harness(
+      {
+        brains: both(brain),
+        send: (t, msg) => {
+          if (msg.type === 'v2_found') queueMicrotask(() => h.m.accept(t));
+          if (msg.type === 'v2_lockin') queueMicrotask(() => h.m.lockIn(t, []));
+          if (msg.type === 'v2_frame' && msg.frame.tick >= 2) h.m.abort('test');
+        },
+      },
+      false,
+      { sides: { A: { ...sides.A, crew: [{ ...spec('wick', 'Builder'), model: 'x/big', rateBps: 15000 }, spec('moss', 'Digger')] }, B: sides.B } },
+    );
+    await h.m.play();
+    expect(seen.get('wick')).toBe('x/big');
+    expect(seen.get('moss')).toBeUndefined();
+    expect(seen.has('moss')).toBe(true);
+  });
+
+  it('ranked ignores a model multiplier: Standard at 1.0x', async () => {
+    const { credits, s } = await playClock({ tiers: { A: ['open'], B: ['quiet'] }, bps: { A: [30000], B: [15000] }, difficulty: 'normal', ranked: true });
+    expect(s.agents.some((a) => a.model !== undefined || a.rateBps !== undefined)).toBe(false);
+    expect(credits.holds).toEqual({ A: holdFor([{ tier: 'standard' }], true), B: holdFor([{ tier: 'standard' }], true) });
+  });
 
   it('does not count a charge the ledger refused as charged', async () => {
     class RefusingCredits extends RecordingCredits {
