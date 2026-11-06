@@ -1,8 +1,9 @@
-// Public reads: /leaderboards/players, /v2/matches/live, /v2/matches/:id(/messages, /log). A signed-in
-// caller also gets their own rows.
+// Public reads: /leaderboards/players, /v2/models, /v2/matches/live, /v2/matches/:id(/messages, /log).
+// A signed-in caller also gets their own rows.
 import { Controller, Get, Inject, Param, Query } from '@nestjs/common';
 import { MATCH_MESSAGES_MAX_LIMIT, type AccountRow, type PlayerLadderRow } from '@skirm/db';
-import { playerTier, rankTitle } from '@skirm/shared';
+import { DEFAULT_LLM_MODEL } from '@skirm/decision-engine/v2';
+import { parseModelCatalog, playerTier, rankTitle } from '@skirm/shared';
 import { z } from 'zod';
 import { CurrentAccount, Public } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
@@ -37,6 +38,17 @@ export class PublicController {
       account ? leaderboards.playerRowFor(account.id) : Promise.resolve(undefined),
     ]);
     return { rows: rows.map(playerView), ...(you ? { you: playerView(you) } : {}) };
+  }
+
+  /**
+   * The models a crew may pick per agent outside ranked (LLM_MODELS), the default first at 1.0x;
+   * ranked always plays `default`. Display only: realtime prices every pick from its own catalog.
+   */
+  @Get('v2/models')
+  models() {
+    const { llmModels, LLM_MODEL } = this.deps.config;
+    const models = llmModels?.length ? llmModels : parseModelCatalog(undefined, LLM_MODEL ?? DEFAULT_LLM_MODEL);
+    return { default: models[0]!.id, models: models.map((m) => ({ id: m.id, label: m.label, rateMultiplierBps: m.rateMultiplierBps })) };
   }
 
   /**
