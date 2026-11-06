@@ -4,10 +4,11 @@ import { TRAITS } from '@skirm/shared';
 import type { Dir, Tile } from './map';
 import type { Action, AgentState, MatchState, Role } from './match';
 import { avoidedTile } from './bluff';
-import { legalActions } from './match';
+import { carryOf, legalActions } from './match';
 import { overlaysFor } from './frame';
 import type { HeardMessage, TalkTier } from './talk';
 import { gearView, type ToolKind } from './tools';
+import { decoyView } from './roles';
 
 export interface SeenAgent {
   id: string;
@@ -27,7 +28,8 @@ export interface Observation {
   /** Rows of the board as seen: tile characters, '?' where the crew has never looked. */
   rows: string[];
   /** `traits`: what each of its progression traits does (absent when it plays none). `tool`: the supply tool it carries. */
-  me: { id: string; name: string; team: 'A' | 'B'; role: Role; x: number; y: number; carrying: number; capacity: number; tier: TalkTier; traits?: string[]; tool?: ToolKind };
+  /** `kit`: an Engineer's own bridges or a Saboteur's decoys left (roles.ts; absent for other roles). */
+  me: { id: string; name: string; team: 'A' | 'B'; role: Role; x: number; y: number; carrying: number; capacity: number; tier: TalkTier; traits?: string[]; tool?: ToolKind; kit?: number };
   teammates: SeenAgent[];
   /** Rivals in sight now (all of them on maps without fog). */
   rivals: SeenAgent[];
@@ -52,6 +54,11 @@ export interface Observation {
    * (sandbags, bridges, running pumps with their ticks left). Absent when there are none.
    */
   gear?: { ground: { at: [number, number]; kind: ToolKind }[]; placed: { at: [number, number]; kind: ToolKind; ticksLeft?: number }[] };
+  /**
+   * Decoys the agent's own crew planted (a Saboteur's, roles.ts): open floor that rivals see as an
+   * item. Absent when the crew has none. A rival's decoy is never listed: it reads as '*' in `rows`.
+   */
+  decoys?: [number, number][];
 }
 
 const CHAR: Record<Tile, string> = {
@@ -94,7 +101,7 @@ export function observe(s: MatchState, agentId: string): Observation {
     ticksLeft: s.limit - s.tick,
     map: { id: def.id, name: def.name, w, h, goal: def.goal, item: def.item, deliverTo: def.deliverTo, exit: def.exit },
     rows,
-    me: { id: a.id, name: a.name, team: a.team, role: a.role, x: a.x, y: a.y, carrying: a.carrying.length, capacity: a.role === 'Hauler' ? 3 : 2, tier: a.tier, ...traitView(a), ...(a.tool ? { tool: a.tool } : {}) },
+    me: { id: a.id, name: a.name, team: a.team, role: a.role, x: a.x, y: a.y, carrying: a.carrying.length, capacity: carryOf(a.role), tier: a.tier, ...traitView(a), ...(a.tool ? { tool: a.tool } : {}), ...(a.kit !== undefined ? { kit: a.kit } : {}) },
     teammates: s.agents.filter((o) => o !== a && o.team === a.team && !o.out).map(view),
     rivals: s.agents.filter((o) => o.team !== a.team && !o.out && visible[o.y * w + o.x]).map(view),
     score: { mine: s.score[a.team], rival: s.score[rival] },
@@ -105,6 +112,7 @@ export function observe(s: MatchState, agentId: string): Observation {
     legal: legalActions(s, a.id),
     ...hazardView(s, a),
     ...gearObs(s),
+    ...decoyObs(s, a),
   };
 }
 
@@ -131,6 +139,13 @@ function gearObs(s: MatchState): Pick<Observation, 'gear'> {
   return g.ground.length || g.placed.length ? { gear: g } : {};
 }
 
+/** The crew's own live decoys, when it has any. */
+function decoyObs(s: MatchState, a: AgentState): Pick<Observation, 'decoys'> {
+  if (!s.decoys) return {};
+  const mine = decoyView(s, a.team).map((d) => d.at);
+  return mine.length ? { decoys: mine } : {};
+}
+
 /** A bluff still believed, or one seen through on the tick just played. */
 function bluffView(s: MatchState, a: AgentState): Pick<Observation, 'bluff'> {
   const b = a.heardBluff;
@@ -146,6 +161,8 @@ export function actionText(act: Action): string {
   if (act.type === 'move') return `move ${act.dir}`;
   if (act.type === 'verb') return act.dir ? `${act.verb} ${act.dir}` : act.verb;
   if (act.type === 'use') return `use ${act.tool} ${act.dir}`;
+  if (act.type === 'tend') return `tend ${act.agent}`;
+  if (act.type === 'plant') return `plant ${act.dir}`;
   return act.type;
 }
 

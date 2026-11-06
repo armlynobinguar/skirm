@@ -129,6 +129,25 @@ describe('chase cam world', () => {
     const w = buildWorld(plain, 'saltmarsh-weir');
     expect(() => stepWorld(w, newRig(), cam(), input({ arena: plain, prev: null, at: 0, focus: 'nobody', look: 'saltmarsh-weir' }))).not.toThrow();
   });
+
+  it('builds each agent in its role look and poses it from the frame (tipped over when knocked down)', () => {
+    const f = v2FrameFixture();
+    f.agents[1]!.down = true;
+    const a = composeV2Arena(f)!;
+    const w = buildWorld(a, LOOK);
+    const c = cam();
+    stepWorld(w, newRig(), c, input({ arena: a, prev: null, at: 0, focus: 'wick', look: LOOK }));
+    const wick = w.agents.get('wick')!;
+    const moss = w.agents.get('moss')!;
+    expect(wick.look.verb).toBe('build');
+    expect(moss.look.verb).toBe('dig');
+    // Every look part is a mesh in its pose group.
+    const meshes = Object.values(wick.parts).reduce((n, g) => n + g.children.length, 0);
+    expect(meshes).toBeGreaterThan(8);
+    expect(moss.g.visible).toBe(true);
+    expect(moss.body.rotation.z).toBeGreaterThan(1.2);
+    expect(wick.body.rotation.z).toBe(0);
+  });
 });
 
 describe('startChaseCam', () => {

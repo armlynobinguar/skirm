@@ -8,6 +8,9 @@
 //   GET  /rentals/mine                              the caller's offers and unused passes
 //   POST /rentals/:offerId    { txHash }            records a verified payment as a pass
 //                             { credits: true, key } pays in credits (NEAR_RENTALS_ONCHAIN off)
+//                             { agentAccount }      one of the caller's agents pays from its own
+//                                                   custodial NEAR account, under its spend cap
+//                                                   (./agent-accounts.controller.ts)
 //
 // A payment counts when its `rental` event names this offer (`rental_id` = `<offerId>:<nonce>`),
 // pays the agent's owner's linked NEAR account, comes from the caller's linked account and is at
@@ -24,6 +27,7 @@ import { CurrentAccount, mustAccount } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
 import { ApiError, notFound } from '../errors';
 import { agentId, parse } from '../validation';
+import { payRentFromAgentAccount } from './agent-accounts.controller';
 import { idOr404 } from './util';
 
 const offerId = z.string().regex(/^rof_[0-9A-HJKMNP-TV-Z]{26}$/);
@@ -31,6 +35,8 @@ const offerBody = z.object({ priceYocto: z.string().regex(/^[1-9][0-9]{0,39}$/).
 const rentBody = z.union([
   z.object({ txHash: z.string().min(1).max(128) }).strict(),
   z.object({ credits: z.literal(true), key: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/) }).strict(),
+  // Agent accounts: one of the caller's own agents pays from its account (server-signed).
+  z.object({ agentAccount: agentId }).strict(),
 ]);
 
 /** HTTP status for each verifier refusal. */
@@ -117,6 +123,10 @@ export class RentalsController {
     const oid = idOr404(offerId, id, 'rental offer');
     const parsed = parse(rentBody, body);
     if ('credits' in parsed) return this.rentWithCredits(account, oid, parsed.key);
+    if ('agentAccount' in parsed) {
+      const paid = await payRentFromAgentAccount(this.deps, account, oid, parsed.agentAccount);
+      return { pass: passView(paid.pass), txHash: paid.txHash, paidFrom: paid.paidFrom };
+    }
     const { txHash } = parsed;
     const { repos, near, config } = this.deps;
     // A replayed payment is answered with the pass it already bought.

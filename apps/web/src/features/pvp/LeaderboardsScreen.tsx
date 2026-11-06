@@ -5,7 +5,9 @@
 // All-time (GET /leaderboards/players: per-player Elo and ranked tier on the v2 ladder), By map
 // (GET /leaderboards/maps/:mapId: ranked wins on one map) and Skills (GET /leaderboards/skills: win
 // rate of skills with enough ranked matches).
-// The pool says "local" while it is kept offchain (the seasons contract is not deployed yet).
+// While the season is not recorded on the seasons contract (poolSource 'local') the pool is skirm's
+// own tally (funding + the fee share of market sales), and the card says so in plain words. An empty
+// pool says how it fills instead of showing 0.00 NEAR.
 // The tab is kept in the URL (?tab=alltime|maps|skills) for sharing; the season is the default.
 import { DEFAULTS } from '@skirm/shared';
 import { Tabs, fmt } from '@skirm/ui';
@@ -21,7 +23,7 @@ import type { PlayerLadderRow, Season, Standing } from '@/lib/api/types';
 import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
 import s from './pvp.module.css';
-import { fmtCountdown, nearText, useNow } from './pvpUtil';
+import { fmtCountdown, nearText, sumYocto, useNow } from './pvpUtil';
 import { ByMap, SkillsBoard } from './RankedBoards';
 
 type Tab = 'season' | 'alltime' | 'maps' | 'skills';
@@ -107,30 +109,67 @@ function SeasonBody({ season, you }: { season: Season; you: Standing | undefined
         </span>
       </div>
       <p className={s.lede} data-testid="s14-season-pool">
-        Prize pool <b className={s.mono}>{nearText(season.poolYocto)}</b>
-        {season.poolSource === 'local' ? (
-          <>
-            {' '}
-            <span className={s.chip} title="Kept offchain until the seasons contract is deployed" data-testid="s14-pool-local">
-              local
-            </span>
-          </>
-        ) : null}{' '}
-        · paid to the top {season.splitBps.length}. Ranked wins earn 25 points, draws 12, losses 5.
+        <PoolText season={season} /> Ranked wins earn {DEFAULTS.season.points.win} points, draws {DEFAULTS.season.points.draw}, losses{' '}
+        {DEFAULTS.season.points.loss}.
       </p>
       <QueryView
         query={standings}
         loading={<Skeleton rows={6} label="Loading the standings" />}
         empty={(d) =>
           d.rows.length === 0 && (
-            <EmptyState action={<Link href={routes.pvp()} className="app-link-strong">Queue for ranked</Link>}>
-              No ranked matches this season yet. Win one to take the first place.
+            <EmptyState
+              action={
+                <span className={s.actions}>
+                  <Link href={routes.pvp()} className="sk-btn sk-btn-primary" data-testid="s14-empty-play">
+                    Play ranked
+                  </Link>
+                  <Link href={routes.verify()} className="app-link-strong" data-testid="s14-empty-verify">
+                    See how results are verified on NEAR
+                  </Link>
+                </span>
+              }
+            >
+              <b>The board is open.</b> No one has played a ranked match this season yet, so your first win takes first place. Every
+              ranked result is written to NEAR, where anyone can check it.
             </EmptyState>
           )
         }
       >
         {(d) => <StandingsTable rows={d.rows} total={d.total} you={you} />}
       </QueryView>
+    </>
+  );
+}
+
+/** The pool line: its size and where it is kept, or, while it is empty, how it fills. */
+function PoolText({ season }: { season: Season }) {
+  const places = season.splitBps.length;
+  const feePct = DEFAULTS.season.feeShareBps / 100;
+  if (sumYocto(season.poolYocto) === 0n) {
+    return season.status === 'open' ? (
+      <>
+        No prize pool yet: {feePct}% of every skill-market fee taken this season goes into it, split among the top {places}.
+      </>
+    ) : (
+      <>This season ended with no prize pool.</>
+    );
+  }
+  return (
+    <>
+      Prize pool <b className={s.mono}>{nearText(season.poolYocto)}</b>
+      {season.poolSource === 'local' ? (
+        <>
+          {' '}
+          <span
+            className={s.chip}
+            title="skirm's server keeps this tally until the season is recorded on the seasons contract on NEAR"
+            data-testid="s14-pool-local"
+          >
+            tallied offchain, not yet on NEAR
+          </span>
+        </>
+      ) : null}{' '}
+      · paid to the top {places}.
     </>
   );
 }

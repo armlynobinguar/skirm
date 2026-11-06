@@ -1,6 +1,7 @@
 import { MAPS_V2, createMatch, frameFor, stepMatch, type AgentSpec, type FrameAgent, type V2Frame } from '@skirm/engine/v2';
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GlobalKeys, topEscapeLayer } from '@/components/shell/GlobalKeys';
 import { liveFx } from '@/features/arena/live';
 import { OVERVIEW, arenaStore } from '@/features/arena/store';
 import { FakeRealtime } from '@/test/fakeRealtime';
@@ -298,6 +299,39 @@ describe('v2 match screen', () => {
     act(() => rt.emit({ type: 'v2_end', matchId: 'mat_v2', result: null, reason: 'declined', logHash: null }));
     expect(screen.getByTestId('v2-verdict')).toHaveTextContent('Void');
     expect(screen.getByTestId('v2-ended')).toHaveTextContent('A player declined');
+  });
+  it('Escape closes the intro, then third person, and never leaves a live match', async () => {
+    const rt = new FakeRealtime();
+    v2StoreFor(rt).queued = [{ agentId: 'agt_1', name: 'Wick', tier: 'standard' }];
+    const { router } = renderWithProviders(
+      <>
+        <GlobalKeys />
+        <V2MatchScreen matchId="mat_esc" />
+      </>,
+      { realtime: rt, handle: 'ana', path: '/matches/mat_esc', search: '' },
+    );
+    const settle = () => act(async () => new Promise((r) => setTimeout(r, 0)));
+    startMatch(rt, 'mat_esc');
+    act(() => rt.emit({ type: 'v2_frame', matchId: 'mat_esc', frame: v2FrameFixture({ tick: 1 }) }));
+    expect(topEscapeLayer()).toBe('intro');
+    key('Escape');
+    await settle();
+    expect(screen.queryByTestId('v2-intro')).not.toBeInTheDocument();
+    expect(topEscapeLayer()).toBe('match');
+
+    // The overview: Escape stays in the match.
+    key('Escape');
+    await settle();
+    expect(screen.getByTestId('v2-live')).toBeInTheDocument();
+
+    key('v');
+    expect(screen.getByTestId('v2-tpv')).toBeInTheDocument();
+    expect(topEscapeLayer()).toBe('tpv');
+    key('Escape');
+    await settle();
+    expect(screen.queryByTestId('v2-tpv')).not.toBeInTheDocument();
+    expect(screen.getByTestId('v2-live')).toBeInTheDocument();
+    expect(router.push).not.toHaveBeenCalled();
   });
 });
 

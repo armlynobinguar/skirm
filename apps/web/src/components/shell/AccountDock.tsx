@@ -4,8 +4,10 @@
 // profile), then three cells: credits with the free allowance and held amount, the NEAR wallet
 // (linked account and its balance, read from the chain), and ranked Elo with its rank title. The card
 // stays in the DOM while closed (hidden), so its figures are always readable by tests. Escape, a
-// click outside, a link inside and a route change close it. The last row signs out and goes to the
-// sign-in screen. Signed out, the badge is a Sign in link.
+// click outside, a link inside and a route change close it. The last row reopens the tutorial (its
+// permanent entry point, once First steps is dismissed) and signs out. Signed out, the badge is a Sign
+// in link. Credits on the badge and the card count paid credits plus today's free allowance, so a new
+// player sees what they can spend rather than 0.
 // Hidden on the live match and run screens, whose HUD owns the screen. The test ids keep their
 // topbar- names (e2e and the smoke use them).
 import { fmt } from '@skirm/ui';
@@ -93,7 +95,11 @@ export function AccountDock() {
         <i className="app-acct-dia" aria-hidden="true" />
         <b className="app-acct-handle">{handle}</b>
         {me.data ? <TierBadge tier={tierFrom(me.data.rank)} size="sm" testId="topbar-tier" /> : null}
-        {credits ? <span className="app-acct-cr">{fmt(credits.balance)} CR</span> : null}
+        {credits ? (
+          <span className="app-acct-cr" title={creditsTitle(credits)} data-testid="topbar-cr">
+            {fmt(spendable(credits))} CR
+          </span>
+        ) : null}
         <svg className="app-acct-chev" viewBox="0 0 10 6" aria-hidden="true">
           <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
         </svg>
@@ -127,12 +133,12 @@ export function AccountDock() {
             <small>Credits</small>
             {credits ? (
               <>
-                <b>{fmt(credits.balance)}</b>
+                <b title={creditsTitle(credits)}>{fmt(spendable(credits))}</b>
                 <span
                   data-testid="topbar-allowance"
                   title={`${credits.allowanceLeft} of ${DAILY_FREE_ALLOWANCE} free credits left today`}
                 >
-                  {fmt(credits.allowanceLeft)} free
+                  {fmt(credits.balance)} paid · {fmt(credits.allowanceLeft)} free
                   {credits.held > 0 ? ` · ${fmt(credits.held)} held` : ''}
                 </span>
               </>
@@ -144,6 +150,9 @@ export function AccountDock() {
           <EloCell me={me.data} />
         </div>
         <div className="app-dock-foot">
+          <Link href={routes.tutorial()} className="app-dock-signout app-dock-tutorial" data-testid="topbar-tutorial">
+            Tutorial
+          </Link>
           <button
             type="button"
             className="app-dock-signout"
@@ -167,6 +176,14 @@ export function AccountDock() {
     </div>
   );
 }
+
+type Credits = NonNullable<Me['credits']>;
+
+/** What the player can spend now: paid credits plus today's free allowance (new players have 0 paid). */
+const spendable = (c: Credits) => c.balance + c.allowanceLeft;
+
+const creditsTitle = (c: Credits) =>
+  `${fmt(c.balance)} paid + ${fmt(c.allowanceLeft)} of ${DAILY_FREE_ALLOWANCE} free today${c.held > 0 ? ` · ${fmt(c.held)} held for a match` : ''}`;
 
 /** The linked NEAR account and its liquid balance; links to the profile, where M01 links one. */
 function WalletCell({ me }: { me: Me | undefined }) {

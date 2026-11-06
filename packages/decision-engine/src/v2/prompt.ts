@@ -20,7 +20,13 @@ Hazards spread in waves, then recede. If one reaches you, you are knocked down f
 A switch floods the rival crew's lane for 8 ticks. Rival crews can pick up items you drop.
 Talk: "team" reaches your crew anywhere, but rivals near you overhear it. "say" reaches everyone near you. Rivals may lie. Never reveal your skills.
 Tools: a supply drop may carry a tool (sandbags, a pump or a bridge). Step on it with no tool in hand to take it; you carry at most one. "use <tool> <dir>" places it on the tile next to you: sandbags stop water spreading there, a pump drains water around it over a few ticks, a bridge lets you walk across a water tile.
-Bluffs: a rival near you may tell you a middle item is gone, the delivery point is flooding, or your own items are unguarded. What you can see is never a lie; a claim about a tile your crew cannot see may fool you, and then you treat that item as gone for a few ticks. Your crew bluffs rivals the same way when they close on a middle item.`;
+Bluffs: a rival near you may tell you a middle item is gone, the delivery point is flooding, or your own items are unguarded. What you can see is never a lie; a claim about a tile your crew cannot see may fool you, and then you treat that item as gone for a few ticks. Your crew bluffs rivals the same way when they close on a middle item.
+Roles: a Builder places blocks, a Digger clears rubble (and digs in one move), a Firefighter puts out fire, a Scout stuns rivals within 2 tiles; Runners carry 2 and Haulers 3.
+Medic: "tend <agent id>" on a crewmate next to you that is knocked down (2 ticks off its wait) or stunned (it acts next tick); once every 5 ticks. Stay near crewmates working by hazards.
+Engineer: you pull a switch from up to 2 tiles away, and you have 2 bridges of your own: "use bridge <dir>" on water next to you, even with no tool in hand.
+Saboteur: "plant <dir>" puts a decoy on open floor next to you; rivals see it as an item, and one that grabs it loses a turn. 2 per match, each uses one of your crew's bluffs. Plant where rivals will walk: the middle, near real items.
+Courier: a move on open ground carries you 2 tiles (it stops at items, the delivery point and anything in the way), but you carry 1 item: take one and run it home.
+Decoys: any item may be a rival decoy. Your crew's own decoys are listed for you and are just floor to you.`;
 
 /** Longest owner's instructions an agent carries (agents.system_prompt, PATCH /agents/:id). */
 export const OWNER_INSTRUCTIONS_MAX = 600;
@@ -78,6 +84,7 @@ export function viewText(o: Observation): string {
     ...hazardLines(o),
   ];
   lines.push(...toolLines(o));
+  lines.push(...roleLines(o));
   if (o.bluff) {
     const [x, y] = o.bluff.at;
     const item = o.map.item.toLowerCase();
@@ -90,6 +97,21 @@ export function viewText(o: Observation): string {
   if (o.heard.length)
     lines.push('Heard last tick:', ...o.heard.map((m) => `- ${m.fromName} (${m.team === o.me.team ? 'crew' : 'rival'}, ${m.overheard ? 'overheard' : m.channel}): ${m.text}`));
   return lines.join('\n');
+}
+
+/** What the new roles have left and know (engine roles.ts), in plain words; empty for the original six. */
+export function roleLines(o: Observation): string[] {
+  const out: string[] = [];
+  const n = o.me.kit ?? 0;
+  if (o.me.role === 'Engineer') out.push(`You have ${n} ${n === 1 ? 'bridge' : 'bridges'} of your own left; you reach switches from 2 tiles away.`);
+  if (o.me.role === 'Saboteur') out.push(`You have ${n} ${n === 1 ? 'decoy' : 'decoys'} left to plant.`);
+  if (o.me.role === 'Medic') {
+    const hurt = o.teammates.filter((m) => m.down);
+    if (hurt.length) out.push(`Knocked down crewmates you could tend if you stand next to them: ${hurt.map((m) => `${m.name} (${m.id}) at ${m.x},${m.y}`).join('; ')}.`);
+  }
+  if (o.me.role === 'Courier') out.push('You move 2 tiles a step on open ground and carry 1 item: deliver each one as soon as you have it.');
+  if (o.decoys?.length) out.push(`Your crew's decoys (floor to you, items to rivals): ${o.decoys.map(([x, y]) => `${x},${y}`).join(' ')}.`);
+  return out;
 }
 
 /** Longest list of gas or live-water tiles spelled out in a prompt. */

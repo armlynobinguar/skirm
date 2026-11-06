@@ -4,6 +4,7 @@
 //   top up   deposits.deposit()                        attached: the amount       30 Tgas
 //   buy      market.buy({token_id})                    attached: the price        150 Tgas (≥ 120 needed)
 //   rent     market.rent({rental_id, owner_id, price}) attached: the price         60 Tgas
+//   fund     Transfer to an agent account              attached: the amount       (no call)
 //   list     skills.nft_approve({token_id,             attached: 0.01 NEAR        100 Tgas
 //              account_id: market, msg: {"price"}})      (approval storage; the excess is refunded)
 //   link     signMessage("skirm:link-near:<skirm account id>:<near account id>")  NEP-413
@@ -11,7 +12,7 @@
 // Mint (S08) needs no wallet: the api mints with the ops key (Minter) to the linked account.
 import type { NearProof } from '../api/types';
 import type { NearConfig } from '../config';
-import type { FunctionCallAction, NearTransaction, NearWallet, SignedMessage } from './types';
+import type { FunctionCallAction, NearTransaction, NearTransferTransaction, NearWallet, SignedMessage } from './types';
 
 const TGAS = 10n ** 12n;
 export const GAS = {
@@ -67,6 +68,14 @@ export function rentTx(c: Contracts, offerId: string, nonce: string, ownerId: st
     receiverId: c.market,
     actions: [call('rent', { rental_id: `${offerId}:${nonce}`, owner_id: ownerId, price: yocto(priceYocto) }, GAS.rent, yocto(priceYocto))],
   };
+}
+
+/**
+ * Funds an agent's own (custodial) NEAR account with a plain transfer from the owner's wallet
+ * (docs/agent-accounts.md). No contract call: the server-held key spends it under the cap.
+ */
+export function fundAgentTx(agentAccountId: string, amountYocto: string): NearTransferTransaction {
+  return { receiverId: agentAccountId, actions: [{ type: 'Transfer', params: { deposit: yocto(amountYocto) } }] };
 }
 
 /** Lists (or reprices: the market replaces the listing) through `nft_approve` on the skills contract. */

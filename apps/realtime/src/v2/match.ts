@@ -22,7 +22,7 @@
 // mark it and every tick's log entry lists the steered agents (`controlled`), so replays and results
 // stay verifiable.
 import { V2_ACTION_DEADLINE_MS, V2_PLANNER_DEADLINE_MS, filterSpeech, maySpeak, type V2AgentCommand, type V2Brain, type V2Decision } from '@skirm/decision-engine/v2';
-import { DEFAULTS, chargeDue, playerTier, type PlayerTier } from '@skirm/shared';
+import { DEFAULTS, chargeDue, playerTier, type AgentCosmetics, type PlayerTier } from '@skirm/shared';
 import {
   commandOrder,
   dropTargets,
@@ -124,6 +124,11 @@ export interface V2Roster {
    * its agent's prompt only on ticks its trigger holds. Absent: every skill always plays.
    */
   skillMeta?: V2SkillMeta[][];
+  /**
+   * Per agent: the skin, trail and nameplate it wears (@skirm/shared EQUIP_COSMETICS ids), copied
+   * onto every frame for the arena to draw. Purely visual: never in the engine or the match log.
+   */
+  cosmetics?: (AgentCosmetics | null)[];
 }
 
 /** A skill's public metadata as a match uses it. */
@@ -182,6 +187,8 @@ export interface V2Finish {
   season?: Partial<Record<Team, NonNullable<V2Debrief['season']>>>;
   /** XP each crew's agents earned (from the stored debriefs). */
   xp?: Partial<Record<Team, NonNullable<V2Debrief['xp']>>>;
+  /** The result could not be stored: v2_end goes out void rather than announce a result that is not kept. */
+  unrecorded?: true;
 }
 
 /** Most agents a crew fields on this map (both sides start from the same number of tiles). */
@@ -535,8 +542,10 @@ export class V2Match {
         this.deps.log.error(`v2 match ${this.matchId}: finish failed: ${(err as Error).message}`);
         return fin;
       });
-    const base = { type: 'v2_end' as const, matchId: this.matchId, result: end.result, reason: end.reason, logHash: end.log && end.result ? logHash(end.log) : null };
-    for (const t of TEAMS) this.deps.send(t, { ...base, debrief: this.debrief(t, end, fin) });
+    // A result that was not stored is not announced: the players are told the match ended void.
+    const shown: V2MatchEnd = fin.unrecorded && end.result ? { ...end, result: null, reason: 'error' } : end;
+    const base = { type: 'v2_end' as const, matchId: this.matchId, result: shown.result, reason: shown.reason, logHash: shown.log && shown.result ? logHash(shown.log) : null };
+    for (const t of TEAMS) this.deps.send(t, { ...base, debrief: this.debrief(t, shown, fin) });
     this.deps.watch?.(base);
     return end;
   }
@@ -841,7 +850,13 @@ export class V2Match {
         const due = chargeDue(cum100[t], this.stats[t].charged);
         if (due > 0) {
           // Only what the ledger accepted counts, so the debrief never shows credits that were not charged.
-          if ((await this.deps.credits.charge(t, due)) !== false) this.stats[t].charged += due;
+          // A ledger error (a lost DB connection) must not void the match: log it like a failed
+          // settle or heartbeat and keep playing; the uncharged credits are not counted.
+          try {
+            if ((await this.deps.credits.charge(t, due)) !== false) this.stats[t].charged += due;
+          } catch (err) {
+            this.deps.log.error(`v2 match ${this.matchId} ${t}: charge of ${due} failed: ${(err as Error).message}`);
+          }
         }
       }
       this.publish(ev);
@@ -967,6 +982,7 @@ export class V2Match {
       const standing = this.steerStanding[t];
       if (steering) frame.steer = { agentId: steering, standing: standing ? { ...standing } : null };
       frame = withControlled(frame, this.controlled);
+      frame = withCosmetics(frame, this.setup.sides);
       // Practice shows all minds (the prototype): the player also sees the bot's plan, reason and inner voice.
       if (this.setup.practice) {
         const r: Team = t === 'A' ? 'B' : 'A';
@@ -977,7 +993,7 @@ export class V2Match {
       this.lastFrames[t] = msg;
       this.deps.send(t, msg);
     }
-    const watch = withControlled(frameFor(s, 'watch', ev), this.controlled);
+    const watch = withCosmetics(withControlled(frameFor(s, 'watch', ev), this.controlled), this.setup.sides);
     this.frames.watch.push(watch);
     if (this.deps.watch) {
       const msg: V2ServerMessage = { type: 'v2_frame', matchId: this.matchId, frame: watch };
@@ -1064,6 +1080,23 @@ export function withControlled(frame: V2Frame, controlled: Readonly<Record<Team,
   const ids = new Set(TEAMS.map((t) => controlled[t]).filter((id): id is string => !!id));
   if (!ids.size) return frame;
   return { ...frame, agents: frame.agents.map((a) => (ids.has(a.id) ? { ...a, controlled: true as const } : a)) };
+}
+
+/**
+ * Puts each agent's equipped cosmetics (plain item ids) on a frame, in every view: what an agent
+ * wears is public, like its name. Rendering only; the state, the engine and the log never see it.
+ */
+export function withCosmetics(frame: V2Frame, sides: Readonly<Record<Team, Pick<V2Roster, 'crew' | 'cosmetics'>>>): V2Frame {
+  const worn = new Map<string, AgentCosmetics>();
+  for (const t of TEAMS) {
+    const side = sides[t];
+    side.cosmetics?.forEach((c, i) => {
+      const id = side.crew[i]?.id;
+      if (id && c && Object.keys(c).length) worn.set(id, c);
+    });
+  }
+  if (!worn.size) return frame;
+  return { ...frame, agents: frame.agents.map((a) => (worn.has(a.id) ? { ...a, cosmetics: { ...worn.get(a.id)! } } : a)) };
 }
 
 const other = (t: Team): Team => (t === 'A' ? 'B' : 'A');

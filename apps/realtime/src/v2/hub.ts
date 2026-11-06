@@ -26,7 +26,7 @@
 // Model choice per agent: a crew entry may name a model from the operator's catalog (LLM_MODELS,
 // `models` below). An id the catalog does not list is refused; a known one is priced here from the
 // catalog (AgentSpec.rateBps), never from the client. Ranked plays the default model whatever is sent.
-import { SYSTEM_ACCOUNT_ID, newId, sealedSecretOf, type LobbyRow, type Repos, type V2CrewRecord, type V2MatchRow } from '@skirm/db';
+import { STARTER_SKILL, SYSTEM_ACCOUNT_ID, newId, sealedSecretOf, type LobbyRow, type Repos, type V2CrewRecord, type V2MatchRow } from '@skirm/db';
 import { campaignMission, forcedTier, isLobbyTalkRule, missionUnlocked, parseModelCatalog, resolveModel, type ModelChoice } from '@skirm/shared';
 import { DEFAULT_LLM_MODEL, createGreedyBrain, type V2Brain } from '@skirm/decision-engine/v2';
 import {
@@ -48,13 +48,13 @@ import {
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
-import { DEFAULTS, skillFitsRole } from '@skirm/shared';
+import { DEFAULTS, rankedRoleRefusal, skillFitsRole, type AgentCosmetics } from '@skirm/shared';
 import { V2_MATCH_LAST_TTL_S, v2MatchChannel, v2MatchLastKey, type ExternalTurnStore, type V2CrewEntry, type V2EndReason, type V2ServerMessage, type Vault } from '@skirm/server';
 import type { Logger, RegistryQueue } from '../deps';
 import { Matchmaker, type Lane, type QueueEntry } from '../matchmaker';
 import type { WsServerMessage } from '../protocol';
 import type { PubSub, Unsubscribe } from '../pubsub';
-import type { QueueTiming, Scheduler } from '../timing';
+import { sleep, type QueueTiming, type Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
 import { ExternalBrain, isExternalBrain, type WebhookPost } from './external';
 import { DEFAULT_V2_TIMING, TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2ControlError, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Playbook, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
@@ -151,6 +151,7 @@ export class V2HubError extends Error {
       | 'unavailable'
       | 'not_in_lockin'
       | 'external_unranked'
+      | 'role_unranked'
       | 'lobby_closed'
       | 'draft_casual'
       | 'mission_locked'
@@ -183,6 +184,8 @@ export class V2Hub {
   private readonly lobbyMatches = new Set<string>();
   /** Campaign matches: match id → the player and the mission, recorded when they end. */
   private readonly campaignMatches = new Map<string, { accountId: string; missionId: string }>();
+  /** Agents of pairs being set up (paired, no live v2_matches row yet), so no other crew can take them meanwhile. */
+  private readonly startingAgents = new Set<string>();
   private closing = false;
 
   constructor(private readonly deps: V2HubDeps) {
@@ -220,6 +223,7 @@ export class V2Hub {
     }
     await this.ownCrew(user.accountId, crew);
     if (ranked) await this.noExternal(user.accountId, crew);
+    if (ranked) await this.rankedRoles(crew);
     if (!this.fitting(crew.length).length) throw new V2HubError('invalid_crew', 'no map takes a crew this size');
     const account = await this.deps.repos.accounts.get(user.accountId);
     check();
@@ -275,7 +279,35 @@ export class V2Hub {
     }
     const busy = await repos.agents.busyAgents(crew.map((c) => c.agentId), matchId !== undefined ? { exceptMatch: matchId } : {});
     if (busy.length) throw new V2HubError('agent_busy', 'an agent is in a match that has not ended');
+    const held = this.heldAgents(accountId);
+    if (crew.some((c) => held.has(c.agentId))) throw new V2HubError('agent_busy', 'an agent is already in another search or a match being set up');
     this.knownModels(crew);
+  }
+
+  /**
+   * Agents no live v2_matches row shows yet but that are taken on this instance: in another
+   * account's queued search, or in a pair being set up. (An owner and a renter may otherwise both
+   * queue the same agent and play it in two matches at once.)
+   */
+  private heldAgents(exceptAccount?: string): Set<string> {
+    const held = new Set(this.startingAgents);
+    for (const e of this.matchmaker.list()) if (e.key !== exceptAccount) for (const c of e.payload.crew) held.add(c.agentId);
+    return held;
+  }
+
+  /**
+   * At pairing, the searches whose crew lost an agent since they queued: to a match that went live
+   * (on any instance) or to the other search of the pair. Their keys; empty when the pair may play.
+   */
+  private async pairClash(a: QueueEntry<V2Search>, b: QueueEntry<V2Search>): Promise<string[]> {
+    const ids = (e: QueueEntry<V2Search>) => e.payload.crew.map((c) => c.agentId);
+    const held = this.heldAgents();
+    const [busyA, busyB] = await Promise.all([a, b].map((e) => this.deps.repos.agents.busyAgents(ids(e))));
+    const clash: string[] = [];
+    if (busyA!.length || ids(a).some((id) => held.has(id))) clash.push(a.key);
+    // The same agent in both crews: the later search gives way.
+    if (busyB!.length || ids(b).some((id) => held.has(id) || (!clash.length && ids(a).includes(id)))) clash.push(b.key);
+    return clash;
   }
 
   /** The operator's model catalog, the default first. */
@@ -299,6 +331,16 @@ export class V2Hub {
   private async noExternal(accountId: string, crew: V2CrewEntry[]): Promise<void> {
     const bound = await this.deps.repos.externalAgents.boundTo(accountId, crew.map((c) => c.agentId));
     if (bound.length) throw new V2HubError('external_unranked', 'an agent played by an external agent plays casual and practice only');
+  }
+
+  /**
+   * Ranked plays the original six roles unless DEFAULTS.roles.rankedNewRoles: a crew with a Medic,
+   * Engineer, Saboteur or Courier is refused (the engine refuses such a ranked match too).
+   */
+  private async rankedRoles(crew: V2CrewEntry[]): Promise<void> {
+    const rows = await Promise.all(crew.map((c) => this.deps.repos.agents.get(c.agentId)));
+    const why = rankedRoleRefusal(rows.map((r) => r?.role ?? 'Runner'));
+    if (why) throw new V2HubError('role_unranked', why);
   }
 
   /**
@@ -388,6 +430,13 @@ export class V2Hub {
     return { match, team };
   }
 
+  /** Whether `agentId` is in the account's crew of this instance's match `matchId` (an external agent's scope). */
+  playsIn(accountId: string, matchId: string, agentId: string): boolean {
+    const match = this.matches.get(matchId);
+    const team = match && TEAMS.find((t) => match.setup.sides[t].accountId === accountId);
+    return !!team && match!.setup.sides[team].crew.some((a) => a.id === agentId);
+  }
+
   accept(accountId: string, matchId: string): void {
     const { match, team } = this.mine(accountId, matchId);
     match.accept(team);
@@ -424,6 +473,7 @@ export class V2Hub {
     if (crew.length < 1 || crew.length > match.crewLimit) throw new V2HubError('invalid_crew', `this map takes 1 to ${match.crewLimit} agents`);
     await this.ownCrew(accountId, crew, matchId);
     if (match.setup.ranked) await this.noExternal(accountId, crew);
+    if (match.setup.ranked) await this.rankedRoles(crew);
     const roster = await this.roster(accountId, crew, { matchId, ranked: match.setup.ranked });
     if (!match.lockIn(team, tiers, roster, playbook)) throw missed();
     this.deps.log.info(`v2 match ${matchId} ${team}: crew changed at lock-in (${roster.crew.length} agents)`);
@@ -630,7 +680,8 @@ export class V2Hub {
    * The crew's agents as they stand now, their decrypted skills, and which run a bought skill. Only
    * skills the agent's player owns are decrypted: one still equipped after it was sold is skipped. A
    * rented agent plays with its owner's skills, and counts as bought: its plans are withheld from
-   * the renter, who never reads another player's strategy.
+   * the renter, who never reads another player's strategy. The free starter skill every account gets
+   * is not bought (see runsBoughtSkill).
    */
   private async roster(accountId: string, entries: V2CrewEntry[], match: RosterMatch): Promise<V2Roster> {
     const { repos, vault, log } = this.deps;
@@ -682,11 +733,30 @@ export class V2Hub {
           return { name: m?.name ?? 'Skill', trigger: m?.trigger ?? null };
         }),
       );
-      bought.push(rented || meta.some((m) => m.creatorId !== accountId));
+      bought.push(runsBoughtSkill(accountId, rented, meta));
       instructions.push(v.systemPrompt ?? null);
     }
+    // A role changed to a new one while the crew was queued for ranked: refused before the match exists.
+    const unranked = match.ranked ? rankedRoleRefusal(crew.map((a) => a.role)) : null;
+    if (unranked) throw new V2HubError('role_unranked', unranked);
     const brains = await this.externalBrains(accountId, crew, bought, match);
-    return { crew, skills, skillKeys, skillNames, skillMeta, bought, instructions, ...(brains ? { brains } : {}) };
+    // What each agent wears (rendering only); a lookup that fails never holds up a match.
+    const worn = await repos.cosmetics.equippedMany(crew.map((a) => a.id)).catch((err: unknown) => {
+      log.warn(`v2: crew plays in default looks: ${(err as Error).message}`);
+      return {} as Record<string, AgentCosmetics>;
+    });
+    const cosmetics = crew.map((a) => worn[a.id] ?? null);
+    return {
+      crew,
+      skills,
+      skillKeys,
+      skillNames,
+      skillMeta,
+      bought,
+      instructions,
+      ...(brains ? { brains } : {}),
+      ...(cosmetics.some((c) => c) ? { cosmetics } : {}),
+    };
   }
 
   /**
@@ -763,6 +833,41 @@ export class V2Hub {
   }
 
   private async start(a: QueueEntry<V2Search>, b: QueueEntry<V2Search>): Promise<void> {
+    // Recheck the crews now that the pair formed: an agent may have gone into a match since it
+    // queued. Only the offending search is dropped; the other goes back to searching.
+    const keys = [a.key, b.key];
+    for (const k of keys) this.playing.set(k, undefined);
+    let clash: string[];
+    try {
+      clash = await this.pairClash(a, b);
+    } catch (err) {
+      this.deps.log.warn(`v2 pairing ${a.key} / ${b.key}: busy check failed: ${(err as Error).message}`);
+      clash = [];
+    } finally {
+      for (const k of keys) if (this.playing.get(k) === undefined) this.playing.delete(k);
+    }
+    if (clash.length) {
+      for (const e of [a, b]) {
+        if (clash.includes(e.key)) {
+          this.deps.log.warn(`v2 pairing: ${e.key}'s search dropped: an agent of its crew is already playing`);
+          this.deps.send(e.key, { type: 'error', code: 'agent_busy', message: 'an agent of your crew is already in another match; search again' });
+        } else if (!this.closing && !this.isBusy(e.key)) this.matchmaker.add({ key: e.key, lane: e.lane, ...(e.pool !== undefined ? { pool: e.pool } : {}), rating: e.rating, payload: e.payload });
+      }
+      return;
+    }
+    const agents = [a, b].flatMap((e) => e.payload.crew.map((c) => c.agentId));
+    for (const id of agents) this.startingAgents.add(id);
+    const unhold = () => {
+      for (const id of agents) this.startingAgents.delete(id);
+    };
+    try {
+      await this.launchPair(a, b, unhold);
+    } finally {
+      unhold();
+    }
+  }
+
+  private async launchPair(a: QueueEntry<V2Search>, b: QueueEntry<V2Search>, unhold: () => void): Promise<void> {
     const matchId = newId('mat');
     await this.launch(matchId, [a.key, b.key], async () => {
       const at = { matchId, ranked: a.payload.ranked };
@@ -780,6 +885,8 @@ export class V2Hub {
       // Draft searches pair only with draft searches (v2PoolsMatch).
       const draft = !ranked && !!a.payload.draft;
       await this.deps.repos.v2Matches.create({ id: matchId, mapId: map.id, ranked, teamA: a.key, teamB: b.key, crews: { A: crewRecords(sides.A), B: crewRecords(sides.B) }, ...(ranked ? {} : { difficulty }) });
+      // The live row now marks the agents busy (busyAgents).
+      unhold();
       this.countPlay(map);
       return this.newMatch({ matchId, map, ranked, difficulty, sides, ...(draft ? { draft } : {}) }, { A: this.deps.brain, B: this.deps.brain }, (t, msg) => this.deps.send(sides[t].accountId, msg));
     });
@@ -874,10 +981,15 @@ export class V2Hub {
   private async finish(end: V2MatchEnd, match: V2Match): Promise<V2Finish> {
     const { log } = this.deps;
     const out: V2Finish = { eloDelta: {}, registry: null };
-    const row = await this.record(end, match).catch((err: unknown) => {
-      log.error(`v2 match ${end.matchId}: record failed: ${(err as Error).message}`);
-      return null;
-    });
+    const row = await this.recordRetrying(end, match);
+    // A result is announced only once it is stored: a row that could not be written (or that was
+    // voided meanwhile) would show a win the sweep then voids, so v2_end goes out void instead.
+    if (end.result && row?.status !== 'ended') {
+      log.error(`v2 match ${end.matchId}: result not stored (${row ? `row is ${row.status}` : 'record failed'}), ending it void`);
+      this.campaignMatches.delete(end.matchId);
+      await this.recordExternal(end.matchId, match);
+      return { ...out, unrecorded: true };
+    }
     if (row) for (const d of row.eloDeltas ?? []) out.eloDelta[d.team] = d.delta;
     // The decision timelines, before v2_end goes out, so the debrief can ask for them at once.
     if (row?.status === 'ended')
@@ -943,6 +1055,21 @@ export class V2Hub {
       }
   }
 
+  /** record(), retried a few times (a transient DB error must not cost a player their result); null when it never succeeded. */
+  private async recordRetrying(end: V2MatchEnd, match: V2Match): Promise<V2MatchRow | null> {
+    const { log } = this.deps;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.record(end, match);
+      } catch (err) {
+        log.error(`v2 match ${end.matchId}: record failed (attempt ${attempt + 1} of ${RECORD_RETRY_MS.length + 1}): ${(err as Error).message}`);
+        const wait = RECORD_RETRY_MS[attempt];
+        if (wait === undefined) return null;
+        await sleep(this.deps.scheduler, wait);
+      }
+    }
+  }
+
   private async record(end: V2MatchEnd, match: V2Match) {
     const r = end.result;
     const { sides } = match.setup;
@@ -988,7 +1115,8 @@ export class V2Hub {
     const now = this.deps.scheduler.now();
     const cutoff = now - olderThanMs;
     const voided: string[] = [];
-    for (const m of await repos.v2Matches.listLive(500)) {
+    // Oldest first: with more live rows than one pass reads, the stalest are the ones to void.
+    for (const m of await repos.v2Matches.listLive(500, 'oldest')) {
       if (this.matches.has(m.id)) continue;
       if (m.heartbeatAt ? m.heartbeatAt.getTime() > now - heartbeatStaleMs : m.createdAt.getTime() > cutoff) continue;
       const row = await repos.v2Matches.finish(m.id, { winner: null, reason: 'aborted' });
@@ -1001,6 +1129,9 @@ export class V2Hub {
     return voided;
   }
 }
+
+/** Waits between attempts to store a match result (so three attempts in all). */
+export const RECORD_RETRY_MS = [250, 1_000];
 
 /** A live match whose last heartbeat is older than this is treated as orphaned. */
 export const HEARTBEAT_STALE_MS = 3 * 60_000;
@@ -1054,3 +1185,14 @@ const modelRec = (side: V2Roster, agentId: string): Pick<V2CrewRecord, 'model' |
   return { ...(a?.model ? { model: a.model } : {}), ...(a?.rateBps !== undefined ? { rateBps: a.rateBps } : {}) };
 };
 const crewRecords = (side: V2Roster): V2CrewRecord[] => side.crew.map((a) => ({ ...rec(a), skills: skillsOf(side, a.id), ...externalOf(side, a.id) }));
+
+/**
+ * Whether an agent runs a skill its player did not write, so its crew's plan and its inner voice are
+ * withheld (a bought skill never leaks through plan text). A rented agent always counts. The free
+ * starter skill every new account is given (Flood Warden, written by the system account) does not:
+ * nobody bought it and its text is the public spec example, so a new player sees their crew's plan.
+ * Official marketplace skills are also written by the system account but are sold, so they count.
+ */
+export function runsBoughtSkill(accountId: string, rented: boolean, skills: readonly { id: string; creatorId: string }[]): boolean {
+  return rented || skills.some((m) => m.creatorId !== accountId && m.id !== STARTER_SKILL.id);
+}

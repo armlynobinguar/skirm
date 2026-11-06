@@ -769,6 +769,7 @@ function VsTakeover({
               head={SKIN_TONES[a?.appearance.skin ?? 0] ?? SKIN_TONES[0]!}
               team="A"
               label={`${c.name}, ${a?.role ?? 'agent'}`}
+              role={a?.role}
               className={h.face}
             />
           ))}

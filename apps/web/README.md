@@ -43,6 +43,7 @@ Web config (`.env.example`; `NEXT_PUBLIC_*` is inlined at build time):
 | `NEXT_PUBLIC_NEAR_CONTRACT_MARKET` | `market.playskirm.testnet` |
 | `NEXT_PUBLIC_NEAR_CONTRACT_DEPOSITS` | `deposits.playskirm.testnet` |
 | `NEXT_PUBLIC_NEAR_CONTRACT_REGISTRY` | `registry.playskirm.testnet` |
+| `NEXT_PUBLIC_SAMPLE_MATCH_ID` | empty (optional): a ranked match recorded on the registry; /verify shows "Try a sample match" for it. Empty hides the button (no public api lists ended ranked matches) |
 
 The contract ids must match the api's `NEAR_CONTRACT_*` (it verifies the hashes against them).
 
@@ -226,6 +227,12 @@ More api and realtime shapes:
   camera with `arenaStore().setView({ mode, focus })` (`OVERVIEW` to reset).
 - `features/arena/chase3d`: `mountChaseCam(el, getState, { onFail })` and a `ChaseCam` default export for
   `next/dynamic` (`three` is pinned in `package.json`, loaded only there).
+- Arena cosmetics: frames carry `agents[].cosmetics` (`{ skin?, trail?, nameplate? }`, item ids from
+  `EQUIP_COSMETICS`). `features/arena/cosmetics.ts` is the only reader: `composeV2Arena` tints worn
+  skins through `tintAgents`, and `ArenaCanvas` calls `drawCosmetics2D` once a frame (skin pattern
+  ring, trail, styled nameplate). The 3D chase cam does not draw them yet. The agent editor's
+  Arena style tab (`features/account/CosmeticsEditor.tsx`) buys and equips them
+  (`api.equipCosmetic(agentId, slot, itemId)`, `api.mintCosmetic(id)` when `cosmetics.onchain`).
 - "Soon" features use `<Soon what="Agent rentals" />` from `@skirm/ui`: never a mock number.
 
 ## Preferences

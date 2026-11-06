@@ -1,6 +1,7 @@
 # skirm NEAR contracts
 
-Rust contracts (near-sdk 5.29, near-contract-standards 5.29) for the MVP onchain systems in arch.md
+Rust contracts (near-sdk 5.29, near-contract-standards 5.29) for skirm's onchain systems (skill NFTs,
+the skill market, match registry, credit top-ups, writer backing and badges)
 and the season prize pools. The stretch `pool` contract is not included.
 
 | Crate | Account (testnet) | What it does |
@@ -12,6 +13,7 @@ and the season prize pools. The stretch `pool` contract is not included.
 | `seasons` | [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | 14-day season prize pools: funded by market fees, standings posted by ops, prizes claimed by players |
 | `badges` | `badges.playskirm.testnet` (not deployed yet) | Soulbound achievement badges in the NEP-171 shape (core views, enumeration, metadata, `nft_mint` event); `nft_transfer` always panics |
 | `backing` | `backing.playskirm.testnet` (not deployed yet) | Writer backing rounds: `open_round` (writer sets share, cap multiple, max raise), payable `back`, `close_round` (raise to the writer), `cancel_round` + `refund`, payable `distribute` (royalty income: backers' capped share kept for `claim`, the rest to the writer), `claim`; NEP-297 `skirm_backing` events. Backers earn only from royalties someone forwards with `distribute`: NEP-199 royalties go to the writer, not the round |
+| `cosmetics` | `cosmetics.playskirm.testnet` (not deployed yet) | NEP-245 multi-token cosmetic items (agent skins, trails, nameplate styles): one token id per item type, owner/ops-gated `mt_create` and `mt_mint`, NEP-245 transfers and `transfer_call` with a private resolver, enumeration and metadata views, `nep245` events; storage charged to the caller |
 
 Roles used below: `playskirm.testnet` is the owner (full-access keys kept offline), the treasury and
 the market's governance account. `ops.playskirm.testnet` is the platform signer.
@@ -26,16 +28,18 @@ be limited to; the testnet ops account actually signs with one full-access key, 
 | `registry` | `record_match` |
 | `seasons` | `open_season`, `lock_season`, `post_standings`, `close_season` |
 | `badges` | `nft_mint` |
+| `cosmetics` | `mt_create`, `mt_mint` |
 
 None of these calls attach NEAR (a function-call key could not), so `skills`, `registry`, `seasons`
-and `badges` pay their own storage. None of the market's admin methods are on the list: they all
+and `badges` pay their own storage. `cosmetics` charges storage to the caller instead: ops pays from
+a storage balance the owner tops up with `storage_deposit({"account_id":"ops.playskirm.testnet"})`. None of the market's admin methods are on the list: they all
 need 1 yocto.
 
 ## Build
 
 ```sh
 cd contracts
-./build.sh            # -> target/wasm32-unknown-unknown/release/skirm_{skills,market,registry,deposits,seasons,badges,backing}.wasm
+./build.sh            # -> target/wasm32-unknown-unknown/release/skirm_{skills,market,registry,deposits,seasons,badges,backing,cosmetics}.wasm
 ```
 
 `wasm32v1-none` cannot build these contracts because it only provides `core`/`alloc` and
@@ -54,7 +58,8 @@ cargo test                                                   # unit tests, every
 ```
 
 The unit tests use near-sdk `unit-testing` and `testing_env!`. They cover every method,
-access control, Formulas §6 arithmetic and the market callback outcomes:
+access control, the sale-split arithmetic (fee + royalty + seller = price) and the market callback
+outcomes:
 
 * 5 NEAR resale gives a 0.25 fee, 0.25 royalty and 4.5 to the seller. A 5 NEAR primary sale
   gives a 0.25 fee, 0 royalty and 4.75 to the creator.
@@ -89,6 +94,10 @@ These contracts are live and initialized, built with `contracts/build.sh` and de
 The market on testnet predates `rent` (agent rentals): until the operator redeploys it
 ([contracts/market/README.md](market/README.md), no state migration needed) the api keeps
 `NEAR_RENTALS_ONCHAIN` off and rentals are paid in credits.
+
+Agents can also pay `rent` from their own NEAR account (`<agent>.<AGENT_ACCOUNTS_PARENT>`). These
+accounts are **custodial**: the api holds their full-access keys, because a function-call key cannot
+attach the deposit that `rent` needs. See [docs/agent-accounts.md](../docs/agent-accounts.md).
 
 The backend's season job opens each season onchain with the ops key. While no season is open,
 the market forwards the season share of each fee to the treasury.
@@ -202,7 +211,8 @@ attached, so a function-call key cannot make it.
 | `skill_info(token_id)`, `skill_token(skill_id, version)`, `is_account_bound(skill_id)`, `get_config()` | view | | |
 | `set_ops`, `set_owner`, `set_account_bound(skill_id, bound)` | owner | 1 yocto | |
 
-`skill` is the public part of `skirm.skill/v0` (Spec §9), validated on chain:
+`skill` is the public part of `skirm.skill/v0` (`SkillPublic` in packages/shared/src/types.ts),
+validated on chain:
 
 * `id`: `skl_` + 26-char ULID.
 * `version` ≥ 1.
@@ -220,11 +230,11 @@ Token id is `<skill id>:<version>`. Token metadata:
 * `title` = name, `description` = summary, `issued_at` = created_at, `copies` = 1.
 * `extra` = JSON
   `{"schema":"skirm.skill/v0","id","version","creator","royalty_bps","prompt_sha256","requires_actions","handles_tags"}`.
-  Tag and action lists are stored in spec order.
+  Tag and action lists are stored in canonical order (`TAGS`, `GATED_ACTIONS` in skills/src/lib.rs).
 
 The creator of a skill id is fixed by its first minted version. The prompt is never on chain.
 
-Payout (Formulas §6): the owner gets `balance − royalty`, with `royalty = floor(balance × royalty_bps / 10^4)`
+Payout: the owner gets `balance − royalty`, with `royalty = floor(balance × royalty_bps / 10^4)`
 going to the creator. On the creator's own (primary) sale the royalty is 0.
 
 ### market
@@ -316,7 +326,7 @@ Ratings are per player.
 | `fund(season_id?)` → `U128` | anyone (the market) | the amount | Adds the deposit to the given or current `Open` season. Panics when no season is open |
 | `lock_season(id)` | owner or ops | | Once block time ≥ `ends_at_ms` |
 | `post_standings(id, standings: [{player, near?, points}])` | owner or ops | | `Locked` seasons only, at most 10 rows, rank = index + 1. Identical retry is a no-op; different data panics |
-| `claim(id)` | the standing's `near` account | | Once per standing; transfers the share |
+| `claim(id)` | the standing's `near` account | | Once per standing; transfers the share. If the transfer fails, the private callback `on_prize_transferred` makes the share claimable again (or adds it to the carry if the season was closed meanwhile); the result is the amount sent, or 0 |
 | `close_season(id)` | owner or ops | | `Locked` with standings: unclaimed shares go to the carry, status becomes `Paid` |
 | `get_season`, `current_season`, `get_config`, `get_carry` | view | | |
 | `set_ops`, `set_owner` | owner | 1 yocto | |
@@ -344,13 +354,46 @@ The backend mints through `NearBadges` (`packages/server/src/near/badges.ts`) wh
 and records `local` through `NoopBadges` otherwise. Deploy it like `seasons` (owner, ops) and add an
 ops function-call key for `nft_mint`; nothing deploys it yet.
 
+### cosmetics
+
+Not deployed yet. Agent skins, trails and nameplate styles as NEP-245 multi-tokens: the token id is
+the item id from `@skirm/shared` `EQUIP_COSMETICS` (`skin_ember`, `trail_spark`, `plate_gold`, ...),
+and an account holds any number of copies.
+
+| Method | Caller | Deposit | Notes |
+| --- | --- | --- | --- |
+| `new(owner_id, ops_id, metadata?)` | deployer | | Metadata default `mt-1.0.0`, `skirm cosmetics` / `SKIRMCOS` |
+| `mt_create(token_id, metadata, max_supply?)` → Token | owner or ops | storage | `token_id` 1–64 of `a-z0-9_`; `metadata.title` 1–64 chars; `metadata.extra` JSON ≤ 1,024 bytes (`{"schema":"skirm.cosmetic/v0","kind",...look}`). The same item again returns it; other metadata panics |
+| `mt_mint(receiver_id, token_ids, amounts, memo?, mint_id?)` → bool | owner or ops | storage | 1–16 items; respects `max_supply`. A `mint_id` already minted returns false and mints nothing (the backend sends `<platform account>:<item>`) |
+| `mt_burn(token_ids, amounts, memo?)` | holder | 1 yocto | Freed storage goes to the caller's storage balance |
+| `mt_transfer(receiver_id, token_id, amount, approval?, memo?)`, `mt_batch_transfer(receiver_id, token_ids, amounts, approvals?, memo?)` | holder | 1 yocto | NEP-245. A new receiver entry is paid from the sender's storage balance. Approvals are not supported (`approval` must be null) |
+| `mt_transfer_call(..., msg)`, `mt_batch_transfer_call(..., msg)` → `[U128]` | holder | 1 yocto | ≥ 70 Tgas. Calls `receiver.mt_on_transfer(sender_id, previous_owner_ids, token_ids, amounts, msg)` → unused amounts |
+| `mt_resolve_transfer(previous_owner_ids, receiver_id, token_ids, amounts, approvals?)` → `[U128]` | private callback | | Moves the unused amounts the receiver still holds back to the sender (a failed or unreadable answer counts as all unused); returns what the receiver kept |
+| `mt_token(token_ids)`, `mt_balance_of(account_id, token_id)`, `mt_batch_balance_of(account_id, token_ids)`, `mt_supply`, `mt_batch_supply` | view | | `Token` = `{token_id, owner_id: null, supply, max_supply, metadata}` |
+| `mt_tokens(from_index?, limit?)`, `mt_tokens_for_owner(account_id, from_index?, limit?)` | view | | Enumeration, ≤ 100 per page |
+| `mt_metadata_contract()`, `mt_metadata_token_by_token_id(token_ids)` | view | | |
+| `storage_deposit(account_id?)`, `storage_withdraw(amount?)` (1 yocto), `storage_balance_of(account_id)` | anyone | | NEP-145-style storage balance that pays for state the caller adds |
+| `get_config()`, `is_minted(mint_id)` | view | | |
+| `set_ops`, `set_owner` | owner | 1 yocto | |
+
+Storage: every call that grows state takes the cost from the attached deposit first (the excess is
+refunded), then from the caller's storage balance, and panics when both fall short. A call that
+frees state credits the caller's storage balance when they have one. Refunds made by
+`mt_resolve_transfer` are absorbed by the contract.
+
+The backend mints through `NearCosmetics` (`packages/server/src/near/cosmetics.ts`) only when
+`NEAR_CONTRACT_COSMETICS` is set and the ops signer is configured. Before turning it on, the owner
+deploys and initializes the contract, tops up the ops storage balance and creates each item type
+with `mt_create` (`cosmeticCreateArgs` in that file builds the args from the catalog). Nothing
+deploys it yet.
+
 ### deposits
 
 | Method | Caller | Deposit | Notes |
 | --- | --- | --- | --- |
 | `new(owner_id, treasury_id, min_deposit?)` | deployer | | `min_deposit` default 0.01 NEAR |
 | `deposit()` → receipt number | player wallet | ≥ min | Logs the event below |
-| `withdraw(amount?)` | owner | 1 yocto | Sends to the treasury; keeps storage cost + 0.1 NEAR on the contract |
+| `withdraw(amount?)` | owner | 1 yocto | Sends to the treasury; keeps storage cost + 0.1 NEAR on the contract. The private callback `on_withdrawn` emits `withdraw` on success, or reverts `total_withdrawn` and emits `withdraw_failed` |
 | `get_deposit(receipt)`, `total_deposited_by(account_id)`, `withdrawable()`, `get_config()` | view | | |
 | `set_treasury`, `set_min_deposit`, `set_owner` | owner | 1 yocto | |
 
@@ -386,8 +429,9 @@ needs no ops key (every call is signed by a player's wallet).
 | `nep171` | `nft_mint`, `nft_transfer` (emitted by skills; badges emits `nft_mint` only, memo `soulbound`) |
 | `skirm_market` | `list` (listing), `delist`, `update_price`, `sale` `{token_id, seller, buyer, price, fee, fee_bps, season_share, treasury_share, royalties{account: amount}, seller_proceeds, refund, payout_fallback}`, `purchase_failed` `{token_id, seller, buyer, refund}`, `rental` `{rental_id, owner, renter, price, fee, fee_bps, season_share, treasury_share, owner_proceeds, refund}`, `season_share_forwarded` `{amount, treasury_id, season_pool_id}`, `fee_proposed` `{old_bps, new_bps, effective_at_ms, by}`, `fee_updated` `{old_bps, new_bps, by}`, `treasury_updated` / `owner_updated` / `governance_updated` / `season_pool_updated` `{old, new, by}` |
 | `skirm_registry` | `match_recorded` (MatchRecordV2) |
-| `skirm_seasons` | `season_opened`, `season_funded`, `season_locked`, `standings_posted`, `prize_claimed`, `season_closed`, `carry_rolled`, `ops_updated`, `owner_updated` |
-| `skirm_deposits` | `deposit` `{receipt, player, amount, block_height, timestamp_ms}`, `withdraw` `{treasury, amount}` |
+| `skirm_seasons` | `season_opened`, `season_funded`, `season_locked`, `standings_posted`, `prize_claimed` (after the transfer succeeded), `prize_transfer_failed`, `season_closed`, `carry_rolled`, `ops_updated`, `owner_updated` |
+| `skirm_deposits` | `deposit` `{receipt, player, amount, block_height, timestamp_ms}`, `withdraw` `{treasury, amount}` (after the transfer succeeded), `withdraw_failed` `{treasury, amount}` |
+| `nep245` | `mt_mint` `{owner_id, token_ids, amounts, memo}`, `mt_transfer` `{old_owner_id, new_owner_id, token_ids, amounts, memo}` (memo `refund` for a resolver refund), `mt_burn` `{owner_id, token_ids, amounts, memo}` (emitted by cosmetics) |
 | `skirm_backing` | `round_opened` (Round), `backed` `{round_id, backer, amount, stake, raised}`, `round_closed` `{round_id, writer, raised, backers}`, `round_cancelled` `{round_id, writer, raised}`, `royalty_distributed` `{round_id, from, amount, to_backers, to_writer, backers_earned, capped}`, `claimed` `{round_id, backer, amount, claimed}`, `refunded` `{round_id, backer, amount}` |
 
 A deposit event looks like

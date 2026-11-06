@@ -17,6 +17,9 @@ const STEP: Record<'N' | 'E' | 'S' | 'W', [number, number]> = { N: [0, -1], E: [
 export function greedyAct(o: Observation, command: Pick<V2AgentCommand, 'preset' | 'targets'> | null = null): Action {
   const ordered = command ? greedyCommanded(o, command) : null;
   if (ordered) return ordered;
+  // The new roles first (none of these is ever legal for the original six, so they play as before).
+  const role = greedyRoleAct(o);
+  if (role) return role;
   const sw = o.legal.find((a) => a.type === 'switch');
   if (sw && o.tick % 7 === 0) return sw;
   const need = o.map.goal - o.score.mine;
@@ -47,6 +50,30 @@ export function greedyAct(o: Observation, command: Pick<V2AgentCommand, 'preset'
   // A high bit of the hash: its lowest bit only follows the parity of the characters, so two ids
   // like "a-2" and "b-1" would always yield together and never get past each other.
   return crowded && ((hash(`${o.me.id}:${o.tick}`) >>> 16) & 1) === 1 ? { type: 'wait' } : move;
+}
+
+/** Ticks before a Saboteur bot plants: let the rival commit to the middle first. */
+export const GREEDY_PLANT_AFTER = 6;
+/** A Saboteur bot plants only this close (columns) to the centre column, where both crews walk. */
+export const GREEDY_PLANT_BAND = 3;
+
+/**
+ * The new roles' own moves, or null. Medic: tend any crewmate the engine lists (a knock-down or a
+ * stun next to it) at once. Saboteur: plant a decoy when it stands in the middle band, a few ticks
+ * in, off the delivery point's doorstep, with empty hands (it is not racing an item home); the first
+ * legal side. Engineers pull valves from further off through the usual switch rule and lay their own
+ * bridges through greedyTool; Couriers just run (carrying 1, they deliver every item).
+ */
+export function greedyRoleAct(o: Observation): Action | null {
+  if (o.me.role === 'Medic') return o.legal.find((a) => a.type === 'tend') ?? null;
+  if (o.me.role === 'Saboteur') {
+    const plant = o.legal.find((a) => a.type === 'plant');
+    if (!plant || o.tick < GREEDY_PLANT_AFTER || o.me.carrying) return null;
+    const [ex, ey] = o.map.exit;
+    if (Math.abs(o.me.x - ex) > GREEDY_PLANT_BAND || dist(o.me, ex, ey) < 2) return null;
+    return plant;
+  }
+  return null;
 }
 
 const dist = (a: { x: number; y: number }, x: number, y: number) => Math.abs(a.x - x) + Math.abs(a.y - y);
@@ -224,6 +251,8 @@ export function greedyThought(o: Observation, act: Action): string {
   let t: string;
   if (act.type === 'switch') t = 'Switch is ready. Flooding their lane.';
   else if (act.type === 'use') t = toolThought(act.tool);
+  else if (act.type === 'tend') t = `Patching up ${o.teammates.find((m) => m.id === act.agent)?.name ?? 'my crewmate'}. Back on your feet.`;
+  else if (act.type === 'plant') t = `Dropping a fake ${item} here. Let them reach for it.`;
   else if (o.me.carrying && (o.me.carrying >= o.me.capacity || o.me.carrying >= need)) t = `${o.me.carrying} in hand. ${d.deliver ?? '?'} steps to the ${o.map.deliverTo.toLowerCase()}.`;
   else if (act.type === 'wait') t = o.legal.length > 1 ? 'Someone is in my way. I will let them pass.' : 'Holding here.';
   else if (d.item !== null) t = `${d.item} steps to the nearest ${item}. Going.`;

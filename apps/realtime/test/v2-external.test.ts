@@ -226,4 +226,40 @@ describe('external agents in the hub', () => {
     await send({ type: 'v2_decline', matchId: found.matchId });
     await sock.inbox.next('v2_end');
   });
+
+  it('an agent token neither sees nor acts on the owner’s matches its agent does not play', async () => {
+    const p = await setup();
+    const sock = new FakeSocket();
+    const c = hub!.connect(sock);
+    const send = (m: unknown) => hub!.message(c, JSON.stringify(m));
+    await send({ type: 'auth', agentToken: externalAgentToken(p.ext.id, p.secret) });
+
+    // The owner plays practice from the browser with an agent the external agent does not play.
+    await p.send({ type: 'v2_queue', crew: [{ agentId: p.agents[1]!.id, tier: 'standard' }], ranked: false, opponent: 'bot' });
+    const found = await p.sock.inbox.next('v2_found');
+    await send({ type: 'v2_accept', matchId: found.matchId });
+    expect(await sock.inbox.next('error')).toMatchObject({ code: 'not_found' });
+    await send({ type: 'v2_decline', matchId: found.matchId });
+    expect(await sock.inbox.next('error')).toMatchObject({ code: 'not_found' });
+    await send({ type: 'v2_lock_in', matchId: found.matchId, tiers: ['standard'] });
+    expect(await sock.inbox.next('error')).toMatchObject({ code: 'not_found' });
+    for (const m of [
+      { type: 'v2_command', matchId: found.matchId, preset: 'regroup' },
+      { type: 'v2_control', matchId: found.matchId, agentId: p.agents[1]!.id },
+      { type: 'v2_lobby_ready', lobbyId: 'lob_x', crew: [{ agentId: p.agents[0]!.id, tier: 'standard' }] },
+    ]) {
+      await send(m);
+      expect(await sock.inbox.next('error')).toMatchObject({ code: 'forbidden' });
+    }
+    await send({ type: 'v2_cancel_queue' });
+    expect(await sock.inbox.next('error')).toMatchObject({ code: 'not_queued' });
+
+    // The owner plays it through; the agent socket hears nothing of it.
+    await p.send({ type: 'v2_accept', matchId: found.matchId });
+    await p.sock.inbox.next('v2_lockin');
+    await p.send({ type: 'v2_lock_in', matchId: found.matchId, tiers: ['standard'] });
+    await p.sock.inbox.next('v2_end', () => true, 60_000);
+    const leaked = sock.inbox.ofType('v2_found').length + sock.inbox.ofType('v2_lockin').length + sock.inbox.ofType('v2_frame').length + sock.inbox.ofType('v2_end').length;
+    expect(leaked).toBe(0);
+  });
 });

@@ -23,6 +23,8 @@ export interface WebConfig {
   privyAppId: string;
   /** Optional Privy app client id (per-environment client in the Privy dashboard). */
   privyClientId: string;
+  /** A known ranked, recorded match id for /verify's "Try a sample match" (NEXT_PUBLIC_SAMPLE_MATCH_ID); empty hides the button. */
+  sampleMatchId: string;
   near: NearConfig;
 }
 
@@ -47,6 +49,7 @@ export const config: WebConfig = {
   authMode: process.env.NEXT_PUBLIC_AUTH_MODE === 'privy' ? 'privy' : 'dev',
   privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID || '',
   privyClientId: process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID || '',
+  sampleMatchId: (process.env.NEXT_PUBLIC_SAMPLE_MATCH_ID || '').trim(),
   near: {
     network: process.env.NEXT_PUBLIC_NEAR_NETWORK === 'mainnet' ? 'mainnet' : 'testnet',
     // FastNEAR, the api's default (packages/server NEAR_RPC_URL).

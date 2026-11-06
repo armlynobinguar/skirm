@@ -17,6 +17,29 @@ The `data-testid` values in brackets are stable selectors for agents driving a b
 
 Every new account starts with the same crew: **Rook**, **Wren** and **Moss**, each with a role, vision 3, comms 3 and the Standard talk tier. Rook carries the account-bound starter skill **Flood Warden**. Your own Elo starts at 1,200.
 
+#### Roles
+
+Set an agent's role in the agent editor (**Role** [`agent-role-picker`], one button per role [`agent-role-<Role>`]) or with `PATCH /agents/:id { role }`. A role change is refused while the agent has a skill equipped that is not for that role. The engine's exact rules live in `packages/engine/src/v2/match.ts` (the original six) and `roles.ts` (the four newer ones).
+
+| Role | What it does |
+| --- | --- |
+| Builder | The only role that uses `add_solid` verbs: places a block on an adjacent open tile (the crew's block supply). |
+| Digger | The only role that uses `remove_solid` verbs (rubble, blocks, crates, trees); walking into dirt clears it in one move instead of three. |
+| Firefighter | The only role that uses `extinguish` verbs on adjacent fire. |
+| Scout | The only role that uses `area_repel`: stuns rivals within 2 tiles for 3 ticks, every 15 ticks. |
+| Runner | Takes and delivers; carries 2 items. |
+| Hauler | Takes and delivers; carries 3 items. |
+| **Medic** | `tend <agent>` on a crewmate within 1 tile (a knocked-down agent does not hold its tile, so the Medic may stand on it). A knock-down with 2 or more ticks left loses 2 of them, never going under 1: the crewmate still gets up at its start, 2 ticks sooner (4 → 2). A stun is cleared and the crewmate acts next tick. Then the Medic waits 5 ticks. Never itself, never a rival. Carries 2. |
+| **Engineer** | Pulls a valve (switch) from up to 2 tiles away instead of only next to it (the nearest in reach, map order on a tie); the switch's shared 26-tick reset is unchanged. Has 2 bridges of its own: `use bridge <dir>` lays one on adjacent water exactly like a supply-drop bridge, without using its tool slot; a bridge it carries from a drop goes down first. Bridges never break, so there is nothing to repair. Carries 2. |
+| **Saboteur** | `plant <dir>` puts a decoy on adjacent open floor (not grass, ice, an item, the delivery point, a start tile, a tool or placed gear, and nobody standing there). 2 per match, and each one uses one of the crew's bluffs: bluffs told plus decoys planted never pass the crew's bluff cap (3 by default). The rival crew sees the decoy as an item whenever the tile is in its sight (fog applies, and it remembers it like any tile); the planting crew sees floor, and its frames list its decoys. A rival that ends a move on it with room to carry springs it: nothing is picked up, the decoy is gone and the rival loses its next action. The planting crew walks over its own decoys; a decoy whose tile stops being open floor (a hazard, a flood, a block, a dropped item) is gone. Bluffs are only ever about real middle items, never a decoy. Carries 2. |
+| **Courier** | Carries 1 item. A move whose first tile is open ground (floor or grass; not ice, water or a bridge, an item, a decoy it takes for an item, the delivery point or a tool) goes one more tile the same way when that tile is floor, grass, an item or the delivery point, inside the walls and free of agents. Rubble, walls and hazards stop the second tile. It resolves after every other move and ice slide; pickups and deliveries happen where it ends. |
+
+**Ranked** plays the original six only while `DEFAULTS.roles.rankedNewRoles` is `false` (the default): queueing ranked, changing the crew at ranked lock-in, or starting a ranked match with a Medic, Engineer, Saboteur or Courier is refused with `role_unranked`, and the engine itself refuses to create such a ranked match. Everything else (casual, practice, lobbies, tournaments, the campaign, daily and puzzles where you pick the crew) plays all ten. The registry contract stores agent ids and talk tiers, never roles, so it needs no change.
+
+**Balance.** The Medic halves a knock-down and takes 2 ticks off a Scout's 3-tick stun, at most every 5 ticks and only next to the crewmate, so it spends its own moves to save its crew's. The Engineer's reach is one tile more and its bridges only matter on water maps. The Saboteur's decoys come out of the bluff budget, cost an action each and cost the victim one action plus the walk. The Courier covers up to twice the ground but brings home half a Runner's load per trip and stops at every item, so it is best on scattered items and steals. In greedy-vs-greedy sweeps over all ten maps (easy and normal, both sides) a crew that swaps one Runner for the new role scores within a Hauler's margin of an all-Runner crew.
+
+**Replays.** Old matches only have the original six, and their rules did not change: an original-role match plays, logs and hashes exactly as before (`packages/engine/test/v2-role-parity.test.ts` and `packages/decision-engine/test/v2-role-parity.test.ts` pin scripted and greedy matches on every map, taken before the new roles), so `/verify` recomputes every stored match the same.
+
 ### 2. Practice vs Greedy bot (the judge path)
 
 1. Click the **Practice** tile [`s02-tile-practice`]. **See** the crew screen at `/maps/copper-hollow/crew?d=easy&opponent=bot` [`screen-s04`]:

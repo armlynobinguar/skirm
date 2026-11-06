@@ -13,11 +13,14 @@ import { verifyMatch, type VerifyReport, type VerifyStatus } from './verify';
 import s from './verify.module.css';
 
 const HEADLINE: Record<VerifyStatus, string> = {
-  verified: '✓ Verified on NEAR',
-  mismatch: '✗ Mismatch',
+  verified: 'Pass · Verified on NEAR',
+  mismatch: 'Fail · Mismatch',
   not_recorded: 'Not recorded onchain',
   unavailable: 'NEAR could not be read',
 };
+
+/** The big mark beside the headline: a check for a pass, a cross for a fail, a dash when there is nothing onchain to compare. */
+const GLYPH: Record<VerifyStatus, string> = { verified: '✓', mismatch: '✗', not_recorded: '–', unavailable: '!' };
 
 const SUMMARY: Record<VerifyStatus, string> = {
   verified: 'The registry record matches the log your browser rechained: same log hash, winner and score.',
@@ -71,14 +74,41 @@ function errorText(err: unknown): string {
 }
 
 export function VerifyResult({ report }: { report: VerifyReport }) {
+  const onchainHash = report.record?.log_sha256 ?? null;
+  const same = !!report.logHash && report.logHash === onchainHash;
+  const onchainText = onchainHash ?? (report.status === 'unavailable' ? 'could not be read' : 'no record');
   return (
     <div className={s.result} data-status={report.status} data-testid="verify-result">
-      <p className={s.headline} data-testid="verify-status">
-        {HEADLINE[report.status]}
-      </p>
+      <div className={s.verdict}>
+        <span className={s.glyph} aria-hidden="true" data-testid="verify-glyph">
+          {GLYPH[report.status]}
+        </span>
+        <div>
+          <p className={s.headline} data-testid="verify-status">
+            {HEADLINE[report.status]}
+          </p>
+          <p className={s.summary}>{SUMMARY[report.status]}</p>
+        </div>
+      </div>
       {report.reason ? <p className={s.reason}>{report.reason}</p> : null}
-      <p className={s.summary}>{SUMMARY[report.status]}</p>
-      <ul className={s.checks}>
+      <dl className={s.compare} data-testid="verify-compare" data-same={same || undefined}>
+        <div>
+          <dt>Log hash recomputed in your browser</dt>
+          <dd>
+            <code data-testid="verify-hash-browser">{report.logHash ?? 'could not be recomputed'}</code>
+          </dd>
+        </div>
+        <div className={s.equals} aria-label={same ? 'identical' : 'not identical'}>
+          {same ? '= identical' : onchainHash ? '≠ different' : 'nothing to compare'}
+        </div>
+        <div>
+          <dt>Log hash in the onchain record ({config.near.contracts.registry})</dt>
+          <dd>
+            <code data-testid="verify-hash-onchain">{onchainText}</code>
+          </dd>
+        </div>
+      </dl>
+      <ul className={s.checks} aria-label="Every check">
         {report.checks.map((c) => (
           <li key={c.id} data-ok={c.ok || undefined} data-testid={`verify-check-${c.id}`}>
             <span className={s.mark}>{c.ok ? '✓' : '✗'}</span>
@@ -97,14 +127,14 @@ export function VerifyResult({ report }: { report: VerifyReport }) {
         </p>
       ) : null}
       <p className={s.links}>
-        <a href={report.links.contract} target="_blank" rel="noreferrer">
-          Registry on nearblocks
-        </a>
         {report.links.tx ? (
-          <a href={report.links.tx} target="_blank" rel="noreferrer" data-testid="verify-tx">
-            Registry transaction
+          <a className={s.primaryLink} href={report.links.tx} target="_blank" rel="noreferrer" data-testid="verify-tx">
+            View the registry transaction on nearblocks ↗
           </a>
         ) : null}
+        <a href={report.links.contract} target="_blank" rel="noreferrer" data-testid="verify-contract">
+          Registry contract on nearblocks ↗
+        </a>
       </p>
     </div>
   );

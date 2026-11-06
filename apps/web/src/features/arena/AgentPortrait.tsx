@@ -1,7 +1,7 @@
 'use client';
-// One agent drawn the arena way (the prototype's isometric block figure): body in the agent's
-// colour, head in its "bone" colour, standing on a small pad, idling. Used by the look editor and
-// the crew lock-in. Reduced motion draws one still frame.
+// One agent drawn the arena way (the isometric block figure in its role's look, figure2d.ts): body
+// in the agent's colour, head in its "bone" colour, standing on a small pad, idling. Used by the
+// look editor, the crew lock-in and the match cards. Reduced motion draws one still frame.
 import { useEffect, useRef } from 'react';
 import { usePreferences } from '@/lib/preferences';
 import * as proto from './proto/world';
@@ -15,13 +15,15 @@ export interface AgentPortraitProps {
   team?: 'A' | 'B';
   /** Accessible name, e.g. "Wick, Builder". */
   label: string;
+  /** The agent's role (Builder, Digger, ...): its hat, tools and pack. Omit for the generic look. */
+  role?: string;
   /** `hero`: the Command deck's lead agent (smaller figure left of centre, pulsing rings, a floating block). */
   variant?: 'portrait' | 'hero';
   className?: string;
   'data-testid'?: string;
 }
 
-export function AgentPortrait({ body, head, team, label, variant = 'portrait', className, 'data-testid': testId }: AgentPortraitProps) {
+export function AgentPortrait({ body, head, team, label, role, variant = 'portrait', className, 'data-testid': testId }: AgentPortraitProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const { reducedMotion } = usePreferences();
 
@@ -40,7 +42,7 @@ export function AgentPortrait({ body, head, team, label, variant = 'portrait', c
       ctx.clearRect(0, 0, r.width, r.height);
       const time = reducedMotion ? 0 : (now - t0) / 1000;
       const hero = variant === 'hero';
-      const T = hero ? Math.min(r.width * 0.6, r.height * 0.64) : Math.min(r.width * 0.9, r.height * 1.1);
+      const T = hero ? Math.min(r.width * 0.6, r.height * 0.64) : Math.min(r.width * 0.9, r.height * 0.98);
       const sx = r.width * (hero ? 0.36 : 0.5);
       const b = r.height * (hero ? 0.84 : 0.88);
       if (hero) {
@@ -62,10 +64,10 @@ export function AgentPortrait({ body, head, team, label, variant = 'portrait', c
         sx,
         b,
         T,
-        { c: body, bone: head, team: team ?? 'A', slot: 0, inv: [] },
+        { c: body, bone: head, team: team ?? 'A', slot: 0, inv: [], role },
         time * 0.6,
-        reducedMotion ? 0 : Math.sin(time * 1.6) * T * 0.012,
-        team ? { team: team === 'A' ? '#34e0c8' : '#ff4655' } : {},
+        0,
+        { ...(team ? { team: team === 'A' ? '#34e0c8' : '#ff4655' } : {}), still: reducedMotion },
       );
       if (hero) {
         const fy = b - T * 0.95 + Math.sin(time * 1.8) * T * 0.02;
@@ -77,7 +79,7 @@ export function AgentPortrait({ body, head, team, label, variant = 'portrait', c
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [body, head, team, variant, reducedMotion]);
+  }, [body, head, team, role, variant, reducedMotion]);
 
   return <canvas ref={ref} role="img" aria-label={label} className={className} data-testid={testId} />;
 }

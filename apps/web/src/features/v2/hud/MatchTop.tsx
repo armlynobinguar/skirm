@@ -3,7 +3,7 @@
 // supply drop and the difficulty's goal tag) and the rival's box (the prototype's hud()). A spectator
 // sees two crews by letter and handle, never "You" and "Rival".
 import { mapV2, type Difficulty, type FrameAgent, type Team, type V2Frame } from '@skirm/engine/v2';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { crewName } from '../common';
 import c from './hud.module.css';
 import { clock, clockLine, fieldHazards, goalTag } from './model';
@@ -23,9 +23,11 @@ export interface MatchTopProps {
   watch?: boolean;
   /** Practice against the greedy bot (the clock line says so). */
   practice?: boolean;
+  /** Drawn under the clock card (the live callout), so it never covers the clock. */
+  children?: ReactNode;
 }
 
-export function MatchTop({ frame, team, ranked, difficulty, tickMs, you, rivalHandle, rivals, watch = false, practice = false }: MatchTopProps) {
+export function MatchTop({ frame, team, ranked, difficulty, tickMs, you, rivalHandle, rivals, watch = false, practice = false, children }: MatchTopProps) {
   const them: Team = team === 'A' ? 'B' : 'A';
   const def = frame ? mapV2(frame.mapId) : undefined;
   const goal = frame?.goal ?? def?.goal ?? 3;
@@ -61,56 +63,59 @@ export function MatchTop({ frame, team, ranked, difficulty, tickMs, you, rivalHa
           {head(team)}
         </span>
       </div>
-      <div className={`sk-panel ${c.clock}`}>
-        <span className="sk-kick">
-          {def?.code ?? 'v2'} · {ranked ? 'ranked' : practice ? 'practice' : 'casual'} · {watch ? 'watching · ' : ''}T{String(tick).padStart(3, '0')}
-        </span>
-        <span className={c.clockN} data-testid="v2-clock">
-          {clock(line?.left ?? (limit * tickMs) / 1000)}
-        </span>
-        <span className={c.bar}>
-          <i style={{ width: `${((limit - tick) / limit) * 100}%` }} />
-        </span>
-        {line ? (
-          <span className={c.hzLine} data-testid="v2-hazard">
-            {line.hazards.length
-              ? line.hazards.map((h, i) => (
-                  <span key={h.kind}>
-                    {i ? ' · ' : ''}
-                    <b>{h.kind}</b> {h.receding ? 'receding' : 'rising'} · next wave in {h.nextIn} s
-                  </span>
-                ))
-              : 'No hazard on this map'}
-            {line.switches ? (
-              <>
-                {' · switches '}
-                <span className={c.sw}>{line.switches.ready == null ? line.switches.total : `${line.switches.ready}/${line.switches.total} ready`}</span>
-              </>
-            ) : null}
-            {line.dropIn != null ? ` · drop in ${line.dropIn} s` : null}
-            {line.holding > 0 ? ` · holding ${line.holding} s` : null}
+      <div className={c.mid}>
+        <div className={`sk-panel ${c.clock}`}>
+          <span className="sk-kick">
+            {def?.code ?? 'v2'} · {ranked ? 'ranked' : practice ? 'practice' : 'casual'} · {watch ? 'watching · ' : ''}T{String(tick).padStart(3, '0')}
           </span>
-        ) : null}
-        {field.length ? (
-          <span className={c.hzField} data-testid="v2-field-hazards">
-            {field.map((h) => (
-              <span key={h.key} className={c.hzChip} data-kind={h.key} data-live={h.live || undefined} title={h.hint} aria-label={`${h.name}: ${h.hint}`}>
-                <i />
-                {h.name}
-              </span>
-            ))}
+          <span className={c.clockN} data-testid="v2-clock">
+            {clock(line?.left ?? (limit * tickMs) / 1000)}
           </span>
-        ) : null}
-        {tag ? (
-          <span className={c.obj} title={tag.text} data-testid="v2-goal">
-            <span className={c.dtag} style={{ '--dc': tag.colour } as CSSProperties}>
-              {tag.name}
+          <span className={c.bar}>
+            <i style={{ width: `${((limit - tick) / limit) * 100}%` }} />
+          </span>
+          {line ? (
+            <span className={c.hzLine} data-testid="v2-hazard">
+              {line.hazards.length
+                ? line.hazards.map((h, i) => (
+                    <span key={h.kind}>
+                      {i ? ' · ' : ''}
+                      <b>{h.kind}</b> {h.receding ? 'receding' : 'rising'} · next wave in {h.nextIn} s
+                    </span>
+                  ))
+                : 'No hazard on this map'}
+              {line.switches ? (
+                <>
+                  {' · switches '}
+                  <span className={c.sw}>{line.switches.ready == null ? line.switches.total : `${line.switches.ready}/${line.switches.total} ready`}</span>
+                </>
+              ) : null}
+              {line.dropIn != null ? ` · drop in ${line.dropIn} s` : null}
+              {line.holding > 0 ? ` · holding ${line.holding} s` : null}
             </span>
-            <b>{tag.title}</b>
-            <span>{tag.text}</span>
-            <i />
-          </span>
-        ) : null}
+          ) : null}
+          {field.length ? (
+            <span className={c.hzField} data-testid="v2-field-hazards">
+              {field.map((h) => (
+                <span key={h.key} className={c.hzChip} data-kind={h.key} data-live={h.live || undefined} title={h.hint} aria-label={`${h.name}: ${h.hint}`}>
+                  <i />
+                  {h.name}
+                </span>
+              ))}
+            </span>
+          ) : null}
+          {tag ? (
+            <span className={c.obj} title={tag.text} data-testid="v2-goal">
+              <span className={c.dtag} style={{ '--dc': tag.colour } as CSSProperties}>
+                {tag.name}
+              </span>
+              <b>{tag.title}</b>
+              <span>{tag.text}</span>
+              <i />
+            </span>
+          ) : null}
+        </div>
+        {children}
       </div>
       <div className={`sk-panel ${c.crewbox} ${c.boxB}`}>
         <span className="sk-kick" data-testid="v2-rival-label">

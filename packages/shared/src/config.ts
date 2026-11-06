@@ -73,6 +73,11 @@ const defaults = {
     provisionalMatches: 20,
     k: 16,
     floor: 100,
+    /**
+     * Largest change one ranked match may apply. The registry contract rejects `|delta| > 32`
+     * (contracts/registry ELO_MAX_DELTA), so a placement K of 48 is clamped to this bound.
+     */
+    maxDelta: 32,
   },
   /**
    * Ranked tiers from Elo (lowest first, `min` is the tier floor). A tier is shown once a player has
@@ -166,6 +171,15 @@ const defaults = {
     nameMaxChars: 32,
     maxSaved: 5,
     actorLineChars: 160,
+  },
+  /**
+   * Agent roles (skill-roles.ts AGENT_ROLES). Ranked plays the six original roles only (Builder,
+   * Digger, Firefighter, Scout, Runner, Hauler) until `rankedNewRoles` is turned on: a ranked crew
+   * with a Medic, Engineer, Saboteur or Courier is refused at queue and lock-in, and the engine
+   * refuses to create such a ranked match. Casual, practice, lobbies, campaign and puzzles play all ten.
+   */
+  roles: {
+    rankedNewRoles: false,
   },
   /**
    * Agent progression (progression.ts): each agent earns XP from the matches it plays to the end

@@ -47,8 +47,8 @@ describe('TopBar', () => {
   it('shows the balance, allowance, held credits and handle when signed in', async () => {
     const me = meFixture({ credits: { balance: 1240, held: 150, allowanceLeft: 12, allowanceResetAt: '', available: 1252 } });
     const { api } = renderWithProviders(<AppShell>hi</AppShell>, { handle: 'ada', path: '/maps/flood-gate', api: { me: async () => me } });
-    expect(await screen.findByText('1,240')).toBeInTheDocument();
-    expect(screen.getByTestId('topbar-allowance')).toHaveTextContent('12 free · 150 held');
+    expect(await screen.findByText('1,252')).toBeInTheDocument();
+    expect(screen.getByTestId('topbar-allowance')).toHaveTextContent('1,240 paid · 12 free · 150 held');
     expect(screen.getByTestId('topbar-account')).toHaveTextContent('ada');
     expect(screen.getByTestId('nav-play')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('nav-market')).not.toHaveAttribute('aria-current');
@@ -88,7 +88,7 @@ describe('TopBar', () => {
     const { user, unmount } = renderWithProviders(<AppShell>hi</AppShell>, { handle: 'ada', path: '/market', api: { me: async () => me } });
     const bar = screen.getByTestId('topbar');
     const badge = within(bar).getByTestId('account-badge');
-    expect(await within(badge).findByText('1,240 CR')).toBeInTheDocument();
+    expect(await within(badge).findByText('1,300 CR')).toBeInTheDocument();
     expect(badge).toHaveTextContent('ada');
     expect(badge).toHaveAttribute('aria-expanded', 'false');
     const card = document.getElementById(badge.getAttribute('aria-controls')!)!;
@@ -98,7 +98,7 @@ describe('TopBar', () => {
     await user.click(badge);
     expect(badge).toHaveAttribute('aria-expanded', 'true');
     expect(card).toBeVisible();
-    expect(within(card).getByText('1,240')).toBeInTheDocument();
+    expect(within(card).getByText('1,300')).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(card).not.toBeVisible();
 
@@ -132,5 +132,35 @@ describe('TopBar', () => {
     expect(screen.getByTestId('notes-aside')).toHaveTextContent('Map atlas');
     await user.click(notes);
     expect(screen.queryByTestId('notes-aside')).not.toBeInTheDocument();
+  });
+
+  it('counts the free allowance on the badge, so a new player does not see 0 CR', async () => {
+    const me = meFixture({ credits: { balance: 0, held: 0, allowanceLeft: 60, allowanceResetAt: '', available: 60 } });
+    renderWithProviders(<AppShell>hi</AppShell>, { handle: 'ada', path: '/play', api: { me: async () => me } });
+    const cr = await screen.findByTestId('topbar-cr');
+    expect(cr).toHaveTextContent('60 CR');
+    expect(cr).toHaveAttribute('title', expect.stringContaining('0 paid + 60 of'));
+    expect(screen.getByTestId('topbar-allowance')).toHaveTextContent('0 paid · 60 free');
+  });
+
+  it('keeps a permanent Tutorial link in the account card', async () => {
+    renderWithProviders(<AppShell>hi</AppShell>, { handle: 'ada', path: '/play', api: { me: async () => meFixture() } });
+    expect(screen.getByTestId('topbar-tutorial')).toHaveAttribute('href', '/tutorial');
+  });
+
+  it('opens and closes the narrow-screen menu, which names the current section', async () => {
+    const { user } = renderWithProviders(<AppShell>hi</AppShell>, { path: '/leaderboards' });
+    const menu = screen.getByTestId('topbar-menu');
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    expect(menu).toHaveTextContent('Leaderboards');
+    expect(menu).toHaveAttribute('aria-controls', nav.id);
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(nav).not.toHaveAttribute('data-open');
+    await user.click(menu);
+    expect(menu).toHaveAttribute('aria-expanded', 'true');
+    expect(nav).toHaveAttribute('data-open');
+    expect(within(nav).getAllByRole('link')).toHaveLength(5);
+    await user.keyboard('{Escape}');
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
   });
 });

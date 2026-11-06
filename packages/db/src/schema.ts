@@ -129,7 +129,7 @@ export const agents = pgTable(
     wins: integer('wins').notNull().default(0),
     losses: integer('losses').notNull().default(0),
     draws: integer('draws').notNull().default(0),
-    /** v2: role (Builder, Digger, Firefighter, Scout, Runner, Hauler), sight and voice range (1–5), talk tier. */
+    /** v2: role (Builder, Digger, Firefighter, Scout, Runner, Hauler, Medic, Engineer, Saboteur, Courier; plain text, no check), sight and voice range (1–5), talk tier. */
     role: text('role').notNull().default('Runner'),
     vision: integer('vision').notNull().default(3),
     comms: integer('comms').notNull().default(3),
@@ -405,6 +405,71 @@ export const rentals = pgTable(
     index('rentals_renter_idx').on(t.renterId, t.agentId),
     index('rentals_owner_idx').on(t.ownerId),
     check('rentals_owner_renter_ck', sql`${t.ownerId} <> ${t.renterId}`),
+  ],
+);
+
+// ---------- Agent accounts ----------
+
+/**
+ * An agent's own NEAR account (docs/agent-accounts.md). CUSTODIAL: the server created it and holds
+ * its full-access key, sealed with the vault's KEK (AAD `skirm/secret/v1:agent-key:<near id>`); the
+ * key never leaves the api in plain form. `cap_yocto` is the owner's per-match spend cap: what the
+ * account may commit to passes for a match not played yet (0 = spending off).
+ */
+export const agentAccounts = pgTable(
+  'agent_accounts',
+  {
+    agentId: text('agent_id')
+      .primaryKey()
+      .references(() => agents.id),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => accounts.id),
+    nearAccountId: text('near_account_id').notNull(),
+    publicKey: text('public_key').notNull(),
+    keyCiphertext: bytea('key_ciphertext').notNull(),
+    keyIv: bytea('key_iv').notNull(),
+    keyAuthTag: bytea('key_auth_tag').notNull(),
+    keyWrapped: bytea('key_wrapped').notNull(),
+    keyKeyId: text('key_key_id').notNull(),
+    capYocto: numeric('cap_yocto', { precision: 40, scale: 0 }).notNull().default('0'),
+    createdAt: createdAt(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('agent_accounts_near_uq').on(t.nearAccountId),
+    index('agent_accounts_owner_idx').on(t.ownerId),
+    check('agent_accounts_cap_ck', sql`${t.capYocto} >= 0`),
+  ],
+);
+
+/**
+ * One payment an agent account makes. Reserved (`pending`) inside the same transaction that checks
+ * the cap, then `sent` with its tx hash and the pass it bought, or `failed`. `unknown` (the signer
+ * gave no answer) keeps counting against the cap until an operator settles it.
+ */
+export const agentAccountSpends = pgTable(
+  'agent_account_spends',
+  {
+    /** `aas_` + ULID; also the `market.rent` nonce. */
+    id: text('id').primaryKey(),
+    agentId: text('agent_id')
+      .notNull()
+      .references(() => agentAccounts.agentId),
+    kind: text('kind').notNull(),
+    amountYocto: numeric('amount_yocto', { precision: 40, scale: 0 }).notNull(),
+    status: text('status').notNull().default('pending'),
+    offerId: text('offer_id').references(() => rentalOffers.id),
+    rentalId: text('rental_id').references(() => rentals.id),
+    txHash: text('tx_hash'),
+    createdAt: createdAt(),
+    settledAt: ts('settled_at'),
+  },
+  (t) => [
+    index('agent_account_spends_agent_idx').on(t.agentId, t.status),
+    check('agent_account_spends_kind_ck', sql`${t.kind} in ('rent', 'withdraw')`),
+    check('agent_account_spends_status_ck', sql`${t.status} in ('pending', 'sent', 'failed', 'unknown')`),
+    check('agent_account_spends_amount_ck', sql`${t.amountYocto} > 0`),
   ],
 );
 
@@ -1004,7 +1069,12 @@ export const dailyAttempts = pgTable(
 
 // ---------- Cosmetics ----------
 
-/** Premium cosmetics an account owns (item ids from @skirm/shared COSMETICS). */
+/**
+ * Premium cosmetics an account owns (item ids from @skirm/shared COSMETICS and EQUIP_COSMETICS).
+ * With NEAR_CONTRACT_COSMETICS set, an equippable item is also minted as a NEP-245 token
+ * (contracts/cosmetics): `mint_status` null = never minted (credits only), `pending` while the
+ * ops call is in flight, then `minted` or `failed`; `minted_to` is the NEAR account it went to.
+ */
 export const cosmeticsOwned = pgTable(
   'cosmetics_owned',
   {
@@ -1014,9 +1084,39 @@ export const cosmeticsOwned = pgTable(
     itemId: text('item_id').notNull(),
     /** `purchase`, or why it was granted. */
     source: text('source').notNull().default('purchase'),
+    mintStatus: text('mint_status'),
+    mintTx: text('mint_tx'),
+    mintedTo: text('minted_to'),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.accountId, t.itemId] })],
+  (t) => [
+    primaryKey({ columns: [t.accountId, t.itemId] }),
+    check(
+      'cosmetics_owned_mint_status_ck',
+      sql`${t.mintStatus} is null or ${t.mintStatus} in ('pending', 'minted', 'failed')`,
+    ),
+  ],
+);
+
+/**
+ * The skin, trail and nameplate each agent wears (@skirm/shared EQUIP_COSMETICS), one row per
+ * agent and slot. Purely visual: realtime copies them onto match frames as plain ids for the
+ * arena to draw; the engine and the match log never see them.
+ */
+export const agentCosmetics = pgTable(
+  'agent_cosmetics',
+  {
+    agentId: text('agent_id')
+      .notNull()
+      .references(() => agents.id),
+    slot: text('slot').notNull(),
+    itemId: text('item_id').notNull(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.agentId, t.slot] }),
+    check('agent_cosmetics_slot_ck', sql`${t.slot} in ('skin', 'trail', 'nameplate')`),
+  ],
 );
 
 // ---------- Private lobbies and tournaments ----------

@@ -1,6 +1,8 @@
 'use client';
 // /verify: anyone pastes a match id and checks it against the NEAR registry in their own browser
-// (no account needed). `?id=` prefills and runs it, so a check can be shared as a link.
+// (no account needed). `?id=` prefills and runs it, so a check can be shared as a link. "Try a
+// sample match" fills and checks NEXT_PUBLIC_SAMPLE_MATCH_ID (a known ranked, recorded match) for
+// visitors without an id of their own; unset, it is hidden (no public api lists ended ranked matches).
 import { Button } from '@skirm/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, type FormEvent } from 'react';
@@ -34,10 +36,15 @@ function VerifyForm() {
   const router = useRouter();
   const current = useSearchParams().get('id')?.trim() || '';
   const [text, setText] = useState(current);
+  const sample = config.sampleMatchId;
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const id = matchIdFrom(text);
     if (id) router.replace(routes.verify(id));
+  };
+  const trySample = () => {
+    setText(sample);
+    router.replace(routes.verify(sample));
   };
   return (
     <div className={`sk-panel ${s.page}`} data-testid="verify-screen">
@@ -54,6 +61,15 @@ function VerifyForm() {
           Check
         </Button>
       </form>
+      {sample ? (
+        <p className={s.sample}>
+          <span>No match id to hand?</span>
+          <Button size="sm" variant="secondary" onClick={trySample} disabled={current === sample} data-testid="verify-sample">
+            Try a sample match
+          </Button>
+          <span>a ranked match recorded on NEAR</span>
+        </p>
+      ) : null}
       {current ? <VerifyPanel key={current} matchId={current} showPageLink={false} auto /> : null}
     </div>
   );

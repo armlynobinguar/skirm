@@ -75,4 +75,21 @@ describe('role skill slots', () => {
     await ctx.repos.agents.update(acc.id, rook!.id, { skills: [{ id: STARTER_SKILL.id, version: 1 }] });
     expect((await ctx.repos.agents.update(acc.id, rook!.id, { role: 'Hauler' })).role).toBe('Hauler');
   });
+
+  it('takes the new roles (plain text column, no migration) and keeps a six-role skill off them', async () => {
+    const ctx = await setup();
+    const acc = await signUp(ctx, 'ana');
+    const [rook] = await ctx.repos.agents.listByOwner(acc.id);
+    for (const role of ['Medic', 'Engineer', 'Saboteur', 'Courier'] as const) {
+      expect((await ctx.repos.agents.update(acc.id, rook!.id, { role })).role).toBe(role);
+      expect((await ctx.repos.agents.view(rook!.id))!.role).toBe(role);
+    }
+    await expect(ctx.repos.agents.update(acc.id, rook!.id, { role: 'Wizard' as never })).rejects.toMatchObject({ code: 'invalid_role' });
+    const six = ['Builder', 'Digger', 'Firefighter', 'Scout', 'Runner', 'Hauler'] as const;
+    const classic = await ctx.repos.skills.create(acc.id, { ...meta, name: 'Classic Only', roles: [...six] }, await ctx.sealer.encryptSkill('p'));
+    expect(classic.roles).toEqual(six);
+    await expect(ctx.repos.agents.update(acc.id, rook!.id, { skills: [{ id: classic.id, version: 1 }] })).rejects.toMatchObject({ code: 'skill_role_mismatch' });
+    const medic = await ctx.repos.skills.create(acc.id, { ...meta, name: 'Field Medic', roles: ['Medic', 'Courier'] }, await ctx.sealer.encryptSkill('p'));
+    expect(medic.roles).toEqual(['Medic', 'Courier']);
+  });
 });

@@ -1,5 +1,7 @@
 import type { ServerConfig } from '../config';
+import { NearAgentAccounts, type AgentAccountsChain } from './agent-accounts';
 import { NearBadges, NoopBadges, type BadgeMinter } from './badges';
+import { NearCosmetics, type CosmeticsChain } from './cosmetics';
 import {
   CompositeDepositVerifier,
   DevDepositVerifier,
@@ -22,8 +24,10 @@ import { NearSeasons, NoopSeasons, type SeasonsChain } from './seasons';
 import { NearMetaTxRelayer, type MetaTxRelayer } from './relayer';
 import { OpsFunctionCaller, type FunctionCaller } from './signer';
 
+export * from './agent-accounts';
 export * from './backing';
 export * from './badges';
+export * from './cosmetics';
 export * from './delegate';
 export * from './deposits';
 export * from './market';
@@ -48,8 +52,12 @@ export interface NearAdapters {
   seasons: SeasonsChain;
   /** Soulbound achievement badges (`badges` contract). */
   badges: BadgeMinter;
+  /** NEP-245 cosmetic items; absent unless NEAR_CONTRACT_COSMETICS and the ops signer are set (credits-only). */
+  cosmetics?: CosmeticsChain;
   /** Gasless onboarding's relayer (NEP-366); absent unless RELAYER_ACCOUNT_ID and _PRIVATE_KEY are set. */
   relayer?: MetaTxRelayer;
+  /** Agents' own custodial NEAR accounts; absent while AGENT_ACCOUNTS_PARENT is unset (feature off). */
+  agentAccounts?: AgentAccountsChain;
 }
 
 export interface NearAdapterOptions extends NearRpcOptions {
@@ -71,11 +79,12 @@ type NearConfig = Pick<
   | 'CREDITS_PER_NEAR'
   | 'nearRpcUrls'
 > &
-  Partial<Pick<ServerConfig, 'RELAYER_ACCOUNT_ID' | 'RELAYER_PRIVATE_KEY'>>;
+  Partial<Pick<ServerConfig, 'RELAYER_ACCOUNT_ID' | 'RELAYER_PRIVATE_KEY' | 'NEAR_CONTRACT_COSMETICS' | 'AGENT_ACCOUNTS_PARENT' | 'AGENT_ACCOUNTS_PARENT_KEY'>>;
 
 /**
  * Registry/Minter/OwnershipReader/Seasons/Badges are Near* when the ops signer is configured, Noop*
- * otherwise. The relayer exists only with RELAYER_ACCOUNT_ID and RELAYER_PRIVATE_KEY set.
+ * otherwise. The relayer exists only with RELAYER_ACCOUNT_ID and RELAYER_PRIVATE_KEY set, and the
+ * cosmetics chain only with NEAR_CONTRACT_COSMETICS and the ops signer.
  * Deposits and rentals always verify through RPC; `dev:` hashes are accepted only with AUTH_MODE=dev.
  */
 export function createNearAdapters(
@@ -96,6 +105,10 @@ export function createNearAdapters(
   const relayers = relayer ? [relayer.relayerId] : [];
   return {
     ...(relayer ? { relayer } : {}),
+    // Cosmetics go onchain only when their contract is named (it is not deployed yet).
+    ...(caller && config.NEAR_CONTRACT_COSMETICS
+      ? { cosmetics: new NearCosmetics(caller, rpc, config.NEAR_CONTRACT_COSMETICS) }
+      : {}),
     rpc,
     registry: caller ? new NearRegistry(caller, config.NEAR_CONTRACT_REGISTRY) : new NoopRegistry(),
     minter: caller ? new NearMinter(caller, config.NEAR_CONTRACT_SKILLS) : new NoopMinter(),
@@ -115,5 +128,8 @@ export function createNearAdapters(
       new RpcRentalVerifier(rpc, config.NEAR_CONTRACT_MARKET, relayers),
       config.AUTH_MODE === 'dev' ? new DevRentalVerifier() : undefined,
     ),
+    ...(config.AGENT_ACCOUNTS_PARENT && config.AGENT_ACCOUNTS_PARENT_KEY
+      ? { agentAccounts: new NearAgentAccounts(config.AGENT_ACCOUNTS_PARENT, config.AGENT_ACCOUNTS_PARENT_KEY, rpc) }
+      : {}),
   };
 }

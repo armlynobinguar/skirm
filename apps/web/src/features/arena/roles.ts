@@ -2,7 +2,7 @@
 import type { Unlock } from '@skirm/shared';
 import * as proto from './proto/world';
 
-export type RoleClass = 'Builder' | 'Digger' | 'Firefighter' | 'Scout' | 'Runner' | 'Hauler';
+export type RoleClass = 'Builder' | 'Digger' | 'Firefighter' | 'Scout' | 'Runner' | 'Hauler' | 'Medic' | 'Engineer' | 'Saboteur' | 'Courier';
 
 /** The agent's role from its unlocks (first of Builder, Digger, Firefighter; else Scout). */
 export function roleTitle(unlocks: readonly Unlock[]): RoleClass {

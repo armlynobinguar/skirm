@@ -10,6 +10,7 @@ import { rowsFor } from './observe';
 import type { Channel, TalkTier } from './talk';
 import type { SkillTrigger } from './triggers';
 import { gearView, type ToolKind } from './tools';
+import { decoyView } from './roles';
 
 export type FrameView = Team | 'watch';
 
@@ -55,6 +56,14 @@ export interface FrameAgent {
   controlled?: true;
   /** The tool it carries from a supply drop (absent: none). */
   tool?: ToolKind;
+  /** An Engineer's own bridges or a Saboteur's decoys left (roles.ts): own crew and the watch view only. */
+  kit?: number;
+  /**
+   * What the agent wears in the arena: item ids from @skirm/shared EQUIP_COSMETICS per slot.
+   * Rendering only: added by the match server after `frameFor`, never read by the engine and never
+   * part of the match log. Absent: the default look.
+   */
+  cosmetics?: { skin?: string; trail?: string; nameplate?: string };
 }
 
 /** One equipped skill in the mind panel: public metadata and whether it is active this tick. */
@@ -112,6 +121,8 @@ export interface V2Frame {
   tools?: { at: [number, number]; kind: ToolKind }[];
   /** Placed sandbags, bridges and running pumps (a pump's ticks left). Absent: none. Public. */
   placed?: { at: [number, number]; kind: ToolKind; ticksLeft?: number }[];
+  /** Saboteur decoys (roles.ts): all of them in the watch view, the viewing crew's own in its frames. Absent: none. */
+  decoys?: { at: [number, number]; team: Team }[];
 }
 
 /** What the server knows beside the match state: each agent's current plan. */
@@ -136,6 +147,8 @@ export function frameFor(s: MatchState, view: FrameView, events: MatchEvent[], e
       });
       const f: FrameAgent = { id: a.id, name: a.name, team: a.team, role: a.role, x: a.x, y: a.y, items, delivered: a.delivered, down: a.down > 0, out: a.out, tier: a.tier };
       if (a.tool) f.tool = a.tool;
+      // An Engineer's bridges or a Saboteur's decoys left: own crew and watchers only.
+      if (a.kit !== undefined && (!team || a.team === team)) f.kit = a.kit;
       if (team && a.team === team) {
         if (extras.planHidden?.includes(a.id)) f.planHidden = true;
         else if (extras.plans?.[a.id]) f.plan = extras.plans[a.id];
@@ -162,8 +175,14 @@ export function frameFor(s: MatchState, view: FrameView, events: MatchEvent[], e
       }
       continue;
     }
-    if (e.kind === 'refused') {
+    // A planted decoy is the planting crew's secret: the rival sees only an item appear.
+    if (e.kind === 'refused' || e.kind === 'planted') {
       if (mine(e.agent)) out.push(e);
+      continue;
+    }
+    // A sprung decoy: the planting crew learns it worked even out of sight.
+    if (e.kind === 'decoy_sprung') {
+      if (!team || e.team === team || mine(e.agent) || shown.has(e.agent)) out.push(e);
       continue;
     }
     // A bluff: the liar's crew and the target's crew both know of it (the target heard it), even
@@ -177,6 +196,8 @@ export function frameFor(s: MatchState, view: FrameView, events: MatchEvent[], e
     out.push(e);
   }
   const gear = gearView(s);
+  // Decoys: every one in the watch view, the crew's own in its frames, never a rival's (its rows show an item there).
+  const decoys = s.decoys ? decoyView(s, team) : [];
   return {
     view,
     mapId: s.map.def.id,
@@ -199,6 +220,7 @@ export function frameFor(s: MatchState, view: FrameView, events: MatchEvent[], e
     ...overlaysFor(s, team),
     ...(gear.ground.length ? { tools: gear.ground } : {}),
     ...(gear.placed.length ? { placed: gear.placed } : {}),
+    ...(decoys.length ? { decoys } : {}),
   };
 }
 

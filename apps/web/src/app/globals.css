@@ -45,8 +45,14 @@ details summary { cursor: pointer; font: 500 11px/16px var(--font-mono); letter-
  * floating over the arena, like the Command deck's tiles. Every chip carries film grain; tabs add
  * diagonal hatching, an icon plate and a serial code, and the active tab a teal halftone fade from
  * the right and a teal underline. */
-.app-topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 12px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); color: var(--ink); pointer-events: none; }
-.app-topbar > * { pointer-events: auto; }
+/* The band: a dark glass strip behind the chips (on ::before, so the bar itself never becomes a
+ * containing block for the menu) with a hairline under it, so scrolled content never shows through.
+ * The bar is sticky and in flow, so every screen's content starts below it. */
+.app-topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); color: var(--ink); }
+.app-topbar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(180deg, rgba(5, 8, 13, .94), rgba(5, 8, 13, .86)); box-shadow: inset 0 -1px 0 var(--line), 0 10px 24px -12px rgba(0, 0, 0, .8); backdrop-filter: blur(10px) saturate(1.1); -webkit-backdrop-filter: blur(10px) saturate(1.1); }
+/* Desktop: the wrapper is transparent to layout and the Menu button is hidden. */
+.app-topbar-navwrap { display: contents; }
+.app-topbar-chip.app-topbar-menu { display: none; }
 .app-topbar-grp { display: flex; align-items: center; gap: 5px; min-width: 0; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .55)); }
 .app-topbar-chip { position: relative; display: flex; align-items: center; height: 38px; border: 0; color: var(--muted); text-decoration: none; background-color: rgba(9, 15, 23, .9); background-image: var(--grain); background-size: 140px 140px; box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); transition: color .2s, background-color .2s, transform .25s var(--ease-out); }
 a.app-topbar-chip:hover, button.app-topbar-chip:hover { color: var(--bone); background-color: rgba(18, 30, 42, .96); transform: translateY(-2px); }
@@ -71,8 +77,10 @@ a.app-topbar-chip:hover, button.app-topbar-chip:hover { color: var(--bone); back
 .app-topbar-right { position: relative; z-index: 2; margin-left: auto; }
 .app-topbar-toggle { gap: 6px; padding: 0 11px 0 8px; font: 500 11px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; cursor: pointer; }
 .app-topbar-toggle .sk-ak { width: 20px; height: 20px; }
-.app-topbar-toggle[aria-pressed='true'] { --nacc: var(--bg); color: var(--bg); background-color: var(--amber); box-shadow: none; }
-button.app-topbar-toggle[aria-pressed='true']:hover { color: var(--bg); background-color: var(--amber); }
+/* Toggles are secondary: muted chips. On: bone text with a teal accent; off: faint, accent dimmed. */
+.app-topbar-toggle { color: var(--faint); --nacc: var(--faint); }
+.app-topbar-toggle[aria-pressed='true'] { color: var(--ink); --nacc: var(--you); }
+button.app-topbar-toggle:hover { color: var(--bone); }
 
 /* ---------- Account badge and card (AccountDock) ---------- */
 /* The badge is the last chip of the top bar: an amber diamond, the handle and the credit balance.
@@ -107,6 +115,8 @@ a.app-dock-cell:hover { color: var(--ink); background-color: rgba(255, 255, 255,
 .app-dock-skeleton { width: 80px; height: 26px; }
 .app-dock-foot { display: flex; justify-content: flex-end; padding: 6px 8px; box-shadow: inset 0 1px 0 var(--line); }
 .app-dock-signout { padding: 6px 10px; font: 500 10.5px/1 var(--font-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); background: none; border: 0; cursor: pointer; transition: color .2s, background-color .2s; }
+a.app-dock-tutorial { margin-right: auto; color: var(--muted); text-decoration: none; }
+a.app-dock-tutorial:hover { color: var(--bone); }
 .app-dock-signout:hover:not(:disabled) { color: var(--bone); background-color: rgba(255, 255, 255, .05); }
 .app-dock-signout:focus-visible { outline: 1px solid var(--you); outline-offset: -1px; }
 .app-dock-signout:disabled { cursor: default; opacity: .6; }
@@ -156,33 +166,37 @@ a.app-dock-cell:hover { color: var(--ink); background-color: rgba(255, 255, 255,
 .legal a { text-decoration: underline; }
 .s01::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(120% 90% at 50% 40%, transparent 30%, rgba(3, 6, 10, .85) 100%), linear-gradient(180deg, rgba(5, 8, 13, .6), transparent 22%, transparent 70%, rgba(5, 8, 13, .85)); }
 
-/* Boot (Boot.tsx): the prototype's #s-boot over the arena canvas. */
-.s01-boot { display: grid; place-items: center; min-height: calc(100vh - 96px); padding: 0 16px; text-align: center; }
-.s01-boot-mark { display: grid; justify-items: center; gap: 18px; }
-.s01-boot-sub { font: 500 12px/16px var(--font-mono); letter-spacing: .42em; text-transform: uppercase; color: var(--muted); }
-.s01-boot-logo { font: 800 clamp(84px, 17vw, 210px)/.88 var(--font-display); letter-spacing: .06em; color: var(--bone); text-shadow: 0 0 60px rgba(52, 224, 200, .25); }
-.s01-boot-logo span { color: var(--rival); }
-.s01-load { display: grid; gap: 8px; width: min(420px, 80vw); margin-top: 34px; }
-.s01-load-bar { display: block; height: 3px; background: var(--line); }
-.s01-load-bar i { display: block; height: 100%; background: var(--you); transition: width .25s linear; }
-.s01-load-row { display: flex; justify-content: space-between; font: 400 11px/16px var(--font-mono); letter-spacing: .1em; color: var(--faint); }
-.s01-tap { margin-top: 34px; padding: 6px 0 6px .5em; border: 0; background: none; font: 600 22px/1.2 var(--font-display); letter-spacing: .5em; text-transform: uppercase; color: var(--bone); cursor: pointer; animation: s01-blink 1.6s ease-in-out infinite; }
-.s01-tap:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
-@keyframes s01-blink { 50% { opacity: .25; } }
 .s01-header { max-width: 1280px; margin: 0 auto; padding: 20px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; }
-.s01-main { max-width: 1280px; margin: 0 auto; padding: 32px 24px 48px; display: flex; flex-direction: column; gap: 48px; }
-.s01-hero { display: flex; flex-wrap: wrap; gap: 48px; align-items: center; }
-.s01-pitch { flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
-.s01-title { margin: 0; font: 800 64px/58px var(--font-display); text-transform: uppercase; color: var(--bone); max-width: 620px; text-wrap: balance; }
-.s01-lede { margin: 0; font-size: 17px; line-height: 26px; color: var(--ink-muted); max-width: 560px; }
-.s01-form { display: flex; flex-direction: column; gap: 12px; max-width: 360px; margin-top: 8px; }
+.s01-main { max-width: 1280px; margin: 0 auto; padding: 8px 24px 48px; display: flex; flex-direction: column; gap: 48px; }
+/* The first screen: pitch, explainer and sign-in on the left, the gameplay clip and the practice
+ * call to action on the right. One column under 900px, the clip right after the sign-in. */
+.s01-hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); column-gap: 56px; row-gap: 20px; align-items: start;
+  grid-template-areas: "title media" "lede media" "actions media" "actions practice";
+  grid-template-rows: auto auto auto 1fr;
+}
+.s01-title { grid-area: title; margin: 0; font: 800 60px/56px var(--font-display); text-transform: uppercase; color: var(--bone); max-width: 600px; text-wrap: balance; }
+.s01-lede { grid-area: lede; margin: 0; font-size: 18px; line-height: 27px; color: var(--ink); max-width: 540px; text-wrap: pretty; }
+.s01-actions { grid-area: actions; display: flex; flex-direction: column; gap: 12px; max-width: 380px; }
+.s01-form { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
 .s01-note { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
-.s01-replay { flex: 0 1 520px; margin: 0; min-width: 0; }
-.s01-replay-grid { display: flex; justify-content: center; overflow-x: auto; }
-.s01-eyebrow { font: 500 11px/16px var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: var(--ink-muted); }
-.s01-replay-name { font: 700 17px/24px var(--font-sans); }
-.s01-replay-meta { font: 500 13px/18px var(--font-mono); color: var(--ink-muted); }
-.s01-replay-score { font: 800 28px/28px var(--font-display); }
+.s01-media { grid-area: media; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.s01-media img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: var(--surface-sunken); box-shadow: var(--elev-2); outline: 1px solid var(--line-strong); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); }
+.s01-media-cap { display: flex; align-items: center; gap: 8px; font: 500 11px/16px var(--font-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-muted); }
+.s01-live-dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--rival); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rival) 25%, transparent); }
+.s01-practice { grid-area: practice; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; border-left: 3px solid var(--you); }
+.s01-practice-text { display: flex; flex-direction: column; gap: 4px; flex: 1 1 260px; min-width: 0; }
+.s01-practice-text p { margin: 0; }
+.s01-practice-name { font: 700 16px/22px var(--font-sans); color: var(--bone); }
+.s01-practice-meta { font: 500 12px/17px var(--font-mono); color: var(--ink-muted); }
+.s01-practice-hint { font: 600 13px/18px var(--font-sans); color: var(--you); }
+.s01-eyebrow { font: 500 11px/16px var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: var(--you); }
+.s01-step-links { display: flex; flex-wrap: wrap; gap: 0 20px; margin-top: auto; }
+@media (max-width: 900px) {
+  .s01-hero { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "lede" "actions" "media" "practice"; grid-template-rows: none; row-gap: 16px; }
+  .s01-actions { max-width: none; }
+  .s01-title { font-size: 48px; line-height: 46px; }
+}
 .s01-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
 .s01-step p { margin: 0; }
 .s01-step-num { font: 800 32px/32px var(--font-display); color: var(--you); }
@@ -204,13 +218,43 @@ a.app-dock-cell:hover { color: var(--ink); background-color: rgba(255, 255, 255,
   .app-topbar-link::after { left: 36px; }
   .app-topbar-toggle { padding: 0 8px; }
 }
-@media (max-width: 480px) { .app-topbar-logo .sk-logo-word { display: none; } }
+/* Narrow screens: one row. The tabs fold into a Menu button (it names the current section) that
+ * drops all five as a full-width list under the bar; the toggles show their icon only. */
+@media (max-width: 720px) {
+  .app-topbar { flex-wrap: nowrap; gap: 8px; }
+  .app-topbar-navwrap { display: block; position: static; flex: none; }
+  .app-topbar-chip.app-topbar-menu { display: flex; flex: none; gap: 8px; padding: 0 12px 0 10px; font: 700 14px/1 var(--font-display); letter-spacing: .07em; text-transform: uppercase; color: var(--bone); cursor: pointer; }
+  .app-topbar-menu[aria-expanded='true'] { background-color: rgba(10, 30, 34, .97); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .38); }
+  .app-topbar-nav { display: none; }
+  .app-topbar-nav[data-open] { position: absolute; z-index: 45; top: calc(100% + 6px); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 4px; order: 0; overflow: visible; padding: 6px; background: rgba(5, 8, 13, .97); box-shadow: inset 0 0 0 1px var(--line); filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .6)); animation: app-dock-in .2s var(--ease-out) both; }
+  .app-topbar-nav[data-open] .app-topbar-link { height: 46px; font-size: 16px; padding: 0 14px 0 6px; gap: 10px; }
+  .app-topbar-nav[data-open] .app-topbar-link::after { left: 44px; right: auto; width: 40px; }
+  .app-topbar-toggle { width: 38px; justify-content: center; padding: 0; }
+  .app-topbar-toggle-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .app-topbar-logo { margin: 0 2px 0 4px; }
+  .app-topbar-logo .sk-logo-word { font-size: 19px !important; }
+  .app-topbar-right { gap: 4px; min-width: 0; }
+  .app-topbar-grp > *, .app-topbar-right > * { flex: none; }
+  .app-topbar-right > .app-acct { flex: 0 1 auto; min-width: 0; }
+  .app-acct-badge { min-width: 0; padding: 0 11px 0 9px; }
+}
+/* Phones: the Menu button keeps its icon (its accessible name says the section), the Sign in chip
+ * drops the network label, and the internal Notes toggle (dev builds only) hides; N still opens it. */
+@media (max-width: 480px) {
+  .app-topbar-chip.app-topbar-menu { width: 38px; justify-content: center; padding: 0; }
+  .app-topbar-menu > span { display: none; }
+  .app-acct-badge .app-dock-net { display: none; }
+  .app-topbar-chip.app-topbar-notes { display: none; }
+}
+/* The smallest phones keep the mark; the wordmark goes only where nothing else would fit. */
+@media (max-width: 359px) { .app-topbar-logo .sk-logo-word { display: none; } }
 
 @media (max-width: 600px) {
   .app-main { padding: var(--space-4) 16px var(--space-8); }
-  .app-topbar { position: static; }
   .s01-header, .s01-main { padding-left: 16px; padding-right: 16px; }
-  .s01-title { font-size: 44px; line-height: 42px; }
+  .s01-title { font-size: 36px; line-height: 36px; }
+  .s01-lede { font-size: 16px; line-height: 23px; }
+  .s01-header { padding-top: 14px; padding-bottom: 14px; }
   .s01-steps { grid-template-columns: 1fr; }
 }
 
@@ -218,5 +262,4 @@ a.app-dock-cell:hover { color: var(--ink); background-color: rgba(255, 255, 255,
   .app-skeleton { animation: none; }
   .app-wipe { display: none; }
   .app-dock { animation: none; }
-  .s01-tap { animation: none; }
 }

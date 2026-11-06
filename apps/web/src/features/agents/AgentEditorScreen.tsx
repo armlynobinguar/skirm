@@ -12,6 +12,9 @@
 //                  when you wrote it, encrypted when bought
 //   talk tier      the agent's default for unranked play (ranked is always Standard)
 //   rent out       offer the agent to other players at a price per match (./RentOut.tsx)
+//   agent account  the agent's own custodial NEAR account with a per-match spend cap: create,
+//                  fund from the wallet, withdraw (./AgentAccountCard.tsx; hidden when the server
+//                  has agent accounts off)
 //   record         this season's record (all time when no season is open) from GET /agents/:id/record:
 //                  win rate, matches, deliveries per match, bluffs landed of told and rival bluffs seen
 //                  through; the agent's own counters until it loads or if it fails
@@ -19,7 +22,7 @@
 //                  earned (./Progression.tsx, POST /agents/:id/traits)
 // `map` / `d` name the crew screen it was opened from, for "Back to crew".
 import { isDifficulty, type Difficulty, type TalkTier } from '@skirm/engine/v2';
-import { skillRolesLabel } from '@skirm/shared';
+import { AGENT_ROLES, AGENT_ROLE_TEXT, rankedRoleAllowed, skillRolesLabel } from '@skirm/shared';
 import { DisplayHeading, Pips, fmt } from '@skirm/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -30,6 +33,7 @@ import { MAPS, mapById, type V2Map } from '@/features/arena/world';
 import { SkillArt } from '@/features/skills/parts';
 import { RoleTag, roleBlockReason } from '@/features/skills/RoleTag';
 import { ProgressionPanel } from './Progression';
+import { AgentAccountCard } from './AgentAccountCard';
 import { RentOut } from './RentOut';
 import { ButtonLink } from '@/components/ButtonLink';
 import { RequireSession } from '@/components/shell/RequireSession';
@@ -229,6 +233,9 @@ function AgentEditor({
     setTier(t);
     patch.mutate({ tier: t }, { onError: () => setTier(was) });
   };
+  // A role change is refused while a skill for another role is equipped (the toast says why).
+  const pickRole = (r: Agent['role']) =>
+    patch.mutate({ role: r }, { onSuccess: () => toast.show({ tone: 'good', title: 'Role set', message: `${agent.name} plays ${r} from the next match.` }) });
   const equip = (s: SkillRow) => {
     const rest = agent.skills.slice(1).filter((k) => k.id !== s.id).map(({ id, version }) => ({ id, version }));
     patch.mutate(
@@ -275,7 +282,7 @@ function AgentEditor({
 
       {/* Centre: the agent on its light beam, its inner voice as a bark, ‹ › under it. */}
       <div className={e.stage}>
-        <AgentPortrait body={colour} head={agentBone(agent)} team="A" label={`${agent.name}, ${role}`} variant="hero" className={e.hero} />
+        <AgentPortrait body={colour} head={agentBone(agent)} team="A" label={`${agent.name}, ${role}`} role={role} variant="hero" className={e.hero} />
         <div className={`${e.bark} ${out ? e.barkOut : ''}`} role="status" data-testid="agent-bark">
           <small>
             <em>THINKS</em>
@@ -530,7 +537,34 @@ function AgentEditor({
           <span className={e.sub}>{TIER_INFO[tier].line} Ranked locks everyone to Standard.</span>
         </section>
 
+        <section className={e.tierBox} aria-label="Role" data-testid="agent-role-picker" data-rise style={{ '--rise-i': 3 } as CSSProperties}>
+          <div className={e.tierHead}>
+            <span className={e.code}>Role · what {agent.name} can do</span>
+            <b>{role}</b>
+          </div>
+          <div className={`${e.seg} ${e.roleGrid}`} role="group" aria-label="Role">
+            {AGENT_ROLES.map((r) => (
+              <button
+                key={r}
+                type="button"
+                aria-pressed={r === role}
+                disabled={patch.isPending}
+                title={AGENT_ROLE_TEXT[r].does}
+                data-testid={`agent-role-${r}`}
+                onClick={() => (r === role ? undefined : pickRole(r))}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <span className={e.sub} data-testid="agent-role-does">
+            {AGENT_ROLE_TEXT[role].does}
+            {rankedRoleAllowed(role) ? '' : ' Casual, practice and the campaign for now: ranked plays the original six.'}
+          </span>
+        </section>
+
         <RentOut agentId={agent.id} agentName={agent.name} linked={linked} />
+        <AgentAccountCard agentId={agent.id} agentName={agent.name} />
 
         <ButtonLink href={backHref} variant="primary" className={e.back} data-testid="agent-back">
           {from ? 'Back to crew ▸' : 'Back to Command ▸'}

@@ -2,7 +2,7 @@
 // The agent cards under the arena (the prototype's buildCards / .acard): portrait, talk tier, role,
 // delivered count and the carry slots with their origin stripe. A pickup, delivery or drop floats
 // above the card. Click follows the agent (again to stop); double-click opens third person.
-// Rivals show once seen; out of sight their slots are "?", and rivals never seen are blank cards.
+// Rivals show once seen; out of sight their slots are "?", and rivals never seen share one slim strip.
 import { carryOf, mapV2, type FrameAgent, type Team } from '@skirm/engine/v2';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AgentPortrait } from '@/features/arena/AgentPortrait';
@@ -65,20 +65,26 @@ export function AgentCards({ team, mapId, tick, cards, unseen = 0, pressed, onPi
           extra={extra?.(agent)}
         />
       ))}
-      {Array.from({ length: unseen }, (_, i) => (
-        <div key={`unseen-${i}`} className={c.cardWrap}>
-          <div className={c.acard} data-rival="" data-unseen="" aria-label="Rival agent not seen yet">
-            <span className={c.unseenFace}>?</span>
-            <span className={c.cin}>
-              <b>Unseen</b>
-              <span className={c.st}>
-                <span>rival</span>
-                <span>–</span>
-              </span>
-            </span>
-          </div>
+      {unseen > 0 ? (
+        // Rivals never seen share one slim strip (not a tall blank card each), so the board keeps its room.
+        <div
+          className={c.unseenStrip}
+          role="group"
+          data-rival=""
+          aria-label={unseen === 1 ? 'Rival agent not seen yet' : `${unseen} rival agents not seen yet`}
+          data-testid="v2-unseen-strip"
+        >
+          <span className={c.unseenPips} aria-hidden="true">
+            {Array.from({ length: unseen }, (_, i) => (
+              <i key={i}>?</i>
+            ))}
+          </span>
+          <span className={c.cin}>
+            <b>{unseen} unseen</b>
+            <span className={c.st}>{unseen === 1 ? 'rival' : 'rivals'} · out of sight</span>
+          </span>
         </div>
-      ))}
+      ) : null}
     </div>
   );
 }
@@ -126,7 +132,7 @@ function Card({ agent, rival, inSight, slot, tick, mapId, item, accent, pressed,
       >
         <span className={c.tier}>{TIER_TAG[agent.tier]}</span>
         {inSight ? <ToolChip kind={agent.tool} onCard /> : null}
-        <AgentPortrait body={body} head={head} team={agent.team === 'A' ? 'A' : 'B'} label={`${agent.name}, ${agent.role}`} className={c.portrait} />
+        <AgentPortrait body={body} head={head} team={agent.team === 'A' ? 'A' : 'B'} label={`${agent.name}, ${agent.role}`} role={agent.role} className={c.portrait} />
         <span className={c.cin}>
           <b>{agent.name}</b>
           <span className={c.st}>

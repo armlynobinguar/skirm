@@ -2,13 +2,15 @@
 //!
 //! v2 match results with log hashes, Elo per player and points per season. Writes come only from
 //! the platform signer `ops.playskirm.testnet` (function-call key, no deposit), so this contract pays
-//! its storage from its own balance (arch.md, Secrets and keys; Open questions: storage).
+//! its storage from its own balance.
 //!
 //! * `record_match` stores a v2 match (`MatchRecordV2`). For a ranked match with a result it
-//!   applies the Elo change per player computed by the backend (Formulas §7: start 1,200, K 32
-//!   then 16, floor 100) and, when the match belongs to a season, the season points (win 25, draw
-//!   12, loss 5) in the same write. The contract enforces the floor, `|delta| ≤ 32`, and that
-//!   winners do not lose and losers do not gain rating. Unranked and void matches carry no Elo.
+//!   applies the Elo change per player computed by the backend (packages/shared/src/elo.ts:
+//!   start 1,200, floor 100; the backend's K varies with matches played and it clamps each
+//!   delta to ±32 before writing) and, when the match belongs to a season, the season points
+//!   (win 25, draw 12, loss 5) in the same write. The contract enforces the floor,
+//!   `|delta| ≤ 32` (`ELO_MAX_DELTA`), and that winners do not lose and losers do not gain
+//!   rating. Unranked and void matches carry no Elo.
 //! * The write is idempotent: re-sending the same record (the worker retries the write as its own
 //!   job) returns the stored record; a different record under the same id is rejected.
 
@@ -17,16 +19,16 @@ use near_sdk::serde_json::json;
 use near_sdk::store::{LookupMap, Vector};
 use near_sdk::{assert_one_yocto, env, near, require, AccountId, BorshStorageKey, PanicOnDefault};
 
-/// Formulas §7 defaults.
+/// Elo defaults, as in `DEFAULTS.elo` (packages/shared/src/config.ts).
 pub const ELO_START: u32 = 1_200;
 pub const ELO_FLOOR: u32 = 100;
-/// Largest K, so the largest possible change of one match.
+/// Largest change of one match the contract accepts. The backend clamps every delta to this.
 pub const ELO_MAX_DELTA: i32 = 32;
 /// Season points per ranked result.
 pub const POINTS_WIN: u32 = 25;
 pub const POINTS_DRAW: u32 = 12;
 pub const POINTS_LOSS: u32 = 5;
-/// Crew cap (Spec §8).
+/// Crew cap: a v2 match fields 1 to 3 agents per side (packages/engine/src/v2/match.ts).
 pub const MAX_CREW: usize = 3;
 pub const MAX_ID_LEN: usize = 64;
 pub const EVENT_STANDARD: &str = "skirm_registry";

@@ -16,6 +16,7 @@ import {
   puzzleRuns,
   communityMaps,
   agents,
+  agentCosmetics,
   cosmeticsOwned,
   eloDecays,
   ledgerAccounts,
@@ -167,6 +168,7 @@ export class AccountsRepo {
     const quests = await this.db.select().from(questClaims).where(eq(questClaims.accountId, accountId));
     const achievements = await this.db.select().from(achievementsUnlocked).where(eq(achievementsUnlocked.accountId, accountId));
     const messages = agentIds.length ? await this.db.select().from(matchMessages).where(inArray(matchMessages.agentId, agentIds)) : [];
+    const agentCosmeticRows = agentIds.length ? await this.db.select().from(agentCosmetics).where(inArray(agentCosmetics.agentId, agentIds)) : [];
     const [campaign, campaignRewardRows, communityMapRows] = await Promise.all([
       this.db.select().from(campaignProgress).where(eq(campaignProgress.accountId, accountId)),
       this.db.select().from(campaignRewards).where(eq(campaignRewards.accountId, accountId)),
@@ -199,6 +201,7 @@ export class AccountsRepo {
       prizePayouts: payouts,
       skillTrials: trials,
       cosmetics,
+      agentCosmetics: agentCosmeticRows,
       questClaims: quests,
       achievements,
       onboarding,

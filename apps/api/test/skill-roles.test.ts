@@ -84,4 +84,22 @@ describe('role skill slots', () => {
     await buyer.patch(`/agents/${agent.id}`, { role: 'Scout' });
     expect((await buyer.post(`/market/${scout.id}/trial`, { agentId: agent.id })).status).toBe(202);
   });
+
+  it('takes the new roles on agents, skills and the Exchange filter', async () => {
+    const u = await h.as('roles-new');
+    const [rook] = (await u.get('/agents')).body;
+    for (const role of ['Medic', 'Engineer', 'Saboteur', 'Courier']) {
+      const res = await u.patch(`/agents/${rook.id}`, { role });
+      expect(res.status, role).toBe(200);
+      expect(res.body.role).toBe(role);
+    }
+    expect((await u.patch(`/agents/${rook.id}`, { role: 'Wizard' })).status).toBe(400);
+    const medic = await u.post('/skills', { ...SAMPLE_SKILL, roles: ['Courier', 'Medic'] });
+    expect(medic.status).toBe(201);
+    expect(medic.body.roles).toEqual(['Medic', 'Courier']);
+    // Naming all ten roles is any role.
+    const all = await u.post('/skills', { ...SAMPLE_SKILL, roles: ['Builder', 'Digger', 'Firefighter', 'Scout', 'Runner', 'Hauler', 'Medic', 'Engineer', 'Saboteur', 'Courier'] });
+    expect(all.body.roles).toEqual(['any']);
+    expect((await u.get('/market?role=Saboteur')).status).toBe(200);
+  });
 });

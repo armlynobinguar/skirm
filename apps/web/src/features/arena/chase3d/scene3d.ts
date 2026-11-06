@@ -4,6 +4,7 @@
 // weather), the tiles that change are re-laid when a new frame arrives, and every animation frame
 // eases the agents, the fog light and the camera.
 import * as THREE from 'three';
+import { fillOf, lookFor, lookParts, lookTop, poseAt, poseKind, type LookGroup, type RoleLook } from '@skirm/ui';
 import * as proto from '../proto/world';
 import { TOOL_INFO } from '../gear';
 import type { LiveArena } from '../live';
@@ -88,14 +89,23 @@ const LEGACY = Math.PI;
 const TWEEN_MS = 400;
 
 /** An agent as the arena draws it; live arenas also carry body colours and status. */
-type Agent3 = ArenaState['agents'][number] & { c?: string; bone?: string; out?: boolean; down?: boolean };
+type Agent3 = ArenaState['agents'][number] & { c?: string; bone?: string };
 
 type DynKey = 'dirt' | 'crate' | 'block' | 'grass' | 'trunk' | 'canopy' | 'water' | 'lava' | 'fire' | 'flame' | 'item' | 'ice' | 'gas' | 'shock' | 'sandbag' | 'bridge' | 'pump' | 'tool';
 
 interface AgentRig {
   g: THREE.Group;
   body: THREE.Group;
+  /** The role's look the figure was built from. */
+  look: RoleLook;
+  /** Pose groups inside `body` (feet, torso, head, held tool, antenna tip). */
+  parts: Record<LookGroup, THREE.Group>;
   inv: THREE.Mesh[];
+  /** Carried count over the items (roles that show it: Haulers). */
+  count: THREE.Sprite | null;
+  shown: number;
+  /** Verb, stun and celebration effects (hidden when idle). */
+  fx: { ring: THREE.Mesh; bits: THREE.Mesh[]; bitMat: THREE.MeshBasicMaterial; ringMat: THREE.MeshBasicMaterial };
   mats: THREE.Material[];
   /** Heading the agent faces (radians around y, 0 = +z). */
   face: number;
@@ -397,34 +407,77 @@ export function worldKey(arena: LiveArena, look: string): string {
   return `${look}:${arena.A.w}x${arena.A.h}`;
 }
 
-/** The stacked-block agent of the map view, with a team ring, name tag and two carry slots. */
+/** A small number on a canvas texture (the Hauler's carried count), repainted when it changes. */
+function countSprite(): THREE.Sprite | null {
+  const cv = document.createElement('canvas');
+  cv.width = 64;
+  cv.height = 32;
+  let g: CanvasRenderingContext2D | null = null;
+  try {
+    g = cv.getContext('2d');
+  } catch {
+    g = null;
+  }
+  if (!g) return null;
+  const ctx = g;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
+  sp.scale.set(0.36, 0.18, 1);
+  sp.userData.paint = (n: number, cap: number, colour: string) => {
+    ctx.clearRect(0, 0, 64, 32);
+    ctx.fillStyle = 'rgba(5,8,13,.85)';
+    ctx.fillRect(2, 2, 60, 28);
+    ctx.fillStyle = colour;
+    ctx.font = '700 22px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${n}/${cap}`, 32, 17);
+    (sp.material.map as THREE.Texture).needsUpdate = true;
+  };
+  return sp;
+}
+
+const GROUPS: readonly LookGroup[] = ['footL', 'footR', 'body', 'head', 'hand', 'tip'];
+/** Height of the carried items over the feet: just over the figure's top (it is scaled 1.1). */
+const carryY = (look: RoleLook) => (lookTop(look) + 0.12) * 1.1;
+
+/** The agent in its role's look (@skirm/ui ROLE_LOOKS), with a team ring, name tag, carry slots and effects. */
 function agentRig(w: World, a: Agent3): AgentRig {
   const g = new THREE.Group();
   const body = new THREE.Group();
   g.add(body);
   const team = TEAM_RING[a.team];
-  const bodyCol = a.c ?? BODY[a.team][a.slot % 3]!;
-  const mats: THREE.Material[] = [
-    lambert({ color: '#1c2530' }),
-    lambert({ color: bodyCol }),
-    lambert({ color: a.bone ?? '#ece8e1' }),
-    new THREE.MeshBasicMaterial({ color: '#0b1118' }),
-    new THREE.MeshBasicMaterial({ color: bodyCol }),
-  ];
-  const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
-  const part = (sx: number, sy: number, sz: number, y: number, mat: THREE.Material, z = 0) => {
-    const p = new THREE.Mesh(box, mat);
-    p.scale.set(sx, sy, sz);
-    p.position.set(0, y, z);
-    p.castShadow = true;
-    body.add(p);
+  const look = lookFor(a.role);
+  const colours = { body: a.c ?? BODY[a.team][a.slot % 3]!, head: a.bone ?? '#ece8e1', team };
+  const mats: THREE.Material[] = [];
+  const byFill = new Map<string, THREE.Material>();
+  const matFor = (hex: string, glow: boolean) => {
+    const k = (glow ? '*' : '') + hex;
+    let m = byFill.get(k);
+    if (!m) {
+      m = glow ? new THREE.MeshBasicMaterial({ color: hex }) : lambert({ color: hex });
+      byFill.set(k, m);
+      mats.push(m);
+    }
+    return m;
   };
-  // Boots, torso, head, visor, visor light.
-  part(0.32, 0.2, 0.32, 0, mats[0]!);
-  part(0.4, 0.3, 0.4, 0.2, mats[1]!);
-  part(0.36, 0.28, 0.36, 0.5, mats[2]!);
-  part(0.28, 0.08, 0.02, 0.62, mats[3]!, 0.185);
-  part(0.2, 0.025, 0.02, 0.645, mats[4]!, 0.196);
+  const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+  const parts = {} as Record<LookGroup, THREE.Group>;
+  for (const k of GROUPS) {
+    parts[k] = new THREE.Group();
+    body.add(parts[k]);
+  }
+  for (const q of lookParts(look)) {
+    const m = new THREE.Mesh(box, matFor(fillOf(q.fill, colours), !!q.glow));
+    m.scale.set(q.size[0], q.size[1], q.size[2]);
+    if (q.group === 'tip') {
+      // The beacon tip scales around its own centre: its group sits at the part.
+      parts.tip.position.set(q.at[0], q.at[1] + q.size[1] / 2, q.at[2]);
+      parts.tip.userData.base = parts.tip.position.clone();
+      m.position.set(0, -q.size[1] / 2, 0);
+    } else m.position.set(q.at[0], q.at[1], q.at[2]);
+    m.castShadow = q.size[1] > 0.04;
+    parts[q.group].add(m);
+  }
   body.scale.setScalar(1.1);
   const ringMat = new THREE.MeshBasicMaterial({ color: team, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
   const tr = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.42, 28), ringMat);
@@ -433,20 +486,109 @@ function agentRig(w: World, a: Agent3): AgentRig {
   g.add(tr);
   const tag = nameSprite(a.name, team);
   if (tag) {
-    tag.position.y = 1.2;
+    tag.position.y = Math.max(1.32, carryY(look) + 0.42);
     g.add(tag);
   }
+  const topY = carryY(look);
   const invGeo = new THREE.OctahedronGeometry(0.09);
   const invMat = new THREE.MeshBasicMaterial({ color: w.pal.accent });
-  const inv = [0, 1].map((i) => {
+  const inv = Array.from({ length: look.carry }, (_, i) => {
     const o = new THREE.Mesh(invGeo, invMat);
-    o.position.set(-0.1 + i * 0.2, 0.95, 0);
+    o.position.set((i - (look.carry - 1) / 2) * 0.2, topY, 0);
+    o.visible = false;
+    g.add(o);
+    return o;
+  });
+  const count = look.count ? countSprite() : null;
+  if (count) {
+    count.position.set(0, topY + 0.2, 0);
+    count.visible = false;
+    g.add(count);
+  }
+  // Effects: a ground ring (the scout pulse) and a few bits (stars, dust, spray, sparkles).
+  const fxRingMat = new THREE.MeshBasicMaterial({ color: look.accent, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.44, 0.5, 28), fxRingMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.03;
+  ring.visible = false;
+  g.add(ring);
+  const bitMat = new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true });
+  const bitGeo = new THREE.OctahedronGeometry(0.045);
+  const bits = Array.from({ length: 6 }, () => {
+    const o = new THREE.Mesh(bitGeo, bitMat);
+    o.visible = false;
     g.add(o);
     return o;
   });
   w.scene.add(g);
   // Crews start facing the middle.
-  return { g, body, inv, mats, face: a.team === 'A' ? Math.PI / 2 : -Math.PI / 2 };
+  return { g, body, look, parts, inv, count, shown: -1, fx: { ring, bits, bitMat, ringMat: fxRingMat }, mats, face: a.team === 'A' ? Math.PI / 2 : -Math.PI / 2 };
+}
+
+/** Poses one agent's figure and its effects for this moment (poseAt in @skirm/ui). */
+function poseRig(ag: AgentRig, a: Agent3, o: { time: number; age: number; walk: number; moving: boolean; still: boolean; seed: number; accent: string }) {
+  const kind = poseKind({ out: a.out, down: a.down, stun: a.stun, cheer: a.cheer, act: a.act, carrying: a.inv.length, moving: o.moving });
+  const pose = poseAt(kind, ag.look, o);
+  ag.body.rotation.z = pose.tilt;
+  ag.body.rotation.x = pose.lean;
+  ag.body.position.y = pose.lift + (a.down ? 0.1 * Math.sin(Math.abs(pose.tilt)) : 0);
+  for (const k of GROUPS) {
+    if (k === 'tip') continue;
+    const off = pose.off[k];
+    ag.parts[k].position.set(off?.[0] ?? 0, off?.[1] ?? 0, off?.[2] ?? 0);
+  }
+  const tip = ag.parts.tip;
+  const base = tip.userData.base as THREE.Vector3 | undefined;
+  if (base) {
+    const off = pose.off.head;
+    tip.position.set(base.x + (off?.[0] ?? 0), base.y + (off?.[1] ?? 0), base.z + (off?.[2] ?? 0));
+    tip.scale.setScalar(pose.tipScale);
+  }
+  const { ring, bits, bitMat, ringMat } = ag.fx;
+  const t = o.still ? 0.4 : o.time;
+  ring.visible = pose.kind === 'act' && ag.look.verb === 'pulse';
+  if (ring.visible) {
+    const k = o.still ? 0.6 : (o.time * 0.9) % 1;
+    ring.scale.setScalar(0.7 + k * 2);
+    ringMat.opacity = o.still ? 0.5 : 0.9 * (1 - k);
+  }
+  const topY = carryY(ag.look);
+  let n = 0;
+  const bit = (x: number, y: number, z: number) => {
+    const b = bits[n++];
+    if (!b) return;
+    b.visible = true;
+    b.position.set(x, y, z);
+  };
+  if (pose.kind === 'stun') {
+    bitMat.color.set('#ffd23f');
+    bitMat.opacity = 1;
+    for (let i = 0; i < 5; i++) {
+      const ang = (o.still ? 0 : o.time * 6) + i * 1.25;
+      bit(Math.cos(ang) * 0.26, topY - 0.12, Math.sin(ang) * 0.26);
+    }
+  } else if (pose.kind === 'cheer' && pose.fx > 0) {
+    bitMat.color.set(o.accent);
+    bitMat.opacity = pose.fx;
+    for (let i = 0; i < 6; i++) {
+      const ang = i * 1.05 + t * 2;
+      const r = 0.25 + (1 - pose.fx) * 0.35;
+      bit(Math.cos(ang) * r, topY - 0.1 + (1 - pose.fx) * 0.4, Math.sin(ang) * r);
+    }
+  } else if (pose.kind === 'act' && ag.look.verb !== 'pulse') {
+    // In front of the agent (+z in its own frame; the rig group turns with its heading).
+    const v = ag.look.verb;
+    bitMat.color.set(v === 'dig' ? '#a07850' : v === 'spray' ? '#8fd0ff' : v === 'build' ? '#7ff5e4' : v === 'heal' ? '#ff4d5e' : '#ffe94a');
+    bitMat.opacity = 0.9;
+    for (let i = 0; i < 5; i++) {
+      const ph = (t * (v === 'spray' ? 2.2 : 1.6) + i / 5) % 1;
+      if (v === 'spray') bit(0.3 + (i % 2) * 0.04, 0.42 - ph * ph * 0.4, 0.3 + ph * 0.5);
+      else if (v === 'dig') bit((i - 2) * 0.06, 0.05 + Math.sin(ph * Math.PI) * 0.35, 0.45);
+      else bit((i - 2) * 0.07, 0.3 + Math.sin(ph * Math.PI) * 0.2, 0.42);
+    }
+  }
+  for (; n < bits.length; n++) bits[n]!.visible = false;
+  return pose;
 }
 
 /** Re-lays the tiles that change, from a new board. */
@@ -601,10 +743,9 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
     const af = fade[a.id] ?? 1;
     ag.g.visible = !a.out && af >= 0.02;
     const hop = moving && !still ? Math.sin(Math.PI * Math.min(1, alpha)) * 0.12 : 0;
-    ag.g.position.set(x, hop + (still ? 0 : Math.sin(time * 3 + i) * 0.015), z);
+    ag.g.position.set(x, hop, z);
     ag.g.rotation.y += still ? angDiff(ag.g.rotation.y, ag.face) : angDiff(ag.g.rotation.y, ag.face) * Math.min(1, dt * 10);
-    ag.body.rotation.z = a.down ? 1.2 : 0;
-    ag.body.position.y = a.down ? 0.1 : 0;
+    poseRig(ag, a, { time, age: (f.now - state.at) / 1000, walk: alpha, moving: moving && !still, still, seed: i, accent: TEAM_RING[a.team] });
     // Anyone between the camera and the watched agent fades so they never hide it.
     const blocking = !!rig.pos && !!rig.focusAt && a.id !== state.focus && segDist(x, z, rig.pos.x, rig.pos.z, rig.focusAt.x, rig.focusAt.z) < 0.75;
     const op = (a.down ? 0.5 : blocking ? 0.28 : 1) * af;
@@ -612,10 +753,16 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
       m.transparent = op < 1;
       m.opacity = op;
     }
+    const carried = a.down ? 0 : a.inv.length;
     ag.inv.forEach((o, j) => {
-      o.visible = j < a.inv.length;
+      o.visible = j < carried;
       o.rotation.y = time * 3;
     });
+    if (ag.count) {
+      ag.count.visible = carried > 0;
+      if (carried > 0 && ag.shown !== carried) (ag.count.userData.paint as (n: number, cap: number, c: string) => void)(carried, ag.look.carry, w.pal.accent);
+      ag.shown = carried;
+    }
     if (a.id === state.focus) focus = ag.g.position;
   });
   // Rivals that left sight are not in the frame at all.

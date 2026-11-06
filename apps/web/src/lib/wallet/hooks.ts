@@ -10,7 +10,7 @@ import { config } from '../config';
 import { useServices } from '../services';
 import { sendTransaction, type SentTransaction } from './gasless';
 import { linkRecipient, linkSignInMessage, newNonce, proofOf, signLinkProof } from './contracts';
-import { WalletError, type NearTransaction, type NearWallet, type WalletOption } from './types';
+import { WalletError, type AnyNearTransaction, type NearTransaction, type NearWallet, type WalletOption } from './types';
 
 export const useWallet = (): NearWallet => useServices().wallet;
 
@@ -31,8 +31,8 @@ export interface NearSigner {
    * Makes sure the wallet is signed in as `linked` (restoring or opening it), then signs and sends
    * `tx`; resolves with the transaction hash for the api.
    */
-  send(tx: NearTransaction, linked: string): Promise<string>;
-  /** As send(), and says whether skirm's relayer paid the gas. */
+  send(tx: AnyNearTransaction, linked: string): Promise<string>;
+  /** As send() for contract calls, and says whether skirm's relayer paid the gas. */
   sendTx(tx: NearTransaction, linked: string): Promise<SentTransaction>;
 }
 
@@ -81,7 +81,12 @@ export function useNearSigner(): NearSigner {
       },
       sendTx,
       async send(tx, linked) {
-        return (await sendTx(tx, linked)).txHash;
+        // A plain transfer (e.g. funding an agent account) is never relayed; contract calls may be.
+        if (tx.actions.some((a) => 'type' in a && a.type === 'Transfer')) {
+          await ensure(linked);
+          return (await wallet.signAndSendTransaction(tx)).txHash;
+        }
+        return (await sendTx(tx as NearTransaction, linked)).txHash;
       },
     };
   }, [wallet, api, toast]);

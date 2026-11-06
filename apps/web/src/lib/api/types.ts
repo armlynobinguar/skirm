@@ -5,11 +5,11 @@
 //
 // Game types (SkillPublic, Tag, …) come from @skirm/shared (type-only imports,
 // browser-safe).
-import type { ActionKind, AgentAppearance, AgentProgression, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, SkillRole, SkillTrigger, Tag, TraitInfo, Unlock } from '@skirm/shared';
+import type { ActionKind, AgentAppearance, AgentCosmetics, AgentProgression, CosmeticItem, EquipCosmetic, PlayerTier, RankedTierName, SkillPublic, SkillRole, SkillTrigger, Tag, TraitInfo, Unlock } from '@skirm/shared';
 
 import type { Difficulty, V2Debrief, V2Frame } from '../realtime/protocol';
 
-export type { AgentAppearance, CosmeticItem, SkillPublic, SkillRole, SkillTrigger, Tag, Unlock };
+export type { AgentAppearance, AgentCosmetics, CosmeticItem, EquipCosmetic, SkillPublic, SkillRole, SkillTrigger, Tag, Unlock };
 
 /** Skill version reference used everywhere a crew or agent names a skill. */
 export interface SkillRef {
@@ -79,7 +79,7 @@ export interface Agent {
   /** How the agent looks in the arena (cosmetic). */
   appearance: AgentAppearance;
   /** v2: role, sight and voice range (1–5) and default talk tier. */
-  role: 'Builder' | 'Digger' | 'Firefighter' | 'Scout' | 'Runner' | 'Hauler';
+  role: 'Builder' | 'Digger' | 'Firefighter' | 'Scout' | 'Runner' | 'Hauler' | 'Medic' | 'Engineer' | 'Saboteur' | 'Courier';
   vision: number;
   comms: number;
   tier: 'quiet' | 'standard' | 'open';
@@ -632,6 +632,29 @@ export interface RentalPass {
   createdAt: string;
 }
 
+/**
+ * An agent's own NEAR account (docs/agent-accounts.md). Custodial: the server holds its key and
+ * spends under `capYocto` per match; the owner funds it from their wallet and can withdraw the rest.
+ */
+export interface AgentAccount {
+  agentId: string;
+  nearAccountId: string;
+  /** null when NEAR RPC did not answer. */
+  balanceYocto: string | null;
+  /** Balance minus storage and the gas reserve. */
+  spendableYocto: string | null;
+  capYocto: string;
+  /** Already committed to passes for the coming match. */
+  committedYocto: string;
+  custodial: true;
+}
+
+/** GET /agents/:id/account: `enabled` is false while the server has agent accounts off. */
+export interface AgentAccountStatus {
+  enabled: boolean;
+  account: AgentAccount | null;
+}
+
 /** One agent's results over its v2 matches (practice against the bot left out). */
 export interface AgentRecordCounts {
   matches: number;
@@ -730,10 +753,26 @@ export interface SeasonStandings {
 
 // ---------- Cosmetics ----------
 
+/** A NEP-245 mint of an owned skin, trail or nameplate (contracts/cosmetics). */
+export interface CosmeticMint {
+  status: 'pending' | 'minted' | 'failed';
+  txHash: string | null;
+  /** The NEAR account it was minted to. */
+  owner: string | null;
+}
+
 /** GET /cosmetics: the premium catalog and what the caller owns. */
 export interface Cosmetics {
   items: CosmeticItem[];
   owned: string[];
+  /** Equippable skins, trails and nameplates (@skirm/shared EQUIP_COSMETICS). */
+  equip?: EquipCosmetic[];
+  /** What each of the caller's agents wears, by agent id. */
+  equipped?: Record<string, AgentCosmetics>;
+  /** NEP-245 mint state per owned item (absent: credits only). */
+  mints?: Record<string, CosmeticMint>;
+  /** The NEP-245 cosmetics contract when it is on (null: credits only, the default). */
+  onchain?: { standard: 'nep245'; contractId: string } | null;
 }
 
 // ---------- Replays ----------

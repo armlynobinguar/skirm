@@ -51,6 +51,7 @@ export function CommandDeck({ lead, agents, elo }: CommandDeckProps) {
             head={SKIN_TONES[lead.appearance.skin] ?? SKIN_TONES[0]}
             team="A"
             label={`Your lead agent, ${lead.name}`}
+            role={lead.role}
             variant="hero"
             className={styles.hero}
           />

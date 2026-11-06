@@ -1,5 +1,6 @@
 import type { Executor } from '../client';
 import { AccountsRepo } from './accounts';
+import { AgentAccountsRepo } from './agent-accounts';
 import { AgentsRepo } from './agents';
 import { BackingRepo } from './backing';
 import { BenchRepo } from './bench';
@@ -83,6 +84,8 @@ export interface Repos {
   backing: BackingRepo;
   /** Gasless onboarding: meta-transactions relayed for players (the free quota). */
   relay: RelayRepo;
+  /** Agents' own custodial NEAR accounts, their spend caps and payments. */
+  agentAccounts: AgentAccountsRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -130,11 +133,13 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     communityMaps: new CommunityMapsRepo(db),
     backing: new BackingRepo(db),
     relay: new RelayRepo(db),
+    agentAccounts: new AgentAccountsRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
 
 export * from './accounts';
+export * from './agent-accounts';
 export * from './agents';
 export * from './backing';
 export * from './bench';

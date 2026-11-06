@@ -3,15 +3,16 @@
 //! A player tops up credits by calling `deposit()` with NEAR attached from their own wallet.
 //! The contract logs a NEP-297 event `{player, amount, receipt}`; the backend reads the
 //! transaction through RPC, checks receiver and amount, and adds credits once per receipt
-//! (arch.md, Money and ownership: "Top up"). Credits themselves live offchain.
+//! (packages/server/src/near/deposits.ts). Credits themselves live offchain.
 //!
-//! The owner moves collected NEAR to the platform treasury with `withdraw`.
+//! The owner moves collected NEAR to the platform treasury with `withdraw`; `on_withdrawn`
+//! undoes the `total_withdrawn` bump if the transfer fails (the NEAR bounces back).
 
 use near_sdk::json_types::{U128, U64};
 use near_sdk::store::LookupMap;
 use near_sdk::{
-    assert_one_yocto, env, near, require, AccountId, BorshStorageKey, NearToken, PanicOnDefault,
-    Promise,
+    assert_one_yocto, env, near, require, AccountId, BorshStorageKey, Gas, NearToken,
+    PanicOnDefault, Promise, PromiseError,
 };
 
 /// Default smallest top-up: 0.01 NEAR (10 credits at the testnet rate of 1,000 credits per
@@ -22,6 +23,8 @@ pub const DEFAULT_MIN_DEPOSIT: NearToken = NearToken::from_millinear(10);
 pub const WITHDRAW_RESERVE: NearToken = NearToken::from_millinear(100);
 
 pub const EVENT_STANDARD: &str = "skirm_deposits";
+/// Gas reserved for `on_withdrawn`, the callback of a withdrawal transfer.
+pub const GAS_FOR_ON_WITHDRAWN: Gas = Gas::from_tgas(5);
 
 #[derive(BorshStorageKey)]
 #[near]
@@ -146,15 +149,43 @@ impl Contract {
             amount <= available,
             "Amount exceeds the withdrawable balance"
         );
+        // Counted now so the amount in flight is not reported as still withdrawable; the
+        // callback takes it back out if the transfer fails.
         self.total_withdrawn = self.total_withdrawn.saturating_add(amount);
-        emit_event(
-            "withdraw",
-            near_sdk::serde_json::json!({
-                "treasury": self.treasury_id,
-                "amount": U128(amount.as_yoctonear()),
-            }),
+        Promise::new(self.treasury_id.clone())
+            .transfer(amount)
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_ON_WITHDRAWN)
+                    .on_withdrawn(self.treasury_id.clone(), U128(amount.as_yoctonear())),
+            )
+    }
+
+    /// Callback of `withdraw`'s transfer. On success emits `withdraw` and returns true. A failed
+    /// transfer refunds the NEAR to this contract, so `total_withdrawn` is reduced again and
+    /// `withdraw_failed` is emitted; returns false.
+    #[private]
+    pub fn on_withdrawn(&mut self, treasury_id: AccountId, amount: U128) -> bool {
+        // Same check as #[private]; repeated in the body so unit tests exercise it.
+        require!(
+            env::predecessor_account_id() == env::current_account_id(),
+            "Method on_withdrawn is private"
         );
-        Promise::new(self.treasury_id.clone()).transfer(amount)
+        // A transfer returns no data; only a failed transfer is an error.
+        let failed = matches!(
+            env::promise_result_checked(0, 0),
+            Err(PromiseError::Failed)
+        );
+        let data = near_sdk::serde_json::json!({ "treasury": treasury_id, "amount": amount });
+        if failed {
+            self.total_withdrawn = self
+                .total_withdrawn
+                .saturating_sub(NearToken::from_yoctonear(amount.0));
+            emit_event("withdraw_failed", data);
+            return false;
+        }
+        emit_event("withdraw", data);
+        true
     }
 
     #[payable]

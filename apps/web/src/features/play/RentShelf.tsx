@@ -8,7 +8,7 @@
 //            /rentals/:offerId turns the payment into a pass. A signed tx (or a credits key) is kept
 //            until the api answers, so a retry after a dropped request never pays twice.
 // A rented agent plays with its owner's skills; you never see them, and its plans stay hidden.
-import { defaultAppearance } from '@skirm/shared';
+import { AGENT_ROLES, defaultAppearance } from '@skirm/shared';
 import { Button } from '@skirm/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
@@ -28,7 +28,7 @@ import { useNearSigner } from '@/lib/wallet/hooks';
 import { WalletError } from '@/lib/wallet/types';
 import styles from './play.module.css';
 
-const ROLES: Agent['role'][] = ['Builder', 'Digger', 'Firefighter', 'Scout', 'Runner', 'Hauler'];
+const ROLES: readonly string[] = AGENT_ROLES;
 const TIERS: Agent['tier'][] = ['quiet', 'standard', 'open'];
 
 /** A rented agent as the crew cards draw it: its public stats, no skills (they stay its owner's). */
@@ -185,7 +185,7 @@ export function RentShelf({
                   title={`Rented from ${p.agent?.ownerHandle ?? 'another player'}${n > 1 ? ` · ${n} matches left` : ''}`}
                   data-testid={`s04-rented-${p.agentId}`}
                 >
-                  <AgentPortrait body={agentColour(a)} head={agentBone(a)} label={a.name} className={c.face} />
+                  <AgentPortrait body={agentColour(a)} head={agentBone(a)} label={a.name} role={a.role} className={c.face} />
                   <span>{a.name}</span>
                   <small>{n > 1 ? `${n} left` : a.role}</small>
                 </button>

@@ -60,6 +60,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 - **Hybrid control**: in casual and practice, steer one of your agents yourself (keys or click-to-move) while the AI runs the rest
 - **Agent progression**: agents earn XP from matches, level up and pick small traits (casual only; ranked plays base stats)
 - **Gas, ice and live water**: gas clouds that cost every other action, ice that slides you a tile further, and cables that electrify the water (Frostline Depot, Sunken Metro)
+- **Ten roles**: Builder, Digger, Firefighter, Scout, Runner and Hauler, plus four newer ones for casual, practice, lobbies, the campaign and puzzles: a **Medic** gets knocked-down or stunned crewmates back sooner, an **Engineer** works valves from 2 tiles and lays its own bridges, a **Saboteur** plants decoy items the rival sees through fog as real, and a **Courier** moves 2 tiles a step but carries 1. Ranked stays on the original six for now (`DEFAULTS.roles.rankedNewRoles`). Exact rules in the [walkthrough](docs/walkthrough.md#roles)
 - **Supply tools**: drops on water maps can carry sandbags, a pump or a bridge to hold back or cross a flood
 - **Quests and achievements**: 3 daily and 2 weekly quests, play streaks, and permanent achievements, mintable as soulbound NEAR badges once the badges contract is deployed (built and tested in `contracts/badges`)
 - **Bring your own agent**: plug your own program (webhook, pull api, or an LLM through the bundled MCP server) into casual and practice matches. See [external agents](docs/external-agents.md)
@@ -80,6 +81,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 - **Exchange**: mint, list and buy skills as NEAR NFTs, with creator royalties on every resale
 - **Back a writer**: stake on a skill writer up front for a capped share of their future royalties. Closing a round pays the whole raise to the writer; backers then earn their share only of royalties routed to the round. On the keyless local stack (`AUTH_MODE=dev`) it runs on paid credits and every resale of a covered skill routes its royalty automatically; with the backing contract (`contracts/backing`, not deployed yet, `BACKING_CONTRACT`) royalties reach backers only when the writer forwards them with `distribute`. On a hosted server without the contract, backing is off
 - **Proof**: every minted version gets a hidden benchmark (win, leak and manipulation rates), ranked stats per map, and 3 free trials for buyers
+- **Arena cosmetics (NEP-245 multi-token items)**: agent skins (a colour palette and pattern), trails and nameplate styles, bought with paid credits and worn per agent from the agent's Arena style tab. Purely visual: matches carry them as plain ids for the arena to draw, never the engine or the match log. The NEP-245 contract is built and tested (`contracts/cosmetics`) but not deployed yet, so they are credits-only by default; with `NEAR_CONTRACT_COSMETICS` set the api mints each bought item to the player's NEAR account and reads ownership from the chain. Badges and skills keep their own contracts
 - **Agent rentals**: rent another player's agent for one match, paid in credits, or with NEAR through the market contract once rentals are switched onchain
 - **Gasless onboarding**: a relayer can pay the gas for a new player's first transactions to skirm's contracts (NEP-366 meta-transactions, 3 per player by default). Off until an operator configures a funded relayer account (`RELAYER_ACCOUNT_ID`, `RELAYER_PRIVATE_KEY`) and the wallet supports delegate actions; see [gasless onboarding](docs/gasless.md)
 
@@ -185,6 +187,7 @@ Only what needs trust or ownership goes onchain: skill ownership, trades, royalt
 | `seasons` | [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | One prize pool per 14-day season: the ops account posts the top 10, who claim their shares |
 | `badges` | `badges.playskirm.testnet` (not deployed yet) | Soulbound achievement badges (NEP-171 shape, never transferable), minted by the ops account |
 | `backing` | `backing.playskirm.testnet` (not deployed yet) | Writer backing rounds: stakes up front, the whole raise to the writer at close; backers claim a capped share of the royalties someone forwards to the round with `distribute` (the skills contract pays royalties to the writer, not to the round) |
+| `cosmetics` | `cosmetics.playskirm.testnet` (not deployed yet) | NEP-245 multi-token cosmetic items (agent skins, trails, nameplates): item types and copies minted by the owner or ops account, transfers and `transfer_call`, storage paid by the caller |
 
 Wallets connect through [NEAR Connect](https://www.npmjs.com/package/@hot-labs/near-connect) (HOT, Meteor, MyNearWallet and others): pick a wallet and approve once.
 
@@ -226,7 +229,7 @@ Every match produces a hash-chained log of every action and every line spoken. R
 
 ## Roadmap
 
-Planned after the hackathon. Nothing below is in the codebase yet; gasless onboarding and model choice per agent, once on this list, are built and listed under [Features](#features).
+Planned after the hackathon. Nothing below is in the codebase yet; gasless onboarding, model choice per agent and NEP-245 multi-token cosmetics, once on this list, are built and listed under [Features](#features) (the cosmetics contract is not deployed yet).
 
 **NEAR AI and agents**
 - **NEAR AI Cloud** as a model provider for agents, next to any OpenAI-compatible API
@@ -241,7 +244,6 @@ Planned after the hackathon. Nothing below is in the codebase yet; gasless onboa
 - **USDC deposits** (NEP-141 / NEP-145), with prices shown in dollars
 - **Liquid-staking prize pools**: season pools earn staking yield until they are paid out
 - **Pyth price feed** for live NEAR/USD prices
-- **Multi-token items (NEP-245)**: cosmetics, badges and skill licences in one contract
 
 **Gameplay**
 - **New modes**: 2v2, free-for-all, co-op survival and king of the hill
@@ -257,7 +259,7 @@ Planned after the hackathon. Nothing below is in the codebase yet; gasless onboa
 ```
 apps/        web (Next.js) · api (NestJS) · realtime (WebSocket) · worker (BullMQ)
 packages/    engine · decision-engine · db · ledger · server · shared · ui · mcp (MCP server for external agents)
-contracts/   skills · market · registry · deposits · seasons · badges · backing (Rust, near-sdk)
+contracts/   skills · market · registry · deposits · seasons · badges · backing · cosmetics (Rust, near-sdk)
 spec/        the ten v2 maps
 docs/        walkthrough, backend contract, economy, benchmarks, deploy, development, external agents, gasless
 ```

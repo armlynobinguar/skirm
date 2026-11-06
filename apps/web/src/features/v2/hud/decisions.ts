@@ -56,7 +56,7 @@ export const reasonNote = (d: MatchDecision) => REASON[d.reason];
 
 /** The words for the skill behind a turn: its name and how it was named, or why there is none. */
 export function skillLine(d: MatchDecision, crew: Pick<DecisionCrew, 'brain' | 'agents'>, skills: readonly DecisionSkill[]): { name: string | null; how: string; skill: DecisionSkill | null } {
-  if (crew.brain === 'greedy') return { name: null, how: 'The greedy brain plays without skills.', skill: null };
+  if (crew.brain === 'greedy') return { name: null, how: 'The greedy brain plays by fixed rules: equipped skills show as active, but their text does not steer it.', skill: null };
   if (!d.skill) {
     const carries = crew.agents.find((a) => a.id === d.agentId)?.skills.length ?? 0;
     return { name: null, how: carries ? 'No equipped skill drove this move.' : 'No skills equipped.', skill: null };

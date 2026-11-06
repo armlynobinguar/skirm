@@ -78,7 +78,8 @@ function pumpReach(o: Observation, x0: number, y0: number): Set<number> {
  * item, or the delivery point when it carries enough).
  */
 export function greedyTool(o: Observation, goal: (c: string, x: number, y: number) => boolean): Action | null {
-  if (!o.me.tool) return null;
+  // An Engineer lays its own bridges the same way (engine roles.ts), tool in hand or not.
+  if (!o.me.tool && !(o.me.role === 'Engineer' && o.me.kit)) return null;
   const uses = o.legal.filter((a): a is Extract<Action, { type: 'use' }> => a.type === 'use');
   if (!uses.length) return null;
   const w = o.rows[0]?.length ?? 0;

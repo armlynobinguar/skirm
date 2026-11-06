@@ -2,7 +2,7 @@
 // Every method returns the parsed JSON body or throws an ApiError (./errors.ts).
 // Credentials are read per request from the CredentialsStore, so signing in or out needs no new
 // client. In components use `useApi()` (src/lib/providers.tsx), never construct one.
-import type { ModelChoice, TraitId } from '@skirm/shared';
+import type { AgentCosmetics, CosmeticSlot, ModelChoice, TraitId } from '@skirm/shared';
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
@@ -37,6 +37,7 @@ import type {
   DailyAttempt,
   DailyBoard,
   DailyToday,
+  CosmeticMint,
   Cosmetics,
   CreditsWithRows,
   CurrentSeason,
@@ -57,6 +58,8 @@ import type {
   AgentRecord,
   MyMatch,
   MyRentalOffer,
+  AgentAccount,
+  AgentAccountStatus,
   Onboarding,
   SkillTemplateView,
   TutorialUpdate,
@@ -117,6 +120,17 @@ export interface ApiClient {
   rent(offerId: string, txHash: string): Promise<{ pass: RentalPass }>;
   /** POST /rentals/:offerId `{ credits, key }`: pays in paid credits; a retry with the same key returns the same pass. */
   rentWithCredits(offerId: string, key: string): Promise<{ pass: RentalPass; credits: number }>;
+  /** GET /agents/:id/account: the agent's own NEAR account, or `enabled: false` when the server has them off. */
+  agentAccount(agentId: string): Promise<AgentAccountStatus>;
+  /** POST /agents/:id/account: creates the agent's custodial NEAR account. */
+  createAgentAccount(agentId: string): Promise<{ account: AgentAccount }>;
+  /** PUT /agents/:id/account/cap: what the account may spend per match. */
+  setAgentAccountCap(agentId: string, capYocto: string): Promise<{ account: AgentAccount }>;
+  /** POST /agents/:id/account/withdraw: sends the rest (or `amountYocto`) to the linked NEAR account. */
+  withdrawAgentAccount(
+    agentId: string,
+    amountYocto?: string,
+  ): Promise<{ txHash: string; amountYocto: string; to: string; account: AgentAccount }>;
   /** GET /agents/:id/record: the agent's season and all-time record, bluffs included. */
   agentRecord(agentId: string): Promise<AgentRecord>;
   /** GET /agents/:id/progression: XP, level, traits and the trait catalogue. */
@@ -182,8 +196,15 @@ export interface ApiClient {
 
   /** GET /cosmetics: the premium catalog and what the caller owns. */
   cosmetics(): Promise<Cosmetics>;
-  /** POST /cosmetics/:id/buy: paid credits only (402 `insufficient_credits` with need/have). */
-  buyCosmetic(itemId: string): Promise<{ owned: string[] }>;
+  /**
+   * POST /cosmetics/:id/buy: paid credits only (402 `insufficient_credits` with need/have). With the
+   * NEP-245 contract on and a linked NEAR account, a bought skin, trail or nameplate is minted (`mint`).
+   */
+  buyCosmetic(itemId: string): Promise<{ owned: string[]; mint?: CosmeticMint | null }>;
+  /** POST /cosmetics/:id/mint: mint an owned item as a NEP-245 token (503 `cosmetics_offchain` while off). */
+  mintCosmetic(itemId: string): Promise<{ mint: CosmeticMint | null }>;
+  /** PUT /agents/:id/cosmetics/:slot: wear an owned item (`null` takes the slot off). */
+  equipCosmetic(agentId: string, slot: CosmeticSlot, itemId: string | null): Promise<{ cosmetics: AgentCosmetics }>;
 
   /** GET /quests: today's and this week's quests, progress and the play streak. */
   quests(): Promise<QuestBoard>;
@@ -408,6 +429,11 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     setRentalOffer: (id, priceYocto) => json('PUT', `/agents/${enc(id)}/rental`, { body: { priceYocto } }),
     rent: (offerId, txHash) => json('POST', `/rentals/${enc(offerId)}`, { body: { txHash } }),
     rentWithCredits: (offerId, key) => json('POST', `/rentals/${enc(offerId)}`, { body: { credits: true, key } }),
+    agentAccount: (id) => get(`/agents/${enc(id)}/account`),
+    createAgentAccount: (id) => json('POST', `/agents/${enc(id)}/account`, { body: {} }),
+    setAgentAccountCap: (id, capYocto) => json('PUT', `/agents/${enc(id)}/account/cap`, { body: { capYocto } }),
+    withdrawAgentAccount: (id, amountYocto) =>
+      json('POST', `/agents/${enc(id)}/account/withdraw`, { body: amountYocto ? { amountYocto } : {} }),
     patchAgent: (id, patch) => json('PATCH', `/agents/${enc(id)}`, { body: patch }),
 
     skills: (tab = 'written') => get('/skills', { tab }),
@@ -448,6 +474,9 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
 
     cosmetics: () => get('/cosmetics'),
     buyCosmetic: (id) => json('POST', `/cosmetics/${enc(id)}/buy`),
+    mintCosmetic: (id) => json('POST', `/cosmetics/${enc(id)}/mint`),
+    equipCosmetic: (agentId, slot, itemId) =>
+      json('PUT', `/agents/${enc(agentId)}/cosmetics/${enc(slot)}`, { body: { itemId } }),
 
     quests: () => get('/quests'),
     claimQuest: (id) => json('POST', `/quests/${enc(id)}/claim`),

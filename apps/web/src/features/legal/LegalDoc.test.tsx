@@ -30,5 +30,7 @@ describe('terms and privacy', () => {
     const urls = sitemap().map((e) => e.url);
     expect(urls.some((u) => u.endsWith('/terms'))).toBe(true);
     expect(urls.some((u) => u.endsWith('/privacy'))).toBe(true);
+    // Sign-in-only screens stay out: a crawler would only see the sign-in prompt.
+    expect(urls.some((u) => u.endsWith('/play') || u.endsWith('/puzzles'))).toBe(false);
   });
 });

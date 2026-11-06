@@ -2,15 +2,17 @@
 //!
 //! NEP-171 NFT with the approval (NEP-178), enumeration (NEP-181) and metadata (NEP-177)
 //! extensions, plus NEP-199 payouts. Each token is one immutable skill version
-//! (Spec §9, Skill format: "editing creates the next version, minted as its own token").
+//! (editing a skill creates the next version, minted as its own token; the skill format is
+//! `SkillPublic` in packages/shared/src/types.ts).
 //!
 //! * `nft_mint` is callable only by the platform signer (`ops.playskirm.testnet`). The ops key is a
 //!   function-call key, which cannot attach NEAR, so this contract pays token storage from its
-//!   own balance (arch.md, Money and ownership: "Mint").
+//!   own balance.
 //! * The token is minted to the skill's creator. Creator and `royalty_bps` (0–1,000, default
 //!   500) are fixed at mint.
 //! * NEP-199 payout: on a resale the creator gets `floor(P · royalty_bps / 10^4)` and the owner
-//!   the rest; when the creator is the seller (primary sale) the royalty is 0 (Formulas §6).
+//!   the rest; when the creator is the seller (primary sale) the royalty is 0. The backend
+//!   mirrors this split in packages/shared/src/market.ts.
 //! * The prompt is never on chain; only `prompt_sha256`. The starter skill (Flood Warden) is
 //!   account-bound and never minted: its id can be registered with `set_account_bound`.
 
@@ -38,11 +40,12 @@ use near_sdk::{
 
 pub const SKILL_SCHEMA: &str = "skirm.skill/v0";
 pub const BPS_DENOMINATOR: u128 = 10_000;
-/// Formulas §6: creator royalty on resale, set at mint, 0 to 1,000 bps, default 500.
+/// Creator royalty on resale, set at mint, 0 to 1,000 bps, default 500.
 pub const DEFAULT_ROYALTY_BPS: u16 = 500;
 pub const MAX_ROYALTY_BPS: u16 = 1_000;
 
-/// The 10 tags, in Spec §2 table order (tag lists are always written in this order).
+/// The 10 tags, in the order of `Tag` in packages/shared/src/types.ts (tag lists are always
+/// written in this order).
 pub const TAGS: [&str; 10] = [
     "spreads",
     "liquid",
@@ -55,7 +58,7 @@ pub const TAGS: [&str; 10] = [
     "collectible",
     "goal",
 ];
-/// Gated actions a skill may declare in `requires_actions` (Spec §9), in canonical order.
+/// Gated actions a skill may declare in `requires_actions`, in canonical order.
 pub const GATED_ACTIONS: [&str; 3] = ["place_block", "dig", "extinguish"];
 
 /// `floor(amount · bps / 10^4)` without overflowing u128.
@@ -76,7 +79,7 @@ pub struct Payout {
     pub payout: HashMap<AccountId, U128>,
 }
 
-/// Payout for a sale of `balance` yoctoNEAR by `owner` (Formulas §6): royalty is 0 when the
+/// Payout for a sale of `balance` yoctoNEAR by `owner`: royalty is 0 when the
 /// owner is the creator, otherwise `floor(balance · royalty_bps / 10^4)`; the owner gets the
 /// remainder, so the entries always sum to `balance` exactly.
 pub fn compute_payout(
@@ -438,7 +441,7 @@ fn is_crockford(c: char) -> bool {
     c.is_ascii_digit() || (c.is_ascii_uppercase() && !matches!(c, 'I' | 'L' | 'O' | 'U'))
 }
 
-/// Validates the public skill fields against Spec §9 and returns the onchain record, with tag
+/// Validates the public skill fields (`skirm.skill/v0`) and returns the onchain record, with tag
 /// and action lists in canonical order.
 pub fn validate_skill(skill: SkillMint) -> SkillInfo {
     let id = &skill.id;

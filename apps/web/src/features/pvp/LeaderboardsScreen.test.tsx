@@ -32,8 +32,9 @@ describe('S14 Leaderboards', () => {
     expect(await screen.findByRole('heading', { name: 'Season 3' })).toBeInTheDocument();
     expect(screen.getByTestId('s14-season-countdown')).toHaveTextContent(/^Ends in 2d 0[23]h \d\dm$/);
     const pool = screen.getByTestId('s14-season-pool');
-    expect(pool).toHaveTextContent('Prize pool 12.50 NEAR local · paid to the top 10');
-    expect(within(pool).getByTestId('s14-pool-local')).toHaveAttribute('title', 'Kept offchain until the seasons contract is deployed');
+    expect(pool).toHaveTextContent('Prize pool 12.50 NEAR tallied offchain, not yet on NEAR · paid to the top 10. Ranked wins earn 25 points, draws 12, losses 5.');
+    expect(within(pool).getByTestId('s14-pool-local')).toHaveAttribute('title', expect.stringMatching(/until the season is recorded on the seasons contract/));
+    expect(pool).not.toHaveTextContent(/local/);
     const first = await screen.findByTestId('s14-season-row-1');
     expect(first).toHaveTextContent('1nova1305–1–01,6123.75 NEAR');
     expect(screen.getByTestId('s14-season-row-2')).toHaveTextContent('2.50 NEAR');
@@ -64,10 +65,25 @@ describe('S14 Leaderboards', () => {
     expect(screen.queryByTestId('s14-pool-local')).not.toBeInTheDocument();
   });
 
-  it('shows the empty season', async () => {
+  it('says how an empty pool fills instead of 0.00 NEAR, and an ended season with none', async () => {
+    const { unmount } = setup({ currentSeason: async () => currentSeasonFixture({ season: seasonFixture({ poolYocto: '0' }) }) });
+    const pool = await screen.findByTestId('s14-season-pool');
+    expect(pool).toHaveTextContent('No prize pool yet: 30% of every skill-market fee taken this season goes into it, split among the top 10.');
+    expect(pool).not.toHaveTextContent('0.00 NEAR');
+    expect(pool).not.toHaveTextContent(/soon/i);
+    expect(screen.queryByTestId('s14-pool-local')).not.toBeInTheDocument();
+    unmount();
+    setup({ currentSeason: async () => currentSeasonFixture({ season: seasonFixture({ poolYocto: '0', status: 'paid', endsAt: new Date(Date.now() - 1000).toISOString() }) }) });
+    expect(await screen.findByTestId('s14-season-pool')).toHaveTextContent('This season ended with no prize pool.');
+  });
+
+  it('shows the empty season with a call to play ranked and a link to /verify', async () => {
     setup({ seasonStandings: async () => ({ rows: [], total: 0 }) });
-    expect(await screen.findByText('No ranked matches this season yet. Win one to take the first place.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Queue for ranked' })).toHaveAttribute('href', '/pvp');
+    const empty = await screen.findByTestId('empty-state');
+    expect(empty).toHaveTextContent('The board is open.');
+    expect(empty).toHaveTextContent('your first win takes first place');
+    expect(within(empty).getByRole('link', { name: 'Play ranked' })).toHaveAttribute('href', '/pvp');
+    expect(within(empty).getByRole('link', { name: 'See how results are verified on NEAR' })).toHaveAttribute('href', '/verify');
   });
 
   it('shows an error with Retry when the season fails', async () => {
