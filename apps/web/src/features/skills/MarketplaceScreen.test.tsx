@@ -28,6 +28,19 @@ function base(o: Partial<ApiClient> = {}): Partial<ApiClient> {
 }
 
 describe('S09 Marketplace', () => {
+  it('is public: signed-out visitors browse the cards, and My skills asks them to sign in', async () => {
+    const { api, user } = renderWithProviders(<MarketplaceScreen />, { api: base() });
+    const card = await screen.findByTestId(`s09-card-${SKILL_ID}`);
+    expect(within(card).getByTestId('s09-price')).toHaveTextContent('1.5 NEAR');
+    expect(screen.getByTestId('s09-filters')).toBeInTheDocument();
+    expect(screen.queryByTestId('signin-required')).not.toBeInTheDocument();
+    expect(api.market).toHaveBeenCalledWith({ sort: 'winrate' });
+    expect(api.me).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId('s09-tab-mine'));
+    expect(await screen.findByTestId('signin-required')).toBeInTheDocument();
+    expect(api.skills).not.toHaveBeenCalled();
+  });
+
   it('shows cards with price in NEAR (bigint), the ranked and benchmark proof line and the corner chip', async () => {
     const { api } = renderWithProviders(<MarketplaceScreen />, { handle: 'ada', api: base() });
     const card = await screen.findByTestId(`s09-card-${SKILL_ID}`);

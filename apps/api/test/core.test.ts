@@ -53,7 +53,7 @@ describe('health and sessions', () => {
   });
 
   it('session routes are 401 without credentials or before sign-in', async () => {
-    for (const path of ['/me', '/me/matches', '/agents', '/skills', '/market', '/credits']) {
+    for (const path of ['/me', '/me/matches', '/agents', '/skills', '/credits']) {
       const res = await h.http().get(path);
       expect(res.status, path).toBe(401);
       expect(res.body.error).toMatchObject({ code: 'unauthenticated' });
@@ -64,7 +64,7 @@ describe('health and sessions', () => {
   });
 
   it('public routes work without a session', async () => {
-    for (const path of ['/leaderboards/players', '/v2/matches/live', '/seasons/current'])
+    for (const path of ['/leaderboards/players', '/v2/matches/live', '/seasons/current', '/market'])
       expect((await h.http().get(path)).status, path).toBe(200);
   });
 

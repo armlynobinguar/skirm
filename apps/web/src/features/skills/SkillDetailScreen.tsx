@@ -17,6 +17,8 @@
 // `skills.nft_approve(token, market, {"price"})` first; then POST /market/:id/listing {priceYocto, txHash}.
 // A signed transaction whose POST failed is re-sent on "Try again", never signed (paid) twice.
 // Equip: PATCH /agents/:id with the skill added (≤ 3 per agent).
+// Signed out the drawer is read-only: the same proof and prices, with "Sign in to buy" / "Sign in to
+// try it" buttons that return here after sign-in.
 import { Badge, Button, Icon, TagChip, TextField, UnlockChip, fmt } from '@skirm/ui';
 import { DIFFS, diffIndex, mapById } from '@/features/arena/world';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -24,6 +26,7 @@ import Link from 'next/link';
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { splitSale, type SkillRole } from '@skirm/shared';
 import { ButtonLink } from '@/components/ButtonLink';
+import { SignInButton } from '@/components/shell/RequireSession';
 import { EmptyState } from '@/components/states/EmptyState';
 import { ErrorCard } from '@/components/states/ErrorCard';
 import { Skeleton } from '@/components/states/Skeleton';
@@ -61,7 +64,8 @@ export function SkillDrawer({ skillId, onClose }: { skillId: string; onClose: ()
   const q = useQuery({
     queryKey: qk.market.one(skillId),
     queryFn: () => api.marketSkill(skillId),
-    enabled: status === 'signedIn',
+    // Public: signed out too, once the session is known (the cache is cleared on sign-in).
+    enabled: status !== 'loading',
   });
 
   let body: ReactNode;
@@ -135,6 +139,7 @@ function Proof({ title, sub, children, ...rest }: { title: string; sub?: string;
 }
 
 function DrawerView({ d, me, onClose }: { d: MarketDetail; me: Me | undefined; onClose: () => void }) {
+  const signedOut = useSession().status === 'signedOut';
   const sk = d.skill;
   const creator = sk.creatorAccount.nearAccountId ?? sk.creatorAccount.handle;
   const listing = d.listing;
@@ -241,7 +246,9 @@ function DrawerView({ d, me, onClose }: { d: MarketDetail; me: Me | undefined; o
         </>
       )}
 
-      {!d.owned && !isCreator && !draft ? <TrialsProof d={d} agents={me?.agents ?? []} /> : null}
+      {!d.owned && !isCreator && !draft ? (
+        signedOut ? <TrialsSignIn skillId={sk.id} /> : <TrialsProof d={d} agents={me?.agents ?? []} />
+      ) : null}
 
       <Proof title="Sale history" data-testid="s10-sales">
         <table className={s.smallTable}>
@@ -406,6 +413,18 @@ export function trialOutcome(r: TrialResult): 'win' | 'loss' | 'draw' | null {
 
 const OUTCOME_LABEL = { win: 'Win', loss: 'Loss', draw: 'Draw' } as const;
 
+/** Signed out: what a trial is, and a way in (trials run with one of your agents). */
+function TrialsSignIn({ skillId }: { skillId: string }) {
+  return (
+    <Proof title="Try before you buy" sub="3 PER VERSION" data-testid="s10-trials">
+      <p>Three matches of your agent carrying this skill against the bot crew, so you see what it does before you pay.</p>
+      <SignInButton variant="secondary" next={routes.marketSkill(skillId)} data-testid="s10-trial-signin">
+        Sign in to try it
+      </SignInButton>
+    </Proof>
+  );
+}
+
 function TrialsProof({ d, agents }: { d: MarketDetail; agents: Agent[] }) {
   const sk = d.skill;
   const trials = useTrials(sk.id, sk.version);
@@ -513,7 +532,8 @@ type Flow = null | { step: 'wallet' | 'confirm'; action: 'buy' | 'list' };
 function Actions({ d, me, ownListing, creator }: { d: MarketDetail; me: Me | undefined; ownListing: boolean; creator: string }) {
   const api = useApi();
   const qc = useQueryClient();
-  const { mode } = useSession();
+  const { mode, status } = useSession();
+  const signedOut = status === 'signedOut';
   const sk = d.skill;
   const listing = d.listing;
   const [flow, setFlow] = useState<Flow>(null);
@@ -615,7 +635,14 @@ function Actions({ d, me, ownListing, creator }: { d: MarketDetail; me: Me | und
         <span className={s.royalty}>Starter skill: account-bound, not an NFT</span>
       )}
 
-      {canBuy ? (
+      {canBuy && signedOut ? (
+        <>
+          <SignInButton next={routes.marketSkill(sk.id)} data-testid="s10-buy-signin">
+            Sign in to buy · {near(listing.priceYocto)}
+          </SignInButton>
+          <span className="app-small sk-muted">No wallet needed to sign in. You get the right to use it; its text stays hidden.</span>
+        </>
+      ) : canBuy ? (
         <>
           <Button
             variant="primary"

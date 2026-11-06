@@ -204,6 +204,42 @@ describe('credits', () => {
   });
 });
 
+describe('market signed out', () => {
+  it('GET /market and /market/:skillId are public, with no caller fields and no skill text', async () => {
+    const list = await h.http().get('/market');
+    expect(list.status).toBe(200);
+    expect(list.body.length).toBeGreaterThan(0);
+    expect(list.body.every((c: { owned: boolean }) => c.owned === false)).toBe(true);
+    expect(list.text.includes('SECRET')).toBe(false);
+    expect((await h.http().get('/market?tag=liquid&sort=price')).status).toBe(200);
+    expect((await h.http().get('/market?sort=nope')).status).toBe(400);
+
+    const detail = await h.http().get(`/market/${skillId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.skill).toMatchObject({ id: skillId });
+    expect(detail.body.owned).toBe(false);
+    expect(detail.body.trials).toEqual({ used: 0, left: expect.any(Number) });
+    expect(detail.body.prompt).toBeUndefined();
+    expect(detail.body.reflexes).toBeUndefined();
+    expect(detail.text.includes('SECRET')).toBe(false);
+  });
+
+  it('hides drafts and keeps every write and the trial routes behind a session', async () => {
+    const draft = (await seller.post('/skills', { ...SAMPLE_SKILL, name: 'Anon Draft' })).body.id;
+    expect((await seller.get(`/market/${draft}`)).status).toBe(200);
+    expect((await h.http().get(`/market/${draft}`)).status).toBe(404);
+    expect((await h.http().get(`/market/${draft}?version=1`)).status).toBe(404);
+    const listed = (await h.http().get('/market')).body.map((c: { skill: { id: string } }) => c.skill.id);
+    expect(listed).not.toContain(draft);
+
+    expect((await h.http().get(`/market/${skillId}/trials`)).status).toBe(401);
+    for (const p of ['trial', 'listing', 'purchase'])
+      expect((await h.http().post(`/market/${skillId}/${p}`).send({})).status, p).toBe(401);
+    expect((await h.http().get('/skills')).status).toBe(401);
+    expect((await h.http().get(`/skills/${skillId}`)).status).toBe(401);
+  });
+});
+
 describe('secrecy', () => {
   it('no route returns the skill text to anyone but the creator', async () => {
     const paths = [

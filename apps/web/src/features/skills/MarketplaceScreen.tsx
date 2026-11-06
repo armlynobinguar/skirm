@@ -11,6 +11,9 @@
 // none, e.g. on an offline server). The corner chip marks a starter, a draft or a minted version.
 // Sorts: ranked win rate, benchmark score, price and newest. On wide screens the page fits the viewport
 // and only the card grid and the drawer scroll (exchange.module.css).
+// Public: signed-out visitors browse the Exchange and open any skill read-only (GET /market and
+// GET /market/:skillId need no session); buy, trial, equip and back show "Sign in to …" instead,
+// and the My skills tab asks them to sign in.
 import { Badge, Button, TextField } from '@skirm/ui';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
@@ -49,11 +52,7 @@ const TABS: { id: MarketTab; label: string }[] = [
 
 /** `skillId`: open the drawer on this skill (the /market/[skillId] deep link). */
 export function MarketplaceScreen({ skillId }: { skillId?: string } = {}) {
-  return (
-    <RequireSession>
-      <Marketplace initial={skillId ?? null} />
-    </RequireSession>
-  );
+  return <Marketplace initial={skillId ?? null} />;
 }
 
 /** Keeps the address bar on the open skill without a navigation (Next syncs native history calls). */
@@ -145,7 +144,13 @@ function Marketplace({ initial }: { initial: string | null }) {
 
       <div className={x.mk} data-open={sel ? '' : undefined}>
         <div id="s09-panel" role="tabpanel" aria-labelledby={`s09-tab-${tab}`} className={x.list}>
-          {tab === 'exchange' ? <ExchangeList sel={sel} onSelect={select} /> : <MineList sel={sel} onSelect={select} />}
+          {tab === 'exchange' ? (
+            <ExchangeList sel={sel} onSelect={select} />
+          ) : (
+            <RequireSession>
+              <MineList sel={sel} onSelect={select} />
+            </RequireSession>
+          )}
         </div>
         <aside ref={drawer} className={x.drawer} aria-label="Skill detail" tabIndex={-1} data-testid="s09-drawer">
           {sel ? (
@@ -173,7 +178,8 @@ function ExchangeList({ sel, onSelect }: { sel: string | null; onSelect: (id: st
   const market = useQuery({
     queryKey: qk.market.list(query),
     queryFn: () => api.market(query),
-    enabled: status === 'signedIn',
+    // Public: signed out too, once the session is known (the cache is cleared on sign-in).
+    enabled: status !== 'loading',
     placeholderData: keepPreviousData,
   });
 
