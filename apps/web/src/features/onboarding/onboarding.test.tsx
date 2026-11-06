@@ -45,14 +45,19 @@ describe('the tutorial board', () => {
 });
 
 describe('First steps on home', () => {
-  it('shows the checklist with what is done and links to each step', async () => {
-    renderWithProviders(<HomeScreen />, {
+  it('keeps the checklist behind a lightbulb, with what is done and links to each step', async () => {
+    const { user } = renderWithProviders(<HomeScreen />, {
       handle: 'ada',
       path: '/play',
       api: { me: async () => meFixture(), onboarding: async () => onboarding({ status: 'in_progress', step: 2, done: { practice: true } }) },
     });
-    const card = await screen.findByTestId('first-steps');
-    expect(within(card).getByTestId('first-steps-count')).toHaveTextContent('1/5');
+    const bulb = await screen.findByTestId('first-steps-open');
+    expect(screen.getByTestId('first-steps-count')).toHaveTextContent('1/5');
+    expect(screen.getByTestId('first-steps')).not.toBeVisible();
+    await user.click(bulb);
+    expect(bulb).toHaveAttribute('aria-expanded', 'true');
+    const card = screen.getByTestId('first-steps');
+    expect(card).toBeVisible();
     expect(within(card).getByTestId('first-step-practice')).toHaveAttribute('data-done', 'true');
     expect(within(card).getByTestId('first-step-skill')).not.toHaveAttribute('data-done');
     expect(within(card).getByTestId('first-steps-tutorial')).toHaveAttribute('href', '/tutorial');
@@ -60,6 +65,9 @@ describe('First steps on home', () => {
     expect(within(card).getByRole('link', { name: /Write a skill/ })).toHaveAttribute('href', '/skills');
     // The deck still renders under it.
     expect(screen.getByTestId('s02-deck')).toBeInTheDocument();
+    // Escape closes it.
+    await user.keyboard('{Escape}');
+    expect(card).not.toBeVisible();
   });
 
   it('hides once every step is done or it was dismissed, and when the api fails', async () => {
@@ -79,7 +87,8 @@ describe('First steps on home', () => {
       path: '/play',
       api: { me: async () => meFixture(), onboarding: async () => onboarding(), dismissChecklist: async () => onboarding({ dismissed: true }) },
     });
-    await user.click(await screen.findByTestId('first-steps-dismiss'));
+    await user.click(await screen.findByTestId('first-steps-open'));
+    await user.click(screen.getByTestId('first-steps-dismiss'));
     await waitFor(() => expect(screen.queryByTestId('first-steps')).not.toBeInTheDocument());
     expect(api.dismissChecklist).toHaveBeenCalledTimes(1);
   });
