@@ -6,8 +6,9 @@
 //! * Buy: the buyer attaches at least the price. The market calls the skills contract's NEP-199
 //!   `nft_transfer_payout(balance = price)`, then pays from the returned payout: the platform fee
 //!   `floor(P · fee_bps / 10^4)` (default 500 bps) is taken from the seller's share, so with the
-//!   creator royalty computed by the skills contract the three parts are exactly Formulas §6:
-//!   fee + royalty + seller = P. Excess deposit is refunded to the buyer.
+//!   creator royalty computed by the skills contract the three parts always sum to the price
+//!   (fee + royalty + seller = P; mirrored in packages/shared/src/market.ts). Excess deposit is
+//!   refunded to the buyer.
 //! * A failed transfer refunds the buyer in full and drops the (stale) listing.
 //! * Fee split: `season_share_bps` of the fee (default 30%) goes to the seasons contract through
 //!   `fund(None)`; the rest goes to the treasury. If `fund` fails (no open season), the callback
@@ -33,7 +34,7 @@ use near_sdk::{
 pub type TokenId = String;
 
 pub const BPS_DENOMINATOR: u128 = 10_000;
-/// Formulas §6: platform fee, proposed 500 bps (5%).
+/// Platform fee, proposed 500 bps (5%).
 pub const DEFAULT_FEE_BPS: u16 = 500;
 /// Upper bound the owner can set. With the 1,000 bps royalty cap the seller's share of the
 /// payout always covers the fee.
@@ -126,7 +127,7 @@ pub struct Settlement {
     pub fallback: bool,
 }
 
-/// Formulas §6 split. `payout` is what `nft_transfer_payout(balance = price)` returned; the fee
+/// Sale split (fee + royalty + seller = price). `payout` is what `nft_transfer_payout(balance = price)` returned; the fee
 /// comes out of the seller's entry. An invalid payout (wrong sum, too long, seller share below
 /// the fee) falls back to paying the seller `price - fee`, so the parts always sum to `price`.
 pub fn settle(

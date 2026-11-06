@@ -1,7 +1,7 @@
 use super::*;
 use near_sdk::mock::MockAction;
 use near_sdk::test_utils::{get_created_receipts, get_logs, VMContextBuilder};
-use near_sdk::testing_env;
+use near_sdk::{testing_env, PromiseResult, RuntimeFeesConfig};
 use std::collections::HashMap;
 
 /// 2025-11-01T12:26:40Z in ms; season 1 runs 14 days from here.
@@ -122,6 +122,46 @@ fn event(name: &str) -> serde_json::Value {
         .into_iter()
         .next()
         .unwrap_or_else(|| panic!("no {name} event"))
+}
+
+fn seasons_id() -> AccountId {
+    acc("seasons.playskirm.testnet")
+}
+
+/// Simulates `on_prize_transferred` with the given result of the prize transfer.
+fn prize_transferred(
+    c: &mut Contract,
+    result: PromiseResult,
+    rank: u32,
+    near_account: &str,
+    amount: u128,
+) -> U128 {
+    let mut b = VMContextBuilder::new();
+    b.current_account_id(seasons_id())
+        .signer_account_id(acc(near_account))
+        .predecessor_account_id(seasons_id())
+        .account_balance(NearToken::from_near(50))
+        .block_timestamp(END * 1_000_000);
+    testing_env!(
+        b.build(),
+        near_sdk::test_vm_config(),
+        RuntimeFeesConfig::test(),
+        Default::default(),
+        vec![result],
+    );
+    c.on_prize_transferred(1, rank, acc(near_account), U128(amount))
+}
+
+/// Asserts that this call scheduled a function call `method` back on the seasons contract.
+fn assert_callback_scheduled(method: &str) {
+    let found = get_created_receipts().iter().any(|r| {
+        r.receiver_id == seasons_id()
+            && r.actions.iter().any(|a| {
+                matches!(a, MockAction::FunctionCallWeight { method_name, .. }
+                    if method_name.as_slice() == method.as_bytes())
+            })
+    });
+    assert!(found, "no {method} callback scheduled");
 }
 
 fn shares(s: &Season) -> u128 {
@@ -424,8 +464,17 @@ fn winner_claims_its_share_by_pull() {
     set(ops(), 0);
     c.post_standings(1, ten_rows());
     set(acc("p0.testnet"), 0);
-    assert_eq!(c.claim(1).0, near(3));
+    let _ = c.claim(1);
     assert_eq!(transfers(), HashMap::from([(acc("p0.testnet"), near(3))]));
+    assert_callback_scheduled("on_prize_transferred");
+    // Marked claimed while the transfer is in flight.
+    let s = c.get_season(1).unwrap();
+    assert!(s.standings[0].claimed);
+    assert_eq!(s.paid_total.0, near(3));
+
+    let ok = PromiseResult::Successful(vec![]);
+    let out = prize_transferred(&mut c, ok, 1, "p0.testnet", near(3));
+    assert_eq!(out.0, near(3));
     let ev = event("prize_claimed");
     assert_eq!(ev["rank"], 1);
     assert_eq!(ev["player"], "acc_p0");
@@ -433,6 +482,82 @@ fn winner_claims_its_share_by_pull() {
     let s = c.get_season(1).unwrap();
     assert!(s.standings[0].claimed);
     assert_eq!(s.paid_total.0, near(3));
+    assert_eq!(c.get_carry().0, 0);
+}
+
+#[test]
+fn failed_prize_transfer_reopens_the_claim() {
+    let mut c = locked(near(10));
+    set(ops(), 0);
+    c.post_standings(1, ten_rows());
+    set(acc("p1.testnet"), 0);
+    let _ = c.claim(1);
+    assert!(get_logs().iter().all(|l| !l.contains("prize_claimed")));
+
+    let out = prize_transferred(&mut c, PromiseResult::Failed, 2, "p1.testnet", near(2));
+    assert_eq!(out.0, 0);
+    let ev = event("prize_transfer_failed");
+    assert_eq!(ev["rank"], 2);
+    assert_eq!(ev["amount"], near(2).to_string());
+    assert_eq!(ev["to_carry"], false);
+    assert!(events("prize_claimed").is_empty());
+    let s = c.get_season(1).unwrap();
+    assert!(!s.standings[1].claimed);
+    assert_eq!(s.paid_total.0, 0);
+    assert_eq!(c.get_carry().0, 0);
+
+    // The winner can claim again.
+    set(acc("p1.testnet"), 0);
+    let _ = c.claim(1);
+    assert_eq!(transfers(), HashMap::from([(acc("p1.testnet"), near(2))]));
+    assert!(c.get_season(1).unwrap().standings[1].claimed);
+}
+
+#[test]
+fn failed_prize_transfer_after_close_goes_to_the_carry() {
+    let mut c = locked(near(10));
+    set(ops(), 0);
+    c.post_standings(1, ten_rows());
+    set(acc("p0.testnet"), 0);
+    let _ = c.claim(1);
+    // The season closes before the callback runs; close counts p0's share as claimed.
+    set(ops(), 0);
+    c.close_season(1);
+    assert_eq!(c.get_carry().0, near(7));
+
+    let out = prize_transferred(&mut c, PromiseResult::Failed, 1, "p0.testnet", near(3));
+    assert_eq!(out.0, 0);
+    assert_eq!(event("prize_transfer_failed")["to_carry"], true);
+    let s = c.get_season(1).unwrap();
+    assert_eq!(s.status, SeasonStatus::Paid);
+    assert!(!s.standings[0].claimed);
+    assert_eq!(s.paid_total.0, 0);
+    // Nothing is stranded: the whole pool is in the carry for the next season.
+    assert_eq!(c.get_carry().0, near(10));
+    set(ops(), 0);
+    let next = c.open_season(2, "Season 2".into(), END, END + 14 * DAY);
+    assert_eq!(next.pool.0, near(10));
+}
+
+#[test]
+#[should_panic(expected = "Method on_prize_transferred is private")]
+fn prize_callback_is_private() {
+    let mut c = locked(near(10));
+    set(ops(), 0);
+    c.post_standings(1, ten_rows());
+    set(acc("p0.testnet"), 0);
+    let _ = c.claim(1);
+    set(acc("p0.testnet"), 0);
+    c.on_prize_transferred(1, 1, acc("p0.testnet"), U128(near(3)));
+}
+
+#[test]
+#[should_panic(expected = "Standing not found")]
+fn prize_callback_rejects_a_mismatched_standing() {
+    let mut c = locked(near(10));
+    set(ops(), 0);
+    c.post_standings(1, ten_rows());
+    prize_transferred(&mut c, PromiseResult::Failed, 1, "p1.testnet", near(3));
 }
 
 #[test]
@@ -442,9 +567,9 @@ fn double_claim_is_rejected() {
     set(ops(), 0);
     c.post_standings(1, ten_rows());
     set(acc("p1.testnet"), 0);
-    c.claim(1);
+    let _ = c.claim(1);
     set(acc("p1.testnet"), 0);
-    c.claim(1);
+    let _ = c.claim(1);
 }
 
 #[test]
@@ -454,7 +579,7 @@ fn non_winner_cannot_claim() {
     set(ops(), 0);
     c.post_standings(1, ten_rows());
     set(stranger(), 0);
-    c.claim(1);
+    let _ = c.claim(1);
 }
 
 #[test]
@@ -462,7 +587,7 @@ fn non_winner_cannot_claim() {
 fn claim_before_standings_panics() {
     let mut c = locked(near(10));
     set(acc("p0.testnet"), 0);
-    c.claim(1);
+    let _ = c.claim(1);
 }
 
 // ---------- close and rollover ----------
@@ -484,7 +609,7 @@ fn claim_after_close_panics() {
     set(ops(), 0);
     c.close_season(1);
     set(acc("p0.testnet"), 0);
-    c.claim(1);
+    let _ = c.claim(1);
 }
 
 #[test]
@@ -508,7 +633,7 @@ fn full_cycle_rolls_unclaimed_and_unallocated_prizes_into_the_next_season() {
     );
 
     set(acc("p0.testnet"), 0);
-    c.claim(1);
+    let _ = c.claim(1);
     // p1 never claims.
     set(ops(), 0);
     let s = c.close_season(1);

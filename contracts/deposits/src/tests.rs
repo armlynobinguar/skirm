@@ -1,7 +1,7 @@
 use super::*;
 use near_sdk::mock::MockAction;
 use near_sdk::test_utils::{get_created_receipts, get_logs, VMContextBuilder};
-use near_sdk::{testing_env, NearToken};
+use near_sdk::{testing_env, NearToken, PromiseResult, RuntimeFeesConfig};
 
 fn owner() -> AccountId {
     "playskirm.testnet".parse().unwrap()
@@ -26,6 +26,29 @@ fn ctx(predecessor: AccountId, deposit: NearToken) -> VMContextBuilder {
         .block_height(1234)
         .block_timestamp(1_762_000_000_000_000_000);
     b
+}
+
+/// Simulates `on_withdrawn` with the given result of the treasury transfer.
+fn on_withdrawn(c: &mut Contract, result: PromiseResult, amount: U128) -> bool {
+    testing_env!(
+        ctx(contract_id(), NearToken::from_yoctonear(0)).build(),
+        near_sdk::test_vm_config(),
+        RuntimeFeesConfig::test(),
+        Default::default(),
+        vec![result],
+    );
+    c.on_withdrawn(treasury(), amount)
+}
+
+/// The data of the first `name` event logged in this call.
+fn event(name: &str) -> near_sdk::serde_json::Value {
+    get_logs()
+        .iter()
+        .filter_map(|l| l.strip_prefix("EVENT_JSON:"))
+        .map(|j| near_sdk::serde_json::from_str::<near_sdk::serde_json::Value>(j).unwrap())
+        .find(|v| v["event"] == name)
+        .map(|v| v["data"][0].clone())
+        .unwrap_or_else(|| panic!("no {name} event"))
 }
 
 fn setup() -> Contract {
@@ -120,13 +143,61 @@ fn owner_withdraws_everything_withdrawable_to_treasury() {
     assert!(expected.0 > 0);
     let _ = c.withdraw(None);
     let receipts = get_created_receipts();
-    assert_eq!(receipts.len(), 1);
+    // The transfer to the treasury, then the callback on this contract.
+    assert_eq!(receipts.len(), 2);
     assert_eq!(receipts[0].receiver_id, treasury());
     match &receipts[0].actions[0] {
         MockAction::Transfer { deposit, .. } => assert_eq!(deposit.as_yoctonear(), expected.0),
         a => panic!("unexpected action {a:?}"),
     }
+    assert_eq!(receipts[1].receiver_id, contract_id());
+    match &receipts[1].actions[0] {
+        MockAction::FunctionCallWeight { method_name, .. } => {
+            assert_eq!(method_name.as_slice(), b"on_withdrawn")
+        }
+        a => panic!("unexpected action {a:?}"),
+    }
     assert_eq!(c.get_config().total_withdrawn, expected);
+
+    assert!(on_withdrawn(&mut c, PromiseResult::Successful(vec![]), expected));
+    assert_eq!(c.get_config().total_withdrawn, expected);
+    let ev = event("withdraw");
+    assert_eq!(ev["treasury"], "treasury.playskirm.testnet");
+    assert_eq!(ev["amount"], expected.0.to_string());
+}
+
+#[test]
+fn failed_withdraw_transfer_is_not_counted() {
+    let mut c = setup();
+    testing_env!(ctx(player(), NearToken::from_near(2)).build());
+    c.deposit();
+
+    let one = U128(NearToken::from_near(1).as_yoctonear());
+    testing_env!(ctx(owner(), NearToken::from_yoctonear(1)).build());
+    let _ = c.withdraw(Some(one));
+    assert_eq!(c.get_config().total_withdrawn, one);
+    assert!(get_logs().iter().all(|l| !l.contains("\"event\":\"withdraw\"")));
+
+    assert!(!on_withdrawn(&mut c, PromiseResult::Failed, one));
+    assert_eq!(c.get_config().total_withdrawn, U128(0));
+    let ev = event("withdraw_failed");
+    assert_eq!(ev["treasury"], "treasury.playskirm.testnet");
+    assert_eq!(ev["amount"], one.0.to_string());
+    assert!(get_logs().iter().all(|l| !l.contains("\"event\":\"withdraw\"")));
+
+    // A later successful withdrawal counts only itself.
+    testing_env!(ctx(owner(), NearToken::from_yoctonear(1)).build());
+    let _ = c.withdraw(Some(one));
+    assert!(on_withdrawn(&mut c, PromiseResult::Successful(vec![]), one));
+    assert_eq!(c.get_config().total_withdrawn, one);
+}
+
+#[test]
+#[should_panic(expected = "Method on_withdrawn is private")]
+fn withdraw_callback_is_private() {
+    let mut c = setup();
+    testing_env!(ctx(owner(), NearToken::from_yoctonear(0)).build());
+    c.on_withdrawn(treasury(), U128(1));
 }
 
 #[test]
