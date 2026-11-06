@@ -454,9 +454,13 @@ function renderArena(c, A, pal, prev, cur, alpha, T, ox, oy, time, opts={}) {
   if (opts.tags) for (const it of items) if (it.agent && !it.agent.out) {
     const a = it.agent, fs = Math.max(10, T*0.2), team = a.team === 'A' ? '#34e0c8' : '#ff4655';
     c.font = `600 ${fs}px Barlow, sans-serif`;
-    const tw = c.measureText(a.name).width + fs*0.8, ty = it.sy - it.hop - T*1.05;
-    c.globalAlpha = it.af ?? 1; c.fillStyle = 'rgba(5,8,13,.84)'; c.fillRect(it.sx - tw/2, ty - fs, tw, fs*1.35);
-    c.fillStyle = team; c.fillRect(it.sx - tw/2, ty - fs, 2.5, fs*1.35);
+    const tw = c.measureText(a.name).width + fs*0.8, th = fs*1.35; let ty = it.sy - it.hop - T*1.05;
+    // nameplates of agents on the same or nearby tiles stack upward instead of overlapping
+    const pl = opts._placed || (opts._placed = []);
+    for (let n = 0; n < 6 && pl.some(r => it.sx - tw/2 < r[2] && it.sx + tw/2 > r[0] && ty - fs < r[3] && ty - fs + th > r[1]); n++) ty -= th + 2;
+    pl.push([it.sx - tw/2, ty - fs, it.sx + tw/2, ty - fs + th]);
+    c.globalAlpha = it.af ?? 1; c.fillStyle = 'rgba(5,8,13,.84)'; c.fillRect(it.sx - tw/2, ty - fs, tw, th);
+    c.fillStyle = team; c.fillRect(it.sx - tw/2, ty - fs, 2.5, th);
     c.fillStyle = '#ece8e1'; c.textAlign = 'center'; c.fillText(a.name, it.sx, ty); c.globalAlpha = 1;
     const bk = opts.barks && opts.barks[a.id];
     if (bk && time - bk.t < 2.6) {
@@ -469,7 +473,7 @@ function renderArena(c, A, pal, prev, cur, alpha, T, ox, oy, time, opts={}) {
       c.font = `500 ${bf}px Barlow, sans-serif`;
       const bw = c.measureText(text).width + bf*1.2 + lw; let by = ty - fs*1.9;
       // bubbles that would overlap one already drawn move up until they clear it
-      const pl = opts._placed || (opts._placed = []), hgt = bf*1.6;
+      const hgt = bf*1.6;
       for (let n = 0; n < 6 && pl.some(r => it.sx - bw/2 < r[2] && it.sx + bw/2 > r[0] && by - bf*1.15 < r[3] && by - bf*1.15 + hgt > r[1]); n++) by -= hgt + 4;
       pl.push([it.sx - bw/2, by - bf*1.15, it.sx + bw/2, by - bf*1.15 + hgt]);
       const bg = bk.ch === 'team' ? 'rgba(8,40,36,.96)' : 'rgba(236,232,225,.96)', fg = bk.ch === 'team' ? '#d8fff8' : '#05080d';
