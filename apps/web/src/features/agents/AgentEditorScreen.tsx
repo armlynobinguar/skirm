@@ -23,7 +23,7 @@
 // `map` / `d` name the crew screen it was opened from, for "Back to crew".
 import { isDifficulty, type Difficulty, type TalkTier } from '@skirm/engine/v2';
 import { AGENT_ROLES, AGENT_ROLE_TEXT, rankedRoleAllowed, skillRolesLabel } from '@skirm/shared';
-import { DisplayHeading, Pips, fmt } from '@skirm/ui';
+import { Pips, fmt } from '@skirm/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
@@ -51,6 +51,7 @@ import {
   TIER_INFO,
   TIER_ORDER,
   agentBone,
+  agentDress,
   agentColour,
   agentComms,
   agentEditorHref,
@@ -64,6 +65,7 @@ import {
   verbFit,
 } from './agentView';
 import e from './agentEditor.module.css';
+import { RenameAgent } from './RenameAgent';
 import { sampleInner, starterPersona } from './voice';
 
 /** How long one bark line stays up (the prototype's 5.2 s). */
@@ -282,7 +284,7 @@ function AgentEditor({
 
       {/* Centre: the agent on its light beam, its inner voice as a bark, ‹ › under it. */}
       <div className={e.stage}>
-        <AgentPortrait body={colour} head={agentBone(agent)} team="A" label={`${agent.name}, ${role}`} role={role} variant="hero" className={e.hero} />
+        <AgentPortrait body={colour} head={agentBone(agent)} dress={agentDress(agent)} team="A" label={`${agent.name}, ${role}`} role={role} variant="hero" className={e.hero} />
         <div className={`${e.bark} ${out ? e.barkOut : ''}`} role="status" data-testid="agent-bark">
           <small>
             <em>THINKS</em>
@@ -413,9 +415,22 @@ function AgentEditor({
         <ProgressionPanel agent={agent} />
 
         <div className={e.plate} data-rise style={{ '--rise-i': 2 } as CSSProperties}>
-          <DisplayHeading level={1} className={e.plateName}>
-            {agent.name}
-          </DisplayHeading>
+          <RenameAgent
+            name={agent.name}
+            className={e.plateName}
+            saving={patch.isPending && patch.variables?.name !== undefined}
+            onSave={(name, done) =>
+              patch.mutate(
+                { name },
+                {
+                  onSuccess: () => {
+                    done();
+                    toast.show({ tone: 'good', title: 'Renamed', message: `Your agent is now ${name}.` });
+                  },
+                },
+              )
+            }
+          />
           <div className={e.tags}>
             <span className={e.roleTile} title={role}>
               <Glyph d={GLYPH.role} />

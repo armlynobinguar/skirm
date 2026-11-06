@@ -6,8 +6,8 @@ import { ApiError } from '../api/errors';
 import type { RelayStatus } from '../api/types';
 import { FakeWallet } from '@/test/fakeWallet';
 import { config } from '../config';
-import { buyTx } from './contracts';
-import { sendTransaction, type RelayApi } from './gasless';
+import { buyTx, delistTx, depositTx, listTx } from './contracts';
+import { relayable, sendTransaction, type RelayApi } from './gasless';
 import { WalletError } from './types';
 
 const tx = buyTx(config.near.contracts, 'skl_X:1', '2000000000000000000000000');
@@ -34,6 +34,19 @@ describe('gasless sending', () => {
     expect(w.delegated).toEqual([tx]);
     expect(api.relay).toHaveBeenCalledWith(btoa('signed_delegate_1'));
     expect(w.sent).toEqual([]);
+  });
+
+  it('sends calls the relayer does not pay for (delist, backing) straight to the wallet, one prompt', async () => {
+    const c = config.near.contracts;
+    expect([buyTx(c, 't', '1'), depositTx(c, '1'), listTx(c, 't', '1')].every((t) => relayable(t))).toBe(true);
+    const delist = delistTx(c, 'skl_X:1');
+    expect(relayable(delist)).toBe(false);
+    expect(relayable({ receiverId: 'backing.playskirm.testnet', actions: [{ type: 'FunctionCall', params: { methodName: 'back', args: {}, gas: '1', deposit: '1' } }] })).toBe(false);
+    const w = wallet();
+    const api = relayApi();
+    expect(await sendTransaction(w, api, delist)).toEqual({ txHash: 'tx_1', gasless: false });
+    expect(w.delegated).toEqual([]);
+    expect(api.relayStatus).not.toHaveBeenCalled();
   });
 
   it('a wallet that cannot sign delegates sends the usual transaction and never asks the api', async () => {

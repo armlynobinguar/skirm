@@ -122,6 +122,33 @@ describe('S15 top-up with a NEAR wallet', () => {
     expect(api.deposit.mock.calls).toEqual([['tx_1'], ['tx_1']]);
   });
 
+  it('keeps a signed deposit across a reload and finishes it before any new one, never paying twice', async () => {
+    const wallet = new FakeWallet({ account: 'ada.testnet', connected: true });
+    let up = false;
+    const deposit = async () => {
+      if (!up) throw new ApiError(503, 'rpc_unavailable', 'NEAR RPC is unavailable');
+      return { credited: 1000, balance: 1000, amountYocto: ONE_NEAR };
+    };
+    const first = renderWithProviders(<CreditsScreen />, { authMode: 'privy', token: 'jwt_1', wallet, api: { ...base, deposit } });
+    await screen.findByTestId('s15-balance-available');
+    await first.user.click(screen.getByRole('button', { name: 'Top up 1 NEAR' }));
+    await first.user.click(screen.getByTestId('m02-confirm'));
+    expect(await screen.findByTestId('s15-topups-paused')).toBeInTheDocument();
+    expect(wallet.sent).toHaveLength(1);
+    // The tab is closed and opened again: the paid deposit is still there to finish.
+    first.unmount();
+    up = true;
+    const again = renderWithProviders(<CreditsScreen />, { authMode: 'privy', token: 'jwt_1', wallet, api: { ...base, deposit } });
+    expect(await screen.findByTestId('s15-unrecorded')).toHaveTextContent('You sent 1 NEAR and it is not credited yet');
+    // Picking another pack finishes the signed one instead of paying again.
+    await again.user.click(screen.getByRole('button', { name: 'Top up 1 NEAR' }));
+    await again.user.click(screen.getByTestId('m02-confirm'));
+    expect(await screen.findByTestId('m02-done')).toBeInTheDocument();
+    expect(wallet.sent).toHaveLength(1);
+    expect(again.api.deposit.mock.calls).toEqual([['tx_1']]);
+    await waitFor(() => expect(screen.queryByTestId('s15-unrecorded')).not.toBeInTheDocument());
+  });
+
   it('says Cancelled when the wallet refuses, and sends nothing to the api', async () => {
     const wallet = new FakeWallet({ account: 'ada.testnet', connected: true });
     wallet.reject('signAndSendTransaction');

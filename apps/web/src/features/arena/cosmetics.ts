@@ -3,7 +3,7 @@
 // walked, and its nameplate style on the name tag. Frames carry the item ids (FrameAgent.cosmetics,
 // added by the match server, rendering only). Kept in this one module so the agent renderer itself
 // stays untouched: live.ts tints through `tintAgents`, and ArenaCanvas calls `drawCosmetics2D` once
-// a frame, after the board. The 3D chase cam does not read cosmetics yet.
+// a frame, after the board. The 3D chase cam draws the same items (chase3d/cosmetics3d.ts).
 import {
   equipCosmeticById,
   type AgentCosmetics,

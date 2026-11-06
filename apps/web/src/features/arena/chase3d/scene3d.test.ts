@@ -148,6 +148,34 @@ describe('chase cam world', () => {
     expect(moss.body.rotation.z).toBeGreaterThan(1.2);
     expect(wick.body.rotation.z).toBe(0);
   });
+
+  it('dresses agents in their owner look, draws what they wear, and rebuilds a figure when that changes', () => {
+    const f = v2FrameFixture();
+    f.agents[0]!.look = { skin: 1, hair: 'ponytail', hairColor: 6, outfit: 3, pants: 2, build: 'sturdy', headgear: 'cap' };
+    f.agents[0]!.cosmetics = { skin: 'skin_ember', trail: 'trail_spark', nameplate: 'plate_gold' };
+    const a = composeV2Arena(f)!;
+    const w = buildWorld(a, LOOK);
+    const c = cam();
+    stepWorld(w, newRig(), c, input({ arena: a, prev: null, at: 0, focus: 'wick', look: LOOK }));
+    const wick = w.agents.get('wick')!;
+    // Sturdy build, the hard hat swapped for a cap.
+    expect(wick.look.torso[0]).toBeGreaterThan(0.4);
+    expect(wick.look.parts.some((q) => q.fill === '#fff1a8')).toBe(false);
+    // Stripes as a ring of marks, plus the spark trail's marks waiting in the scene.
+    expect(wick.g.children.filter((o) => o instanceof THREE.Mesh && o.geometry instanceof THREE.PlaneGeometry)).toHaveLength(10);
+    expect(wick.trail).toHaveLength(15);
+    const first = wick;
+    // Same look next frame: the same figure.
+    stepWorld(w, newRig(), c, input({ arena: a, prev: null, at: 0, focus: 'wick', look: LOOK }));
+    expect(w.agents.get('wick')).toBe(first);
+    // A new skin mid-match: rebuilt, the old figure out of the scene.
+    const b = composeV2Arena({ ...f, agents: [{ ...f.agents[0]!, cosmetics: { skin: 'skin_glacier' } }, ...f.agents.slice(1)] })!;
+    stepWorld(w, newRig(), c, input({ arena: b, prev: null, at: 0, focus: 'wick', look: LOOK }));
+    const again = w.agents.get('wick')!;
+    expect(again).not.toBe(first);
+    expect(w.scene.children).not.toContain(first.g);
+    expect(again.trail).toHaveLength(0);
+  });
 });
 
 describe('startChaseCam', () => {

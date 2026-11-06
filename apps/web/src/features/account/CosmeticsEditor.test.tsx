@@ -70,4 +70,15 @@ describe('Arena style (cosmetics editor)', () => {
     await user.click(screen.getByTestId('style-mint-plate_gold'));
     expect(mintCosmetic).toHaveBeenCalledWith('plate_gold');
   });
+
+  it('says a minted item is on another NEAR account instead of offering a buy that does nothing', async () => {
+    setup({
+      owned: [],
+      mints: { trail_spark: { status: 'minted', txHash: 'TX0', owner: 'old.testnet' } },
+      onchain: { standard: 'nep245', contractId: 'cosmetics.playskirm.testnet' },
+    });
+    expect(await screen.findByTestId('style-elsewhere-trail_spark')).toHaveTextContent('Minted to old.testnet, not on your linked NEAR account now');
+    expect(screen.queryByTestId('style-buy-trail_spark')).toBeNull();
+    expect(screen.getByTestId('style-equip-trail_spark')).toBeDisabled();
+  });
 });

@@ -1,5 +1,6 @@
 'use client';
-// The campaign on home: how far the player got and the next mission, linking to /campaign. Shows
+// The campaign on home, kept short: how far the player got and a link to the next mission (named
+// in the tooltip and for screen readers), linking to /campaign. Shows
 // the plain link while the api has not answered, so the campaign is always one click from home.
 import Link from 'next/link';
 import { routes } from '@/lib/routes';
@@ -19,13 +20,13 @@ export function CampaignStrip() {
         ? `Next: Chapter ${next.chapter.index} · ${next.title} · ${next.mapName}`
         : 'Chapters of missions against the bot';
   return (
-    <aside className={c.strip} aria-labelledby="campaign-strip-title" data-testid="campaign-strip">
+    <aside className={c.strip} title={sub} aria-labelledby="campaign-strip-title" data-testid="campaign-strip">
       <span className={c.stripText}>
-        <span className="sk-kick">Single player{data ? ` · ${data.progress.cleared}/${data.progress.total}` : ''}</span>
+        <span className="sk-kick">{data ? `${data.progress.cleared}/${data.progress.total} cleared` : 'Single player'}</span>
         <span id="campaign-strip-title" className={c.stripTitle}>
           Campaign
         </span>
-        <span className={c.stripSub}>{sub}</span>
+        <span className="sk-sr-only">{sub}</span>
       </span>
       <Link href={next ? routes.campaign(next.id) : routes.campaign()} className={c.stripGo} data-testid="campaign-strip-go">
         {data && data.progress.cleared > 0 && !done ? 'Continue ▸' : 'Open ▸'}

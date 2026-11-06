@@ -1,7 +1,8 @@
 // How a v2 agent reads on the crew, lock-in and editor screens (the prototype's ROSTER fields):
 // role, colours, vision and comms, default talk tier, its verb on a map and its voice.
 import { ROLE_EFFECT, TALK_TIERS, HEAD_START_TICKS_PER_AGENT, TICK_MS, type EffectClass, type Role, type TalkTier } from '@skirm/engine/v2';
-import { OUTFIT_COLORS, SKIN_TONES } from '@skirm/shared';
+import { OUTFIT_COLORS, SKIN_TONES, lookColours } from '@skirm/shared';
+import type { Dress } from '@skirm/ui';
 import type { V2Map } from '@/features/arena/world';
 import type { Agent } from '@/lib/api/types';
 import { routes } from '@/lib/routes';
@@ -13,6 +14,11 @@ export function agentRole(a: Agent): Role {
 /** Body colour: the agent's outfit (the prototype's `c`). */
 export function agentColour(a: Agent): string {
   return OUTFIT_COLORS[a.appearance.outfit] ?? OUTFIT_COLORS[0]!;
+}
+
+/** How its owner dressed it (hair, trousers, build, headgear) for the arena figure. */
+export function agentDress(a: Agent): Dress {
+  return lookColours(a.appearance).dress;
 }
 
 /** Head colour (the prototype's `bone`). */

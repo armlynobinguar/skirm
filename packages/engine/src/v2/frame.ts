@@ -64,6 +64,22 @@ export interface FrameAgent {
    * part of the match log. Absent: the default look.
    */
   cosmetics?: { skin?: string; trail?: string; nameplate?: string };
+  /**
+   * How its owner dressed it (@skirm/shared AgentAppearance: palette indexes and style names).
+   * Rendering only, added by the match server like `cosmetics`. Absent: the crew's default colours.
+   */
+  look?: FrameLook;
+}
+
+/** An agent's appearance on a frame (@skirm/shared AgentAppearance, kept structural here). */
+export interface FrameLook {
+  skin: number;
+  hair: string;
+  hairColor: number;
+  outfit: number;
+  pants: number;
+  build: string;
+  headgear: string;
 }
 
 /** One equipped skill in the mind panel: public metadata and whether it is active this tick. */

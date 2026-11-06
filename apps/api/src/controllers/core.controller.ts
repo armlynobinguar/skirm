@@ -73,6 +73,10 @@ export class CoreController {
     let { account, created } = await repos.accounts.getOrCreate(user, vault);
     if (account.system) throw new ApiError(403, 'forbidden', 'this handle is reserved');
     if (b.nearAccountId && b.nearAccountId !== account.nearAccountId) {
+      // Switching wallets, like unlinking, waits for active listings: their approval and payout
+      // belong to the wallet linked now, and resale from the new one would fail onchain.
+      if (account.nearAccountId && (await repos.market.hasActiveListing(account.id)))
+        throw new ApiError(409, 'listing_active', 'cancel your market listings before changing your NEAR account');
       const other = await repos.accounts.byNearAccount(b.nearAccountId);
       if (other && other.id !== account.id) throw nearTaken();
       await this.checkNearProof(account.id, b.nearAccountId, b.nearProof);

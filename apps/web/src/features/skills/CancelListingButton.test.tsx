@@ -57,11 +57,27 @@ describe('S10 cancel listing', () => {
       api: { me: async () => linked(), marketSkill: async () => mine(), cancelListing: async () => cancelled({ calls: [delist, revoke] }) },
     });
     await user.click(await screen.findByTestId('s10-cancel-listing'));
-    await waitFor(() => expect(wallet.sent).toHaveLength(1));
-    expect(api.cancelListing).toHaveBeenCalled();
+    await waitFor(() => expect(api.cancelListing).toHaveBeenCalled());
+    // The delist is signed once, before the api takes the listing down (no second delist).
+    expect(wallet.sent).toHaveLength(1);
     expect(wallet.sent[0]).toEqual({
       receiverId: 'market.playskirm.testnet',
       actions: [{ type: 'FunctionCall', params: { methodName: 'delist', args: { token_id: `${SKILL_ID}:1` }, gas: '30000000000000', deposit: '1' } }],
     });
+  });
+
+  it('leaves the listing up when the wallet refuses the delist', async () => {
+    const wallet = new FakeWallet({ account: 'ada.testnet', connected: true });
+    wallet.reject('signAndSendTransaction');
+    const { user, api } = renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, {
+      authMode: 'privy',
+      token: 'jwt_1',
+      wallet,
+      api: { me: async () => linked(), marketSkill: async () => mine(), cancelListing: async () => cancelled({ calls: [] }) },
+    });
+    await user.click(await screen.findByTestId('s10-cancel-listing'));
+    expect(await screen.findByTestId('toasts')).toBeInTheDocument();
+    expect(api.cancelListing).not.toHaveBeenCalled();
+    expect(screen.getByTestId('s10-cancel-listing')).toBeEnabled();
   });
 });

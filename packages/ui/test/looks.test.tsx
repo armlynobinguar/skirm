@@ -5,6 +5,7 @@ import {
   AgentAvatar,
   CHEER_S,
   ROLE_LOOKS,
+  dressLook,
   genericLook,
   isoPolys,
   lookFor,
@@ -175,5 +176,67 @@ describe('AgentAvatar with a role', () => {
     cleanup();
     const r = render(<AgentAvatar size={32} label="X" role="Alchemist" body="#ffb547" />);
     expect(r.container.querySelectorAll('polygon').length).toBeGreaterThan(10);
+  });
+});
+
+describe('dressed looks', () => {
+  const dress = { hair: 'ponytail', hairColor: '#b8432f', pants: '#2e4a3a', build: 'regular', headgear: 'role' } as const;
+
+  it('keeps the role hat with role headgear and swaps it otherwise', () => {
+    const builder = lookFor('Builder');
+    const own = dressLook(builder, dress);
+    expect(own.parts.some((q) => q.fill === '#fff1a8')).toBe(true);
+    const capped = dressLook(builder, { ...dress, headgear: 'cap' });
+    expect(capped.parts.some((q) => q.fill === '#fff1a8')).toBe(false);
+    // The cap is in the role's accent; the hammer stays in hand.
+    expect(capped.parts.some((q) => q.fill === builder.accent)).toBe(true);
+    expect(capped.parts.some((q) => q.group === 'hand')).toBe(true);
+  });
+
+  it('drops the antenna tip with other headgear', () => {
+    const scout = lookFor('Scout');
+    expect(scout.parts.some((q) => q.group === 'tip')).toBe(true);
+    expect(dressLook(scout, { ...dress, headgear: 'none' }).parts.some((q) => q.group === 'tip')).toBe(false);
+  });
+
+  it('scales the torso by build and colours the legs', () => {
+    const base = lookFor('Runner');
+    const slim = dressLook(base, { ...dress, build: 'slim' });
+    const sturdy = dressLook(base, { ...dress, build: 'sturdy' });
+    expect(slim.torso[0]).toBeLessThan(base.torso[0]);
+    expect(sturdy.torso[0]).toBeGreaterThan(base.torso[0]);
+    expect(lookParts(sturdy).filter((q) => q.fill === '#2e4a3a')).toHaveLength(2);
+  });
+
+  it('hides the hair top under a hat but keeps a ponytail', () => {
+    const top = (l: ReturnType<typeof lookFor>) => l.parts.filter((q) => q.fill === '#b8432f' && q.at[1] >= 0.76);
+    const tail = (l: ReturnType<typeof lookFor>) => l.parts.filter((q) => q.fill === '#b8432f' && q.at[2] < -0.2);
+    const bare = dressLook(lookFor('Medic'), { ...dress, headgear: 'none' });
+    const beanie = dressLook(lookFor('Medic'), { ...dress, headgear: 'beanie' });
+    expect(top(bare).length).toBeGreaterThan(0);
+    expect(top(beanie)).toHaveLength(0);
+    expect(tail(beanie)).toHaveLength(1);
+    expect(dressLook(lookFor('Medic'), { ...dress, hair: 'none', headgear: 'none' }).parts.some((q) => q.fill === '#b8432f')).toBe(false);
+  });
+
+  it('is cached per look and dress', () => {
+    const l = lookFor('Builder');
+    expect(dressLook(l, { ...dress })).toBe(dressLook(l, { ...dress }));
+    expect(isoPolys(dressLook(l, dress), { body: '#e2574c', head: '#d9a477', team: '#34e0c8' }, 1).length).toBeGreaterThan(0);
+  });
+});
+
+describe('result poses', () => {
+  it('ranks the match result over everything but out, and poses it', () => {
+    expect(poseKind({ result: 'victory', down: true, act: 'x' })).toBe('victory');
+    expect(poseKind({ result: 'defeat', out: true })).toBe('out');
+    const look = lookFor('Builder');
+    const win = poseAt('victory', look, { time: 0.1, age: 0 });
+    expect(win.off.hand?.[1]).toBeGreaterThan(0.3);
+    expect(win.fx).toBe(1);
+    const loss = poseAt('defeat', look, { time: 0, age: 0, still: true });
+    expect(loss.lean).toBeGreaterThan(0.2);
+    expect(loss.off.head?.[1]).toBeLessThan(0);
+    expect(loss.tilt).toBe(0);
   });
 });

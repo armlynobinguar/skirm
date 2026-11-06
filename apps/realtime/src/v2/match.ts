@@ -48,6 +48,7 @@ import {
   type CrewCommand,
   type Difficulty,
   type FrameCommand,
+  type FrameLook,
   type FrameSkill,
   type FrameView,
   type MapDefV2,
@@ -129,6 +130,11 @@ export interface V2Roster {
    * onto every frame for the arena to draw. Purely visual: never in the engine or the match log.
    */
   cosmetics?: (AgentCosmetics | null)[];
+  /**
+   * Per agent: how its owner dressed it in the look editor (agents.appearance), copied onto every
+   * frame beside `cosmetics`. Rendering only, like them.
+   */
+  looks?: (FrameLook | null)[];
 }
 
 /** A skill's public metadata as a match uses it. */
@@ -1086,17 +1092,32 @@ export function withControlled(frame: V2Frame, controlled: Readonly<Record<Team,
  * Puts each agent's equipped cosmetics (plain item ids) on a frame, in every view: what an agent
  * wears is public, like its name. Rendering only; the state, the engine and the log never see it.
  */
-export function withCosmetics(frame: V2Frame, sides: Readonly<Record<Team, Pick<V2Roster, 'crew' | 'cosmetics'>>>): V2Frame {
+export function withCosmetics(
+  frame: V2Frame,
+  sides: Readonly<Record<Team, Pick<V2Roster, 'crew' | 'cosmetics' | 'looks'>>>,
+): V2Frame {
   const worn = new Map<string, AgentCosmetics>();
+  const looks = new Map<string, FrameLook>();
   for (const t of TEAMS) {
     const side = sides[t];
     side.cosmetics?.forEach((c, i) => {
       const id = side.crew[i]?.id;
       if (id && c && Object.keys(c).length) worn.set(id, c);
     });
+    side.looks?.forEach((l, i) => {
+      const id = side.crew[i]?.id;
+      if (id && l) looks.set(id, l);
+    });
   }
-  if (!worn.size) return frame;
-  return { ...frame, agents: frame.agents.map((a) => (worn.has(a.id) ? { ...a, cosmetics: { ...worn.get(a.id)! } } : a)) };
+  if (!worn.size && !looks.size) return frame;
+  return {
+    ...frame,
+    agents: frame.agents.map((a) => {
+      const c = worn.get(a.id);
+      const l = looks.get(a.id);
+      return c || l ? { ...a, ...(c ? { cosmetics: { ...c } } : {}), ...(l ? { look: { ...l } } : {}) } : a;
+    }),
+  };
 }
 
 const other = (t: Team): Team => (t === 'A' ? 'B' : 'A');

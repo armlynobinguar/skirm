@@ -165,6 +165,11 @@ export function CosmeticsEditor({ agentId, name, onDone }: CosmeticsEditorProps)
                         ) : on ? (
                           <Badge tone="you">Worn</Badge>
                         ) : null
+                      ) : m?.status === 'minted' ? (
+                        // Bought and minted, but the token is not on the linked NEAR account now.
+                        <small className="sk-muted" data-testid={`style-elsewhere-${c.id}`}>
+                          {m.owner ? `Minted to ${m.owner}, not` : 'Not'} on your linked NEAR account now. Move it back to wear it.
+                        </small>
                       ) : (
                         <Button
                           type="button"

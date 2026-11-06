@@ -78,4 +78,17 @@ describe('v2 cosmetics on frames', () => {
     const sides = { A: { crew: [spec('wick', 'Builder')], cosmetics: [null] }, B: { crew: [] } };
     expect(withCosmetics(frame, sides)).toBe(frame);
   });
+
+  it('withCosmetics copies each owner look onto its agent, beside what it wears', () => {
+    const look = { skin: 2, hair: 'bun', hairColor: 3, outfit: 1, pants: 0, build: 'sturdy', headgear: 'cap' };
+    const frame = { agents: [{ id: 'wick' }, { id: 'rook' }] } as unknown as V2Frame;
+    const sides = {
+      A: { crew: [spec('wick', 'Builder'), spec('rook', 'Scout')], cosmetics: [{ trail: 'trail_x' }, null], looks: [null, look] },
+      B: { crew: [] },
+    };
+    const out = withCosmetics(frame, sides);
+    expect(out.agents[0]).toEqual({ id: 'wick', cosmetics: { trail: 'trail_x' } });
+    expect(out.agents[1]).toEqual({ id: 'rook', look });
+    expect(out.agents[1]!.look).not.toBe(look);
+  });
 });

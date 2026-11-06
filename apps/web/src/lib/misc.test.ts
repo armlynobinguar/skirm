@@ -39,6 +39,11 @@ describe('NEAR amounts', () => {
   it('formats and parses yoctoNEAR', () => {
     expect(formatNear('1250000000000000000000000')).toBe('1.25');
     expect(formatNear(10n ** 24n * 3n)).toBe('3');
+    // Tiny but non-zero prices never read as 0.
+    expect(formatNear(parseNear('0.00005'))).toBe('0.00005');
+    expect(formatNear(parseNear('0.0000523'))).toBe('0.000052');
+    expect(formatNear('0')).toBe('0');
+    expect(formatNear(parseNear('1.00001'))).toBe('1');
     expect(parseNear('1.25')).toBe('1250000000000000000000000');
     expect(() => parseNear('1,5')).toThrow();
   });

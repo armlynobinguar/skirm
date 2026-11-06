@@ -20,6 +20,7 @@ export const GAS = {
   buy: (150n * TGAS).toString(),
   approve: (100n * TGAS).toString(),
   rent: (60n * TGAS).toString(),
+  delist: (30n * TGAS).toString(),
 } as const;
 
 /** Attached to nft_approve for the approval's storage; the skills contract refunds the excess. */
@@ -56,6 +57,14 @@ export function buyTx(c: Contracts, tokenId: string, priceYocto: string): NearTr
   return {
     receiverId: c.market,
     actions: [call('buy', { token_id: tokenId }, GAS.buy, yocto(priceYocto))],
+  };
+}
+
+/** Takes a listing off the market contract (1 yocto attached: a full-access signature). */
+export function delistTx(c: Contracts, tokenId: string): NearTransaction {
+  return {
+    receiverId: c.market,
+    actions: [call('delist', { token_id: tokenId }, GAS.delist, '1')],
   };
 }
 

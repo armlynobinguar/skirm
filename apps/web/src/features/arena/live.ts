@@ -1,7 +1,7 @@
 // Live v2 matches as the arena draws them: one crew's frame (or a spectator's whole board) on the
 // map's own arena, under soft fog, with this tick's talk as bubbles.
 import { STUN_TICKS, type Team, type V2Frame } from '@skirm/engine/v2';
-import type { AgentCosmetics } from '@skirm/shared';
+import { lookColours, type AgentCosmetics } from '@skirm/shared';
 import { cosmeticsOf, tintAgents } from './cosmetics';
 import type { LiveEmote } from './emotes';
 import { gearOf } from './gear';
@@ -106,8 +106,10 @@ export function composeV2Arena(frame: V2Frame, prev?: LiveArena | null): LiveAre
       down: g.down,
       inv: g.items.map(() => 'item'),
       ...(g.tool ? { tool: g.tool } : {}),
-      c: BODY[g.team][slot % 3],
-      bone: HEAD[g.team],
+      // The owner's look when the frame carries one (outfit body, skin head, dress); else the crew palette.
+      ...(g.look
+        ? (({ body, head, dress }) => ({ c: body, bone: head, dress }))(lookColours(g.look))
+        : { c: BODY[g.team][slot % 3], bone: HEAD[g.team] }),
     };
   });
   // Equipped cosmetics (rendering only): the skin's palette on the body, the rest drawn by ./cosmetics.

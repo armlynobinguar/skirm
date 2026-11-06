@@ -6,13 +6,13 @@ import p from './puzzles.module.css';
 
 export function PuzzlesStrip() {
   return (
-    <aside className={p.strip} aria-labelledby="puzzles-strip-title" data-testid="puzzles-strip">
+    <aside className={p.strip} title="Fixed boards, fewest ticks wins. Beat par for gold." aria-labelledby="puzzles-strip-title" data-testid="puzzles-strip">
       <span className={p.stripText}>
-        <span className="sk-kick">Single player · no rival</span>
+        <span className="sk-kick">No rival</span>
         <span id="puzzles-strip-title" className={p.stripTitle}>
           Puzzles
         </span>
-        <span className={p.stripSub}>Fixed boards, fewest ticks wins. Beat par for gold.</span>
+        <span className="sk-sr-only">Fixed boards, fewest ticks wins. Beat par for gold.</span>
       </span>
       <Link href={routes.puzzles()} className={p.stripGo} data-testid="puzzles-strip-go">
         Open ▸

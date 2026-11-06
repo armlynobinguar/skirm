@@ -214,6 +214,50 @@ describe('S10 with a NEAR wallet', () => {
     expect(api.purchaseSkill).toHaveBeenNthCalledWith(2, SKILL_ID, { txHash: 'tx_1', version: 1 });
   });
 
+  it('keeps a paid purchase after the drawer closes, and finishes it without paying again', async () => {
+    const wallet = new FakeWallet({ account: 'ada.testnet', connected: true });
+    let up = false;
+    const purchaseSkill = async () => {
+      if (!up) throw new ApiError(503, 'rpc_unavailable', 'NEAR RPC is unavailable, try again');
+      return { owned: true as const, sale: {} as never };
+    };
+    const first = renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, { ...privy, wallet, api: base({ purchaseSkill }) });
+    await first.user.click(await screen.findByTestId('s10-buy'));
+    await first.user.click(await screen.findByTestId('m02-confirm'));
+    expect(await screen.findByTestId('m02-failed')).toBeInTheDocument();
+    first.unmount();
+    up = true;
+    const again = renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, { ...privy, wallet, api: base({ purchaseSkill }) });
+    expect(await screen.findByTestId('s10-unrecorded')).toHaveTextContent('You paid for this skill');
+    await again.user.click(screen.getByTestId('s10-unrecorded-finish'));
+    await waitFor(() => expect(again.api.purchaseSkill).toHaveBeenCalledWith(SKILL_ID, { txHash: 'tx_1', version: 1 }));
+    await waitFor(() => expect(screen.queryByTestId('s10-unrecorded')).not.toBeInTheDocument());
+    expect(wallet.sent).toHaveLength(1);
+  });
+
+  it('says the buyer was refunded when the market recorded no sale, and lets them buy afresh', async () => {
+    const wallet = new FakeWallet({ account: 'ada.testnet', connected: true });
+    let calls = 0;
+    const { user } = renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, {
+      ...privy,
+      wallet,
+      api: base({
+        purchaseSkill: async () => {
+          calls += 1;
+          if (calls === 1) throw new ApiError(422, 'purchase_unverified', 'the market recorded no sale of this token', { reason: 'failed' });
+          return { owned: true, sale: {} as never };
+        },
+      }),
+    });
+    await user.click(await screen.findByTestId('s10-buy'));
+    await user.click(await screen.findByTestId('m02-confirm'));
+    expect(await screen.findByTestId('m02-failed')).toHaveTextContent('your NEAR came back');
+    // A refused hash is not re-sent: Try again signs a new purchase.
+    await user.click(screen.getByTestId('m02-confirm'));
+    expect(await screen.findByTestId('m02-done')).toBeInTheDocument();
+    expect(wallet.sent).toHaveLength(2);
+  });
+
   it('refuses to sign from another account than the linked one', async () => {
     const wallet = new FakeWallet({ account: 'mallory.testnet', connected: true });
     const { user, api } = renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, {

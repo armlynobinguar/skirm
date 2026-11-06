@@ -4,11 +4,13 @@
 // crew ring, carried items and the verb's effect. The prototype's drawAgent calls this.
 import {
   ISO_V,
+  dressLook,
   isoPolys,
   lookFor,
   lookTop,
   poseAt,
   poseKind,
+  type Dress,
   type Pose,
   type RoleLook,
 } from '@skirm/ui';
@@ -27,7 +29,17 @@ export interface Figure2DAgent {
   act?: string | null;
   /** Delivered this frame. */
   cheer?: boolean;
+  /** The match is over: loop the victory or defeat pose (debrief portraits). */
+  result?: 'victory' | 'defeat' | null;
   inv?: readonly unknown[];
+  /** How its owner dressed it (hair, trousers, build, headgear). Absent: the role's plain look. */
+  dress?: Dress;
+}
+
+/** The look this agent wears: its role's, dressed when its owner chose a look. */
+export function figureLook(a: Pick<Figure2DAgent, 'role' | 'dress'>): RoleLook {
+  const base = lookFor(a.role);
+  return a.dress ? dressLook(base, a.dress) : base;
 }
 
 export interface Figure2DOpts {
@@ -59,6 +71,7 @@ export function figurePose(
     down: a.down,
     stun: a.stun,
     cheer: a.cheer,
+    result: a.result,
     act: a.act,
     carrying: a.inv?.length ?? 0,
     moving: opts.moving,
@@ -107,7 +120,7 @@ export function drawFigure(
   opts: Figure2DOpts = {},
 ) {
   const ba = opts.alpha ?? 1;
-  const look = lookFor(a.role);
+  const look = figureLook(a);
   const pose = figurePose(a, look, time, opts);
   const still = !!opts.still;
   const dir: 1 | -1 = a.team === 'B' ? -1 : 1;
@@ -150,7 +163,8 @@ export function drawFigure(
   const y0 = b - hop - pose.lift * T * ISO_V;
   c.translate(sx, y0);
   if (pose.tilt) c.rotate(pose.tilt * dir);
-  for (const q of isoPolys(look, { body: a.c ?? '#34e0c8', head: a.bone ?? '#ece8e1' }, dir, pose))
+  const team = opts.team ?? (a.team === 'B' ? '#ff4655' : '#34e0c8');
+  for (const q of isoPolys(look, { body: a.c ?? '#34e0c8', head: a.bone ?? '#ece8e1', team }, dir, pose))
     fill(c, q.pts, T, q.fill);
   c.restore();
   c.save();
@@ -175,7 +189,8 @@ export function drawFigure(
   }
   if (pose.kind === 'act')
     verbFx(c, look, sx + fx * 0.55, b + fy * 0.55, T, time, still, pose.fx, dir);
-  if (pose.kind === 'cheer' && pose.fx > 0) {
+  if (pose.kind === 'defeat') drawRainCloud(c, sx, headY - T * 0.18, T, time, still);
+  if ((pose.kind === 'cheer' || pose.kind === 'victory') && pose.fx > 0) {
     c.globalAlpha = pose.fx * ba;
     for (let i = 0; i < 7; i++) {
       const ang = i * 0.9 + (still ? 0 : time * 2);
@@ -191,6 +206,24 @@ export function drawFigure(
   }
   c.restore();
   c.globalAlpha = 1;
+}
+
+/** A small grey cloud with a few drops falling, over a defeated agent. */
+function drawRainCloud(c: CanvasRenderingContext2D, x: number, y: number, T: number, time: number, still: boolean) {
+  const base = c.globalAlpha;
+  c.fillStyle = '#8d97a6';
+  for (const [dx, dy, r] of [[-0.09, 0.01, 0.07], [0, -0.03, 0.09], [0.09, 0.01, 0.07]] as const) {
+    c.beginPath();
+    c.arc(x + dx * T, y + dy * T, r * T, 0, 7);
+    c.fill();
+  }
+  c.fillStyle = '#5fb8ff';
+  for (let i = 0; i < 3; i++) {
+    const ph = still ? 0.5 : (time * 1.6 + i / 3) % 1;
+    c.globalAlpha = base * (still ? 0.8 : 1 - ph);
+    c.fillRect(x + (i - 1) * T * 0.08 - T * 0.008, y + T * (0.07 + ph * 0.14), T * 0.016, T * 0.04);
+  }
+  c.globalAlpha = base;
 }
 
 /** Carried items over the head: one diamond each, and the count for roles that carry more (Haulers). */

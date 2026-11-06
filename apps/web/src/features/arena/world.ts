@@ -1,6 +1,7 @@
 // Typed access to the prototype's v2 world (./proto/world.ts): the 10-map roster with mirrored
 // 2-crew arenas, and the draw calls the arena canvas needs. Screens read maps through here, never
 // through the proto module directly.
+import type { Dress } from '@skirm/ui';
 import { mapV2, type Difficulty as DifficultyKey, type GoalCheck, type TalkTier } from '@skirm/engine/v2';
 import type { LiveGear } from './gear';
 import * as proto from './proto/world';
@@ -130,6 +131,11 @@ export interface ArenaAgent {
   act?: string | null;
   /** It delivered this tick (a short celebration). */
   cheer?: boolean;
+  /** Body (outfit) and head (skin) colours; absent: the crew's default palette. */
+  c?: string;
+  bone?: string;
+  /** How its owner dressed it (live frames with a look). */
+  dress?: Dress;
 }
 
 /** A board state the renderer draws: tiles plus agents with their crew side. */

@@ -139,11 +139,19 @@ export function errorCopy(e: unknown): { title: string; message: string; code?: 
     case 'listing_active':
       return {
         title: 'Listing still open',
-        message: 'Cancel your market listings, then unlink your NEAR account.',
+        message: 'Cancel your market listings first, then unlink or change your NEAR account.',
         code: e.code,
       };
     case 'not_found':
       return { title: 'Not found', message: 'This page does not exist or was removed.', code: e.code };
+    case 'purchase_unverified': {
+      const reason = e.details?.reason;
+      if (reason === 'not_found')
+        return { title: 'Not on NEAR yet', message: 'NEAR has not shown this purchase yet. Try again in a moment; you will not be charged twice.', code: e.code };
+      if (reason === 'failed')
+        return { title: 'No sale happened', message: 'The purchase did not complete on NEAR, so your NEAR came back (less the network fee). You can buy again.', code: e.code };
+      return { title: 'Purchase not recognised', message: 'That transaction is not a purchase of this skill by your NEAR account.', code: e.code };
+    }
     default:
       return { title: 'Something went wrong', message: e.message, code: e.code };
   }

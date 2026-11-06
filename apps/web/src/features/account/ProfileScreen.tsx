@@ -27,7 +27,7 @@ import { STARTER_AGENTS, formatNear } from '@/lib/constants';
 import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
 import { useWallet } from '@/lib/wallet/hooks';
-import { agentBone, agentColour } from '@/features/agents/agentView';
+import { agentBone, agentColour, agentDress } from '@/features/agents/agentView';
 import { mapById } from '@/features/arena/world';
 import { ConnectWalletModal } from '@/features/skills/ConnectWalletModal';
 import s from './account.module.css';
@@ -172,7 +172,7 @@ function AgentsCard({ agents }: { agents: Agent[] }) {
                 <tr key={a.id} data-testid={`s16-agent-${a.id}`}>
                   <td>
                     <span className={s.agentName}>
-                      <AgentAvatar size={28} label={a.name} role={a.role} body={agentColour(a)} head={agentBone(a)} />
+                      <AgentAvatar size={28} label={a.name} role={a.role} body={agentColour(a)} head={agentBone(a)} dress={agentDress(a)} />
                       <span data-testid="s16-agent-name">{a.name}</span>
                       <button
                         type="button"

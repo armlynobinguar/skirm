@@ -9,6 +9,7 @@ import { formatNear } from '@/lib/constants';
 import { useApi } from '@/lib/services';
 import { useNearSigner } from '@/lib/wallet/hooks';
 import type { NearTransaction } from '@/lib/wallet/types';
+import { isFinalRefusal, pendingStore } from '@/lib/wallet/pending';
 import { WalletError } from '@/lib/wallet/types';
 
 /** `2000` → `20%`. */
@@ -44,23 +45,43 @@ export function walletTx(c: BackingWalletCall): NearTransaction {
   };
 }
 
+/** A backing call the wallet signed that /backing/sync has not mirrored yet (survives a reload). */
+const signedBacking = pendingStore<{ txHash: string }>('backing', (v) => typeof v.txHash === 'string');
+
 /**
  * Runs a backing write: on a `{ wallet }` answer, signs the call as the linked NEAR account and
- * mirrors it with /backing/sync. Refreshes every backing query afterwards.
+ * mirrors it with /backing/sync. A signed call whose sync failed is kept and synced first on the
+ * next write, never signed (staked) a second time. Refreshes every backing query afterwards.
  */
 export function useBackingWrite() {
   const api = useApi();
   const qc = useQueryClient();
   const me = useMe();
   const signer = useNearSigner();
-  return async function run<T>(call: () => Promise<BackingWrite<T>>): Promise<T | null> {
-    const res = await call();
+  const sync = async (txHash: string) => {
     try {
+      await api.syncBacking(txHash);
+      signedBacking.save(null);
+    } catch (err) {
+      if (isFinalRefusal(err)) signedBacking.save(null);
+      throw err;
+    }
+  };
+  return async function run<T>(call: () => Promise<BackingWrite<T>>): Promise<T | null> {
+    try {
+      // Mirror an earlier signed call first: a retry must not stake again.
+      const held = signedBacking.load();
+      if (held) {
+        await sync(held.txHash);
+        return null;
+      }
+      const res = await call();
       if (!isWallet(res)) return res;
       const linked = me.data?.account.nearAccountId;
       if (!linked) throw new WalletError('wallet_no_account', 'Link a NEAR account first.');
       const txHash = await signer.send(walletTx(res.wallet), linked);
-      await api.syncBacking(txHash);
+      signedBacking.save({ txHash });
+      await sync(txHash);
       return null;
     } finally {
       void qc.invalidateQueries({ queryKey: qk.backing.all });

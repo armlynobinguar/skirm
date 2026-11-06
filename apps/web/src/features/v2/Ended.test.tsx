@@ -88,6 +88,11 @@ describe('v2 result screen', () => {
     expect(stars.map((s) => s.textContent)).toEqual(['Goal · Shore the tunnels · earned', 'Won the match · earned']);
     expect(screen.getByTestId('v2-elo')).toHaveTextContent('+16');
     expect(screen.getByTestId('v2-mvp')).toHaveTextContent('Wick');
+    // The crew line: each agent posing for the win, the MVP tagged.
+    const poses = screen.getByTestId('v2-crew-poses');
+    expect(poses).toHaveAttribute('data-outcome', 'victory');
+    expect(within(poses).getAllByRole('listitem').length).toBeGreaterThan(0);
+    expect(within(poses).getByRole('img', { name: /Wick, victory, MVP/ })).toBeInTheDocument();
     const tally = screen.getByTestId('v2-tally');
     expect(tally).toHaveTextContent('Normal goal · Shore the tunnelsComplete · 3/3 verbs');
     expect(tally).toHaveTextContent('Messages sent12');
