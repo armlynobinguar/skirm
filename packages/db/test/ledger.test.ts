@@ -16,6 +16,21 @@ const strip = (rows: { type: string; amount: number; source: string; note: strin
   }));
 
 describe('LedgerRepo (Postgres) applies @skirm/ledger rules', () => {
+  it('staleHolds lists only still-held runs with a matching prefix placed before the cutoff', async () => {
+    const ctx = await setup();
+    const acc = await signUp(ctx, 'sweep');
+    for (const runId of ['bench-run1-0', 'v2-match-a']) {
+      const h = await ctx.repos.ledger.hold({ accountId: acc.id, runId, stepLimit: 10, agents: 1 });
+      expect(h.ok).toBe(true);
+    }
+    const later = new Date(Date.now() + 60_000);
+    expect(await ctx.repos.ledger.staleHolds(['bench-', 'daily-'], later)).toEqual(['bench-run1-0']);
+    expect(await ctx.repos.ledger.staleHolds(['bench-'], new Date(Date.now() - 60_000))).toEqual([]);
+    expect(await ctx.repos.ledger.staleHolds([], later)).toEqual([]);
+    expect((await ctx.repos.ledger.abort('bench-run1-0')).ok).toBe(true);
+    expect(await ctx.repos.ledger.staleHolds(['bench-'], later)).toEqual([]);
+  });
+
   it('one agent: 60 held from the allowance, 27 charged, 33 returned', async () => {
     const ctx = await setup();
     const acc = await signUp(ctx, 'ana');

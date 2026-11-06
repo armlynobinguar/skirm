@@ -442,9 +442,14 @@ export class BackingRepo {
    * Credits mode: routes the writer's royalties from resales since each round closed. Each sale
    * goes to the oldest closed round that covers its skill and still has room under the cap
    * (rounds never share a sale); a sale no round can take stays the writer's. Returns the payouts
-   * recorded.
+   * recorded. Runs in one transaction that locks the writer's closed rounds, so two settles at once
+   * (a claim and a page load) cannot both read the same earned total and pay past the cap.
    */
   async settleFromSales(writerId: string): Promise<number> {
+    return tx(this.db, (t) => new BackingRepo(t).settleLocked(writerId));
+  }
+
+  private async settleLocked(writerId: string): Promise<number> {
     const rounds = await this.db
       .select()
       .from(backingRounds)
@@ -455,7 +460,8 @@ export class BackingRepo {
           eq(backingRounds.mode, 'credits'),
         ),
       )
-      .orderBy(asc(backingRounds.closedAt));
+      .orderBy(asc(backingRounds.closedAt))
+      .for('update');
     const open = rounds.filter(
       (r) => r.closedAt && big(r.backersEarnedYocto) < backingCap(big(r.raisedYocto), r.capMultipleBps),
     );

@@ -26,6 +26,7 @@ import { qk, useMe } from '@/lib/api/queries';
 import type { Me } from '@/lib/api/types';
 import type { OutgoingMessage } from '@/lib/realtime/client';
 import { useRealtimeMessage, useRealtimeStatus } from '@/lib/realtime/hooks';
+import { matchOrigin } from '@/lib/match-origin';
 import { routes } from '@/lib/routes';
 import { useApi, useRealtime } from '@/lib/services';
 import s from '@/features/pvp/pvp.module.css';
@@ -136,6 +137,10 @@ function LobbyRoom({ lobby, me }: { lobby: Lobby; me: Me }) {
       setReady(false);
       void qc.invalidateQueries({ queryKey: qk.me });
       void qc.invalidateQueries({ queryKey: qk.lobbies.all });
+      matchOrigin.set(
+        m.matchId,
+        lobby.tournamentId ? { kind: 'tournament', tournamentId: lobby.tournamentId } : { kind: 'lobby', lobbyId: lobby.id },
+      );
       router.push(routes.match(m.matchId));
     } else if (m.type === 'error' && readyRef.current && !NOT_LOBBY_ERRORS.has(m.code)) {
       if (m.code === 'not_found' && sent.current === null) return;

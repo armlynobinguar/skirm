@@ -233,20 +233,27 @@ export class RentalsRepo {
    * a pass is missing, e.g. two matches racing for the same pass.
    */
   async consume(renterId: string, agentIds: string[], matchId: string, now = new Date()): Promise<void> {
-    for (const agentId of agentIds) {
-      const [pass] = await this.db
-        .select({ id: rentals.id })
-        .from(rentals)
-        .where(and(eq(rentals.renterId, renterId), eq(rentals.agentId, agentId), isNull(rentals.matchId)))
-        .orderBy(asc(rentals.createdAt))
-        .limit(1)
-        .for('update', { skipLocked: true });
-      if (!pass) throw new RepoError('no_rental', 'no unused rental for this agent');
-      await this.db
-        .update(rentals)
-        .set({ matchId, usedAt: now })
-        .where(and(eq(rentals.id, pass.id), isNull(rentals.matchId)));
-    }
+    // One transaction (a savepoint when the caller already holds one): a missing pass for any agent
+    // rolls back the passes already marked for the others, and FOR UPDATE SKIP LOCKED only works
+    // inside a transaction.
+    await tx(this.db, async (t) => {
+      for (const agentId of agentIds) {
+        const [pass] = await t
+          .select({ id: rentals.id })
+          .from(rentals)
+          .where(and(eq(rentals.renterId, renterId), eq(rentals.agentId, agentId), isNull(rentals.matchId)))
+          .orderBy(asc(rentals.createdAt))
+          .limit(1)
+          .for('update', { skipLocked: true });
+        if (!pass) throw new RepoError('no_rental', 'no unused rental for this agent');
+        const used = await t
+          .update(rentals)
+          .set({ matchId, usedAt: now })
+          .where(and(eq(rentals.id, pass.id), isNull(rentals.matchId)))
+          .returning({ id: rentals.id });
+        if (!used.length) throw new RepoError('no_rental', 'the rental pass was used by another match');
+      }
+    });
   }
 
   /**

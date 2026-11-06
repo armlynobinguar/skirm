@@ -235,8 +235,10 @@ spikes then alert.
 
 ## Rate limits
 
-The api counts every request per client (the first `X-Forwarded-For` hop, which Cloud Run's front
-end sets) in one-minute windows, with Redis counters shared by every instance:
+The api counts every request per client in one-minute windows, with Redis counters shared by every
+instance. The client is the `X-Forwarded-For` entry added by our own proxy, counted from the end
+(`TRUSTED_PROXY_HOPS`: 1 on plain Cloud Run, 2 behind an external HTTPS load balancer), so a
+client cannot pick a fresh bucket by sending its own header:
 
 | Bucket | Default | Routes |
 | --- | --- | --- |

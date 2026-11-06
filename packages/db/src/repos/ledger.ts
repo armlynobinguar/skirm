@@ -2,7 +2,7 @@
 // slice of state it touches (account row, run hold, today's global free budget) FOR UPDATE, runs the
 // pure state machine, then persists the new state and the journal rows in one transaction.
 // Game Spec §6 (credit_check, settle, abort), §7 (free allowance); Formulas §2–§4.
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, like, lt, or, sql } from 'drizzle-orm';
 import {
   DEFAULT_LEDGER_CONFIG,
   abort as pureAbort,
@@ -283,6 +283,27 @@ export class LedgerRepo {
       .from(ledgerRows)
       .where(eq(ledgerRows.runId, runId))
       .orderBy(ledgerRows.id);
+  }
+
+  /**
+   * Run ids of holds still `held` that were placed before `before` and whose id starts with one of
+   * `prefixes`. Used to find holds a crashed or stalled job never settled or aborted.
+   */
+  async staleHolds(prefixes: readonly string[], before: Date, limit = 200): Promise<string[]> {
+    if (!prefixes.length) return [];
+    const rows = await this.db
+      .select({ runId: runHolds.runId })
+      .from(runHolds)
+      .where(
+        and(
+          eq(runHolds.status, 'held'),
+          lt(runHolds.createdAt, before),
+          or(...prefixes.map((p) => like(runHolds.runId, `${p}%`))),
+        ),
+      )
+      .orderBy(runHolds.createdAt)
+      .limit(limit);
+    return rows.map((r) => r.runId);
   }
 
   async getHold(runId: string): Promise<RunHold | undefined> {

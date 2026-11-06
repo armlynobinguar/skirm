@@ -13,6 +13,7 @@ import { navGroupOf, routes, screenOf, type NavGroup } from '@/lib/routes';
 import { sfxEngine, useSfx } from '@/lib/sfx';
 import { AccountDock } from './AccountDock';
 import { notesStore, useNotesOpen } from './notes';
+import { matchBack } from '@/lib/match-origin';
 
 const NAV: { id: NavGroup; label: string; href: string; icon: AkIconName; serial: string }[] = [
   { id: 'play', label: 'Play', href: routes.home(), icon: 'play', serial: 'PLY·01' },
@@ -43,7 +44,7 @@ export function TopBar() {
             data-testid="topbar-back"
             onClick={() => {
               sfx.play('click');
-              router.push(screen.back!);
+              router.push(matchBack(pathname, screen.back!));
             }}
           >
             <AkIcon name="back" />

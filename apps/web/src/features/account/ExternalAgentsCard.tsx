@@ -114,6 +114,14 @@ export function ExternalAgentsCard({ agents }: { agents: Pick<Agent, 'id' | 'nam
         talk-tier rate whoever plays it.
       </p>
       {shown ? <SecretOnce shown={shown} onDone={() => setShown(null)} /> : null}
+      {list.isError ? (
+        <p className="sk-muted" role="alert" data-testid="ext-error">
+          Could not load your external agents: {errorCopy(list.error).message}{' '}
+          <Button size="sm" variant="secondary" onClick={() => void list.refetch()}>
+            Retry
+          </Button>
+        </p>
+      ) : null}
       {rows.length ? (
         <ul className={s.runs} data-testid="ext-list">
           {rows.map((x) => (

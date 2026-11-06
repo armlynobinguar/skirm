@@ -40,6 +40,7 @@ import { routes } from '@/lib/routes';
 import { useApi, useRealtime } from '@/lib/services';
 import styles from './play.module.css';
 import { RentShelf, passesByAgent, rentedAgent } from './RentShelf';
+import { matchOrigin } from '@/lib/match-origin';
 
 /** Agents a crew may field. */
 export const CREW_CAP = 3;
@@ -181,6 +182,7 @@ function V2Crew({ me, mapId, initialDifficulty, initialBot }: { me: Me; mapId: s
     } else if (m.type === 'v2_found') {
       setPhase('found');
       void qc.invalidateQueries({ queryKey: qk.me });
+      matchOrigin.set(m.matchId, { kind: 'command' });
       router.push(routes.match(m.matchId));
     } else if (m.type === 'error') {
       if (NOT_QUEUE_ERRORS.has(m.code)) return;

@@ -1,6 +1,6 @@
 // Agent rentals (the prototype's "Agent rentals" earn-back line; 5% platform fee, as on skill
 // sales). An owner offers an agent at a price per match; a renter pays through `market.rent` and
-// gets a one-match pass, used up when that match starts. The agent plays with its owner's skills;
+// gets a one-match pass, used up when that match ends (a void match uses none). The agent plays with its owner's skills;
 // the renter never reads them (realtime withholds plans of skills the player did not write).
 //
 //   PUT  /agents/:id/rental   { priceYocto | null }  the owner sets or ends the offer

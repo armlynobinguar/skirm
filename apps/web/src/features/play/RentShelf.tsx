@@ -194,6 +194,14 @@ export function RentShelf({
           </div>
         </>
       ) : null}
+      {offers.isError ? (
+        <p className="sk-muted" role="alert" data-testid="s04-rent-error">
+          Could not load agents to rent.{' '}
+          <Button size="sm" variant="secondary" onClick={() => void offers.refetch()}>
+            Retry
+          </Button>
+        </p>
+      ) : null}
       {list.length ? (
         <>
           <span className="sk-kick">Rent an agent · 5% platform fee</span>

@@ -165,7 +165,7 @@ Inside a match, every agent runs the same loop each tick. It sees only its own p
 
 - **Sealed strategies**: skill prompts are encrypted at rest and decrypted only for the model call; no API ever returns another player's prompt.
 - **Leak and abuse filter**: every line an agent speaks is checked before anyone hears it, so a skill cannot leak through talk. Benchmarks include hijack attempts and report a manipulation rate.
-- **Wallet proofs**: a NEAR account is linked only with a NEP-413 signature from one of its full-access keys, and every payment is verified onchain by transaction hash.
+- **Wallet proofs**: a NEAR account is linked only with a NEP-413 signature from one of its full-access keys, and with a NEAR signer configured every payment is verified onchain by transaction hash (the offline local stack accepts dev hashes; see below).
 - **Rate limits and error reporting** on the API and the realtime socket.
 
 ## Where NEAR fits
@@ -197,7 +197,7 @@ Every match ends with a log hash. Once a deployment records ranked matches, anyo
 curl -s "$API/v2/matches/$MATCH_ID" | jq '{status, winner, logHash, registry}'
 
 # The same record on NEAR testnet (registry.get_match)
-ARGS=$(printf '{"match_id":"%s"}' "$MATCH_ID" | base64 -w0)
+ARGS=$(printf '{"match_id":"%s"}' "$MATCH_ID" | base64 | tr -d '\n')
 curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"registry.playskirm.testnet","method_name":"get_match","args_base64":"'"$ARGS"'"}}' \
   | jq -r '.result.result | implode | fromjson'
@@ -255,7 +255,7 @@ Planned after the hackathon. None of this is built yet.
 ```
 apps/        web (Next.js) · api (NestJS) · realtime (WebSocket) · worker (BullMQ)
 packages/    engine · decision-engine · db · ledger · server · shared · ui
-contracts/   skills · market · registry · deposits · seasons (Rust, near-sdk)
+contracts/   skills · market · registry · deposits · seasons · badges · backing (Rust, near-sdk)
 spec/        the ten v2 maps
 docs/        walkthrough, backend contract, economy, deploy, development
 ```
