@@ -4,7 +4,7 @@
 npm ci
 npm test                          # every workspace through Turborepo (Vitest)
 npm run typecheck && npm run build
-cd contracts && cargo test        # the seven NEAR contract crates
+cd contracts && cargo test        # the eight NEAR contract crates
 ```
 
 `npm ci` also enables a pre-push hook ([`.githooks/pre-push`](../.githooks/pre-push)) that runs typecheck and test, plus `cargo test` when `contracts/` changed, for the commits being pushed. Don't skip it; fix what it finds.
