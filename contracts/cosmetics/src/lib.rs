@@ -760,7 +760,7 @@ impl Contract {
         self.balances.flush();
         self.owner_tokens.flush();
         self.storage.flush();
-        self.mint_ids.flush();
+        // mint_ids is a LookupSet: it writes straight to storage, nothing to flush.
     }
 
     /// Settles what a call did to storage since `before`. Growth is paid by `payer`: from
