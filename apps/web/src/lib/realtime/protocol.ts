@@ -197,6 +197,7 @@ export type WsErrorCode =
   | 'not_controlling'
   | 'too_many_subscriptions'
   | 'unavailable'
+  | 'forbidden'
   | 'internal'
   | (string & {});
 
