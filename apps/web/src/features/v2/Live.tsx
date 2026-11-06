@@ -7,7 +7,8 @@
 //             follow, double-click for third person) and the controls; above them, for a player
 //             only, the live commands (hud/Commands.tsx). In casual and practice, "Take control"
 //             under your cards steers that agent by hand (hud/Control.tsx; the AI runs the rest).
-//   over it → the intro cutscene, the 3-2-1-GO count, callouts, and the VICTORY / DEFEAT banner.
+//   over it → the intro cutscene, the 3-2-1-GO count and the VICTORY / DEFEAT banner; callouts sit
+//             just under the clock card.
 // The match is server-paced: Pause freezes this view only (resume jumps back to live), Story keeps
 // third person subtitles up for their full time, and the speed control shows only for a replay.
 // Keys: Space pause, V third person, ← → next agent in third person, Enter / Esc skip the intro,
@@ -19,6 +20,7 @@
 import { AkIcon, Button, Segmented, type SegmentedOption } from '@skirm/ui';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEscapeLayer } from '@/components/shell/GlobalKeys';
 import { useToast } from '@/components/toast/ToastProvider';
 import type { ChaseCamState } from '@/features/arena/chase3d';
 import { liveEmotesOf } from '@/features/arena/emotes';
@@ -201,6 +203,12 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
     });
   };
 
+  // Escape goes to the shell's escape layers (GlobalKeys): the intro, then third person, and in a live
+  // match it is swallowed, so it never takes the player Back out of a match in play.
+  useEscapeLayer('intro', intro, endIntro);
+  useEscapeLayer('tpv', !!tpv && !intro, exitTpv);
+  useEscapeLayer('match', !watch && !replay && !ended && view.phase === 'live');
+
   // Keys (capture phase, so Esc closes the intro or third person before the shell goes back).
   const keys = useRef<(e: KeyboardEvent) => void>(() => {});
   keys.current = (e: KeyboardEvent) => {
@@ -210,7 +218,10 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
       e.preventDefault();
       e.stopPropagation();
     };
+    // The shell's escape layer already closed the intro or third person with this Escape.
+    const escTaken = e.key === 'Escape' && e.defaultPrevented;
     if (intro) {
+      if (escTaken) return;
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
         take();
         endIntro();
@@ -218,6 +229,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
       return;
     }
     if (e.key === 'Escape' && tpv) {
+      if (escTaken) return;
       take();
       exitTpv();
     } else if (control.onKey(e)) {
@@ -284,7 +296,9 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
         rivals={rivals}
         watch={watch}
         practice={view.practice}
-      />
+      >
+        <CalloutBar callout={callout} />
+      </MatchTop>
       <Comms lines={comms} team={team} filter={filter} onFilter={setFilter} tickMs={view.tickMs} />
       <div className={c.mbot}>
         {!watch && !replay && view.phase === 'live' ? <CommandBar view={view} frame={frame} /> : null}
@@ -325,7 +339,6 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
         </div>
         <AgentCards team={team} mapId={view.mapId} tick={tick} cards={rivalCards} unseen={unseen} pressed={tpv ?? focus} onPick={onPick} onWatch={enterTpv} className={c.cardsB} />
       </div>
-      <CalloutBar callout={callout} />
       {intro ? null : <GearLegend frame={frame} />}
       {watched ? (
         <ThirdPerson

@@ -74,7 +74,7 @@ export function cameraFor(scene: ArenaScene, narrow: boolean): Camera {
     case 'agent':
       return { fx: narrow ? 0.5 : 0.66, fy: 0.6, zoom: 1.15, dim: 0.74 };
     case 'match':
-      return { fx: narrow ? 0.5 : 0.44, fy: narrow ? 0.42 : 0.54, zoom: narrow ? 1.3 : 0.86, dim: 0 };
+      return { fx: narrow ? 0.5 : 0.44, fy: narrow ? 0.42 : 0.54, zoom: narrow ? 1.3 : 0.92, dim: 0 };
     case 'follow':
       return { fx: narrow ? 0.5 : 0.44, fy: narrow ? 0.42 : 0.54, zoom: 1.6, dim: 0 };
     case 'intro':
@@ -91,8 +91,11 @@ export function cameraFor(scene: ArenaScene, narrow: boolean): Camera {
 /** Room the arena is fitted into before zoom (the prototype's availW / availH). */
 export function fitBox(scene: ArenaScene, vw: number, vh: number): { w: number; h: number } {
   const narrow = vw < 820;
-  if (scene === 'match' || scene === 'follow' || scene === 'intro' || scene === 'tpv')
-    return { w: narrow ? vw * 0.96 : vw - 420, h: vh - (narrow ? 420 : 380) };
+  // The compact HUD leaves the live board about 300px of height on desktop (top row plus card row);
+  // third person keeps the older, tighter fit its tilt was tuned for.
+  if (scene === 'match' || scene === 'follow' || scene === 'intro')
+    return { w: narrow ? vw * 0.96 : vw - 420, h: vh - (narrow ? 420 : 300) };
+  if (scene === 'tpv') return { w: narrow ? vw * 0.96 : vw - 420, h: vh - (narrow ? 420 : 380) };
   if (scene === 'maps') return { w: vw * 0.9, h: vh * (narrow ? 0.42 : 0.8) };
   return { w: vw * 0.9, h: vh * 0.8 };
 }

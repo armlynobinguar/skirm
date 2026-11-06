@@ -21,6 +21,9 @@
 .gems i { width: 12px; height: 12px; transform: rotate(45deg); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .gems i[data-f] { background: var(--g, var(--amber)); box-shadow: 0 0 10px var(--g, var(--amber)); }
 .r { color: var(--rival); }
+/* The clock column: the clock card, and the live callout hung just under it (never over it). */
+.mid { position: relative; display: grid; justify-items: center; min-width: 0; pointer-events: none; }
+.mid > * { pointer-events: auto; }
 .clock { display: grid; justify-items: center; gap: 4px; min-width: 230px; padding: 10px 26px 12px; }
 .clockN { font: 800 58px/.85 var(--font-display); font-variant-numeric: tabular-nums; color: var(--bone); }
 .bar { display: block; width: 100%; height: 3px; background: var(--line); }
@@ -44,9 +47,10 @@
 .dtag { display: inline-block; padding: 1px 6px; font: 700 9.5px/14px var(--font-mono); letter-spacing: .16em; text-transform: uppercase; white-space: nowrap; color: var(--bg); background: var(--dc, var(--you)); }
 
 /* Right: comms */
-.comms { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(212px + env(safe-area-inset-top, 0px)); bottom: 220px; width: 340px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.comms { pointer-events: none; position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(212px + env(safe-area-inset-top, 0px)); bottom: 220px; width: 340px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.comms > * { pointer-events: auto; }
 .commsHd { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
-.feed { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; overflow: hidden; list-style: none; mask-image: linear-gradient(180deg, #000 78%, transparent); }
+.feed { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; overflow: hidden; list-style: none; mask-image: linear-gradient(180deg, #000 78%, transparent); }
 .msg { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; padding: 7px 10px; font-size: 13px; background: rgba(9, 15, 23, .86); box-shadow: inset 2px 0 0 var(--c); animation: feedin .45s var(--ease-out) both; }
 .msg[data-tag="mind"] { background: rgba(20, 14, 36, .86); box-shadow: inset 2px 0 0 var(--violet); }
 .msg[data-tag="mind"] .tx { font-style: italic; color: #d9d0f5; }
@@ -61,6 +65,9 @@
 .ch[data-tag="verb"], .ch[data-tag="mind"] { background: rgba(169, 139, 255, .18); color: var(--violet); }
 .ch[data-tag="arena"] { background: rgba(255, 181, 71, .18); color: var(--amber); }
 .tx { color: var(--text); }
+/* Nothing on the channel yet: one slim line, not a panel. */
+.msg[data-empty] { padding: 4px 10px; font-size: 12px; animation: none; }
+.msg[data-empty] .tx { color: var(--muted); }
 .note { grid-column: 2; display: flex; align-items: center; gap: 4px; font: 400 10.5px/14px var(--font-mono); letter-spacing: .04em; color: var(--amber); }
 .ear { flex: none; display: inline-block; width: 12px; height: 12px; vertical-align: -2px; }
 .filter :global(button) { display: inline-flex; align-items: center; justify-content: center; }
@@ -72,7 +79,7 @@
 .mbot > * { pointer-events: auto; }
 .cards { display: flex; gap: 8px; min-width: 0; }
 .cardWrap { position: relative; }
-.acard { --c: var(--you); position: relative; display: grid; grid-template-rows: 1fr auto; width: 118px; height: 162px; padding: 0; overflow: hidden; text-align: left; color: inherit; font: inherit; border: 0; background: var(--panel-solid); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; transition: transform .3s var(--ease-out), box-shadow .3s; }
+.acard { --c: var(--you); position: relative; display: grid; grid-template-rows: 1fr auto; width: 112px; height: 146px; padding: 0; overflow: hidden; text-align: left; color: inherit; font: inherit; border: 0; background: var(--panel-solid); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; transition: transform .3s var(--ease-out), box-shadow .3s; }
 .acard:hover { transform: translateY(-4px); }
 .acard:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .acard[aria-pressed="true"] { transform: translateY(-6px); box-shadow: inset 0 0 0 2px var(--c), 0 0 24px color-mix(in srgb, var(--c) 40%, transparent); }
@@ -80,9 +87,15 @@
 .acard[data-down] { filter: grayscale(1) brightness(.6); }
 .acard[data-unseen] { cursor: default; }
 .acard[data-steered] { box-shadow: inset 0 0 0 2px var(--amber), 0 0 18px color-mix(in srgb, var(--amber) 45%, transparent); }
-.portrait { display: block; width: 100%; height: 84px; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 22%, transparent), transparent); }
-.unseenFace { display: grid; place-items: center; height: 84px; font: 800 34px/1 var(--font-display); color: var(--faint); }
+.portrait { display: block; width: 100%; height: 70px; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 22%, transparent), transparent); }
+.unseenFace { display: grid; place-items: center; height: 70px; font: 800 34px/1 var(--font-display); color: var(--faint); }
 .cin { display: grid; gap: 3px; padding: 5px 8px 7px; }
+/* Rivals never seen: one slim strip with a "?" per agent instead of a tall blank card each. */
+.unseenStrip { align-self: flex-end; display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 10px; background: var(--panel-solid); box-shadow: inset 0 0 0 1px var(--line), inset 0 2px 0 var(--rival); }
+.unseenPips { display: flex; gap: 4px; }
+.unseenPips i { display: grid; place-items: center; width: 22px; height: 22px; font: 800 14px/1 var(--font-display); font-style: normal; color: var(--faint); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.unseenStrip .cin { padding: 0; }
+.unseenStrip .cin b { font-size: 16px; }
 .cin b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 19px/1 var(--font-display); text-transform: uppercase; color: var(--bone); }
 .st { display: flex; justify-content: space-between; gap: 4px; font: 400 9.5px/12px var(--font-mono); color: var(--muted); }
 .tier { position: absolute; top: 5px; right: 6px; font: 400 9px/12px var(--font-mono); letter-spacing: .08em; color: var(--c); }
@@ -104,7 +117,7 @@
 @keyframes blink { 50% { opacity: .45; } }
 
 /* Callout, countdown, banner */
-.callout { position: absolute; left: 50%; top: calc(170px + env(safe-area-inset-top, 0px)); padding: 8px 16px; white-space: nowrap; font: 700 20px/1.2 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--bg); background: var(--amber); clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); transform: translateX(-50%); animation: cin .4s var(--ease-out) both; }
+.callout { position: absolute; left: 50%; top: calc(100% + 8px); z-index: 1; padding: 8px 16px; white-space: nowrap; font: 700 20px/1.2 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--bg); background: var(--amber); clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); transform: translateX(-50%); animation: cin .4s var(--ease-out) both; }
 .callout[data-side="you"] { background: var(--you); }
 .callout[data-side="rival"] { background: var(--rival); color: #fff; }
 @keyframes cin { from { opacity: 0; transform: translate(-50%, -10px); } }
@@ -124,6 +137,8 @@
 .lboxB { bottom: 0; }
 .cine .lbox { height: 11vh; }
 .cine.tpv .lbox { height: 6vh; }
+/* Third person: the bottom row sits above the letterbox, not under it. */
+.tpv .mbot { bottom: calc(6vh + 8px); }
 .flash { position: absolute; inset: 0; z-index: 58; background: #fff; opacity: 0; animation: flash 1s ease-out both; }
 @keyframes flash { 0% { opacity: .9; } 100% { opacity: 0; } }
 
@@ -171,7 +186,7 @@
 .islot b { display: block; font: 700 20px/1 var(--font-display); letter-spacing: .02em; text-transform: uppercase; color: var(--bone); }
 .islot small { display: block; margin-top: 4px; font: 400 10.5px/14px var(--font-mono); letter-spacing: .06em; color: var(--oc, var(--muted)); }
 .islot[data-empty] b { color: var(--faint); }
-.mind { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(6vh + 64px); bottom: calc(6vh + 160px); width: 370px; display: flex; flex-direction: column; gap: 14px; overflow: auto; padding: 16px 18px; animation: fromR .6s var(--ease-out) both; }
+.mind { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(6vh + 64px); bottom: calc(6vh + 166px); width: 370px; display: flex; flex-direction: column; gap: 14px; overflow: auto; padding: 16px 18px; animation: fromR .6s var(--ease-out) both; }
 .mh { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .mind section { display: grid; gap: 7px; }
 .mind h3 { display: flex; justify-content: space-between; margin: 0; font: 500 10.5px/14px var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
@@ -184,7 +199,7 @@
 .heard b { margin-right: 6px; font: 500 10px/14px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
 .heard em { margin-right: 6px; padding: 0 4px; font-style: normal; color: var(--bg); background: var(--amber); }
 .heard em .ear { width: 11px; height: 11px; vertical-align: -1px; }
-.subs { position: absolute; left: 340px; right: 410px; bottom: calc(6vh + 168px); display: grid; gap: 8px; justify-items: center; text-align: center; }
+.subs { position: absolute; left: 340px; right: 410px; bottom: calc(6vh + 220px); display: grid; gap: 8px; justify-items: center; text-align: center; }
 .sub { max-width: 100%; padding: 7px 16px 9px; font-size: clamp(17px, 1.6vw, 23px); line-height: 1.38; color: #fff; text-shadow: 0 2px 6px #000, 0 0 2px #000; text-wrap: balance; background: rgba(0, 0, 0, .6); }
 .sub .sw { display: block; margin-bottom: 2px; font: 400 11px/14px var(--font-mono); font-style: normal; letter-spacing: .2em; text-transform: uppercase; color: var(--c); text-shadow: none; }
 .sub[data-kind="think"] { font-style: italic; color: #dbe6ec; background: rgba(0, 0, 0, .42); }
@@ -194,6 +209,34 @@
 @keyframes subin { from { opacity: 0; transform: translateY(10px); } }
 .chase { position: fixed; inset: 0; z-index: -1; touch-action: none; }
 
+/* Laptop and 720p screens (about 1280x720 to 1440x900): a tighter top row and card row, so the board
+   gets the room and nothing is cropped. */
+@media (min-width: 821px) and (max-height: 920px) {
+  .crewbox { gap: 4px; padding: 8px 12px; }
+  .crewT { font-size: 22px; }
+  .clock { gap: 3px; padding: 8px 20px 10px; }
+  .clockN { font-size: 46px; }
+  .comms { top: calc(178px + env(safe-area-inset-top, 0px)); bottom: 180px; }
+  .acard { width: 104px; height: 128px; }
+  .portrait, .unseenFace { height: 56px; }
+  .cin { gap: 2px; padding: 4px 7px 6px; }
+  .cin b { font-size: 17px; }
+  .slot { width: 22px; height: 22px; }
+  .slot svg { width: 15px; height: 15px; }
+  .ctrl { padding: 6px; }
+  .ctrl :global(.sk-btn) { min-height: 34px; }
+  .tpid { top: calc(6vh + 56px); gap: 4px; padding: 10px 14px; }
+  .tpName { font-size: 44px; }
+  .islot { grid-template-columns: 36px minmax(0, 1fr); padding: 4px; }
+  .islot .slot { width: 36px; height: 36px; }
+  .islot b { font-size: 17px; }
+  .mind { top: calc(6vh + 56px); bottom: calc(6vh + 146px); gap: 10px; padding: 12px 14px; width: 340px; }
+  .thk { min-height: 3.4em; }
+  .subs { right: 380px; bottom: calc(6vh + 196px); }
+}
+@media (max-width: 1366px) {
+  .comms { width: 300px; }
+}
 @media (max-width: 1180px) {
   .tpid { display: none; }
   .subs { left: 16px; }

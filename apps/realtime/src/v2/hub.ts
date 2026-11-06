@@ -26,7 +26,7 @@
 // Model choice per agent: a crew entry may name a model from the operator's catalog (LLM_MODELS,
 // `models` below). An id the catalog does not list is refused; a known one is priced here from the
 // catalog (AgentSpec.rateBps), never from the client. Ranked plays the default model whatever is sent.
-import { SYSTEM_ACCOUNT_ID, newId, sealedSecretOf, type LobbyRow, type Repos, type V2CrewRecord, type V2MatchRow } from '@skirm/db';
+import { STARTER_SKILL, SYSTEM_ACCOUNT_ID, newId, sealedSecretOf, type LobbyRow, type Repos, type V2CrewRecord, type V2MatchRow } from '@skirm/db';
 import { campaignMission, forcedTier, isLobbyTalkRule, missionUnlocked, parseModelCatalog, resolveModel, type ModelChoice } from '@skirm/shared';
 import { DEFAULT_LLM_MODEL, createGreedyBrain, type V2Brain } from '@skirm/decision-engine/v2';
 import {
@@ -630,7 +630,8 @@ export class V2Hub {
    * The crew's agents as they stand now, their decrypted skills, and which run a bought skill. Only
    * skills the agent's player owns are decrypted: one still equipped after it was sold is skipped. A
    * rented agent plays with its owner's skills, and counts as bought: its plans are withheld from
-   * the renter, who never reads another player's strategy.
+   * the renter, who never reads another player's strategy. The free starter skill every account gets
+   * is not bought (see runsBoughtSkill).
    */
   private async roster(accountId: string, entries: V2CrewEntry[], match: RosterMatch): Promise<V2Roster> {
     const { repos, vault, log } = this.deps;
@@ -682,7 +683,7 @@ export class V2Hub {
           return { name: m?.name ?? 'Skill', trigger: m?.trigger ?? null };
         }),
       );
-      bought.push(rented || meta.some((m) => m.creatorId !== accountId));
+      bought.push(runsBoughtSkill(accountId, rented, meta));
       instructions.push(v.systemPrompt ?? null);
     }
     const brains = await this.externalBrains(accountId, crew, bought, match);
@@ -1054,3 +1055,14 @@ const modelRec = (side: V2Roster, agentId: string): Pick<V2CrewRecord, 'model' |
   return { ...(a?.model ? { model: a.model } : {}), ...(a?.rateBps !== undefined ? { rateBps: a.rateBps } : {}) };
 };
 const crewRecords = (side: V2Roster): V2CrewRecord[] => side.crew.map((a) => ({ ...rec(a), skills: skillsOf(side, a.id), ...externalOf(side, a.id) }));
+
+/**
+ * Whether an agent runs a skill its player did not write, so its crew's plan and its inner voice are
+ * withheld (a bought skill never leaks through plan text). A rented agent always counts. The free
+ * starter skill every new account is given (Flood Warden, written by the system account) does not:
+ * nobody bought it and its text is the public spec example, so a new player sees their crew's plan.
+ * Official marketplace skills are also written by the system account but are sold, so they count.
+ */
+export function runsBoughtSkill(accountId: string, rented: boolean, skills: readonly { id: string; creatorId: string }[]): boolean {
+  return rented || skills.some((m) => m.creatorId !== accountId && m.id !== STARTER_SKILL.id);
+}

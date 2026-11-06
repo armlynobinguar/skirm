@@ -51,7 +51,7 @@ export function Comms({ lines, team, filter, onFilter, tickMs }: { lines: V2Comm
       </div>
       <ol className={c.feed} data-testid="v2-comms" aria-live="polite">
         {shown.length === 0 ? (
-          <li className={c.msg} style={{ '--c': 'var(--line-strong)' } as CSSProperties}>
+          <li className={c.msg} data-empty="" style={{ '--c': 'var(--line-strong)' } as CSSProperties}>
             <span className={c.tx}>{lines.length ? 'Nothing on this channel yet.' : 'Nobody has spoken yet.'}</span>
           </li>
         ) : null}

@@ -274,9 +274,10 @@ describe('v2 practice against the greedy bot', () => {
     expect(decrypt).toHaveBeenCalledTimes(1);
     expect((await deps.repos.v2Matches.get(sold.found.matchId))!.crews!.A[0]!.skills).toEqual([]);
     expect(warns.some((w) => w.includes(STARTER_SKILL.id) && w.includes('does not own'))).toBe(true);
-    // The bought skill no longer runs, so the crew plan is no longer withheld for it.
+    // The starter skill is not a bought one, so the crew plan is never withheld for it, held or not
+    // (a bought skill's plan rule: test/v2-bought-skill.test.ts).
     const planHidden = (matchId: string) => ana.inbox.ofType('v2_frame').filter((f) => f.matchId === matchId).flatMap((f) => f.frame.agents.filter((a) => a.team === 'A')).map((a) => a.planHidden === true);
-    expect(planHidden(owned.found.matchId).every(Boolean)).toBe(true);
+    expect(planHidden(owned.found.matchId).some(Boolean)).toBe(false);
     expect(planHidden(sold.found.matchId).some(Boolean)).toBe(false);
   });
 });
