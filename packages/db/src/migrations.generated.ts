@@ -399,5 +399,19 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE INDEX \"relayed_txs_account_idx\" ON \"relayed_txs\" USING btree (\"account_id\");",
       "\nCREATE INDEX \"relayed_txs_near_idx\" ON \"relayed_txs\" USING btree (\"near_account_id\");"
     ]
+  },
+  {
+    "tag": "0023_cosmetic_items",
+    "folderMillis": 1793939119411,
+    "bps": true,
+    "hash": "57abfeaf7d15fd10e132b6063db53cb89c4e671f5769919214a4a97a34a39d4f",
+    "sql": [
+      "CREATE TABLE \"agent_cosmetics\" (\n\t\"agent_id\" text NOT NULL,\n\t\"slot\" text NOT NULL,\n\t\"item_id\" text NOT NULL,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"agent_cosmetics_agent_id_slot_pk\" PRIMARY KEY(\"agent_id\",\"slot\"),\n\tCONSTRAINT \"agent_cosmetics_slot_ck\" CHECK (\"agent_cosmetics\".\"slot\" in ('skin', 'trail', 'nameplate'))\n);\n",
+      "\nALTER TABLE \"cosmetics_owned\" ADD COLUMN \"mint_status\" text;",
+      "\nALTER TABLE \"cosmetics_owned\" ADD COLUMN \"mint_tx\" text;",
+      "\nALTER TABLE \"cosmetics_owned\" ADD COLUMN \"minted_to\" text;",
+      "\nALTER TABLE \"agent_cosmetics\" ADD CONSTRAINT \"agent_cosmetics_agent_id_agents_id_fk\" FOREIGN KEY (\"agent_id\") REFERENCES \"public\".\"agents\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"cosmetics_owned\" ADD CONSTRAINT \"cosmetics_owned_mint_status_ck\" CHECK (\"cosmetics_owned\".\"mint_status\" is null or \"cosmetics_owned\".\"mint_status\" in ('pending', 'minted', 'failed'));"
+    ]
   }
 ];

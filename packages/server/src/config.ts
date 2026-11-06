@@ -149,6 +149,17 @@ export const envSchema = z
     NEAR_CONTRACT_SEASONS: nearAccount(ENV_DEFAULTS.NEAR_CONTRACT_SEASONS),
     NEAR_CONTRACT_BADGES: nearAccount(ENV_DEFAULTS.NEAR_CONTRACT_BADGES),
     /**
+     * The NEP-245 cosmetics contract (contracts/cosmetics, not deployed yet). Unset (the default):
+     * cosmetics stay credits-only. Set, with the ops signer: bought skins, trails and nameplates
+     * are also minted to the player's linked NEAR account, and ownership is read from the chain.
+     */
+    NEAR_CONTRACT_COSMETICS: optional()
+      .transform((v) => v?.trim())
+      .refine(
+        (v) => v === undefined || /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/.test(v),
+        { message: 'must be a NEAR account id' },
+      ),
+    /**
      * `true`: agent rentals are paid through `market.rent` from the renter's wallet (needs the
      * market redeployed with `rent`, contracts/market/README.md). Off: they are paid in credits.
      */

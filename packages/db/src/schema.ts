@@ -1004,7 +1004,12 @@ export const dailyAttempts = pgTable(
 
 // ---------- Cosmetics ----------
 
-/** Premium cosmetics an account owns (item ids from @skirm/shared COSMETICS). */
+/**
+ * Premium cosmetics an account owns (item ids from @skirm/shared COSMETICS and EQUIP_COSMETICS).
+ * With NEAR_CONTRACT_COSMETICS set, an equippable item is also minted as a NEP-245 token
+ * (contracts/cosmetics): `mint_status` null = never minted (credits only), `pending` while the
+ * ops call is in flight, then `minted` or `failed`; `minted_to` is the NEAR account it went to.
+ */
 export const cosmeticsOwned = pgTable(
   'cosmetics_owned',
   {
@@ -1014,9 +1019,39 @@ export const cosmeticsOwned = pgTable(
     itemId: text('item_id').notNull(),
     /** `purchase`, or why it was granted. */
     source: text('source').notNull().default('purchase'),
+    mintStatus: text('mint_status'),
+    mintTx: text('mint_tx'),
+    mintedTo: text('minted_to'),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.accountId, t.itemId] })],
+  (t) => [
+    primaryKey({ columns: [t.accountId, t.itemId] }),
+    check(
+      'cosmetics_owned_mint_status_ck',
+      sql`${t.mintStatus} is null or ${t.mintStatus} in ('pending', 'minted', 'failed')`,
+    ),
+  ],
+);
+
+/**
+ * The skin, trail and nameplate each agent wears (@skirm/shared EQUIP_COSMETICS), one row per
+ * agent and slot. Purely visual: realtime copies them onto match frames as plain ids for the
+ * arena to draw; the engine and the match log never see them.
+ */
+export const agentCosmetics = pgTable(
+  'agent_cosmetics',
+  {
+    agentId: text('agent_id')
+      .notNull()
+      .references(() => agents.id),
+    slot: text('slot').notNull(),
+    itemId: text('item_id').notNull(),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.agentId, t.slot] }),
+    check('agent_cosmetics_slot_ck', sql`${t.slot} in ('skin', 'trail', 'nameplate')`),
+  ],
 );
 
 // ---------- Private lobbies and tournaments ----------

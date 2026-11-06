@@ -22,7 +22,7 @@
 // mark it and every tick's log entry lists the steered agents (`controlled`), so replays and results
 // stay verifiable.
 import { V2_ACTION_DEADLINE_MS, V2_PLANNER_DEADLINE_MS, filterSpeech, maySpeak, type V2AgentCommand, type V2Brain, type V2Decision } from '@skirm/decision-engine/v2';
-import { DEFAULTS, chargeDue, playerTier, type PlayerTier } from '@skirm/shared';
+import { DEFAULTS, chargeDue, playerTier, type AgentCosmetics, type PlayerTier } from '@skirm/shared';
 import {
   commandOrder,
   dropTargets,
@@ -124,6 +124,11 @@ export interface V2Roster {
    * its agent's prompt only on ticks its trigger holds. Absent: every skill always plays.
    */
   skillMeta?: V2SkillMeta[][];
+  /**
+   * Per agent: the skin, trail and nameplate it wears (@skirm/shared EQUIP_COSMETICS ids), copied
+   * onto every frame for the arena to draw. Purely visual: never in the engine or the match log.
+   */
+  cosmetics?: (AgentCosmetics | null)[];
 }
 
 /** A skill's public metadata as a match uses it. */
@@ -967,6 +972,7 @@ export class V2Match {
       const standing = this.steerStanding[t];
       if (steering) frame.steer = { agentId: steering, standing: standing ? { ...standing } : null };
       frame = withControlled(frame, this.controlled);
+      frame = withCosmetics(frame, this.setup.sides);
       // Practice shows all minds (the prototype): the player also sees the bot's plan, reason and inner voice.
       if (this.setup.practice) {
         const r: Team = t === 'A' ? 'B' : 'A';
@@ -977,7 +983,7 @@ export class V2Match {
       this.lastFrames[t] = msg;
       this.deps.send(t, msg);
     }
-    const watch = withControlled(frameFor(s, 'watch', ev), this.controlled);
+    const watch = withCosmetics(withControlled(frameFor(s, 'watch', ev), this.controlled), this.setup.sides);
     this.frames.watch.push(watch);
     if (this.deps.watch) {
       const msg: V2ServerMessage = { type: 'v2_frame', matchId: this.matchId, frame: watch };
@@ -1064,6 +1070,23 @@ export function withControlled(frame: V2Frame, controlled: Readonly<Record<Team,
   const ids = new Set(TEAMS.map((t) => controlled[t]).filter((id): id is string => !!id));
   if (!ids.size) return frame;
   return { ...frame, agents: frame.agents.map((a) => (ids.has(a.id) ? { ...a, controlled: true as const } : a)) };
+}
+
+/**
+ * Puts each agent's equipped cosmetics (plain item ids) on a frame, in every view: what an agent
+ * wears is public, like its name. Rendering only; the state, the engine and the log never see it.
+ */
+export function withCosmetics(frame: V2Frame, sides: Readonly<Record<Team, Pick<V2Roster, 'crew' | 'cosmetics'>>>): V2Frame {
+  const worn = new Map<string, AgentCosmetics>();
+  for (const t of TEAMS) {
+    const side = sides[t];
+    side.cosmetics?.forEach((c, i) => {
+      const id = side.crew[i]?.id;
+      if (id && c && Object.keys(c).length) worn.set(id, c);
+    });
+  }
+  if (!worn.size) return frame;
+  return { ...frame, agents: frame.agents.map((a) => (worn.has(a.id) ? { ...a, cosmetics: { ...worn.get(a.id)! } } : a)) };
 }
 
 const other = (t: Team): Team => (t === 'A' ? 'B' : 'A');

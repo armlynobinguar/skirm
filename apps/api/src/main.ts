@@ -73,6 +73,8 @@ async function main(): Promise<void> {
       rentals: near.rentals,
       ownership: near.ownership,
       badges: near.badges,
+      // NEP-245 cosmetics only with NEAR_CONTRACT_COSMETICS set (off by default: credits-only).
+      ...(near.cosmetics ? { cosmetics: near.cosmetics } : {}),
       keys: new RpcNearKeyChecker(near.rpc),
       ...(backingContract ? { backing: new RpcBackingTxReader(near.rpc, backingContract) } : {}),
     },
