@@ -132,7 +132,7 @@ function Card({ agent, rival, inSight, slot, tick, mapId, item, accent, pressed,
       >
         <span className={c.tier}>{TIER_TAG[agent.tier]}</span>
         {inSight ? <ToolChip kind={agent.tool} onCard /> : null}
-        <AgentPortrait body={body} head={head} team={agent.team === 'A' ? 'A' : 'B'} label={`${agent.name}, ${agent.role}`} className={c.portrait} />
+        <AgentPortrait body={body} head={head} team={agent.team === 'A' ? 'A' : 'B'} label={`${agent.name}, ${agent.role}`} role={agent.role} className={c.portrait} />
         <span className={c.cin}>
           <b>{agent.name}</b>
           <span className={c.st}>

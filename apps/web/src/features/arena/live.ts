@@ -1,6 +1,6 @@
 // Live v2 matches as the arena draws them: one crew's frame (or a spectator's whole board) on the
 // map's own arena, under soft fog, with this tick's talk as bubbles.
-import type { Team, V2Frame } from '@skirm/engine/v2';
+import { STUN_TICKS, type Team, type V2Frame } from '@skirm/engine/v2';
 import type { LiveEmote } from './emotes';
 import { gearOf } from './gear';
 import { mapById, type Arena, type ArenaState } from './world';
@@ -66,7 +66,7 @@ const V2_TILE: Record<string, string | null> = {
  * board as this crew has seen it, and its agents plus the rivals in sight. Unseen tiles keep the
  * map's original tile and draw under soft fog (`light`), and this tick's talk rides along as bubbles.
  */
-export function composeV2Arena(frame: V2Frame): LiveArena | null {
+export function composeV2Arena(frame: V2Frame, prev?: LiveArena | null): LiveArena | null {
   const m = mapById(frame.mapId);
   if (!m) return null;
   const A = m.A;
@@ -85,16 +85,21 @@ export function composeV2Arena(frame: V2Frame): LiveArena | null {
     }
   });
   const slots = { A: 0, B: 0 };
+  const acts = actsOf(frame, prev);
   const agents: ArenaState['agents'] = frame.agents.map((g) => {
     const slot = slots[g.team]++;
+    const act = acts.get(g.id);
     return {
+      ...act,
       id: g.id,
       name: g.name,
       team: g.team,
       slot,
       x: g.x,
       y: g.y,
-      out: g.out || g.down,
+      role: g.role,
+      out: g.out,
+      down: g.down,
       inv: g.items.map(() => 'item'),
       ...(g.tool ? { tool: g.tool } : {}),
       c: BODY[g.team][slot % 3],
@@ -120,6 +125,45 @@ export function composeV2Arena(frame: V2Frame): LiveArena | null {
     barks: barksOf(frame),
     ...(controlled ? { controlled } : {}),
   };
+}
+
+/** What an agent did this tick, for its pose (rendering only: read from the frame's events). */
+export interface AgentAct {
+  act?: string;
+  cheer?: true;
+  stun?: true;
+  stunTill?: number;
+}
+
+/**
+ * Each agent's verb, delivery and stun this tick from the frame's events. A stun lasts STUN_TICKS
+ * after the tick it landed, carried over from the previous frame of the same match, and ends early
+ * once the agent moves or acts again.
+ */
+export function actsOf(frame: Pick<V2Frame, 'events' | 'tick' | 'agents' | 'mapId'>, prev?: LiveArena | null): Map<string, AgentAct> {
+  const out = new Map<string, AgentAct>();
+  const get = (id: string) => {
+    let a = out.get(id);
+    if (!a) out.set(id, (a = {}));
+    return a;
+  };
+  for (const e of frame.events) {
+    if (e.kind === 'verb') get(e.agent).act = e.effect;
+    else if (e.kind === 'dug') get(e.agent).act = 'remove_solid';
+    else if (e.kind === 'tool_used') get(e.agent).act ??= 'tool';
+    else if (e.kind === 'delivered') get(e.agent).cheer = true;
+    else if (e.kind === 'stunned' || e.kind === 'shocked') get(e.agent).stunTill = frame.tick + STUN_TICKS;
+  }
+  // Carry a stun from the last frame (same map, later tick) while the agent stays put and idle.
+  const m = mapById(frame.mapId);
+  const before = prev && m && prev.tick != null && prev.tick < frame.tick && prev.A.w === m.A.w && prev.A.h === m.A.h ? prev : null;
+  const was = new Map((before?.state.agents ?? []).map((a) => [a.id, a]));
+  for (const g of frame.agents) {
+    const p = was.get(g.id);
+    if (p?.stunTill != null && p.stunTill >= frame.tick && p.x === g.x && p.y === g.y && !out.get(g.id)?.act) get(g.id).stunTill ??= p.stunTill;
+  }
+  for (const [, a] of out) if (a.stunTill != null && a.stunTill >= frame.tick) a.stun = true;
+  return out;
 }
 
 /**

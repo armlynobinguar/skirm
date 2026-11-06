@@ -185,7 +185,7 @@ export function RentShelf({
                   title={`Rented from ${p.agent?.ownerHandle ?? 'another player'}${n > 1 ? ` · ${n} matches left` : ''}`}
                   data-testid={`s04-rented-${p.agentId}`}
                 >
-                  <AgentPortrait body={agentColour(a)} head={agentBone(a)} label={a.name} className={c.face} />
+                  <AgentPortrait body={agentColour(a)} head={agentBone(a)} label={a.name} role={a.role} className={c.face} />
                   <span>{a.name}</span>
                   <small>{n > 1 ? `${n} left` : a.role}</small>
                 </button>

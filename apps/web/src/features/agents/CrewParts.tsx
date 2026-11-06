@@ -202,6 +202,7 @@ export function CrewCard({ name, agent, map, tier, ranked, disabled, skillMine, 
         body={agent ? agentColour(agent) : '#34e0c8'}
         head={agent ? agentBone(agent) : '#ece8e1'}
         label={role ? `${name}, ${role}` : name}
+        role={agent?.role}
         className={c.portrait}
       />
       <div className={c.info}>
@@ -324,7 +325,7 @@ export function RosterStrip({
           style={{ '--c': agentColour(a) } as CSSProperties}
           data-testid={`${testPrefix}-roster-${a.id}`}
         >
-          <AgentPortrait body={agentColour(a)} head={agentBone(a)} label={a.name} className={c.face} />
+          <AgentPortrait body={agentColour(a)} head={agentBone(a)} label={a.name} role={a.role} className={c.face} />
           <span>{a.name}</span>
           <small>{agentRole(a)}</small>
         </button>

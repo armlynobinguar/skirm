@@ -106,10 +106,36 @@ export function isStarter(m: V2Map): boolean {
   return MAPS.indexOf(m) < 5;
 }
 
+/** An agent on the board: crew side, place, carried items, and (live frames) what it is doing. */
+export interface ArenaAgent {
+  id: string;
+  name: string;
+  team: 'A' | 'B';
+  slot: number;
+  x: number;
+  y: number;
+  inv: unknown[];
+  tool?: string;
+  /** Its role (Builder, Digger, ...): picks the figure's look. Absent: the generic look. */
+  role?: string;
+  /** Removed from the match (hidden). */
+  out?: boolean;
+  /** Knocked down this tick (drawn tipped over until it gets back up). */
+  down?: boolean;
+  /** Stunned (stars and a wobble). */
+  stun?: boolean;
+  /** Last tick the stun lasts (carried from frame to frame). */
+  stunTill?: number;
+  /** The verb effect it used this tick ('remove_solid' for a dig, 'tool' for a tool). */
+  act?: string | null;
+  /** It delivered this tick (a short celebration). */
+  cheer?: boolean;
+}
+
 /** A board state the renderer draws: tiles plus agents with their crew side. */
 export interface ArenaState {
   grid: (string | null)[];
-  agents: { id: string; name: string; team: 'A' | 'B'; slot: number; x: number; y: number; inv: unknown[]; tool?: string }[];
+  agents: ArenaAgent[];
   /** Tiles under a gas cloud (live matches on maps with gas vents). */
   gas?: number[];
   /** Electrified water tiles (live matches on maps with sparking cables). */
