@@ -841,7 +841,13 @@ export class V2Match {
         const due = chargeDue(cum100[t], this.stats[t].charged);
         if (due > 0) {
           // Only what the ledger accepted counts, so the debrief never shows credits that were not charged.
-          if ((await this.deps.credits.charge(t, due)) !== false) this.stats[t].charged += due;
+          // A ledger error (a lost DB connection) must not void the match: log it like a failed
+          // settle or heartbeat and keep playing; the uncharged credits are not counted.
+          try {
+            if ((await this.deps.credits.charge(t, due)) !== false) this.stats[t].charged += due;
+          } catch (err) {
+            this.deps.log.error(`v2 match ${this.matchId} ${t}: charge of ${due} failed: ${(err as Error).message}`);
+          }
         }
       }
       this.publish(ev);

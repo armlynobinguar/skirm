@@ -27,7 +27,13 @@ export class LedgerV2Credits implements V2Credits {
   async charge(team: Team, amount: number): Promise<boolean> {
     if (amount <= 0) return true;
     const r = await this.ledger.chargeTurns(v2HoldId(this.matchId, team), Array.from({ length: amount }, () => ({ agent: 0, reason: null })));
-    if (!r.ok) this.log.warn(`v2 match ${this.matchId} ${team}: charge failed: ${r.error}`);
+    if (!r.ok) {
+      // A refused charge is play the crew is not paying for; hold_exceeded means the hold was priced
+      // too low for the match, which is a pricing bug, not a player error, so it is logged loudly.
+      if (r.error === 'hold_exceeded')
+        this.log.error(`v2 match ${this.matchId} ${team}: charge of ${amount} refused (hold_exceeded): the crew keeps playing unpaid; the hold was priced too low`);
+      else this.log.warn(`v2 match ${this.matchId} ${team}: charge failed: ${r.error}`);
+    }
     return r.ok;
   }
 
