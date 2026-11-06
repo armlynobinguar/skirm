@@ -60,7 +60,8 @@ describe('rate limit buckets', () => {
 describe('rate limits over the api', () => {
   let h: Harness;
   beforeAll(async () => {
-    h = await setup({ rateLimit: { store: new MemoryRateLimitStore(), limits: { strict: 3, general: 5 } } });
+    // A fixed clock: real one-minute windows can roll over mid-test on a slow runner and reset the count.
+    h = await setup({ rateLimit: { store: new MemoryRateLimitStore(() => 0), limits: { strict: 3, general: 5 } } });
   });
   afterAll(() => h.close());
 
