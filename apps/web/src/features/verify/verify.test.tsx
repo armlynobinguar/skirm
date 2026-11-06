@@ -1,7 +1,8 @@
 import { appendTick, startLog, type LogHeader } from '@skirm/engine/v2';
 import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
+import { config } from '@/lib/config';
 import type { PublicMatchLog } from '@/lib/api/matchLogTypes';
 import { createFakeApi } from '@/test/fakeApi';
 import { v2MatchRecordFixture } from '@/test/fixtures';
@@ -207,8 +208,47 @@ describe('VerifyPanel and /verify', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(rpc(() => viewResult(record())).fetch);
     const api2 = createFakeApi({ v2Match: async () => match(), v2MatchLog: async () => served() });
     renderWithProviders(<VerifyScreen />, { api: api2, path: '/verify', search: '?id=mat_v2' });
-    expect(await screen.findByTestId('verify-status')).toHaveTextContent('Verified on NEAR');
+    expect(await screen.findByTestId('verify-status')).toHaveTextContent('Pass · Verified on NEAR');
+    expect(screen.getByTestId('verify-glyph')).toHaveTextContent('✓');
+    expect(screen.getByTestId('verify-compare')).toHaveAttribute('data-same');
+    expect(screen.getByTestId('verify-compare')).toHaveTextContent('= identical');
+    expect(screen.getByTestId('verify-hash-browser')).toHaveTextContent(served().logHash!);
+    expect(screen.getByTestId('verify-hash-onchain')).toHaveTextContent(served().logHash!);
     expect(screen.getByTestId('verify-tx')).toHaveAttribute('href', 'https://testnet.nearblocks.io/txns/Fx9abc');
+    expect(screen.getByTestId('verify-contract')).toHaveAttribute('href', 'https://testnet.nearblocks.io/address/registry.playskirm.testnet');
     fetchSpy.mockRestore();
+  });
+
+  it('a mismatched onchain hash reads as a fail with both hashes side by side', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(rpc(() => viewResult(record({ log_sha256: 'cd'.repeat(32) }))).fetch);
+    const api = createFakeApi({ v2Match: async () => match(), v2MatchLog: async () => served() });
+    renderWithProviders(<VerifyPanel matchId="mat_v2" auto />, { api });
+    expect(await screen.findByTestId('verify-status')).toHaveTextContent('Fail · Mismatch');
+    expect(screen.getByTestId('verify-glyph')).toHaveTextContent('✗');
+    expect(screen.getByTestId('verify-compare')).not.toHaveAttribute('data-same');
+    expect(screen.getByTestId('verify-compare')).toHaveTextContent('≠ different');
+    expect(screen.getByTestId('verify-hash-onchain')).toHaveTextContent('cd'.repeat(32));
+    fetchSpy.mockRestore();
+  });
+});
+
+describe('/verify sample match', () => {
+  const original = config.sampleMatchId;
+  afterEach(() => {
+    config.sampleMatchId = original;
+  });
+
+  it('is hidden when NEXT_PUBLIC_SAMPLE_MATCH_ID is unset', () => {
+    config.sampleMatchId = '';
+    renderWithProviders(<VerifyScreen />, { api: createFakeApi(), path: '/verify' });
+    expect(screen.queryByTestId('verify-sample')).not.toBeInTheDocument();
+  });
+
+  it('fills the input with the sample id and runs the check', async () => {
+    config.sampleMatchId = 'mat_v2';
+    renderWithProviders(<VerifyScreen />, { api: createFakeApi(), path: '/verify' });
+    fireEvent.click(screen.getByTestId('verify-sample'));
+    expect(screen.getByTestId('verify-input')).toHaveValue('mat_v2');
+    expect(testRouter.replace).toHaveBeenCalledWith('/verify?id=mat_v2');
   });
 });

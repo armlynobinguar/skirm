@@ -43,6 +43,7 @@ Web config (`.env.example`; `NEXT_PUBLIC_*` is inlined at build time):
 | `NEXT_PUBLIC_NEAR_CONTRACT_MARKET` | `market.playskirm.testnet` |
 | `NEXT_PUBLIC_NEAR_CONTRACT_DEPOSITS` | `deposits.playskirm.testnet` |
 | `NEXT_PUBLIC_NEAR_CONTRACT_REGISTRY` | `registry.playskirm.testnet` |
+| `NEXT_PUBLIC_SAMPLE_MATCH_ID` | empty (optional): a ranked match recorded on the registry; /verify shows "Try a sample match" for it. Empty hides the button (no public api lists ended ranked matches) |
 
 The contract ids must match the api's `NEAR_CONTRACT_*` (it verifies the hashes against them).
 
