@@ -69,7 +69,7 @@ export function Replay({ view, error = null, onExit, highlights, caster, startTi
     const rivals: FrameAgent[][] = [];
     let seen: FrameAgent[] = [];
     frames.forEach((f, i) => {
-      lines.push(...linesOf(f, frames[i - 1] ?? null));
+      lines.push(...linesOf(f, frames[i - 1] ?? null, lines));
       seen = rivalsSeen(seen, f);
       rivals.push(seen);
     });

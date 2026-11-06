@@ -1,0 +1,55 @@
+/* Agent reactions in 3D third person (TpvEmote.tsx): a pill over the chased agent. */
+.tpv {
+  position: fixed;
+  left: 50%;
+  top: 38%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 12px;
+  border: 1.5px solid var(--c);
+  border-radius: 999px;
+  background: rgba(5, 8, 13, 0.9);
+  pointer-events: none;
+  transform: translate(-50%, 0);
+  animation: emotein 2s var(--ease-out, ease-out) both;
+}
+.glyph {
+  font: 800 22px/1 var(--font-display, Barlow, sans-serif);
+  color: var(--c);
+}
+.label {
+  font: 600 12px/1 var(--font-mono, monospace);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ece8e1;
+}
+
+@keyframes emotein {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.7);
+  }
+  9% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.08);
+  }
+  16% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  85% {
+    opacity: 1;
+    transform: translate(-50%, -8px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tpv {
+    animation: none;
+  }
+}
