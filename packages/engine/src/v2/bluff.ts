@@ -10,7 +10,7 @@
 // from the difficulty) and one a tick. The roll is a hash of the tick and both agents, so a match
 // still replays the same from the same inputs.
 import type { AgentState, MatchEvent, MatchState } from './match';
-import { manhattan } from './match';
+import { carryOf, manhattan } from './match';
 import { clean, rangeOf, TALK_TIERS, type SayInput } from './talk';
 import { commsOf, visionOf } from './traits';
 
@@ -72,9 +72,10 @@ export function planBluffs(s: MatchState, says: readonly SayInput[]): PlannedBlu
   const up = (a: AgentState) => !a.out && !a.down;
   const out: PlannedBluff[] = [];
   for (const T of ['A', 'B'] as const) {
-    if (s.tally[T].lies >= s.lieCap[T]) continue;
+    // Decoys a Saboteur planted come out of the same budget (roles.ts).
+    if (s.tally[T].lies + (s.tally[T].decoys ?? 0) >= s.lieCap[T]) continue;
     for (const victim of s.agents) {
-      if (victim.team === T || !up(victim) || victim.carrying.length >= (victim.role === 'Hauler' ? 3 : 2)) continue;
+      if (victim.team === T || !up(victim) || victim.carrying.length >= carryOf(victim.role)) continue;
       const tile = closingOn(s, victim);
       if (tile === null) continue;
       const liar = s.agents.find((a) => a.team === T && up(a) && !a.stun && !speaking.has(a.id) && canTell(s, a) && manhattan(a, victim) <= rangeOf(commsOf(a)));

@@ -44,7 +44,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     phase: 'brief',
     topic: 'roles',
     title: 'Roles',
-    body: 'A role decides the special verb an agent may use. A Builder places blocks, a Digger clears rubble, a Firefighter puts out fire and a Scout repels rivals nearby; Runners and Haulers just move and carry (a Hauler carries 3). Pick roles that answer the map’s hazards.',
+    body: 'A role decides the special verb an agent may use. A Builder places blocks, a Digger clears rubble, a Firefighter puts out fire and a Scout repels rivals nearby; Runners and Haulers just move and carry (a Hauler carries 3). Casual adds four more roles. Pick roles that answer the map’s hazards.',
   },
   {
     id: 'talk',

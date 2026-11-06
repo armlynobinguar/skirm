@@ -45,6 +45,7 @@ describe('config', () => {
       'price',
       'progression',
       'ranked',
+      'roles',
       'season',
       'talk',
       'tokens',

@@ -79,7 +79,7 @@ export interface Agent {
   /** How the agent looks in the arena (cosmetic). */
   appearance: AgentAppearance;
   /** v2: role, sight and voice range (1–5) and default talk tier. */
-  role: 'Builder' | 'Digger' | 'Firefighter' | 'Scout' | 'Runner' | 'Hauler';
+  role: 'Builder' | 'Digger' | 'Firefighter' | 'Scout' | 'Runner' | 'Hauler' | 'Medic' | 'Engineer' | 'Saboteur' | 'Courier';
   vision: number;
   comms: number;
   tier: 'quiet' | 'standard' | 'open';

@@ -138,7 +138,7 @@ export const skillBody = z.object({
     .min(1)
     .max(10)
     .refine((a) => new Set(a).size === a.length, 'handles_tags must be unique'),
-  /** Agent roles that may equip it: `['any']` (the default) or 1-6 role names. */
+  /** Agent roles that may equip it: `['any']` (the default) or 1-10 role names (all ten store as any). */
   roles: skillRoles.default(['any']),
   royalty_bps: z.number().int().min(0).max(1000).default(500),
   /** When the skill joins its agent's prompt; absent or null: always. Public, unlike the prompt. */

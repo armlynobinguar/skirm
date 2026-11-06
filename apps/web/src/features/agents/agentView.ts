@@ -60,11 +60,15 @@ export const VOICE_OF_ROLE: Readonly<Record<Role, Voice>> = {
   Firefighter: 'Careful',
   Digger: 'Quiet',
   Hauler: 'Chatty',
+  Medic: 'Careful',
+  Engineer: 'Calm',
+  Saboteur: 'Cocky',
+  Courier: 'Blunt',
 };
 export const agentVoice = (a: Agent): Voice => VOICE_OF_ROLE[agentRole(a)];
 
 export interface VerbFit {
-  /** The effect class only this role can use (null: Runner and Hauler take and deliver only). */
+  /** The effect class only this role can use (null: Runner, Hauler and the newer roles gate no map verb). */
   effect: EffectClass | null;
   /** The map's themed verb for it, when the map has one. */
   verb: string | null;

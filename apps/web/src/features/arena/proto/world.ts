@@ -670,6 +670,7 @@ const VERB_ICON = {
 const ROLE_ICON = {
   Builder:'M4 4h22v22H4zM15 9v12M9 15h12', Digger:'M5 25 18 12M12 6c6-3 12 2 12 2s4 6 1 12', Firefighter:'M15 4S8 12 8 17a7 7 0 0 0 14 0c0-5-7-13-7-13z',
   Scout:'M15 15m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0M3 15s5-8 12-8 12 8 12 8-5 8-12 8-12-8-12-8z', Runner:'M6 24l6-8 5 3 4-7M18 6m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0', Hauler:'M4 10h22v14H4zM10 10V6h10v4',
+  Medic:'M12 5h6v7h7v6h-7v7h-6v-7H5v-6h7z', Engineer:'M15 15m-6 0a6 6 0 1 0 12 0a6 6 0 1 0-12 0M15 4v5M15 21v5M4 15h5M21 15h5', Saboteur:'M4 11c4-3 18-3 22 0 0 6-4 9-7 9-2 0-3-2-4-2s-2 2-4 2c-3 0-7-3-7-9zM9 13h3M18 13h3', Courier:'M17 3 7 17h7l-2 10 11-15h-7z',
 };
 const EAR_D = 'M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4';
 const EAR_PATH = typeof Path2D !== 'undefined' ? new Path2D(EAR_D) : null;

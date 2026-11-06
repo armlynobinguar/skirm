@@ -173,6 +173,15 @@ const defaults = {
     actorLineChars: 160,
   },
   /**
+   * Agent roles (skill-roles.ts AGENT_ROLES). Ranked plays the six original roles only (Builder,
+   * Digger, Firefighter, Scout, Runner, Hauler) until `rankedNewRoles` is turned on: a ranked crew
+   * with a Medic, Engineer, Saboteur or Courier is refused at queue and lock-in, and the engine
+   * refuses to create such a ranked match. Casual, practice, lobbies, campaign and puzzles play all ten.
+   */
+  roles: {
+    rankedNewRoles: false,
+  },
+  /**
    * Agent progression (progression.ts): each agent earns XP from the matches it plays to the end
    * (ranked and casual; practice against the bot and void matches give none, as for the agent's
    * record). Per match: the kind's base, plus `win` or `draw`, plus `perDelivered` per item it
