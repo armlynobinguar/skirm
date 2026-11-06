@@ -206,7 +206,7 @@ export function slotsOf(agent: FrameAgent | null, slots: number, known: boolean,
 export type FeedFilter = 'all' | 'team' | 'say' | 'heard' | 'mind';
 
 /** The tag a feed line wears. */
-export type FeedTag = 'team' | 'rteam' | 'say' | 'heard' | 'verb' | 'arena' | 'mind' | 'order';
+export type FeedTag = 'team' | 'rteam' | 'say' | 'heard' | 'verb' | 'arena' | 'mind' | 'order' | 'emote';
 
 export function feedTag(line: V2CommsLine, team: Team): FeedTag {
   if (line.channel === 'team') return line.overheard ? 'heard' : line.team === team ? 'team' : 'rteam';
@@ -221,7 +221,7 @@ export function inFilter(line: V2CommsLine, team: Team, filter: FeedFilter): boo
     case 'team':
       return tag === 'team' || tag === 'rteam' || tag === 'order';
     case 'say':
-      return tag === 'say' || tag === 'verb' || tag === 'arena';
+      return tag === 'say' || tag === 'verb' || tag === 'arena' || tag === 'emote';
     case 'heard':
       return tag === 'heard';
     case 'mind':
@@ -256,7 +256,7 @@ export function subtitlesFor(lines: V2CommsLine[], agent: FrameAgent, team: Team
     if (l.channel === 'arena') push({ kind: 'arena', who: 'Arena', team: null, text: l.text });
     else if (l.channel === 'mind') {
       if (l.from === agent.id && !rival) push({ kind: 'think', who: l.fromName, team: l.team, text: l.text });
-    } else if (l.channel === 'verb') {
+    } else if (l.channel === 'verb' || l.channel === 'emote') {
       if (l.from === agent.id) push({ kind: 'verb', who: l.fromName, team: l.team, text: l.text });
     } else if (l.from === agent.id) {
       const hidden = rival && ranked && l.channel === 'team';
@@ -276,7 +276,7 @@ export function heardBy(lines: V2CommsLine[], agent: FrameAgent, team: Team, max
   const out: V2CommsLine[] = [];
   for (let i = lines.length - 1; i >= 0 && out.length < max; i--) {
     const l = lines[i]!;
-    if (l.channel === 'verb' || l.channel === 'arena' || l.channel === 'mind') continue;
+    if (l.channel === 'verb' || l.channel === 'arena' || l.channel === 'mind' || l.channel === 'emote') continue;
     if (agent.team !== team) {
       if (l.from === agent.id) out.push(l);
     } else if (l.from !== agent.id && (l.team === agent.team || l.overheard || l.channel === 'say')) out.push(l);

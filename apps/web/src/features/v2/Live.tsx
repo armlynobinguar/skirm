@@ -21,6 +21,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/toast/ToastProvider';
 import type { ChaseCamState } from '@/features/arena/chase3d';
+import { liveEmotesOf } from '@/features/arena/emotes';
 import { composeV2Arena, liveFx, setLiveFx } from '@/features/arena/live';
 import { OVERVIEW, arenaStore } from '@/features/arena/store';
 import type { ArenaState } from '@/features/arena/world';
@@ -30,6 +31,7 @@ import { AgentCards, type CardAgent } from './hud/AgentCards';
 import { GearLegend } from './hud/Gear';
 import { CommandBar } from './hud/Commands';
 import { Comms } from './hud/Comms';
+import { TpvEmote } from './hud/TpvEmote';
 import { ControlBar, TakeControl, useHybridControl } from './hud/Control';
 import c from './hud/hud.module.css';
 import { Intro } from './hud/Intro';
@@ -121,9 +123,12 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   // Draw this frame in the arena (without subscribing: the canvas does). The 3D cam tweens from the last one.
   const prevArena = useRef<ArenaState | null>(null);
   useEffect(() => {
-    const arena = frame ? composeV2Arena(frame) : null;
+    const base = frame ? composeV2Arena(frame) : null;
+    const arena = base && frame ? { ...base, emotes: liveEmotesOf(comms, frame.tick) } : base;
     prevArena.current = arenaStore().get().live?.arena.state ?? null;
     arenaStore().setLive(arena, view.mapId);
+    // The feed changes with the frame (its emote lines ride along); comms alone never redraws.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frame, view.mapId]);
 
   // The camera: the intro's slow pull-in, third person, following an agent, or the whole board.
@@ -340,6 +345,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
         />
       ) : null}
       {watched && use3d ? <ChaseCam className={c.chase} getState={chaseState} onFail={on3dFail} /> : null}
+      {watched && use3d && watched.inSight ? <TpvEmote lines={comms} agentId={watched.agent.id} tick={tick} /> : null}
       {intro ? (
         <Intro
           mapId={view.mapId}

@@ -14,6 +14,7 @@
 import { commandLabel, mapV2 } from '@skirm/engine/v2';
 import type { PlayerTier } from '@skirm/shared';
 import { useEffect, useSyncExternalStore } from 'react';
+import { emotesOf, pendingBluffs, type EmoteKind } from '@/features/arena/emotes';
 import type { Realtime } from '@/lib/realtime/client';
 import type { Difficulty, FrameAgent, MatchResult, TalkTier, Team, V2Debrief, V2DraftBan, V2DraftSkill, V2EndReason, V2Frame, WsServerMessage } from '@/lib/realtime/protocol';
 import { useRealtime } from '@/lib/services';
@@ -49,8 +50,11 @@ export interface V2CommsLine {
   from: string;
   fromName: string;
   team: Team;
-  /** Talk (say, team), an agent's action (verb), the arena itself (supply drops), a plan change (mind), or your own live command (order). */
-  channel: 'say' | 'team' | 'verb' | 'arena' | 'mind' | 'order';
+  /**
+   * Talk (say, team), an agent's action (verb), the arena itself (supply drops), a plan change
+   * (mind), your own live command (order), or an agent's reaction (emote, arena/emotes.ts).
+   */
+  channel: 'say' | 'team' | 'verb' | 'arena' | 'mind' | 'order' | 'emote';
   text: string;
   /** A rival's team message your agents overheard. */
   overheard: boolean;
@@ -62,6 +66,11 @@ export interface V2CommsLine {
   bluff?: 'landed' | 'doubted';
   /** The target's answer to a bluff (the line after it). */
   bluffReply?: true;
+  /** The bluff's answer: the item tile the lie was about (a fooled agent finds it out later). */
+  at?: [number, number];
+  /** emote lines: which reaction, and the glyph it wears (e.g. "?!", "+2"). */
+  emote?: EmoteKind;
+  glyph?: string;
   /** mind lines: the agent's inner voice (its THINK line), not a plan change. */
   thought?: true;
   /** order lines: who the command went to ("Crew" or the agent's name). */
@@ -198,7 +207,7 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
       if (prev.watch && m.frame.view !== 'watch') return frameView(m.matchId, m.frame, now);
       if (!prev.watch && m.frame.view === 'watch') return prev;
       if (prev.frame && m.frame.tick <= prev.frame.tick) return prev;
-      const lines = linesOf(m.frame, prev.frame);
+      const lines = linesOf(m.frame, prev.frame, prev.comms);
       const said = [...ordersOf(m.frame, prev.frame), ...saidOf(m.frame)];
       return {
         ...prev,
@@ -224,9 +233,11 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
 
 /**
  * What one frame adds to the feed: its talk, the verbs, switches and supply drops it reported, and
- * a "mind" line for each of your agents whose plan changed since the last frame.
+ * a "mind" line for each of your agents whose plan changed since the last frame, then the agents'
+ * reactions (emote lines). `history` is the feed so far: a believed bluff waits in it until its
+ * target finds the item was there after all.
  */
-export function linesOf(frame: V2Frame, prev: V2Frame | null): V2CommsLine[] {
+export function linesOf(frame: V2Frame, prev: V2Frame | null, history: readonly V2CommsLine[] = []): V2CommsLine[] {
   const tick = frame.tick;
   const out: V2CommsLine[] = [...ordersOf(frame, prev), ...frame.comms.map((c) => ({ ...c, tick }))];
   const def = mapV2(frame.mapId);
@@ -250,7 +261,7 @@ export function linesOf(frame: V2Frame, prev: V2Frame | null): V2CommsLine[] {
       const lie = out.findIndex((l) => l.from === e.agent && l.channel === 'say' && !l.bluff);
       if (lie >= 0) out[lie] = { ...out[lie]!, bluff };
       const v = agent(e.victim);
-      if (v) out.splice(lie >= 0 ? lie + 1 : out.length, 0, { tick, from: v.id, fromName: v.name, team: v.team, channel: 'say', text: BLUFF_REPLY[bluff], overheard: false, bluff, bluffReply: true });
+      if (v) out.splice(lie >= 0 ? lie + 1 : out.length, 0, { tick, from: v.id, fromName: v.name, team: v.team, channel: 'say', text: BLUFF_REPLY[bluff], overheard: false, bluff, bluffReply: true, at: e.at });
     }
   }
   if (frame.view !== 'watch')
@@ -266,6 +277,9 @@ export function linesOf(frame: V2Frame, prev: V2Frame | null): V2CommsLine[] {
       if (prev?.agents.find((p) => p.id === a.id)?.thought === a.thought) continue;
       out.push({ tick, from: a.id, fromName: a.name, team: a.team, channel: 'mind', text: a.thought, overheard: false, thought: true });
     }
+  // Reactions: only agents in this frame (in sight) get one; the feed line carries its glyph.
+  for (const em of emotesOf(frame, prev, pendingBluffs(history, tick)))
+    out.push({ tick, from: em.agent, fromName: em.name, team: em.team, channel: 'emote', text: `${em.glyph} ${em.text}`, overheard: false, emote: em.kind, glyph: em.glyph });
   return out;
 }
 

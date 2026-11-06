@@ -1,6 +1,7 @@
 // Live v2 matches as the arena draws them: one crew's frame (or a spectator's whole board) on the
 // map's own arena, under soft fog, with this tick's talk as bubbles.
 import type { Team, V2Frame } from '@skirm/engine/v2';
+import type { LiveEmote } from './emotes';
 import { gearOf } from './gear';
 import { mapById, type Arena, type ArenaState } from './world';
 
@@ -22,6 +23,8 @@ export interface LiveArena {
   barks?: Record<string, LiveBark> | null;
   /** Hybrid control: the agent its player steers (ringed when the camera follows no one). */
   controlled?: string;
+  /** Reactions over agents (arena/emotes.ts), from the feed's emote lines of the last ticks. */
+  emotes?: LiveEmote[] | null;
 }
 
 /** A line an agent said this tick, drawn as a bubble over it for 2.6 s. */

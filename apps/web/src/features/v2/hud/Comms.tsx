@@ -13,7 +13,7 @@ import { Ear } from './parts';
 /** Most lines the feed shows (the prototype keeps 70). */
 const SHOWN = 70;
 
-const LABEL: Record<Exclude<FeedTag, 'heard'>, string> = { team: 'Team', rteam: 'Team', say: 'Say', verb: 'Verb', arena: 'Arena', mind: 'Plan', order: 'Order' };
+const LABEL: Record<Exclude<FeedTag, 'heard'>, string> = { team: 'Team', rteam: 'Team', say: 'Say', verb: 'Verb', arena: 'Arena', mind: 'Plan', order: 'Order', emote: 'React' };
 
 const FILTERS: SegmentedOption<FeedFilter>[] = [
   { value: 'all', label: 'All' },
