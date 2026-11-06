@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds the five skirm contracts to wasm in target/wasm32-unknown-unknown/release/.
+# Builds the seven skirm contracts (skills, market, registry, deposits, seasons, badges, backing)
+# to wasm in target/wasm32-unknown-unknown/release/.
 #
 # near-sdk needs `std`, which the wasm32v1-none target does not have, so this builds for
 # wasm32-unknown-unknown and rebuilds std with `-C target-cpu=mvp` (no post-MVP wasm features

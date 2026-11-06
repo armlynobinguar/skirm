@@ -23,8 +23,9 @@ nothing is played:
 - A trial ends `needs_model` with no results and does not count against the buyer's three.
 - The worker logs `benchmark needs a model: set LLM_API_KEY` (or `trial needs a model`).
 
-The local stack and `deploy.yml` run greedy (`V2_BRAIN=greedy`), so every benchmark there is
-`needs_model`. The real gauntlet runs only when the worker boots a model brain: `LLM_API_KEY` (or
+The local stack runs greedy (`V2_BRAIN=greedy` in `docker-compose.yml` unless `.env` sets
+`V2_BRAIN=model`), so every benchmark there is `needs_model`. `deploy.yml` sets `V2_BRAIN=model`, so
+staging runs the gauntlet when its model key secret is set and is `needs_model` without it. The real gauntlet runs only when the worker boots a model brain: `LLM_API_KEY` (or
 `OPENROUTER_API_KEY`) set and `V2_BRAIN` not `greedy` (`LLM_MODEL` on `LLM_BASE_URL`, by default
 `anthropic/claude-haiku-5.5` on OpenRouter; one call per agent per tick, the crew plan every
 `V2_REPLAN_EVERY` = 25 ticks with `LLM_PLANNER_MODEL`). Scores are comparable only between runs on

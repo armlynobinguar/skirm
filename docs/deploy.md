@@ -2,7 +2,7 @@
 
 ## Local (one command)
 
-Needs Docker with Compose v2, plus Node 20+ and `npm ci` at the repo root for the smoke script.
+Needs Docker with Compose 2.24 or newer (the optional `.env` uses `env_file` `path`/`required`), plus Node 20+ and `npm ci` at the repo root for the smoke script.
 
 ```sh
 V2_TICK_MS=200 docker compose up --build   # or -d to run in the background; drop V2_TICK_MS for 2 s ticks
@@ -17,7 +17,7 @@ npm ci && scripts/smoke.sh                 # in a second shell, once web answers
 - Defaults are `V2_BRAIN=greedy` (the offline greedy brain: no model calls, no spend, practice is free) and `AUTH_MODE=dev`, so sign in with the `x-dev-user: <handle>` header. Override them from the shell (`V2_BRAIN=model docker compose up`, which also needs `LLM_API_KEY`) or from a `.env` file. `LLM_BASE_URL` and `LLM_MODEL` pick any OpenAI-compatible provider and model (`.env.example`; default OpenRouter and `anthropic/claude-haiku-5.5`); a local Ollama on the host is `LLM_BASE_URL=http://host.docker.internal:11434/v1` with `V2_BRAIN=model` and no key. `V2_TICK_MS` sets the tick (default 2000 ms, at least 50). Model keys, Privy and NEAR settings also come from `.env`. Compose always sets `DATABASE_URL` and `REDIS_URL` itself.
 - There are no replay files: a match's log and its hash are on its `v2_matches` row, and its frames stay in Redis for 6 hours for replays.
 - The browser talks to api and realtime directly. `web` is built with `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL` from `PUBLIC_API_URL` / `PUBLIC_WS_URL` (defaults `http://localhost:4000`, `ws://localhost:4001/ws`), because Next inlines `NEXT_PUBLIC_*` at build time, and api allows CORS from `CORS_ORIGINS` (default `http://localhost:3000,http://127.0.0.1:3000`). To serve on another host or port, set all three and rebuild web: `PUBLIC_API_URL=http://myhost:4000 PUBLIC_WS_URL=ws://myhost:4001/ws CORS_ORIGINS=http://myhost:3000 docker compose up --build`.
-- `scripts/smoke.sh` is the end-to-end check. It first checks the web app (`GET /` serves the sign-in screen and the bundle names `API_URL`; `WEB_BROWSER=1` adds a headless Chromium sign-in that sees 60 free credits and the Practice tile), then health, dev sign-in and the new-account defaults, a practice match against the greedy bot over WebSocket (`scripts/ws-v2.cjs`) that ends with a log hash, the stored match and its messages, credits unchanged, and a two-client ranked match with Elo ±16 and both players in the current season. `API_URL`, `WS_URL` and `WEB_URL` point it at another stack, `SKIP_WEB=1` skips the web checks, and `SKIP_PVP=1` skips the ranked match. It prints PASS/FAIL per check and exits non-zero on any failure.
+- `scripts/smoke.sh` is the end-to-end check. It first checks the web app (`GET /` serves the sign-in screen and the bundle names `API_URL`; `WEB_BROWSER=1` adds a headless Chromium sign-in that sees 60 free credits and the Practice tile), then health, dev sign-in and the new-account defaults, a practice match against the greedy bot over WebSocket (`scripts/ws-v2.cjs`) that ends with a log hash, the stored match and its messages, credits unchanged, and a two-client ranked match with Elo ±24 (placement K-factor) and both players in the current season. `API_URL`, `WS_URL` and `WEB_URL` point it at another stack, `SKIP_WEB=1` skips the web checks, and `SKIP_PVP=1` skips the ranked match. It prints PASS/FAIL per check and exits non-zero on any failure.
 - Clean up afterwards. The disk has filled before.
 
   ```sh
@@ -27,9 +27,9 @@ npm ci && scripts/smoke.sh                 # in a second shell, once web answers
 
 One image recipe covers every service: `docker/node.Dockerfile` with `--build-arg APP=api|worker|realtime|migrate|web`. The web image is Next's standalone server (`next build` with `NEXT_OUTPUT=standalone`, `node apps/web/server.js` on port 3000); its build args are `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL` and `NEXT_PUBLIC_AUTH_MODE`. If npm fails with `SELF_SIGNED_CERT_IN_CHAIN` behind a TLS-intercepting proxy, build with `docker build --secret id=npm_ca,src=<ca bundle> …`. Compose can't pass that secret without extra build permissions.
 
-CI (`.github/workflows/ci.yml`) runs on pushes to `main` (merges included) and by hand from the Actions tab, not on PR branches. It has one job: contracts (`cargo test` and `contracts/build.sh`, stable Rust + `rust-src`).
+CI (`.github/workflows/ci.yml`) runs on pushes to `main` (merges included) and by hand from the Actions tab, not on PR branches. It has two jobs: `app` (`npm ci`, `npm run typecheck`, `npm test`; the Postgres and Redis suites skip without `TEST_DATABASE_URL` / `TEST_REDIS_URL`) and `contracts` (`cargo test` and `contracts/build.sh`, stable Rust + `rust-src`).
 
-Everything else runs on developers' machines: typecheck and unit tests in the pre-push hook (`.githooks/pre-push`), and by hand the Postgres/Redis tests (`TEST_DATABASE_URL`, `TEST_REDIS_URL`), web e2e (Playwright against `apps/web/scripts/dev-backend.sh`) and the full stack smoke (`npm run smoke`; README, "Full stack smoke" says when).
+Before a push, typecheck and unit tests also run in the pre-push hook (`.githooks/pre-push`). Everything else runs on developers' machines, by hand: the Postgres/Redis tests (`TEST_DATABASE_URL`, `TEST_REDIS_URL`), web e2e (Playwright against `apps/web/scripts/dev-backend.sh`) and the full stack smoke (`npm run smoke`; README, "Full stack smoke" says when).
 
 `.github/workflows/deploy.yml` redeploys staging (see "Deploy from CI" below).
 
@@ -51,7 +51,7 @@ The layout follows System Architecture, everything in `us-central1`. One project
 | Postgres | Cloud SQL for PostgreSQL 16 `skirm-pg-<env>` | db-f1-micro, 10 GiB SSD, private IP |
 | Redis | Memorystore for Redis `skirm-redis-<env>` | Basic, 1 GiB, `maxmemory-policy=noeviction` (BullMQ) |
 | Maps | Cloud Storage | bucket `<project>-<env>-maps` (for later; maps are bundled) |
-| Secrets | Secret Manager | `<env>-database-url`, `<env>-privy-verification-key`; optional `<env>-llm-api-key` (the model brain's `LLM_API_KEY`; the older `<env>-openrouter-api-key` still works as `OPENROUTER_API_KEY`), `<env>-bench-secret` (worker: keys the hidden benchmark picks), `<env>-near-ops-key`, `<env>-ops-token` (api only, turns on `GET /ops/stats` for the skirm-ops dashboard) |
+| Secrets | Secret Manager | `<env>-database-url`, `<env>-privy-verification-key`; optional `<env>-llm-api-key` (the model brain's `LLM_API_KEY`; the older `<env>-openrouter-api-key` still works as `OPENROUTER_API_KEY`), `<env>-bench-secret` (worker: keys the hidden benchmark picks), `<env>-near-ops-key`, `<env>-ops-token` (api only, turns on `GET /ops/stats` for the skirm-ops dashboard), `<env>-relayer-private-key` (api only: the gasless relayer's `RELAYER_PRIVATE_KEY`; needs the `RELAYER_ACCOUNT_ID` variable, and the deploy stops if only one of the two is set; [gasless.md](gasless.md)) |
 | Skill vault key | Cloud KMS | key ring `skill-vault`, key `skill-prompt-kek-<env>` (`SKILL_KEK_KMS`) |
 | Images | Artifact Registry | repo `skirm`, tagged with the commit |
 | Runtime identity | service account `skirm-run-<env>` | reads only `<env>-*` secrets |
@@ -63,7 +63,7 @@ Postgres and Redis have no public endpoint. The Cloud Run pieces reach them thro
 - A GCP project with billing, and a deployer service account with Owner on it. Don't use the Compute Engine default service account: it only has Editor, which can't set IAM policies, read secrets, use KMS keys or create the VPC peering.
 - An API key for an OpenAI-compatible model provider (default: OpenRouter with `anthropic/claude-haiku-5.5`). Without it every match plays the offline greedy brain and benchmarks and trials end `needs_model`; `scripts/deploy-gcp.sh` sets `V2_BRAIN=model` when `<env>-llm-api-key` (or the older `<env>-openrouter-api-key`) exists, `greedy` otherwise. Another provider or model: set the `LLM_BASE_URL`, `LLM_MODEL` (and optionally `LLM_PLANNER_MODEL`, `LLM_PRICE_INPUT_USD`, `LLM_PRICE_OUTPUT_USD`) repository variables, which `deploy.yml` passes to the script; unset keeps the defaults.
 - The Privy app id and its **verification key** (Privy dashboard → Basics → API keys → "Verify with key instead"; a `-----BEGIN PUBLIC KEY-----` PEM, not the `privy_app_secret_…`). Add the web URL to Privy's allowed domains (Basics → Domains and clients). Never run a deployed environment with `AUTH_MODE=dev`: dev mode trusts any `x-dev-user` header.
-- NEAR testnet accounts, with the contracts deployed (`contracts/README.md`, seasons included) and the `ops` function-call key (`NEAR_OPS_ACCOUNT`, `<env>-near-ops-key`). Without them the Noop adapters record ranked results as `local` and season pools read `local`.
+- NEAR testnet accounts, with the contracts deployed (`contracts/README.md`, seasons included) and the `ops` account's key (`NEAR_OPS_ACCOUNT`, `<env>-near-ops-key`; a full-access key, see `contracts/README.md`). Without them the Noop adapters record ranked results as `local` and season pools read `local`.
 
 ### Match logs and the skill vault key
 
@@ -133,7 +133,8 @@ gcloud secrets create $ENV-database-url --data-file=dburl
 shred -u pgpw dburl
 
 gcloud secrets create $ENV-privy-verification-key --data-file=privy-es256.pub.pem
-# Optional: $ENV-llm-api-key (or the older $ENV-openrouter-api-key), $ENV-bench-secret (openssl rand -hex 32), $ENV-near-ops-key, $ENV-ops-token
+# Optional: $ENV-llm-api-key (or the older $ENV-openrouter-api-key), $ENV-bench-secret (openssl rand -hex 32), $ENV-near-ops-key, $ENV-ops-token,
+# $ENV-relayer-private-key (api only). The runtime account's secretAccessor binding above covers every $ENV- secret.
 ```
 
 ### Each deploy
@@ -144,10 +145,12 @@ PROJECT=<project id> PRIVY_APP_ID=<app id> scripts/deploy-gcp.sh      # ENV=stag
 
 `scripts/deploy-gcp.sh` first works out what changed: each piece is compared with the commit its running image was built from (the image tag), and only pieces whose inputs differ are built and deployed (`SERVICES=all` deploys everything, `SERVICES=web,api` exactly those; the script header lists the inputs). A change to the lockfile, the Dockerfile, the script or `deploy.yml` redeploys everything; a change under `apps/web` or `packages/ui` deploys only web. It then builds missing images for the current commit on Cloud Build (`docker/cloudbuild.yaml` for migrate/api/worker/realtime, `docker/cloudbuild.web.yaml` for `web-<env>` with the environment's URLs and Privy app id), then deploys with `V2_BRAIN` and `SKILL_KEK_KMS` (no volume, no `SKILL_KEK`) in the System Architecture order: the `migrate-<env>` job, `api-<env>`, `worker-<env>`, `web-<env>`, and `realtime-<env>` last, because a new realtime revision ends live matches. Don't deploy during demo windows. It ends with `curl $API_URL/health`, which should return `{"ok":true}`.
 
+Env vars and secrets are merged into each service (`--update-env-vars`, `--update-secrets`), not replaced, so a value set by hand on a service survives a deploy. The flip side: unsetting a variable (or deleting a repository variable) does not remove it from the service. Remove it once by hand, for example `gcloud run services update api-staging --region=us-central1 --remove-env-vars=LLM_MODEL` (and the same on the other services that have it).
+
 Notes:
 - `gcloud run worker-pools` uses gRPC. `scripts/deploy-gcp.sh` falls back to the REST API by itself. From an environment whose proxy only passes HTTPS/1.1 (Claude Code cloud sessions), create or update the worker pool with the Cloud Run v2 REST API instead (`POST https://run.googleapis.com/v2/projects/$P/locations/$R/workerPools?workerPoolId=worker-$ENV`, same env, secrets and `vpcAccess` as `api-<env>`, `scaling.manualInstanceCount: 1`).
 - A proxy that attaches a GCP token to `*.run.app` requests gets `401 invalid_token` from the public services. Don't scope the GCP credential to `*.run.app`.
-- All three backend services get the full secret set for simplicity. To follow the trust table in System Architecture exactly, drop the model key (`LLM_API_KEY` / `OPENROUTER_API_KEY`; the api then casts replays with the template caster) and `BENCH_SECRET` from `api` and the Privy key from `worker`.
+- All three backend services get the shared secret set for simplicity; `<env>-ops-token` and `<env>-relayer-private-key` go to the api only. To follow the trust table in System Architecture exactly, drop the model key (`LLM_API_KEY` / `OPENROUTER_API_KEY`; the api then casts replays with the template caster) and `BENCH_SECRET` from `api` and the Privy key from `worker`.
 - `api`, `realtime` and `web` are public (`--allow-unauthenticated`), because the app does its own auth with Privy. `worker` and `migrate` have no endpoint.
 - `scripts/smoke.sh` needs `AUTH_MODE=dev`, so it runs against local or a throwaway dev-auth stack only, never a deployed environment.
 - Map files load from the bundled `spec/maps`. The `maps` bucket is for later.
@@ -181,7 +184,9 @@ gcloud iam service-accounts add-iam-policy-binding $SA --role=roles/iam.workload
   --member="principalSet://iam.googleapis.com/projects/$NUM/locations/global/workloadIdentityPools/github/attribute.repository/TyronVT/skirm"
 ```
 
-Repository variables (Settings → Secrets and variables → Actions → Variables; none are secret): `GCP_PROJECT`, `GCP_WIF_PROVIDER` (`projects/<number>/locations/global/workloadIdentityPools/github/providers/skirm`), `GCP_DEPLOY_SA` and `PRIVY_APP_ID`. For the custom domain, also `PUBLIC_API_URL` (`https://api.playskirm.xyz`), `PUBLIC_WS_URL` (`wss://rt.playskirm.xyz/ws`) and `CORS_ORIGINS` (`https://playskirm.xyz,<web run.app URL>`); without them the deploy points web at the run.app URLs and the api refuses the custom domain's origin. Run `scripts/deploy-gcp.sh` by hand with the same three variables.
+Repository variables (Settings → Secrets and variables → Actions → Variables; none are secret): `GCP_PROJECT`, `GCP_WIF_PROVIDER` (`projects/<number>/locations/global/workloadIdentityPools/github/providers/skirm`), `GCP_DEPLOY_SA` and `PRIVY_APP_ID`. Optional: `NEAR_OPS_ACCOUNT` (the platform signer; read only when the `<env>-near-ops-key` secret exists) and the model settings `LLM_BASE_URL`, `LLM_MODEL`, `LLM_PLANNER_MODEL`, `LLM_PRICE_INPUT_USD` and `LLM_PRICE_OUTPUT_USD` (unset: OpenRouter and its default model; the deploy sets `V2_BRAIN=model`, and without the `<env>-llm-api-key` or `<env>-openrouter-api-key` secret every agent plays the greedy brain). For the custom domain, also `PUBLIC_API_URL` (`https://api.playskirm.xyz`), `PUBLIC_WS_URL` (`wss://rt.playskirm.xyz/ws`) and `CORS_ORIGINS` (`https://playskirm.xyz,<web run.app URL>`); without them the deploy points web at the run.app URLs and the api refuses the custom domain's origin. Run `scripts/deploy-gcp.sh` by hand with the same three variables. Also optional, passed to the services only when set: `LLM_MODELS` (the per-agent model catalog, JSON; [economy.md](economy.md)), `BACKING_CONTRACT` (empty keeps writer backing off on staging), `NEAR_RENTALS_ONCHAIN`, `RELAYER_ACCOUNT_ID` and `RELAYER_FREE_TXS` (gasless onboarding, with the `<env>-relayer-private-key` secret), and `SAMPLE_MATCH_ID`, which is baked into the web image as `NEXT_PUBLIC_SAMPLE_MATCH_ID` (the ranked, recorded match behind `/verify`'s "Try a sample match"; empty hides the button). No value may contain `@`.
+
+After changing a variable or a secret, run the deploy workflow by hand with `services=all`: the default `services=auto` redeploys only the pieces whose files changed, so a new value would wait for the next commit that touches each service (the web image built for a commit is reused, so a new `SAMPLE_MATCH_ID` lands with the next commit deployed with `services=web` or `all`).
 
 ## Backups and restore
 

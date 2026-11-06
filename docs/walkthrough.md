@@ -13,7 +13,7 @@ The `data-testid` values in brackets are stable selectors for agents driving a b
 3. **See:**
    - Home (the Command deck) at `/play` [`screen-s02`, `s02-deck`], with your handle on the account badge in the top bar [`account-badge`]; click it to open the account card [`topbar-account`].
    - Credits **0** and **60 free** [`topbar-credits`, `topbar-allowance`].
-   - Six tiles: **Skirmish** (ranked) [`s02-tile-ranked`], **Map atlas** [`s02-tile-atlas`], **Crew** [`s02-tile-crew`], **Skills** (the Exchange) [`s02-tile-skills`], **Ladder** [`s02-tile-ladder`] and **Practice · Vs Greedy bot** [`s02-tile-practice`].
+   - Seven tiles: **Skirmish** (ranked) [`s02-tile-ranked`], **Map atlas** [`s02-tile-atlas`], **Crew** [`s02-tile-crew`], **Skills** (the Exchange) [`s02-tile-skills`], **Ladder** [`s02-tile-ladder`], **Practice · Vs Greedy bot** [`s02-tile-practice`] and **Daily** (today's seed) [`s02-tile-daily`].
 
 Every new account starts with the same crew: **Rook**, **Wren** and **Moss**, each with a role, vision 3, comms 3 and the Standard talk tier. Rook carries the account-bound starter skill **Flood Warden**. Your own Elo starts at 1,200.
 
@@ -143,4 +143,4 @@ It prints PASS or FAIL per check:
 3. Practice vs Greedy bot over WebSocket: found, accepted, locked in, `v2_end` with a log hash.
 4. The stored match: ended, practice, the same log hash, no Elo, no registry write; its messages.
 5. Credits unchanged: practice is free on the greedy brain.
-6. Two clients play a ranked match: Elo ±16 and both players in `/seasons/current`.
+6. Two clients play a ranked match: Elo ±24 (placement K-factor; 0 on a draw) and both players in `/seasons/current`.
