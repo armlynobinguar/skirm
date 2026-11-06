@@ -1,5 +1,6 @@
 'use client';
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { cx } from '../util';
 import { Icon } from './Icon';
 
@@ -27,7 +28,8 @@ function focusables(root: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Escape and a scrim click close it. Focus moves in on open, Tab and Shift+Tab cycle inside the
+ * Rendered into document.body (a portal), so it always covers the whole viewport. Escape and a
+ * scrim click close it. Focus moves in on open, Tab and Shift+Tab cycle inside the
  * dialog (focus that escapes is pulled back), and focus returns to the opener on close.
  */
 export function Modal({ open, title, children, footer, onClose, size = 'md', inline, initialFocus }: ModalProps): React.ReactElement | null {
@@ -81,7 +83,7 @@ export function Modal({ open, title, children, footer, onClose, size = 'md', inl
   }, [open, inline]);
 
   if (!open) return null;
-  return (
+  const dialog = (
     <div
       className={cx('sk-scrim', inline && 'is-inline')}
       onMouseDown={(e) => {
@@ -111,4 +113,8 @@ export function Modal({ open, title, children, footer, onClose, size = 'md', inl
       </div>
     </div>
   );
+  // On top of the page, outside the screen that opened it: a parent with a transform, filter,
+  // backdrop-filter or clip-path would otherwise become the fixed scrim's box and clip the dialog
+  // (the Customize dialog cut off inside the agents card, the buy dialog inside the skill drawer).
+  return inline || typeof document === 'undefined' ? dialog : createPortal(dialog, document.body);
 }
