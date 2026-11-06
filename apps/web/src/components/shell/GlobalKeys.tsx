@@ -15,6 +15,7 @@ import { screenOf } from '@/lib/routes';
 import { useSfx } from '@/lib/sfx';
 import { notesStore } from './notes';
 import { matchBack } from '@/lib/match-origin';
+import { config } from '@/lib/config';
 
 /** Escape layers, handled first to last: the first active one takes the key. */
 export const ESCAPE_LAYERS = ['takeover', 'intro', 'tpv'] as const;
@@ -110,7 +111,7 @@ export function GlobalKeys() {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
       if (isTypingTarget(e.target)) return;
-      if (e.key === 'n' || e.key === 'N') {
+      if (config.designNotes && (e.key === 'n' || e.key === 'N')) {
         if (e.repeat) return;
         notesStore.toggle();
         sfx.play('click');

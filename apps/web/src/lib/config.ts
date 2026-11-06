@@ -6,6 +6,8 @@ export type AuthMode = 'dev' | 'privy';
 export interface WebConfig {
   /** Public origin of this site, no trailing slash: canonical URLs, Open Graph, sitemap, robots. */
   siteUrl: string;
+  /** Show the internal design notes (top bar Notes, N key); off in production builds by default. */
+  designNotes: boolean;
   /** REST base URL of apps/api, no trailing slash. */
   apiUrl: string;
   /** WebSocket URL of apps/realtime (path /ws). */
@@ -38,6 +40,8 @@ const trimSlash = (s: string) => s.replace(/\/+$/, '');
 
 export const config: WebConfig = {
   siteUrl: trimSlash(process.env.NEXT_PUBLIC_SITE_URL || 'https://playskirm.xyz'),
+  /** The design notes (top bar Notes, N): internal notes for the team, so off in production builds unless NEXT_PUBLIC_DESIGN_NOTES=1. */
+  designNotes: process.env.NEXT_PUBLIC_DESIGN_NOTES === '1' || process.env.NODE_ENV !== 'production',
   apiUrl: trimSlash(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'),
   wsUrl: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4001/ws',
   authMode: process.env.NEXT_PUBLIC_AUTH_MODE === 'privy' ? 'privy' : 'dev',

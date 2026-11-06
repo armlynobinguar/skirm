@@ -2,14 +2,14 @@
 // v2 match, ended: the debrief (the prototype's s-result). Left: map line, verdict, score, the goal
 // and star checks, Queue again. Right: the match report: Elo change and MVP, the difficulty goal,
 // talk, verbs, credits held / used / returned, draft bans (draft mode), the registry write and the
-// match log hash. Bluff stats and season points are designed but not live, so they show "Soon", never a number. Under
+// match log hash. Rows with no data yet (bluff stats on older reports, checks the engine cannot judge) are left out. Under
 // both, the Comms transcript: every line said that this tab saw delivered. A spectator gets the
 // result by crew ("ada wins"), no stars and no report of their own; practice carries its badge and
 // queues practice again. Last, a player's decision timeline (Decisions: "why did it do that?").
 //   Ended          → on the match screen (a void match, or after the banner when the route did not move).
 //   V2ResultScreen → /matches/[id]/result: this tab's v2 store, else GET /v2/matches/:id.
 import { DIFF_MODS, TICK_MS, mapV2 } from '@skirm/engine/v2';
-import { Button, Soon, fmt } from '@skirm/ui';
+import { Button, fmt } from '@skirm/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ButtonLink } from '@/components/ButtonLink';
@@ -132,7 +132,10 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
   const d = data.debrief;
   const mvp = d ? mvpOf(d) : null;
   const [goal, ...checks] = d?.goals ?? [];
-  const stars = watch ? [] : d ? [...(goal ? [{ ...goal, title: `Goal · ${goal.title}` }] : []), ...checks] : [{ title: 'Won the match', met: win, available: true }];
+  // A check the engine cannot judge yet (available: false) is left out, never shown as a placeholder.
+  const stars = (watch ? [] : d ? [...(goal ? [{ ...goal, title: `Goal · ${goal.title}` }] : []), ...checks] : [{ title: 'Won the match', met: win, available: true }]).filter(
+    (s) => s.available !== false,
+  );
   const verbs = d ? d.agents.reduce((s, a) => s + a.used, 0) : 0;
   const back = origin ? originLink(origin) : null;
   const again = back
@@ -171,7 +174,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
               <li key={s.title} data-got={(s.available !== false && s.met) || undefined} style={{ '--sd': `${600 + i * 220}ms` } as CSSProperties}>
                 <i aria-hidden="true" />
                 {s.title}
-                {s.available === false ? <Soon what={`${s.title} check`} /> : <span className="sk-sr-only">{s.met ? ' · earned' : ' · missed'}</span>}
+                <span className="sk-sr-only">{s.met ? ' · earned' : ' · missed'}</span>
               </li>
             ))}
           </ul>
@@ -190,7 +193,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
             </ButtonLink>
           ) : null}
           <ButtonLink href={routes.market()}>Exchange</ButtonLink>
-          <ButtonLink href={routes.home()}>Command</ButtonLink>
+          <ButtonLink href={routes.home()}>Play</ButtonLink>
         </div>
       </div>
       <section className={`sk-panel ${v.tally}`} aria-label="Match report" data-testid="v2-tally">
@@ -211,16 +214,12 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
         </div>
         {d ? (
           <>
-            {goal ? (
+            {goal && goal.available !== false ? (
               <Row label={`${D.name} goal · ${goal.title}`}>
-                {goal.available === false ? (
-                  <Soon what="This goal's check" />
-                ) : (
-                  <b style={{ color: goal.met ? 'var(--you)' : 'var(--rival)' }}>
-                    {goal.met ? 'Complete' : 'Missed'}
-                    {goal.progress ? ` · ${goal.progress}` : ''}
-                  </b>
-                )}
+                <b style={{ color: goal.met ? 'var(--you)' : 'var(--rival)' }}>
+                  {goal.met ? 'Complete' : 'Missed'}
+                  {goal.progress ? ` · ${goal.progress}` : ''}
+                </b>
               </Row>
             ) : null}
             <Row label="Messages sent">
@@ -229,24 +228,20 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
             <Row label="Rival team chat your agents overheard">
               <b>{fmt(d.talk.overheard)}</b>
             </Row>
-            <Row label="Bluffs told · believed by the rival">
-              {d.bluffs ? (
-                <b>
-                  {fmt(d.bluffs.told)} · {fmt(d.bluffs.believed)}
-                </b>
-              ) : (
-                <Soon what="Bluff stats" />
-              )}
-            </Row>
-            <Row label="Rival bluffs · your agents saw through">
-              {d.bluffs ? (
-                <b>
-                  {fmt(d.bluffs.heard)} · {fmt(d.bluffs.seenThrough)}
-                </b>
-              ) : (
-                <Soon what="Bluff stats" />
-              )}
-            </Row>
+            {d.bluffs ? (
+              <>
+                <Row label="Bluffs told · believed by the rival">
+                  <b>
+                    {fmt(d.bluffs.told)} · {fmt(d.bluffs.believed)}
+                  </b>
+                </Row>
+                <Row label="Rival bluffs · your agents saw through">
+                  <b>
+                    {fmt(d.bluffs.heard)} · {fmt(d.bluffs.seenThrough)}
+                  </b>
+                </Row>
+              </>
+            ) : null}
             <Row label="Themed verbs used">
               <b>{fmt(verbs)}</b>
             </Row>
@@ -264,11 +259,9 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
             <b style={{ color: 'var(--amber)' }} data-testid="v2-season-points">
               +{fmt(d.season.points)} · Season {d.season.number}
             </b>
-          ) : !d ? (
+          ) : !d || data.ranked ? (
+            // No report, or a ranked result stored before the points were recorded on it.
             <b>—</b>
-          ) : data.ranked ? (
-            // A ranked result stored before the points were recorded on the report.
-            <Soon what="Season points" />
           ) : (
             <b data-testid="v2-season-points">Ranked only</b>
           )}

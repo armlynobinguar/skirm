@@ -137,6 +137,14 @@ describe('S11 Skirmish hub', () => {
     expect(await within(screen.getByTestId('s11-ladder')).findByText(/No ranked matches this season yet/)).toBeInTheDocument();
   });
 
+  it('links to private lobbies, tournaments and match verification from the hub', async () => {
+    setup();
+    await ready();
+    expect(screen.getByTestId('s11-more-lobbies')).toHaveAttribute('href', '/lobbies');
+    expect(screen.getByTestId('s11-more-tournaments')).toHaveAttribute('href', '/tournaments');
+    expect(screen.getByTestId('s11-more-verify')).toHaveAttribute('href', '/verify');
+  });
+
   it('shows an error card with Retry when the season fails', async () => {
     const { api, user } = setup({ api: { currentSeason: async () => Promise.reject(new Error('boom')) } });
     await ready();

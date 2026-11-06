@@ -29,14 +29,14 @@ describe('TopBar', () => {
     expect(within(dock).queryByTestId('account-badge')).not.toBeInTheDocument();
     expect(within(dock).queryByTestId('topbar-credits')).not.toBeInTheDocument();
     expect(within(bar).getByTestId('nav-leaderboards')).toHaveAttribute('aria-current', 'page');
-    expect(within(bar).getByTestId('topbar-crumb')).toHaveTextContent('/ Ladder');
+    expect(within(bar).getByTestId('topbar-crumb')).toHaveTextContent('/ Leaderboards');
     expect(within(bar).getByTestId('topbar-back')).toBeInTheDocument();
   });
 
   it('has no Back on the Command deck and toggles sound effects', async () => {
     const { user } = renderWithProviders(<AppShell>hi</AppShell>, { path: '/play' });
     expect(screen.queryByTestId('topbar-back')).not.toBeInTheDocument();
-    expect(screen.getByTestId('topbar-crumb')).toHaveTextContent('/ Command');
+    expect(screen.getByTestId('topbar-crumb')).toHaveTextContent('/ Play');
     const sfx = screen.getByTestId('topbar-sfx');
     expect(sfx).toHaveAttribute('aria-pressed', 'true');
     await user.click(sfx);

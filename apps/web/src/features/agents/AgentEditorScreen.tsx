@@ -14,13 +14,13 @@
 //   rent out       offer the agent to other players at a price per match (./RentOut.tsx)
 //   record         this season's record (all time when no season is open) from GET /agents/:id/record:
 //                  win rate, matches, deliveries per match, bluffs landed of told and rival bluffs seen
-//                  through; the agent's own counters with "Soon" until it loads or if it fails
+//                  through; the agent's own counters until it loads or if it fails
 //   progression    level, XP bar and traits under the record, with the trait picker when a pick is
 //                  earned (./Progression.tsx, POST /agents/:id/traits)
 // `map` / `d` name the crew screen it was opened from, for "Back to crew".
 import { isDifficulty, type Difficulty, type TalkTier } from '@skirm/engine/v2';
 import { skillRolesLabel } from '@skirm/shared';
-import { DisplayHeading, Pips, Soon, fmt } from '@skirm/ui';
+import { DisplayHeading, Pips, fmt } from '@skirm/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
@@ -358,11 +358,7 @@ function AgentEditor({
           <div className={e.recHead}>
             <span className={e.kick}>
               Record <i aria-hidden="true">▸▸</i>{' '}
-              {rec ? (
-                <span data-testid="agent-record-span">{record.data?.season ? `Season ${record.data.season.number}` : 'All time'}</span>
-              ) : (
-                <Soon what="Season record" />
-              )}
+              {rec ? <span data-testid="agent-record-span">{record.data?.season ? `Season ${record.data.season.number}` : 'All time'}</span> : null}
             </span>
             <b>{winPct === null ? 'No matches yet' : `${winPct}% wins`}</b>
           </div>
@@ -401,12 +397,6 @@ function AgentEditor({
                 <small>W–L–D</small>
                 <b>
                   {agent.wins}–{agent.losses}–{agent.draws}
-                </b>
-              </span>
-              <span>
-                <small>Bluffs</small>
-                <b>
-                  <Soon what="Bluff stats" />
                 </b>
               </span>
             </div>

@@ -84,7 +84,7 @@ export interface ScreenLabel {
 }
 
 const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: string | null }[] = [
-  { re: /^\/play\/?$/, key: 'home', title: 'Command', sub: '// home', back: null },
+  { re: /^\/play\/?$/, key: 'home', title: 'Play', sub: '// home', back: null },
   { re: /^\/maps\/[^/]+\/crew\/?$/, key: 'crew', title: 'Lock in', sub: '// crew + talk', back: routes.home() },
   { re: /^\/maps\/editor\/?$/, key: 'map-editor', title: 'Map editor', sub: '// community maps', back: '/maps?tab=community' },
   { re: /^\/tutorial\/?$/, key: 'tutorial', title: 'Tutorial', sub: '// first match', back: routes.home() },
@@ -94,7 +94,7 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/puzzles\/[^/]+\/?$/, key: 'puzzle', title: 'Puzzle', sub: '// fewest ticks', back: routes.puzzles() },
   { re: /^\/agents(\/|$)/, key: 'agent', title: 'Agent', sub: '// prompt + stats', back: routes.home() },
   { re: /^\/maps(\/|$)/, key: 'maps', title: 'Atlas', sub: '// maps', back: routes.home() },
-  { re: /^\/pvp(\/|$)/, key: 'pvp', title: 'Skirmish', sub: '// ranked', back: routes.home() },
+  { re: /^\/pvp(\/|$)/, key: 'pvp', title: 'PvP', sub: '// ranked', back: routes.home() },
   { re: /^\/lobbies\/?$/, key: 'lobbies', title: 'Lobbies', sub: '// private matches', back: routes.pvp() },
   { re: /^\/lobbies\//, key: 'lobby', title: 'Lobby', sub: '// friend challenge', back: routes.lobbies() },
   { re: /^\/tournaments\/?$/, key: 'tournaments', title: 'Tournaments', sub: '// brackets', back: routes.pvp() },
@@ -103,7 +103,7 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/verify\/?$/, key: 'verify', title: 'Verify', sub: '// match vs NEAR', back: routes.pvp() },
   { re: /^\/matches\/[^/]+\/result\/?$/, key: 'match-result', title: 'Debrief', sub: '// replay hash on NEAR', back: routes.pvp() },
   { re: /^\/matches(\/|$)/, key: 'match', title: 'Live', sub: '// 2 s ticks', back: routes.pvp() },
-  { re: /^\/leaderboards(\/|$)/, key: 'ladder', title: 'Ladder', sub: '// season', back: routes.home() },
+  { re: /^\/leaderboards(\/|$)/, key: 'ladder', title: 'Leaderboards', sub: '// season', back: routes.home() },
   { re: /^\/terms\/?$/, key: 'terms', title: 'Terms', sub: '// the rules', back: routes.home() },
   { re: /^\/privacy\/?$/, key: 'privacy', title: 'Privacy', sub: '// your data', back: routes.home() },
   { re: /^\/market(\/|$)/, key: 'market', title: 'Exchange', sub: '// proof first', back: routes.home() },

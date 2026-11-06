@@ -113,8 +113,8 @@ describe('agent editor', () => {
     expect(screen.getByTestId('agent-skill')).toHaveTextContent('yours');
     const record = screen.getByTestId('agent-record');
     expect(record).toHaveTextContent('75% wins');
-    expect(within(record).getByLabelText('Season record: coming soon')).toBeInTheDocument();
-    expect(within(record).getByLabelText('Bluff stats: coming soon')).toBeInTheDocument();
+    // Before the record loads: no placeholders, just the agent's own counters.
+    expect(within(record).queryByText('Soon')).toBeNull();
     expect(screen.getByTestId('agent-voice')).toHaveTextContent(/\w/);
     expect(screen.getByText(/dry run on Copper Hollow/i)).toBeInTheDocument();
     expect(screen.getByTestId('agent-back')).toHaveAttribute('href', '/maps/copper-hollow/crew?d=hard');

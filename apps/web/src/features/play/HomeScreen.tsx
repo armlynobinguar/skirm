@@ -29,7 +29,7 @@ function Home() {
   const me = useMe();
   return (
     <>
-      <h1 className="sk-sr-only">Command</h1>
+      <h1 className="sk-sr-only">Play</h1>
       {me.isError && !me.data ? <ErrorCard error={me.error} onRetry={() => void me.refetch()} /> : null}
       <FirstSteps lead={me.data?.agents[0]} />
       <CampaignStrip />
