@@ -8,7 +8,21 @@
 .result[data-status='mismatch'] { border-left-color: var(--rival); }
 .result[data-status='not_recorded'],
 .result[data-status='unavailable'] { border-left-color: var(--amber); }
-.headline { margin: 0; font: 700 16px/1.2 var(--font-display); text-transform: uppercase; }
+.headline { margin: 0; font: 700 20px/1.2 var(--font-display); text-transform: uppercase; }
+.verdict { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; }
+.glyph { display: inline-grid; place-items: center; width: 52px; height: 52px; border: 2px solid currentColor; border-radius: 50%; font: 700 30px/1 var(--font-display); }
+.result[data-status='verified'] .glyph { color: var(--you); }
+.result[data-status='mismatch'] .glyph { color: var(--rival); }
+.result[data-status='not_recorded'] .glyph,
+.result[data-status='unavailable'] .glyph { color: var(--amber); }
+.compare { display: grid; gap: 6px; margin: 0; padding: 10px 12px; border: 1px solid var(--line); }
+.compare dt { font: 500 11px/14px var(--font-mono); color: var(--muted); text-transform: uppercase; }
+.compare dd { margin: 2px 0 0; }
+.compare code { overflow-wrap: anywhere; font: 400 12px/16px var(--font-mono); color: var(--text); }
+.equals { font: 700 12px/16px var(--font-mono); color: var(--amber); text-transform: uppercase; }
+.compare[data-same] .equals { color: var(--you); }
+.result[data-status='mismatch'] .compare:not([data-same]) .equals { color: var(--rival); }
+.primaryLink { color: var(--text); font-weight: 700; }
 .result[data-status='verified'] .headline { color: var(--you); }
 .result[data-status='mismatch'] .headline { color: var(--rival); }
 .result[data-status='not_recorded'] .headline,
@@ -29,3 +43,4 @@
 .form label { display: grid; gap: 4px; flex: 1 1 260px; font: 500 11px/14px var(--font-mono); color: var(--muted); text-transform: uppercase; }
 .form input { padding: 8px 10px; color: var(--text); background: rgba(9, 15, 23, .8); border: 1px solid var(--line); font: 400 13px/18px var(--font-mono); }
 .intro { margin: 0; color: var(--text); }
+.sample { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font: 400 12px/16px var(--font-mono); color: var(--muted); }

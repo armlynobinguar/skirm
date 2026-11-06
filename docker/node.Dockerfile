@@ -85,6 +85,7 @@ ARG NEXT_PUBLIC_NEAR_CONTRACT_SKILLS=skills.playskirm.testnet
 ARG NEXT_PUBLIC_NEAR_CONTRACT_MARKET=market.playskirm.testnet
 ARG NEXT_PUBLIC_NEAR_CONTRACT_DEPOSITS=deposits.playskirm.testnet
 ARG NEXT_PUBLIC_NEAR_CONTRACT_REGISTRY=registry.playskirm.testnet
+ARG NEXT_PUBLIC_SAMPLE_MATCH_ID=
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
 RUN set -eu; \
@@ -105,6 +106,7 @@ RUN set -eu; \
           NEXT_PUBLIC_NEAR_CONTRACT_MARKET="${NEXT_PUBLIC_NEAR_CONTRACT_MARKET}" \
           NEXT_PUBLIC_NEAR_CONTRACT_DEPOSITS="${NEXT_PUBLIC_NEAR_CONTRACT_DEPOSITS}" \
           NEXT_PUBLIC_NEAR_CONTRACT_REGISTRY="${NEXT_PUBLIC_NEAR_CONTRACT_REGISTRY}" \
+          NEXT_PUBLIC_SAMPLE_MATCH_ID="${NEXT_PUBLIC_SAMPLE_MATCH_ID}" \
           npm run build --workspace @skirm/web; \
         test -f apps/web/.next/standalone/apps/web/server.js \
           || { echo "apps/web/.next/standalone/apps/web/server.js was not produced" >&2; exit 1; }; \

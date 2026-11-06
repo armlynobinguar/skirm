@@ -163,6 +163,7 @@ services:
         NEXT_PUBLIC_NEAR_CONTRACT_MARKET: ${NEAR_CONTRACT_MARKET:-market.playskirm.testnet}
         NEXT_PUBLIC_NEAR_CONTRACT_DEPOSITS: ${NEAR_CONTRACT_DEPOSITS:-deposits.playskirm.testnet}
         NEXT_PUBLIC_NEAR_CONTRACT_REGISTRY: ${NEAR_CONTRACT_REGISTRY:-registry.playskirm.testnet}
+        NEXT_PUBLIC_SAMPLE_MATCH_ID: ${SAMPLE_MATCH_ID:-}
     environment:
       # Server-side reads (shared replay link previews) reach the api inside the compose network.
       API_INTERNAL_URL: http://api:4000
