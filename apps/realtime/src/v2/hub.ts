@@ -1075,7 +1075,8 @@ export class V2Hub {
     const now = this.deps.scheduler.now();
     const cutoff = now - olderThanMs;
     const voided: string[] = [];
-    for (const m of await repos.v2Matches.listLive(500)) {
+    // Oldest first: with more live rows than one pass reads, the stalest are the ones to void.
+    for (const m of await repos.v2Matches.listLive(500, 'oldest')) {
       if (this.matches.has(m.id)) continue;
       if (m.heartbeatAt ? m.heartbeatAt.getTime() > now - heartbeatStaleMs : m.createdAt.getTime() > cutoff) continue;
       const row = await repos.v2Matches.finish(m.id, { winner: null, reason: 'aborted' });

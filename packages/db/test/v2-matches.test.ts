@@ -35,4 +35,17 @@ describe('v2 matches', () => {
     await ctx.repos.v2Matches.finish(c.id, { winner: 'B', reason: 'time' });
     expect((await ctx.repos.accounts.get(ana.id))!.elo).toBe(1200);
   });
+
+  it('lists live matches oldest first when asked (the orphan sweep), newest first by default', async () => {
+    const ctx = await setup();
+    const ana = await signUp(ctx, 'ana');
+    const ben = await signUp(ctx, 'ben');
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      ids.push((await ctx.repos.v2Matches.create({ mapId: 'copper-hollow', ranked: false, teamA: ana.id, teamB: ben.id })).id);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect((await ctx.repos.v2Matches.listLive(2, 'oldest')).map((r) => r.id)).toEqual(ids.slice(0, 2));
+    expect((await ctx.repos.v2Matches.listLive(2)).map((r) => r.id)).toEqual([ids[2], ids[1]]);
+  });
 });
