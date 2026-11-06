@@ -418,6 +418,13 @@ export class V2Hub {
     return { match, team };
   }
 
+  /** Whether `agentId` is in the account's crew of this instance's match `matchId` (an external agent's scope). */
+  playsIn(accountId: string, matchId: string, agentId: string): boolean {
+    const match = this.matches.get(matchId);
+    const team = match && TEAMS.find((t) => match.setup.sides[t].accountId === accountId);
+    return !!team && match!.setup.sides[team].crew.some((a) => a.id === agentId);
+  }
+
   accept(accountId: string, matchId: string): void {
     const { match, team } = this.mine(accountId, matchId);
     match.accept(team);

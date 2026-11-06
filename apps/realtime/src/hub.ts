@@ -201,12 +201,55 @@ export class RealtimeHub {
   }
 
   private sendAccount(accountId: string, msg: WsServerMessage): void {
-    for (const c of this.byAccount.get(accountId) ?? []) this.send(c, msg);
+    for (const c of this.byAccount.get(accountId) ?? []) if (this.externalMaySee(c, msg)) this.send(c, msg);
+  }
+
+  /**
+   * An agent-token socket hears only about the matches its own agent plays: the owner's other
+   * matches (their crew plans, frames, debriefs) and lobbies never reach it.
+   */
+  private externalMaySee(c: Client, msg: WsServerMessage): boolean {
+    if (!c.external) return true;
+    if (msg.type === 'v2_lobby') return false;
+    const matchId = 'matchId' in msg && typeof msg.matchId === 'string' ? msg.matchId : undefined;
+    if (matchId === undefined) return true;
+    return !!c.external.agentId && !!c.user && this.v2.playsIn(c.user.accountId, matchId, c.external.agentId);
+  }
+
+  /**
+   * What an agent-token socket may send (docs/external-agents.md): queue casual or practice with its
+   * agent, cancel that search, accept, decline, ban and lock in the matches that agent plays, and
+   * spectate like anyone. Commands, control, steering and lobbies stay with the player.
+   */
+  private externalMaySend(c: Client, msg: WsClientMessage): void {
+    if (!c.external || !c.user) return;
+    const { accountId } = c.user;
+    const agentId = c.external.agentId;
+    switch (msg.type) {
+      case 'auth':
+      case 'v2_queue':
+      case 'v2_watch':
+      case 'v2_unwatch':
+      case 'v2_replay':
+        return;
+      case 'v2_cancel_queue':
+        if (agentId && this.v2.matchmaker.get(accountId)?.payload.crew.some((e) => e.agentId === agentId)) return;
+        throw new HubError('not_queued', 'this agent is not searching for a match');
+      case 'v2_accept':
+      case 'v2_decline':
+      case 'v2_ban':
+      case 'v2_lock_in':
+        if (agentId && this.v2.playsIn(accountId, msg.matchId, agentId)) return;
+        throw new HubError('not_found', 'match not found');
+      default:
+        throw new HubError('forbidden', `an agent token cannot send ${msg.type}`);
+    }
   }
 
   // ---------- Messages ----------
 
   private async handle(c: Client, msg: WsClientMessage): Promise<void> {
+    this.externalMaySend(c, msg);
     switch (msg.type) {
       case 'auth':
         return this.auth(c, msg);
@@ -257,7 +300,8 @@ export class RealtimeHub {
         return;
       }
       case 'v2_replay': {
-        const frames = await this.v2.replay(c.user?.accountId ?? null, msg.matchId);
+        // An agent token replays as a spectator: the owner's own view (crew plans) stays with the owner.
+        const frames = await this.v2.replay(c.external ? null : (c.user?.accountId ?? null), msg.matchId);
         this.send(c, { type: 'v2_frames', matchId: msg.matchId, frames });
         return;
       }
@@ -305,7 +349,8 @@ export class RealtimeHub {
     let set = this.byAccount.get(account.id);
     if (!set) this.byAccount.set(account.id, (set = new Set()));
     set.add(c);
-    this.v2.resume(account.id, (m) => this.send(c, m));
+    // Only a match its own agent plays is resumed; the owner's other matches stay out of reach.
+    this.v2.resume(account.id, (m) => void (this.externalMaySee(c, m) && this.send(c, m)));
   }
 
   private async auth(c: Client, msg: Extract<WsClientMessage, { type: 'auth' }>): Promise<void> {
