@@ -56,21 +56,21 @@ Scripts (`npm run <x> -w @skirm/web`): `dev`, `build`, `start`, `test` (Vitest),
 ```
 src/
   app/                              routes only (thin server components)
-    layout.tsx                      SHARED  root: CSS + <Providers>
+    layout.tsx                      root: CSS + <Providers>
     page.tsx                        S01 Sign in (no header)
-    globals.css                     SHARED  app-* classes, S01 styles
-    not-found.tsx, error.tsx        SHARED
-    (shell)/layout.tsx              SHARED  <AppShell>: header + main for every other screen
-    (shell)/(play)/...              Play builder
-    (shell)/(skills)/...            Skills + Market builder
-    (shell)/(pvp)/...               PvP builder
-    (shell)/(account)/...           Account builder
-  features/<group>/                 screens and their private components, per owner
-    play/  skills/  pvp/  account/
-  components/                       SHARED  Providers, shell (TopBar, AppShell, RequireSession),
+    globals.css                     app-* classes, S01 styles
+    not-found.tsx, error.tsx
+    (shell)/layout.tsx              <AppShell>: header + main for every other screen
+    (shell)/(play)/...              Play: home, maps, campaign, daily, puzzles, crew, agents
+    (shell)/(skills)/...            Skills and the Exchange
+    (shell)/(pvp)/...               PvP: hub, lobbies, tournaments, matches, replays, verify
+    (shell)/(account)/...           Profile and credits
+  features/<group>/                 screens and their private components, per section
+    play/  skills/  pvp/  account/  campaign/  daily/  puzzles/  lobbies/  verify/  …
+  components/                       Providers, shell (TopBar, AppShell, RequireSession),
                                             states (Skeleton, ErrorCard, EmptyState, QueryView),
                                             toast, ButtonLink, ScreenPlaceholder
-  lib/                              SHARED
+  lib/
     config.ts                       NEXT_PUBLIC_* config
     constants.ts                    allowance, starter agents, DEFAULT_CREDITS_PER_NEAR, NEAR
                                     formatting (formatNear; parseNear is strict and throws)
@@ -81,75 +81,69 @@ src/
     auth/credentials.ts, session.tsx, privy.ts, PrivyRoot.tsx (the only Privy SDK import), drafts.ts
     wallet/types.ts, contracts.ts, nearConnect.ts, hooks.ts   NEAR wallet (NEAR Connect)
     realtime/client.ts, protocol.ts, hooks.ts
-  test/                             SHARED  setup, renderWithProviders, fakes, fixtures, router mock
+  test/                             setup, renderWithProviders, fakes, fixtures, router mock
 e2e/                                Playwright specs (one file per group: practice.spec.ts, …)
 scripts/dev-backend.sh              native backend for dev and e2e
 ```
 
-Route groups `(play)`, `(skills)`, … only split ownership; they add no layout and no URL segment.
+Route groups `(play)`, `(skills)`, `(pvp)`, … group the routes by section; they add no layout and
+no URL segment.
 
-## Screens and owners
+## Screens
 
-| ID | Screen | Route | Screen component | Owner |
-| --- | --- | --- | --- | --- |
-| S01 | Sign in (pitch, practice line) | `/` | `features/play/SignInScreen.tsx` | Play |
-| S02 | Home (Command deck) | `/play` | `features/play/HomeScreen.tsx` | Play |
-| — | Map atlas | `/maps` | `features/play/AtlasScreen.tsx` | Play |
-| — | Tutorial (guided first match: briefing, then tips over the match) | `/tutorial` | `features/onboarding/TutorialScreen.tsx`, `TutorialCoach.tsx` | Play |
-| S04 | Crew (casual, ranked, Vs Greedy bot) | `/maps/[mapId]/crew` (`?d=`, `?opponent=bot`) | `features/play/CrewBuilderScreenV2.tsx` (`V2CrewScreen`) | Play |
-| — | Agent editor | `/agents/[agentId]` | `features/agents/AgentEditorScreen.tsx` | Play |
-| S07 | My skills | `/skills` (`?tab=owned`) | `features/skills/MySkillsScreen.tsx` | Skills + Market |
-| S08 | Skill editor | `/skills/new`, `/skills/[skillId]/edit` | `features/skills/SkillEditorScreen.tsx` | Skills + Market |
-| S09 | Marketplace (Exchange) | `/market` | `features/skills/MarketplaceScreen.tsx` | Skills + Market |
-| S10 | Skill detail (drawer) | `/market/[skillId]` | `features/skills/SkillDetailScreen.tsx` | Skills + Market |
-| M01 | Connect NEAR wallet | component | `features/skills/ConnectWalletModal.tsx` | Skills + Market |
-| M02 | Confirm transaction | component | `features/skills/ConfirmTransactionModal.tsx` | Skills + Market |
-| S11 | Skirmish hub | `/pvp` | `features/pvp/PvpLobbyScreen.tsx` | PvP |
-| S12 | Match: accept, lock-in, live, end (players and spectators) | `/matches/[matchId]` | `features/v2/V2MatchScreen.tsx` | PvP |
-| S13 | Match result (debrief) | `/matches/[matchId]/result` | `features/v2/Ended.tsx` (`V2ResultScreen`) | PvP |
-| S14 | Leaderboards (season, all-time) | `/leaderboards` | `features/pvp/LeaderboardsScreen.tsx` | PvP |
-| S15 | Credits | `/account/credits` | `features/account/CreditsScreen.tsx` | Account |
-| S16 | Profile: rank, agents, recent matches, settings | `/account` | `features/account/ProfileScreen.tsx` | Account |
+| Section | Screen | Route | Screen component |
+| --- | --- | --- | --- |
+| Play | Sign in (pitch, practice line) | `/` | `features/play/SignInScreen.tsx` |
+| Play | Home (Command deck) | `/play` | `features/play/HomeScreen.tsx` |
+| Play | Map atlas, community maps | `/maps` (`?tab=community`) | `features/play/AtlasScreen.tsx` |
+| Play | Map editor | `/maps/editor` | `features/maps/MapEditorScreen.tsx` |
+| Play | Tutorial (guided first match) | `/tutorial` | `features/onboarding/TutorialScreen.tsx` |
+| Play | Campaign (missions vs the bot) | `/campaign` | `features/campaign/CampaignScreen.tsx` |
+| Play | Daily challenge | `/daily` | `features/daily/DailyScreen.tsx` |
+| Play | Puzzles, one puzzle | `/puzzles`, `/puzzles/[puzzleId]` | `features/puzzles/PuzzlesScreen.tsx`, `PuzzleScreen.tsx` |
+| Play | Crew (casual, ranked, vs the bot) | `/maps/[mapId]/crew` (`?d=`, `?opponent=bot`) | `features/play/CrewBuilderScreenV2.tsx` |
+| Play | Agent editor | `/agents/[agentId]` | `features/agents/AgentEditorScreen.tsx` |
+| Skills | My skills | `/skills` | `features/skills/MySkillsScreen.tsx` |
+| Skills | Skill editor | `/skills/new`, `/skills/[skillId]/edit` | `features/skills/SkillEditorScreen.tsx` |
+| Skills | Skill test bench | `/skills/bench`, `/skills/bench/[runId]` | `features/skills/bench/BenchScreen.tsx` |
+| Exchange | Exchange (marketplace) | `/market` | `features/skills/MarketplaceScreen.tsx` |
+| Exchange | Skill detail (drawer) | `/market/[skillId]` | `features/skills/SkillDetailScreen.tsx` |
+| Exchange | Writer backing | `/backing` | `features/backing/BackingScreen.tsx` |
+| PvP | PvP hub (ranked, casual, draft queues) | `/pvp` | `features/pvp/PvpLobbyScreen.tsx` |
+| PvP | Private lobbies, a lobby, join by code | `/lobbies`, `/lobbies/[lobbyId]`, `/lobbies/join/[code]` | `features/lobbies/LobbiesScreen.tsx`, `LobbyScreen.tsx` |
+| PvP | Tournaments, a bracket | `/tournaments`, `/tournaments/[id]` | `features/lobbies/TournamentsScreen.tsx`, `TournamentScreen.tsx` |
+| PvP | Match: accept, lock-in, live, end (players and spectators) | `/matches/[matchId]` | `features/v2/V2MatchScreen.tsx` |
+| PvP | Match result (debrief) | `/matches/[matchId]/result` | `features/v2/Ended.tsx` (`V2ResultScreen`) |
+| PvP | Shared replay | `/replays/[shareId]` | `features/replays/SharedReplayScreen.tsx` |
+| PvP | Verify a match on NEAR | `/verify` (`?id=`) | `features/verify/VerifyScreen.tsx` |
+| Leaderboards | Season, all-time, map and skill boards | `/leaderboards` | `features/pvp/LeaderboardsScreen.tsx` |
+| Account | Profile: rank, agents, recent matches, settings | `/account` | `features/account/ProfileScreen.tsx` |
+| Account | Credits | `/account/credits` | `features/account/CreditsScreen.tsx` |
+| Legal | Terms, privacy | `/terms`, `/privacy` | `app/(shell)/…/page.tsx` |
 
-Every screen renders inside the header, with its root `data-testid` and, where the screen needs an
-account, inside `<RequireSession>`. Public screens (no session needed, per the spec's spectator and
-judge rows): S12, S13, S14. The api returns extra fields for a signed-in player of the match (`you`,
-`debrief`).
+Every screen renders inside the header with a root `data-testid` and, where it needs an account,
+inside `<RequireSession>`. Public screens (no session needed): sign in, leaderboards, matches and
+their debriefs, shared replays, puzzles, verify and the legal pages. The api returns extra fields
+for a signed-in player of the match (`you`, `debrief`).
 
-M01 and M02 are used outside their owner's group (S15 top-up, S16 connect). Their props
-interfaces are fixed in the stubs; the owner may add optional props only, and the Account builder
-codes against the stub until it is real.
+## Conventions
 
-### Shared files: do not edit
+- Build from `@skirm/ui` (`TopUpPanel`, `Modal`, `Tabs`, `TextField`, `Badge`, `TagChip`,
+  `AgentAvatar`, `Icon`, …) and the arena pieces in `features/arena`.
+- Styles: a CSS module next to the screen using tokens (`var(--surface)`, `var(--space-4)`, …).
+  Global helpers: `app-card`, `app-row`, `app-stack`, `app-h1..3`, `app-banner is-warning|is-critical`,
+  `sk-muted`, `sk-mono`. Phones from 360 px: 16 px gutters (the shell already pads), no horizontal
+  page scroll (wide tables sit in an `overflow-x: auto` wrapper).
+- Links: `routes.*` from `src/lib/routes.ts` with `next/link`; a link that looks like a button is
+  `<ButtonLink>` (never a `<button>` inside `<a>`).
+- Copy: "credits", "step", "network fee"; sentence case; verb + object buttons. Errors say what
+  happened and what to do; the code goes in a Details disclosure (`ErrorCard` and `toast.error`).
+- Server components are only the `page.tsx` files; screens are `'use client'`.
+- The top bar's design notes (Notes, N) are internal: on in development, off in production builds
+  unless `NEXT_PUBLIC_DESIGN_NOTES=1`.
 
-Everything marked SHARED above, plus `package.json`, `next.config.ts`, `tsconfig.json`,
-`vitest.config.ts`, `playwright.config.ts` and `e2e/helpers.ts`. If you need a change there (a new
-api method, a type fix, a hook), stop and ask the coordinator, or put a local helper in your
-`features/<group>/` folder. In particular, do not add dependencies, do not edit
-`src/lib/api/types.ts` to fit a guess (fix the guess against `apps/api/src`), and do not add
-layouts under `(shell)`.
-
-## Building a screen
-
-1. Read the spec row and the states table in `uiux.md`, then the artboard `.dc.html` (inline
-   styles map 1:1 to tokens: `var(--surface)`, `var(--space-4)`, …).
-2. Replace the `<ScreenPlaceholder>` in your screen component. Keep the root
-   `data-testid="screen-sNN"` (move it to your root element).
-3. Build from `@skirm/ui` (`TopUpPanel`, `Modal`, `Tabs`, `TextField`, `Badge`, `TagChip`,
-   `AgentAvatar`, `Icon`, …) and the arena pieces in `features/arena`.
-4. Styles: a CSS module next to the screen (`ProfileScreen.module.css`) using tokens. Global
-   helpers: `app-card`, `app-row`, `app-stack`, `app-h1..3`, `app-banner is-warning|is-critical`,
-   `sk-muted`, `sk-mono`. Phones from 360 px: 16 px gutters (the shell already pads), no
-   horizontal page scroll (wrap wide grids in `overflow-x: auto`).
-5. Links: `routes.*` from `src/lib/routes.ts` with `next/link`; a link that looks like a button is
-   `<ButtonLink>` (never a `<button>` inside `<a>`).
-6. Write the copy from the spec ("credits", "step", "network fee"; sentence case; verb + object
-   buttons). Errors say what happened and what to do; the code goes in a Details disclosure
-   (`ErrorCard` and `toast.error` do this).
-7. Add tests (below). Server components are only the `page.tsx` files; screens are `'use client'`.
-
-Next 16 notes: `params` is a Promise (`const { matchId } = await params` in `page.tsx`, already
-done); `useSearchParams()` in a statically rendered page needs a `<Suspense>` boundary (or read
+Next 16 notes: `params` is a Promise (`const { matchId } = await params` in `page.tsx`);
+`useSearchParams()` in a statically rendered page needs a `<Suspense>` boundary (or read
 `window.location.search` in handlers); `error.tsx` gets `retry`, not `reset`. Docs for this exact
 version: `node_modules/next/dist/docs/`.
 
@@ -346,7 +340,7 @@ act(() => realtime.emit({ type: 'v2_frame', matchId: 'mat_1', frame: v2FrameFixt
 - Cover each screen's states from the spec table (empty, loading, error, out of credits, free
   budget used, offline / reconnecting) and keyboard paths, not only the happy path.
 
-**data-testids**: the spec names none, so this is the convention every builder follows:
+**data-testids**: the convention every screen follows:
 - screen root: `screen-s01` … `screen-s16`; modals: `m01-…`, `m02-…`, `m03-…`.
 - inside a screen: `sNN-<thing>` in kebab case, e.g. `s09-tag-filter-liquid`, `s11-find-match`,
   `s16-rank-elo`; the v2 match screens use `v2-<thing>` (`v2-accept`, `v2-verdict`). Repeated rows add an id: `s07-skill-row-<skillId>`.
@@ -381,5 +375,6 @@ play on the greedy brain (`V2_BRAIN=greedy`), so no model key is needed; `practi
 - **Privy and wallet with real credentials**: verified with mocks and builds only (no Privy app id,
   no deployed testnet contracts in this repo's CI). Privy's embedded NEAR wallet is not used; players
   link their own wallet through M01.
-- **CI**: `.github/workflows/ci.yml` runs the contracts job only. Web typecheck and tests run in
-  the pre-push hook (`.githooks/pre-push`); the e2e runs by hand against `dev-backend.sh`.
+- **CI**: `.github/workflows/ci.yml` runs typecheck and tests for every workspace (the web included)
+  and the contracts' `cargo test` on pushes to `main`. The Playwright e2e runs by hand against
+  `dev-backend.sh`.
