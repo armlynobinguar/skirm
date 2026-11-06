@@ -377,5 +377,14 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     "sql": [
       "ALTER TYPE \"public\".\"ledger_note\" ADD VALUE 'rental';"
     ]
+  },
+  {
+    "tag": "0021_match_heartbeat",
+    "folderMillis": 1793924215666,
+    "bps": true,
+    "hash": "5fcb9a30d3399771fa29a4c901165a0233a09b226b06baf06c34691a73b48d5b",
+    "sql": [
+      "ALTER TABLE \"v2_matches\" ADD COLUMN \"heartbeat_at\" timestamp with time zone;"
+    ]
   }
 ];

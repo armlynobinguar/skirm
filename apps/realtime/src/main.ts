@@ -82,6 +82,13 @@ async function bootstrap(): Promise<void> {
   await app.init();
 }
 
+// One stray rejected promise must not take the whole process (and every live match on it) down:
+// log it in the same structured shape as other errors and keep serving.
+process.on('unhandledRejection', (reason: unknown) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  console.error(JSON.stringify({ severity: 'ERROR', msg: 'unhandled rejection', error: err.message, stack: err.stack }));
+});
+
 bootstrap().catch((err: unknown) => {
   console.error(`[realtime] failed to start: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);

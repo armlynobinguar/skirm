@@ -24,10 +24,11 @@ export class LedgerV2Credits implements V2Credits {
     return { ok: false as const, need: r.need ?? amount, have: r.have ?? 0 };
   }
 
-  async charge(team: Team, amount: number) {
-    if (amount <= 0) return;
+  async charge(team: Team, amount: number): Promise<boolean> {
+    if (amount <= 0) return true;
     const r = await this.ledger.chargeTurns(v2HoldId(this.matchId, team), Array.from({ length: amount }, () => ({ agent: 0, reason: null })));
     if (!r.ok) this.log.warn(`v2 match ${this.matchId} ${team}: charge failed: ${r.error}`);
+    return r.ok;
   }
 
   async settle(team: Team) {

@@ -179,6 +179,19 @@ describe('v2 spectating across instances', () => {
     expect(pubsub.activeChannels()).toEqual([]);
   });
 
+  it('the orphan sweep leaves a match with a fresh heartbeat alone, and voids it once the heartbeat is stale', async () => {
+    const { deps, one, two } = await twoInstances();
+    hubs = [one, two];
+    await liveElsewhere(deps, 'mat_beating');
+    // Another instance is still playing it: a heartbeat well after the sweep's clock.
+    await deps.repos.v2Matches.heartbeat('mat_beating', new Date(Date.now() + 10 * 60_000));
+    expect(await one.v2.sweepOrphans(0)).toEqual([]);
+    expect((await deps.repos.v2Matches.get('mat_beating'))?.status).toBe('live');
+    // That instance went quiet: its last heartbeat is now older than the staleness window.
+    expect(await one.v2.sweepOrphans(0, -24 * 60 * 60_000)).toEqual(['mat_beating']);
+    expect((await deps.repos.v2Matches.get('mat_beating'))?.status).toBe('void');
+  });
+
   it('caps remote watches per socket and lets every channel go on disconnect', async () => {
     const { deps, one, two, pubsub } = await twoInstances();
     hubs = [one, two];

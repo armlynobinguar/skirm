@@ -133,6 +133,11 @@ export class V2MatchesRepo {
     return row;
   }
 
+  /** Marks a live match as still being played (see the realtime orphan sweep). */
+  async heartbeat(id: string, at: Date = new Date()): Promise<void> {
+    await this.db.update(v2Matches).set({ heartbeatAt: at }).where(and(eq(v2Matches.id, id), eq(v2Matches.status, 'live')));
+  }
+
   async listLive(limit = 50): Promise<V2MatchRow[]> {
     return this.db.select().from(v2Matches).where(eq(v2Matches.status, 'live')).orderBy(desc(v2Matches.createdAt)).limit(limit);
   }

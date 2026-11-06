@@ -717,6 +717,7 @@ export class V2Hub {
         this.relay(setup.matchId, msg);
       },
       finish: (end) => this.finish(end, match),
+      heartbeat: () => repos.v2Matches.heartbeat(setup.matchId, new Date(this.deps.scheduler.now())),
       log,
     });
     return match;
@@ -950,13 +951,20 @@ export class V2Hub {
     await Promise.all([...this.running]);
   }
 
-  /** Live `v2_matches` rows no instance holds (a crashed instance) are voided and their holds released. */
-  async sweepOrphans(olderThanMs: number): Promise<string[]> {
+  /**
+   * Live `v2_matches` rows no instance holds (a crashed instance) are voided and their holds
+   * released. A match that has started ticking is judged by its heartbeat (stale after
+   * `heartbeatStaleMs`), so a long match on another instance is never voided while it still plays;
+   * one that never reached its first heartbeat falls back to its age (`olderThanMs`).
+   */
+  async sweepOrphans(olderThanMs: number, heartbeatStaleMs = HEARTBEAT_STALE_MS): Promise<string[]> {
     const { repos } = this.deps;
-    const cutoff = this.deps.scheduler.now() - olderThanMs;
+    const now = this.deps.scheduler.now();
+    const cutoff = now - olderThanMs;
     const voided: string[] = [];
     for (const m of await repos.v2Matches.listLive(500)) {
-      if (this.matches.has(m.id) || m.createdAt.getTime() > cutoff) continue;
+      if (this.matches.has(m.id)) continue;
+      if (m.heartbeatAt ? m.heartbeatAt.getTime() > now - heartbeatStaleMs : m.createdAt.getTime() > cutoff) continue;
       const row = await repos.v2Matches.finish(m.id, { winner: null, reason: 'aborted' });
       if (row.status !== 'void') continue;
       for (const t of TEAMS) await repos.ledger.abort(v2HoldId(m.id, t)).catch(() => undefined);
@@ -967,6 +975,9 @@ export class V2Hub {
     return voided;
   }
 }
+
+/** A live match whose last heartbeat is older than this is treated as orphaned. */
+export const HEARTBEAT_STALE_MS = 3 * 60_000;
 
 /** A `v2match:<id>` message as a watcher gets it; anything else is dropped. */
 export function relayV2Watch(matchId: string, payload: string): V2ServerMessage | undefined {

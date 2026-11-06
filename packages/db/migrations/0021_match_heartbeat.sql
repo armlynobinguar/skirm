@@ -1,0 +1,1 @@
+ALTER TABLE "v2_matches" ADD COLUMN "heartbeat_at" timestamp with time zone;

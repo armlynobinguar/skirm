@@ -38,7 +38,7 @@ class FakeCredits implements V2Credits {
     this.holds[team] = amount;
     return { ok: true as const };
   }
-  async charge(team: Team, n: number) {
+  async charge(team: Team, n: number): Promise<boolean | void> {
     this.charged[team]! += n;
   }
   async settle(team: Team) {
@@ -216,14 +216,14 @@ describe('v2 match: whole-credit charges never exceed the hold', () => {
 
   class RecordingCredits extends FakeCredits {
     calls: Record<Team, number[]> = { A: [], B: [] };
-    override async charge(team: Team, n: number) {
+    override async charge(team: Team, n: number): Promise<boolean | void> {
       this.calls[team].push(n);
       await super.charge(team, n);
     }
   }
 
-  async function playClock(o: { tiers: Record<Team, AgentSpec['tier'][]>; difficulty: Difficulty; ranked?: boolean; outAt?: { tick: number; agent: string } }) {
-    const credits = new RecordingCredits();
+  async function playClock(o: { tiers: Record<Team, AgentSpec['tier'][]>; difficulty: Difficulty; ranked?: boolean; outAt?: { tick: number; agent: string }; credits?: RecordingCredits }) {
+    const credits = o.credits ?? new RecordingCredits();
     const sides = setup().sides;
     const crew = (t: Team) => o.tiers[t].map((tier, i) => spec(`${t.toLowerCase()}${i}`, 'Runner', tier));
     const h = harness(
@@ -279,6 +279,22 @@ describe('v2 match: whole-credit charges never exceed the hold', () => {
       }
     });
   }
+
+  it('does not count a charge the ledger refused as charged', async () => {
+    class RefusingCredits extends RecordingCredits {
+      override async charge(team: Team, n: number) {
+        this.calls[team].push(n);
+        if (team === 'A') return false;
+        await super.charge(team, n);
+        return true;
+      }
+    }
+    const { end, credits } = await playClock({ tiers: { A: ['quiet'], B: ['quiet'] }, difficulty: 'normal', credits: new RefusingCredits() });
+    expect(credits.calls.A.length).toBeGreaterThan(0);
+    expect(end.stats.A.charged).toBe(0);
+    expect(end.stats.B.charged).toBe(credits.charged.B);
+    expect(end.stats.B.charged).toBeGreaterThan(0);
+  });
 
   it('holds and charges ranked crews at Standard', async () => {
     const { credits } = await playClock({ tiers: { A: ['open', 'open'], B: ['quiet'] }, difficulty: 'hard', ranked: true });

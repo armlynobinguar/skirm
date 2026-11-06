@@ -610,6 +610,8 @@ export const v2Matches = pgTable(
     seasonId: text('season_id').references(() => seasons.id),
     createdAt: createdAt(),
     endedAt: ts('ended_at'),
+    /** Stamped every few ticks by the instance playing the match; the orphan sweep reads it. */
+    heartbeatAt: ts('heartbeat_at'),
   },
   (t) => [
     index('v2_matches_status_idx').on(t.status, t.createdAt),

@@ -95,7 +95,8 @@ export const DEFAULT_V2_TIMING: V2Timing = {
 /** The ledger seen from a match: one hold per crew, charged per tick, the rest returned. */
 export interface V2Credits {
   hold(team: Team, accountId: string, amount: number): Promise<{ ok: true } | { ok: false; need: number; have: number }>;
-  charge(team: Team, amount: number): Promise<void>;
+  /** Charges `amount` against the hold; resolves `false` when the ledger refused it (not counted as charged). */
+  charge(team: Team, amount: number): Promise<boolean | void>;
   /** Ends the hold, returning what was not charged. */
   settle(team: Team): Promise<void>;
   /** Voids the hold, returning everything. */
@@ -207,8 +208,13 @@ export interface V2MatchDeps {
   watch?(msg: V2ServerMessage): void;
   /** Writes the result (Elo, registry job, stored frames) before v2_end goes out with the debrief. */
   finish?(end: V2MatchEnd): Promise<V2Finish>;
+  /** Marks the match as alive (every HEARTBEAT_EVERY ticks) so another instance's sweep leaves it alone. */
+  heartbeat?(): Promise<void>;
   log: Logger;
 }
+
+/** Ticks between heartbeats of a live match. */
+export const HEARTBEAT_EVERY = 10;
 
 type Phase = 'found' | 'draft' | 'lockin' | 'live' | 'ended';
 
@@ -619,7 +625,7 @@ export class V2Match {
     if (this.controlled[team] === agentId) return { ok: true, agentId };
     this.setControl(team, agentId);
     // The planner learns who is steered on its next plan; a fresh one now so the crew adapts at once.
-    void this.replan(team);
+    this.replanSafely(team);
     return { ok: true, agentId };
   }
 
@@ -761,7 +767,15 @@ export class V2Match {
     const pays = TEAMS.filter((t) => !setup.free?.[t]);
     for (const t of pays) {
       const amount = holdFor(crews[t], setup.ranked, s.limit);
-      const r = await this.deps.credits.hold(t, setup.sides[t].accountId, amount);
+      let r: Awaited<ReturnType<V2Credits['hold']>>;
+      try {
+        r = await this.deps.credits.hold(t, setup.sides[t].accountId, amount);
+      } catch (err) {
+        // The hold may have committed before the error reached us; abort is idempotent, so release it
+        // rather than leave credits held that no settle or void would ever return.
+        await this.deps.credits.release(t).catch(() => undefined);
+        throw err;
+      }
       if (!r.ok) return this.voidMatch('credits', t);
       this.held.set(t, amount);
       this.heldFor[t] = amount;
@@ -825,13 +839,15 @@ export class V2Match {
         cum100[t] += costPer100[t];
         const due = chargeDue(cum100[t], this.stats[t].charged);
         if (due > 0) {
-          await this.deps.credits.charge(t, due);
-          this.stats[t].charged += due;
+          // Only what the ledger accepted counts, so the debrief never shows credits that were not charged.
+          if ((await this.deps.credits.charge(t, due)) !== false) this.stats[t].charged += due;
         }
       }
       this.publish(ev);
       if (s.result) break;
-      if (s.tick % timing.replanEvery === 0) for (const t of TEAMS) void this.replan(t);
+      if (s.tick % timing.replanEvery === 0) for (const t of TEAMS) this.replanSafely(t);
+      if (s.tick % HEARTBEAT_EVERY === 0)
+        void this.deps.heartbeat?.().catch((err: unknown) => this.deps.log.warn(`v2 match ${this.matchId}: heartbeat failed: ${(err as Error).message}`));
       await this.sleepUntil(tickStart + timing.tickMs);
     }
     log.result = s.result;
@@ -898,6 +914,11 @@ export class V2Match {
     else if (d.reason === 'illegal') st.illegal++;
     if (d.refusedSay) st.refusedSays++;
     st.costUsd += d.call?.costUsd ?? 0;
+  }
+
+  /** Fire-and-forget replan: a throw outside brain.plan() (observe, timeline) is logged, never left unhandled. */
+  private replanSafely(team: Team): void {
+    this.replan(team).catch((err: unknown) => this.deps.log.warn(`v2 match ${this.matchId} ${team}: replan failed: ${(err as Error)?.message ?? String(err)}`));
   }
 
   /** The crew plan, written from its first agent still in the match (kept as is on failure). */

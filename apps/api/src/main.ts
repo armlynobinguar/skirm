@@ -91,6 +91,8 @@ async function main(): Promise<void> {
         ...(process.env.RATE_LIMIT_STRICT ? { strict: Number(process.env.RATE_LIMIT_STRICT) } : {}),
         ...(process.env.RATE_LIMIT_GENERAL ? { general: Number(process.env.RATE_LIMIT_GENERAL) } : {}),
       },
+      // 1 on plain Cloud Run; 2 behind an external HTTPS load balancer.
+      trustedHops: Number(process.env.TRUSTED_PROXY_HOPS ?? 1) || 1,
     },
     corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
       .split(',')
@@ -127,6 +129,13 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   process.on('SIGINT', () => void shutdown('SIGINT'));
 }
+
+// One stray rejected promise must not take the whole process (and every live match on it) down:
+// log it in the same structured shape as other errors and keep serving.
+process.on('unhandledRejection', (reason: unknown) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  console.error(JSON.stringify({ severity: 'ERROR', msg: 'unhandled rejection', error: err.message, stack: err.stack }));
+});
 
 main().catch((err: unknown) => {
   if (err instanceof ConfigError) console.error(`[api] ${err.message}`);

@@ -40,6 +40,13 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => stop('SIGINT'));
 }
 
+// One stray rejected promise must not take the whole process (and every live match on it) down:
+// log it in the same structured shape as other errors and keep serving.
+process.on('unhandledRejection', (reason: unknown) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  console.error(JSON.stringify({ severity: 'ERROR', msg: 'unhandled rejection', error: err.message, stack: err.stack }));
+});
+
 main().catch((err) => {
   jsonLogger.error('worker failed to start', {
     code: errorCode(err),
