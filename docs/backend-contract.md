@@ -35,6 +35,8 @@ The single reference for `apps/api`, `apps/worker`, `apps/realtime` and `apps/we
 | `NEAR_CONTRACT_SKILLS` / `_MARKET` / `_REGISTRY` / `_DEPOSITS` / `_SEASONS` / `_BADGES` | `skills.playskirm.testnet` … `badges.playskirm.testnet` | `badges` is not deployed yet |
 | `CREDITS_PER_NEAR` | `1000` (`DEFAULTS.credits.perNear`) | credits one NEAR buys: $0.001 a credit at an assumed $1 NEAR |
 | `NEAR_RENTALS_ONCHAIN` | `false` | api: `true` takes agent rentals through `market.rent` from the renter's wallet (needs the market redeployed with `rent`, contracts/market/README.md); off, rentals are paid in paid credits |
+| `RELAYER_ACCOUNT_ID`, `RELAYER_PRIVATE_KEY` | unset | gasless onboarding's relayer (set both or neither; [gasless.md](gasless.md)). Unset → `/relay` is off and nothing else changes |
+| `RELAYER_FREE_TXS` | `3` | relayed (gas-free) transactions per player |
 | `API_PORT` / `REALTIME_PORT` | `4000` / `4001` | |
 | `PUBLIC_API_URL` / `PUBLIC_WS_URL` | `http://localhost:4000` / `ws://localhost:4001/ws` | web (inlined at build time) |
 | `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | api: browser origins it accepts |
@@ -228,6 +230,8 @@ Modes (`GET /backing/config` `mode`): `near` when `BACKING_CONTRACT` is set: eve
 | POST | `/cosmetics/:id/buy` | | `{ owned }`. Paid credits only, never the free allowance: `402 insufficient_credits` with `need`, `have`. Buying an owned item is a no-op 200 |
 | GET | `/credits` | | `{ balance, held, allowanceLeft, allowanceResetAt, available, creditsPerNear, rows: {id, type, amount, source, note, matchId, txHash, createdAt}[] }` (latest 100) |
 | POST | `/credits/deposits` | `{ txHash }` | `{ credited, balance, amountYocto }`: a `deposits.deposit()` tx verified through RPC (dev mode: `dev:<yocto>`), credited once (`409 duplicate_receipt`) |
+| GET | `/relay` | | `{ enabled, freeTxs, used, remaining }`: gasless onboarding for the caller ([gasless.md](gasless.md)); `enabled: false` without a relayer |
+| POST | `/relay` | `{ signedDelegate }` (base64 borsh NEP-366 SignedDelegate) | `{ txHash, remaining }`: the relayer's transaction. `404 relay_disabled`, `409 near_not_linked` / `relay_duplicate`, `403 wrong_signer` / `relay_quota`, `422` for a refused delegate (`receiver_not_allowed`, `method_not_allowed`, `action_not_allowed`, `too_many_actions`, `gas_too_high`, `bad_signature`, `delegate_expired`, `delegate_too_far_ahead`, `unknown_key`, `stale_nonce`, `relay_tx_failed`), `502 relay_failed`, `503 rpc_unavailable`. Strict rate-limit bucket |
 
 ### Quests and achievements
 
@@ -421,7 +425,8 @@ The ops writes are idempotent, so the worker's season tick can resend one whose 
 - `Minter.mint(skillVersion)`: `nft_mint` on `skills` (one token per version, NEP-171 + NEP-199 royalties).
 - `SeasonsChain`: the seasons calls above.
 - `BadgeMinter.mint(badge)`: `nft_mint` on `badges` (soulbound, one token per player and achievement); `NoopBadges` stores `local` with a `noop:` hash.
-- `DepositVerifier.verify(txHash)`: reads the tx through RPC and checks the receiver (`deposits`), the amount and that the receipt is new. Dev accepts `dev:<yocto>`.
+- `DepositVerifier.verify(txHash)`: reads the tx through RPC and checks the receiver (`deposits`), the amount and that the receipt is new. Dev accepts `dev:<yocto>`. With a relayer configured, a meta-transaction it sent counts as the player's own (deposits and rentals).
+- `MetaTxRelayer` (`NearMetaTxRelayer`, only with `RELAYER_*`): final block height, access-key nonces, and `relay(SignedDelegate)` from the relayer account ([gasless.md](gasless.md)).
 - `OwnershipReader.ownerOf(tokenId)`: purchases and the mint fallback.
 - Market fee governance (contract side): a `governance_id` (defaults to the owner) proposes a fee and applies it after 24 h, capped at 10 %; every setter emits a NEP-297 event.
 
