@@ -72,9 +72,12 @@ export class CosmeticsController {
     const res = await this.deps.repos.cosmetics.buy(account.id, id);
     if (res.ok) {
       const chain = this.deps.near.cosmetics;
-      if (chain && res.charged > 0 && equipCosmeticById(id) && account.nearAccountId)
-        return { owned: res.owned, mint: await this.mint(account, id) };
-      return { owned: res.owned };
+      const mint = chain && res.charged > 0 && equipCosmeticById(id) && account.nearAccountId ? await this.mint(account, id) : undefined;
+      // What the player can wear now, as GET /cosmetics and the equip check see it: a minted token
+      // held by another NEAR account does not count, so the shop never shows it owned when equip
+      // would refuse it.
+      const { owned } = await this.ownership(account);
+      return mint !== undefined ? { owned, mint } : { owned };
     }
     if (res.error === 'not_found') throw notFound('cosmetic');
     if (res.error === 'insufficient_credits')
