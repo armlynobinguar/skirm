@@ -290,4 +290,17 @@ describe('S04 v2 crew screen', () => {
     expect(screen.getByTestId('s04-map-line')).toHaveTextContent('practice vs Greedy bot');
     expect(screen.getByTestId('s04-quick')).toBeInTheDocument();
   });
+
+  it('says in plain words what each agent can do on the map, with an explanation', async () => {
+    const { user } = setup();
+    await user.click(await screen.findByTestId(`s04-roster-${MOSS.id}`));
+    const moss = within(screen.getByTestId(`s04-card-${MOSS.id}`)).getByTestId('crew-action');
+    expect(moss).toHaveTextContent('No special action');
+    expect(moss).not.toHaveTextContent(/no verb/i);
+    expect(moss).toHaveAttribute('title', expect.stringContaining('Runners have no special map action: they take the goal items and deliver them'));
+    expect(moss).toHaveAttribute('data-muted');
+    const wick = within(screen.getByTestId(`s04-card-${WICK.id}`)).getByTestId('crew-action');
+    expect(wick).toHaveAttribute('title', expect.stringContaining('Special action: places blocks'));
+    expect(wick).not.toHaveAttribute('data-muted');
+  });
 });

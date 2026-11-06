@@ -32,6 +32,34 @@ import { XpBar } from './Progression';
 /** Effect class as a label: "add_solid" → "add solid". */
 const effectLabel = (e: string) => e.replace(/_/g, ' ');
 
+/** What a role's special map action does, in plain words (ROLE_EFFECT in @skirm/engine/v2). */
+const EFFECT_PLAIN: Readonly<Record<string, string>> = {
+  add_solid: 'places blocks',
+  remove_solid: 'clears dirt, blocks, crates and trees',
+  extinguish: 'puts out fire',
+  area_repel: 'stuns nearby rivals',
+};
+
+/**
+ * The card's action label and its explanation. A "verb" is a map's themed name for a role's special
+ * action (Builder, Digger, Firefighter, Scout); Runners and Haulers have none and only take and
+ * deliver the goal items.
+ */
+export function actionHint(role: string, fit: { effect: string | null; verb: string | null }): { label: string; hint: string } {
+  if (!fit.effect)
+    return {
+      label: 'No special action',
+      hint: `${role}s have no special map action: they take the goal items and deliver them. Builders, Diggers, Firefighters and Scouts each get one.`,
+    };
+  const plain = EFFECT_PLAIN[fit.effect] ?? effectLabel(fit.effect);
+  return {
+    label: effectLabel(fit.effect),
+    hint: fit.verb
+      ? `Special action: ${plain}. On this map it is called ${fit.verb}.`
+      : `Special action: ${plain}. This map has no use for it, so this agent only takes and delivers.`,
+  };
+}
+
 function RoleIcon({ path, size = 30 }: { path: string; size?: number }) {
   return (
     <svg viewBox="0 0 30 30" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -147,6 +175,7 @@ export interface CrewCardProps {
 export function CrewCard({ name, agent, map, tier, ranked, disabled, skillMine, onTier, model, onRemove, editHref, index, 'data-testid': testId }: CrewCardProps) {
   const role = agent ? agentRole(agent) : null;
   const fit = role ? verbFit(role, map) : null;
+  const action = role && fit ? actionHint(role, fit) : null;
   const colour = agent ? agentColour(agent) : 'var(--you)';
   const skill = agent?.skills[0];
   return (
@@ -178,17 +207,22 @@ export function CrewCard({ name, agent, map, tier, ranked, disabled, skillMine, 
       <div className={c.info}>
         <div className={c.nm}>
           <b>{name}</b>
-          {fit ? <span>{fit.effect ? effectLabel(fit.effect) : 'no verb'}</span> : null}
+          {action && fit ? (
+            <span title={action.hint} data-muted={fit.effect ? undefined : ''} data-testid="crew-action">
+              {action.label}
+              <span className="sk-sr-only">. {action.hint}</span>
+            </span>
+          ) : null}
         </div>
         {fit ? (
           <div className={c.chips}>
             {fit.verb ? (
-              <span className={c.chip} data-fit="">
+              <span className={c.chip} data-fit="" title={action?.hint}>
                 {fit.verb}
               </span>
             ) : (
-              <span className={c.chip} data-muted="">
-                {fit.effect ? 'verb not on this map' : 'take + deliver only'}
+              <span className={c.chip} data-muted="" title={action?.hint}>
+                {fit.effect ? 'not used on this map' : 'take + deliver only'}
               </span>
             )}
           </div>
