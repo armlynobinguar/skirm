@@ -69,7 +69,7 @@ describe('decision timeline helpers', () => {
     expect(skillLine(crew.decisions[0]!, crew, skills)).toMatchObject({ name: 'Gap Sealer v2', how: 'named by the agent’s model' });
     expect(skillLine(crew.decisions[1]!, crew, skills).how).toBe('No skills equipped.');
     expect(skillLine(crew.decisions[3]!, crew, skills).how).toBe('No equipped skill drove this move.');
-    expect(skillLine(crew.decisions[0]!, { ...crew, brain: 'greedy' }, skills).how).toBe('The greedy brain plays without skills.');
+    expect(skillLine(crew.decisions[0]!, { ...crew, brain: 'greedy' }, skills).how).toBe('The greedy brain plays by fixed rules: equipped skills show as active, but their text does not steer it.');
   });
 });
 
@@ -128,7 +128,7 @@ describe('Decisions', () => {
     renderWithProviders(<Decisions matchId="mat_v2" />, { handle: 'ada', api: { v2MatchDecisions: async () => f } });
     fireEvent.click(await screen.findByTestId('v2-decisions-crew-B'));
     expect(screen.getByTestId('v2-decisions-action')).toHaveTextContent('move W');
-    expect(screen.getByTestId('v2-decisions-skill')).toHaveTextContent('The greedy brain plays without skills.');
+    expect(screen.getByTestId('v2-decisions-skill')).toHaveTextContent('The greedy brain plays by fixed rules: equipped skills show as active, but their text does not steer it.');
   });
 
   it('says nothing was kept when the timeline is missing or refused', async () => {

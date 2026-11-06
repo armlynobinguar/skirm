@@ -89,9 +89,9 @@ describe('v2 matches over the hub', () => {
     // Ana's agent earned ranked XP, written with the result and told in her debrief.
     expect(end.debrief!.xp).toEqual([expect.objectContaining({ agentId: ana.agents[0]!.id, gained: expect.any(Number), level: expect.any(Number) })]);
     expect((await deps.repos.agents.view(ana.agents[0]!.id))!.progression.xp).toBe(end.debrief!.xp![0]!.xp);
-    // Rook runs the starter skill, which Ana did not write: her plan is withheld.
+    // Rook runs the free starter skill: nobody bought it, so Ana's plan is not withheld.
     const own = ana.inbox.ofType('v2_frame').flatMap((f) => f.frame.agents.filter((a) => a.team === 'A'));
-    expect(own.every((a) => a.planHidden === true)).toBe(true);
+    expect(own.some((a) => a.planHidden)).toBe(false);
 
     // Replay: Ana gets her own view; anyone else the whole board.
     await ana.send({ type: 'v2_replay', matchId: found.matchId });
