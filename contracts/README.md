@@ -11,12 +11,14 @@ and the season prize pools. The stretch `pool` contract is not included.
 | `deposits` | [`deposits.playskirm.testnet`](https://testnet.nearblocks.io/address/deposits.playskirm.testnet) | `deposit()` top-ups with a NEP-297 event for the credits ledger; owner withdraws to the treasury |
 | `seasons` | [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | 14-day season prize pools: funded by market fees, standings posted by ops, prizes claimed by players |
 | `badges` | `badges.playskirm.testnet` (not deployed yet) | Soulbound achievement badges in the NEP-171 shape (core views, enumeration, metadata, `nft_mint` event); `nft_transfer` always panics |
-| `backing` | `backing.playskirm.testnet` (not deployed yet) | Writer backing rounds: `open_round` (writer sets share, cap multiple, max raise), payable `back`, `close_round` (raise to the writer), `cancel_round` + `refund`, payable `distribute` (royalty income: backers' capped share kept for `claim`, the rest to the writer), `claim`; NEP-297 `skirm_backing` events |
+| `backing` | `backing.playskirm.testnet` (not deployed yet) | Writer backing rounds: `open_round` (writer sets share, cap multiple, max raise), payable `back`, `close_round` (raise to the writer), `cancel_round` + `refund`, payable `distribute` (royalty income: backers' capped share kept for `claim`, the rest to the writer), `claim`; NEP-297 `skirm_backing` events. Backers earn only from royalties someone forwards with `distribute`: NEP-199 royalties go to the writer, not the round |
 
 Roles used below: `playskirm.testnet` is the owner (full-access keys kept offline), the treasury and
 the market's governance account. `ops.playskirm.testnet` is the platform signer.
 
-The ops key allow-list (function-call keys, one per contract):
+The methods the platform signer calls on each contract (what a function-call key per contract would
+be limited to; the testnet ops account actually signs with one full-access key, see
+[Deployed on testnet](#deployed-on-testnet-2026-11-01)):
 
 | Contract | Methods |
 | --- | --- |
@@ -25,8 +27,9 @@ The ops key allow-list (function-call keys, one per contract):
 | `seasons` | `open_season`, `lock_season`, `post_standings`, `close_season` |
 | `badges` | `nft_mint` |
 
-Function-call keys cannot attach NEAR, so `skills`, `registry`, `seasons` and `badges` pay their own storage.
-None of the market's admin methods are on the list: they all need 1 yocto.
+None of these calls attach NEAR (a function-call key could not), so `skills`, `registry`, `seasons`
+and `badges` pay their own storage. None of the market's admin methods are on the list: they all
+need 1 yocto.
 
 ## Build
 
@@ -132,7 +135,9 @@ near contract deploy deposits.playskirm.testnet use-file $W/skirm_deposits.wasm 
   with-init-call new json-args '{"owner_id":"playskirm.testnet","treasury_id":"playskirm.testnet"}' \
   prepaid-gas '100 Tgas' attached-deposit '0 NEAR' $NET
 
-# 3. Platform signer function-call keys (store the private keys in Secret Manager as NEAR_OPS_KEY)
+# 3. Optional: platform signer function-call keys, one per contract. The backend signs every
+#    contract with a single NEAR_OPS_KEY, so the testnet deploy uses ops' full-access key from
+#    step 1 (stored in Secret Manager as NEAR_OPS_KEY) and skips these.
 near account add-key ops.playskirm.testnet grant-function-call-access --allowance '5 NEAR' \
   --contract-account-id skills.playskirm.testnet --function-names 'nft_mint' \
   autogenerate-new-keypair print-to-terminal $NET

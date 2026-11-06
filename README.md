@@ -67,6 +67,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 **Strategy**
 - **Skills** are sealed prompts injected server-side; only their writer ever sees the text
 - **Skill triggers** make a skill play only when its condition holds (hazard close, behind on score, time running out)
+- **Model choice per agent**: in casual and practice, pick a model for each agent in the crew builder, trading cost against strength; each model scales the agent's talk rate. The picker appears when the operator lists more than one model in `LLM_MODELS`; ranked always plays the default model ([economy](docs/economy.md))
 - **Talk**: agents coordinate every tick, and the rival overhears what is said in range. A leak and abuse filter checks every line
 - **"Why did it do that?"**: after a match, a per-agent, per-tick timeline of what it saw, planned and did, and which skill drove it
 
@@ -77,13 +78,14 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 
 **Own and trade**
 - **Exchange**: mint, list and buy skills as NEAR NFTs, with creator royalties on every resale
-- **Back a writer**: stake on a skill writer up front for a capped share of their future royalties (paid in credits until the backing contract in `contracts/backing` is deployed)
+- **Back a writer**: stake on a skill writer up front for a capped share of their future royalties. Closing a round pays the whole raise to the writer; backers then earn their share only of royalties routed to the round. On the keyless local stack (`AUTH_MODE=dev`) it runs on paid credits and every resale of a covered skill routes its royalty automatically; with the backing contract (`contracts/backing`, not deployed yet, `BACKING_CONTRACT`) royalties reach backers only when the writer forwards them with `distribute`. On a hosted server without the contract, backing is off
 - **Proof**: every minted version gets a hidden benchmark (win, leak and manipulation rates), ranked stats per map, and 3 free trials for buyers
 - **Agent rentals**: rent another player's agent for one match, paid in credits, or with NEAR through the market contract once rentals are switched onchain
+- **Gasless onboarding**: a relayer can pay the gas for a new player's first transactions to skirm's contracts (NEP-366 meta-transactions, 3 per player by default). Off until an operator configures a funded relayer account (`RELAYER_ACCOUNT_ID`, `RELAYER_PRIVATE_KEY`) and the wallet supports delegate actions; see [gasless onboarding](docs/gasless.md)
 
 ## Quick start
 
-Requires **Docker** with Compose v2. No API keys or wallet needed.
+Requires **Docker** with Compose 2.24 or newer (for the optional `.env` file). No API keys or wallet needed.
 
 ```sh
 git clone https://github.com/TyronVT/skirm.git && cd skirm
@@ -104,14 +106,16 @@ The stack runs the offline **greedy brain** by default, so nothing calls a model
 
 ### Bring your own model
 
-skirm talks to any **OpenAI-compatible** chat API: OpenRouter, OpenAI, Anthropic, Groq, Together, or a local Ollama, LM Studio or vLLM. Set the provider and model in a `.env` file next to `docker-compose.yml` and restart:
+skirm talks to any **OpenAI-compatible** chat API: OpenRouter, OpenAI, Anthropic, Groq, Together, or a local Ollama, LM Studio or vLLM. Switch the brain to `model` and set the provider and model in a `.env` file next to `docker-compose.yml`, then restart (the compose file defaults `V2_BRAIN` to `greedy`, which plays offline even with a key):
 
 ```sh
 # Any model on OpenRouter (the default base URL)
+echo 'V2_BRAIN=model'          >> .env
 echo 'LLM_API_KEY=sk-or-...'   >> .env
 echo 'LLM_MODEL=<model id>'    >> .env
 
-# or a local model through Ollama
+# or a local model through Ollama (no key needed)
+echo 'V2_BRAIN=model'                                   >> .env
 echo 'LLM_BASE_URL=http://host.docker.internal:11434/v1' >> .env
 echo 'LLM_MODEL=llama3.1'                               >> .env
 
@@ -137,7 +141,7 @@ Inside a match, every agent runs the same loop each tick. It sees only its own p
 | Matches, maps and AI decisions | skirm services | Fast and cheap: thousands of decisions per match |
 | The text of your strategy | Encrypted vault | Only you can read it, even after you sell its use |
 | Skill ownership, trades and royalties | NEAR | You own what you write, and royalties pay out automatically |
-| Ranked results and prize pools | NEAR | Anyone can verify a result, and prizes cannot be withheld |
+| Ranked results and prize pools | NEAR | Each ranked result and its log hash are public, and once standings are posted each winner claims their share straight from the contract. The standings themselves are posted by skirm's ops account, which the contract trusts without checking them against the registry, and nothing in the contract forces them to be posted |
 
 <details>
 <summary><b>Architecture (for developers)</b></summary>
@@ -178,9 +182,9 @@ Only what needs trust or ownership goes onchain: skill ownership, trades, royalt
 | `market` | [`market.playskirm.testnet`](https://testnet.nearblocks.io/address/market.playskirm.testnet) | List, buy and rent. Splits the 5 % fee, creator royalty and seller; funds the season pool |
 | `registry` | [`registry.playskirm.testnet`](https://testnet.nearblocks.io/address/registry.playskirm.testnet) | Ranked match records: log hash, per-player Elo, season standings |
 | `deposits` | [`deposits.playskirm.testnet`](https://testnet.nearblocks.io/address/deposits.playskirm.testnet) | NEAR top-ups that emit a NEP-297 event for the credits ledger |
-| `seasons` | [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | One prize pool per 14-day season, claimed by the top 10 |
+| `seasons` | [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | One prize pool per 14-day season: the ops account posts the top 10, who claim their shares |
 | `badges` | `badges.playskirm.testnet` (not deployed yet) | Soulbound achievement badges (NEP-171 shape, never transferable), minted by the ops account |
-| `backing` | `backing.playskirm.testnet` (not deployed yet) | Writer backing rounds: stakes up front, a capped share of the writer's royalties pulled by backers |
+| `backing` | `backing.playskirm.testnet` (not deployed yet) | Writer backing rounds: stakes up front, the whole raise to the writer at close; backers claim a capped share of the royalties someone forwards to the round with `distribute` (the skills contract pays royalties to the writer, not to the round) |
 
 Wallets connect through [NEAR Connect](https://www.npmjs.com/package/@hot-labs/near-connect) (HOT, Meteor, MyNearWallet and others): pick a wallet and approve once.
 
@@ -222,7 +226,7 @@ Every match produces a hash-chained log of every action and every line spoken. R
 
 ## Roadmap
 
-Planned after the hackathon. None of this is built yet.
+Planned after the hackathon. Nothing below is in the codebase yet; gasless onboarding and model choice per agent, once on this list, are built and listed under [Features](#features).
 
 **NEAR AI and agents**
 - **NEAR AI Cloud** as a model provider for agents, next to any OpenAI-compatible API
@@ -235,7 +239,6 @@ Planned after the hackathon. None of this is built yet.
 **Payments**
 - **NEAR Intents (1Click)**: top up credits from any token on any chain
 - **USDC deposits** (NEP-141 / NEP-145), with prices shown in dollars
-- **Gasless onboarding**: a relayer pays gas for new players' first transactions (meta-transactions, NEP-366)
 - **Liquid-staking prize pools**: season pools earn staking yield until they are paid out
 - **Pyth price feed** for live NEAR/USD prices
 - **Multi-token items (NEP-245)**: cosmetics, badges and skill licences in one contract
@@ -247,17 +250,16 @@ Planned after the hackathon. None of this is built yet.
 
 **Also planned**
 - **Skill coach**: after a loss, suggested prompt edits from the decision timeline
-- **Model choice per agent**: trade cost against strength in the crew builder
 - **Clans** with a NEAR treasury
 
 ## Repository layout
 
 ```
 apps/        web (Next.js) · api (NestJS) · realtime (WebSocket) · worker (BullMQ)
-packages/    engine · decision-engine · db · ledger · server · shared · ui
+packages/    engine · decision-engine · db · ledger · server · shared · ui · mcp (MCP server for external agents)
 contracts/   skills · market · registry · deposits · seasons · badges · backing (Rust, near-sdk)
 spec/        the ten v2 maps
-docs/        walkthrough, backend contract, economy, deploy, development
+docs/        walkthrough, backend contract, economy, benchmarks, deploy, development, external agents, gasless
 ```
 
 ## Development
@@ -280,6 +282,8 @@ CI runs typecheck, unit tests, the contract tests and the wasm build on every pu
 | [Backend contract](docs/backend-contract.md) | REST routes, WebSocket messages, queues, environment |
 | [Economy](docs/economy.md) | Talk tiers, holds, the free allowance, margins |
 | [Benchmarks](docs/benchmarks.md) | The skill benchmark gauntlet and trials |
+| [External agents](docs/external-agents.md) | Bring your own agent: webhook, pull api and the MCP server |
+| [Gasless onboarding](docs/gasless.md) | NEP-366 meta-transactions through a relayer (off until configured) |
 | [Deploy](docs/deploy.md) | Docker Compose and Google Cloud Run |
 | [Development](docs/development.md) | Tests, the full stack smoke, CI |
 | [Contracts](contracts/README.md) | Build, test and deploy the NEAR contracts |
