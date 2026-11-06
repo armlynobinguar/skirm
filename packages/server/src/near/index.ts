@@ -18,14 +18,17 @@ import {
 } from './registry';
 import { NearRpc, type NearRpcOptions } from './rpc';
 import { NearSeasons, NoopSeasons, type SeasonsChain } from './seasons';
+import { NearMetaTxRelayer, type MetaTxRelayer } from './relayer';
 import { OpsFunctionCaller, type FunctionCaller } from './signer';
 
 export * from './backing';
 export * from './badges';
+export * from './delegate';
 export * from './deposits';
 export * from './rentals';
 export * from './ownership';
 export * from './registry';
+export * from './relayer';
 export * from './rpc';
 export * from './seasons';
 export * from './signer';
@@ -41,6 +44,8 @@ export interface NearAdapters {
   seasons: SeasonsChain;
   /** Soulbound achievement badges (`badges` contract). */
   badges: BadgeMinter;
+  /** Gasless onboarding's relayer (NEP-366); absent unless RELAYER_ACCOUNT_ID and _PRIVATE_KEY are set. */
+  relayer?: MetaTxRelayer;
 }
 
 export interface NearAdapterOptions extends NearRpcOptions {
@@ -61,11 +66,12 @@ type NearConfig = Pick<
   | 'NEAR_CONTRACT_BADGES'
   | 'CREDITS_PER_NEAR'
   | 'nearRpcUrls'
->;
+> &
+  Partial<Pick<ServerConfig, 'RELAYER_ACCOUNT_ID' | 'RELAYER_PRIVATE_KEY'>>;
 
 /**
  * Registry/Minter/OwnershipReader/Seasons/Badges are Near* when the ops signer is configured, Noop*
- * otherwise.
+ * otherwise. The relayer exists only with RELAYER_ACCOUNT_ID and RELAYER_PRIVATE_KEY set.
  * Deposits and rentals always verify through RPC; `dev:` hashes are accepted only with AUTH_MODE=dev.
  */
 export function createNearAdapters(
@@ -78,7 +84,14 @@ export function createNearAdapters(
     (config.NEAR_OPS_ACCOUNT && config.NEAR_OPS_KEY
       ? new OpsFunctionCaller(config.NEAR_OPS_ACCOUNT, config.NEAR_OPS_KEY, config.nearRpcUrls)
       : undefined);
+  const relayer =
+    config.RELAYER_ACCOUNT_ID && config.RELAYER_PRIVATE_KEY
+      ? new NearMetaTxRelayer(config.RELAYER_ACCOUNT_ID, config.RELAYER_PRIVATE_KEY, rpc)
+      : undefined;
+  // Deposits and rentals the relayer sent for a player count as the player's (docs/gasless.md).
+  const relayers = relayer ? [relayer.relayerId] : [];
   return {
+    ...(relayer ? { relayer } : {}),
     rpc,
     registry: caller ? new NearRegistry(caller, config.NEAR_CONTRACT_REGISTRY) : new NoopRegistry(),
     minter: caller ? new NearMinter(caller, config.NEAR_CONTRACT_SKILLS) : new NoopMinter(),
@@ -90,11 +103,11 @@ export function createNearAdapters(
       : new NoopSeasons(),
     badges: caller ? new NearBadges(caller, config.NEAR_CONTRACT_BADGES) : new NoopBadges(),
     deposits: new CompositeDepositVerifier(
-      new RpcDepositVerifier(rpc, config.NEAR_CONTRACT_DEPOSITS, config.CREDITS_PER_NEAR),
+      new RpcDepositVerifier(rpc, config.NEAR_CONTRACT_DEPOSITS, config.CREDITS_PER_NEAR, relayers),
       config.AUTH_MODE === 'dev' ? new DevDepositVerifier(config.CREDITS_PER_NEAR) : undefined,
     ),
     rentals: new CompositeRentalVerifier(
-      new RpcRentalVerifier(rpc, config.NEAR_CONTRACT_MARKET),
+      new RpcRentalVerifier(rpc, config.NEAR_CONTRACT_MARKET, relayers),
       config.AUTH_MODE === 'dev' ? new DevRentalVerifier() : undefined,
     ),
   };

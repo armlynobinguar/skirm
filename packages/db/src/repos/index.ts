@@ -20,6 +20,7 @@ import { PlaybooksRepo } from './playbooks';
 import { PuzzlesRepo } from './puzzles';
 import { ProofRepo } from './proof';
 import { QuestsRepo } from './quests';
+import { RelayRepo } from './relay';
 import { RankedRepo } from './ranked';
 import { RentalsRepo } from './rentals';
 import { ReplaysRepo } from './replays';
@@ -80,6 +81,8 @@ export interface Repos {
   communityMaps: CommunityMapsRepo;
   /** Writer backing rounds, backers' stakes and the royalties routed to them. */
   backing: BackingRepo;
+  /** Gasless onboarding: meta-transactions relayed for players (the free quota). */
+  relay: RelayRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -126,6 +129,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     puzzles: new PuzzlesRepo(db),
     communityMaps: new CommunityMapsRepo(db),
     backing: new BackingRepo(db),
+    relay: new RelayRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -152,6 +156,7 @@ export * from './playbooks';
 export * from './proof';
 export * from './quests';
 export * from './ranked';
+export * from './relay';
 export * from './rentals';
 export * from './replays';
 export * from './seasons';

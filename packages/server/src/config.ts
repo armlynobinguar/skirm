@@ -25,6 +25,7 @@ export const ENV_DEFAULTS = {
   /** The model provider: any OpenAI-compatible API (same defaults as @skirm/decision-engine's DEFAULT_LLM_*). */
   LLM_BASE_URL: 'https://openrouter.ai/api/v1',
   LLM_MODEL: 'anthropic/claude-haiku-5.5',
+  RELAYER_FREE_TXS: 3,
   API_PORT: 4000,
   REALTIME_PORT: 4001,
   PUBLIC_API_URL: 'http://localhost:4000',
@@ -150,6 +151,25 @@ export const envSchema = z
       .enum(['true', 'false', ''])
       .optional()
       .transform((v) => v === 'true'),
+    /**
+     * Gasless onboarding (NEP-366 meta-transactions, docs/gasless.md): the api relays players'
+     * signed delegate actions from this account, which pays the gas. Both unset (the default): off.
+     */
+    RELAYER_ACCOUNT_ID: optional(),
+    RELAYER_PRIVATE_KEY: optional(),
+    /** Relayed transactions each NEAR account gets for free (default 3). */
+    RELAYER_FREE_TXS: z
+      .string()
+      .optional()
+      .transform((v, ctx) => {
+        if (v === undefined || v.trim() === '') return ENV_DEFAULTS.RELAYER_FREE_TXS;
+        const n = Number(v);
+        if (!Number.isSafeInteger(n) || n < 0 || n > 100) {
+          ctx.addIssue({ code: 'custom', message: 'must be a whole number from 0 to 100' });
+          return z.NEVER;
+        }
+        return n;
+      }),
     CREDITS_PER_NEAR: z
       .string()
       .optional()
@@ -209,6 +229,18 @@ export const envSchema = z
       ctx.addIssue({
         code: 'custom',
         path: ['NEAR_OPS_KEY'],
+        message: 'must be an ed25519:<base58> secret key',
+      });
+    if (!!env.RELAYER_ACCOUNT_ID !== !!env.RELAYER_PRIVATE_KEY)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['RELAYER_PRIVATE_KEY'],
+        message: 'RELAYER_ACCOUNT_ID and RELAYER_PRIVATE_KEY are set together',
+      });
+    if (env.RELAYER_PRIVATE_KEY && !/^ed25519:[1-9A-HJ-NP-Za-km-z]{40,100}$/.test(env.RELAYER_PRIVATE_KEY))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['RELAYER_PRIVATE_KEY'],
         message: 'must be an ed25519:<base58> secret key',
       });
   });

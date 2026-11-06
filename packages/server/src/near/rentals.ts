@@ -3,7 +3,7 @@
 // event. The caller matches it to its own offer (rental id, owner, price). Dev mode accepts
 // `dev:<yocto>[:<nonce>]` hashes, split at the default platform fee.
 import type { NearRpc } from './rpc';
-import { eventsOf, isSuccess, NearRpcError, type TxStatus } from './rpc';
+import { callSucceeded, effectiveCall, eventsOf, NearRpcError, txStatusOf, type TxStatus } from './rpc';
 
 /** The market's default platform fee (contracts/market DEFAULT_FEE_BPS), used for dev rentals. */
 export const RENTAL_DEV_FEE_BPS = 500n;
@@ -94,6 +94,8 @@ export class RpcRentalVerifier implements RentalVerifier {
   constructor(
     private readonly rpc: NearRpc,
     private readonly marketContract: string,
+    /** Relayer accounts whose meta-transactions count as the player's own (docs/gasless.md). */
+    private readonly relayers: readonly string[] = [],
   ) {}
 
   async verify(txHash: string, opts: { renterId?: string | null }): Promise<RentalPayment> {
@@ -101,7 +103,7 @@ export class RpcRentalVerifier implements RentalVerifier {
     if (!opts.renterId) throw new RentalError('renter_required', 'link a NEAR account to rent');
     let tx: TxStatus;
     try {
-      tx = await this.rpc.txStatus(txHash, opts.renterId);
+      tx = await txStatusOf(this.rpc, txHash, opts.renterId, this.relayers);
     } catch (err) {
       if (err instanceof NearRpcError && err.code === 'not_found')
         throw new RentalError('not_found', 'transaction not found');
@@ -109,11 +111,12 @@ export class RpcRentalVerifier implements RentalVerifier {
         throw new RentalError('rpc_unavailable', 'NEAR RPC is unavailable, try again');
       throw new RentalError('not_found', 'transaction could not be read');
     }
-    if (tx.transaction.receiver_id !== this.marketContract)
+    const call = effectiveCall(tx, this.relayers);
+    if (call.receiverId !== this.marketContract)
       throw new RentalError('wrong_receiver', 'transaction is not a rental on the market contract');
-    if (tx.transaction.signer_id !== opts.renterId)
+    if (call.signerId !== opts.renterId)
       throw new RentalError('wrong_sender', 'transaction was signed by another account');
-    if (!isSuccess(tx.status)) throw new RentalError('failed', 'rental transaction failed');
+    if (!callSucceeded(tx, call)) throw new RentalError('failed', 'rental transaction failed');
 
     // Only the market's own event counts: another contract in the tx could log a lookalike, so a
     // receipt without an executor is not trusted either.

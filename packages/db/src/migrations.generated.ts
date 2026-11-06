@@ -386,5 +386,18 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     "sql": [
       "ALTER TABLE \"v2_matches\" ADD COLUMN \"heartbeat_at\" timestamp with time zone;"
     ]
+  },
+  {
+    "tag": "0022_gasless_relay",
+    "folderMillis": 1793931004316,
+    "bps": true,
+    "hash": "d43e825fd8f1b868c71eb69351baf686a3dab48b6ecaa3fe3518349d05f37ec4",
+    "sql": [
+      "CREATE TABLE \"relayed_txs\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"account_id\" text NOT NULL,\n\t\"near_account_id\" text NOT NULL,\n\t\"receiver_id\" text NOT NULL,\n\t\"methods\" text NOT NULL,\n\t\"delegate_hash\" text NOT NULL,\n\t\"status\" text DEFAULT 'pending' NOT NULL,\n\t\"tx_hash\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"updated_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\tCONSTRAINT \"relayed_txs_status_ck\" CHECK (\"relayed_txs\".\"status\" in ('pending', 'sent', 'failed'))\n);\n",
+      "\nALTER TABLE \"relayed_txs\" ADD CONSTRAINT \"relayed_txs_account_id_accounts_id_fk\" FOREIGN KEY (\"account_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE UNIQUE INDEX \"relayed_txs_delegate_uq\" ON \"relayed_txs\" USING btree (\"delegate_hash\");",
+      "\nCREATE INDEX \"relayed_txs_account_idx\" ON \"relayed_txs\" USING btree (\"account_id\");",
+      "\nCREATE INDEX \"relayed_txs_near_idx\" ON \"relayed_txs\" USING btree (\"near_account_id\");"
+    ]
   }
 ];
