@@ -212,6 +212,8 @@ export interface RelayStatus {
   freeTxs: number;
   used: number;
   remaining: number;
+  /** false: no NEAR account linked yet (nothing can be relayed until one is). */
+  linked?: boolean;
 }
 
 /** POST /relay: the relayer's transaction hash (post it to the usual confirm route). */
@@ -432,6 +434,24 @@ export interface ListingRequest {
 export interface PurchaseResponse {
   owned: true;
   sale: Sale;
+}
+
+/** A wallet call the api names for the client to sign (args as JSON, deposit and gas as strings). */
+export interface OnchainCall {
+  receiverId: string;
+  methodName: string;
+  args: Record<string, unknown>;
+  deposit: string;
+  gas: string;
+  /** false: optional cleanup (nft_revoke after delist). */
+  required: boolean;
+}
+
+/** DELETE /market/:id/listing. `onchain` (null in dev mode) takes the listing down on the market contract. */
+export interface CancelListingResponse {
+  cancelled: true;
+  listing: Listing;
+  onchain: { calls: OnchainCall[] } | null;
 }
 
 // ---------- Leaderboards and matches ----------

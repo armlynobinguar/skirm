@@ -17,7 +17,24 @@ export interface DepositVerification {
   /** Receipt number the deposits contract assigned. */
   depositReceipt?: string;
   dev: boolean;
+  /**
+   * One entry per deposit() action (a batched transaction can carry several), each credited once
+   * under its own receipt key. Absent: the whole verification is one part (`receipt`, `credits`).
+   */
+  parts?: DepositPart[];
 }
+
+/** One deposit() action of a transaction. */
+export interface DepositPart {
+  /** Ledger idempotency key: the tx hash for the first action, `<hash>#<i>` for action i > 0. */
+  receipt: string;
+  amountYocto: bigint;
+  credits: number;
+  depositReceipt?: string;
+}
+
+export const depositPartReceipt = (txHash: string, index: number) =>
+  index === 0 ? txHash : `${txHash}#${index}`;
 
 export type DepositErrorCode =
   | 'invalid_hash'
@@ -108,35 +125,50 @@ export class RpcDepositVerifier implements DepositVerifier {
       throw new DepositError('wrong_sender', 'transaction was signed by another account');
     if (!callSucceeded(tx, call0)) throw new DepositError('failed', 'deposit transaction failed');
 
-    const call = call0.actions
+    // Every deposit() action is credited: a batched transaction can carry several (one receipt, so
+    // all or none of them ran). Action i pairs with the i-th `deposit` event of the deposits contract.
+    const calls = call0.actions
       .map((a) => (typeof a === 'object' ? a.FunctionCall : undefined))
-      .find((f) => f?.method_name === 'deposit');
-    if (!call) throw new DepositError('no_deposit', 'transaction does not call deposit()');
+      .filter((f): f is NonNullable<typeof f> => f?.method_name === 'deposit');
+    if (calls.length === 0) throw new DepositError('no_deposit', 'transaction does not call deposit()');
 
-    const event = eventsOf(tx, 'skirm_deposits').find(
-      (e) =>
-        e.event === 'deposit' && (e.executor ?? this.depositsContract) === this.depositsContract,
-    );
-    const data = Array.isArray(event?.data)
-      ? (event!.data[0] as Record<string, unknown> | undefined)
-      : (event?.data as Record<string, unknown> | undefined);
-    if (!data || typeof data.amount !== 'string')
+    const events = eventsOf(tx, 'skirm_deposits')
+      .filter((e) => e.event === 'deposit' && (e.executor ?? this.depositsContract) === this.depositsContract)
+      .flatMap((e) => (Array.isArray(e.data) ? e.data : [e.data]) as (Record<string, unknown> | undefined)[]);
+    if (events.length < calls.length)
       throw new DepositError('no_deposit', 'no deposit event in the transaction');
-    if (data.player !== opts.senderId)
-      throw new DepositError('wrong_sender', 'deposit credited another account');
-    const amountYocto = BigInt(data.amount);
-    if (BigInt(call.deposit) !== amountYocto)
-      throw new DepositError('no_deposit', 'attached deposit does not match the event');
-    const credits = creditsForYocto(amountYocto, this.creditsPerNear);
+    const hash = tx.transaction.hash || txHash;
+    const parts: DepositPart[] = [];
+    for (let i = 0; i < calls.length; i++) {
+      const data = events[i];
+      if (!data || typeof data.amount !== 'string' || !/^[0-9]{1,40}$/.test(data.amount))
+        throw new DepositError('no_deposit', 'no deposit event in the transaction');
+      if (data.player !== opts.senderId)
+        throw new DepositError('wrong_sender', 'deposit credited another account');
+      const amountYocto = BigInt(data.amount);
+      if (BigInt(calls[i]!.deposit) !== amountYocto)
+        throw new DepositError('no_deposit', 'attached deposit does not match the event');
+      const part: DepositPart = {
+        // The first action keeps the bare tx hash (the key deposits were always credited under).
+        receipt: depositPartReceipt(hash, i),
+        amountYocto,
+        credits: creditsForYocto(amountYocto, this.creditsPerNear),
+      };
+      if (data.receipt !== undefined) part.depositReceipt = String(data.receipt);
+      parts.push(part);
+    }
+    const amountYocto = parts.reduce((n, p) => n + p.amountYocto, 0n);
+    const credits = parts.reduce((n, p) => n + p.credits, 0);
     if (credits < 1) throw new DepositError('too_small', 'deposit is worth less than one credit');
     const out: DepositVerification = {
-      receipt: tx.transaction.hash || txHash,
+      receipt: hash,
       amountYocto,
       credits,
       sender: opts.senderId,
       dev: false,
+      parts,
     };
-    if (data.receipt !== undefined) out.depositReceipt = String(data.receipt);
+    if (parts[0]!.depositReceipt !== undefined) out.depositReceipt = parts[0]!.depositReceipt;
     return out;
   }
 }

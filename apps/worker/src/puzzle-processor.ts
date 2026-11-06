@@ -16,6 +16,7 @@ import { skillFitsRole } from '@skirm/shared';
 import type { BenchmarkAttempt, BenchmarkDeps, BenchmarkOutcome } from './benchmark-processor';
 import { BENCH_EVENTS_MAX, benchEventLine, type BenchEvent } from './bench-processor';
 import { WorkerError, errorCode } from './deps';
+import { settleRecorded } from './hold-sweep';
 
 /** What a finished run stores in `puzzle_runs.result`. Never any prompt or speech text. */
 export interface PuzzleRunResult {
@@ -170,9 +171,7 @@ export async function processPuzzleRun(
         );
         if (!c.ok) logger.warn('puzzle charge failed', { runId, code: c.error });
       }
-      const st = await repos.ledger.settle(holdId);
-      if (!st.ok) logger.warn('puzzle settle failed', { runId, code: st.error });
-      held = false;
+      // Settled after finish below (settleRecorded): a retry never charges twice.
     }
 
     const result: PuzzleRunResult = {
@@ -203,6 +202,10 @@ export async function processPuzzleRun(
       result,
       ...(solve ? { solve } : {}),
     });
+    if (held) {
+      held = false;
+      await settleRecorded(deps, holdId, 'puzzle settle failed', { runId });
+    }
     logger.info('puzzle run done', {
       runId,
       puzzle: puzzle.id,

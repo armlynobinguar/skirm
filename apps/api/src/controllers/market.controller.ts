@@ -4,7 +4,8 @@
 // GET /market and GET /market/:skillId are public (signed-out visitors browse the Exchange): they
 // return the same public metadata, with the caller-only fields (owned, trials) at their signed-out
 // defaults and drafts hidden. Every write and the trial routes still need a session.
-import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
+import { MarketTxError } from '@skirm/server';
 import {
   TRIAL_LIMIT,
   versionKey,
@@ -31,6 +32,20 @@ const marketQuery = z.object({
 const versionQuery = z.object({ version: optIntQuery(1, 1_000_000) });
 const trialBody = z.object({ version: z.number().int().min(1).optional(), agentId });
 const DEV_PURCHASE_RE = /^dev:([0-9]{1,40})(?::[A-Za-z0-9_-]{1,64})?$/;
+
+/** Runs a market tx check, mapping its errors: RPC down 503, no linked account 422, else 422 `code`. */
+async function marketTx<T>(code: string, check: () => Promise<T>): Promise<T> {
+  try {
+    return await check();
+  } catch (err) {
+    if (!(err instanceof MarketTxError)) throw err;
+    if (err.code === 'rpc_unavailable')
+      throw new ApiError(503, 'rpc_unavailable', 'NEAR RPC is unavailable, try again');
+    if (err.code === 'account_required')
+      throw new ApiError(422, 'near_account_required', 'link a NEAR account first');
+    throw new ApiError(422, code, err.message, { reason: err.code });
+  }
+}
 
 const key = (v: { id: string; version: number }) => versionKey(v.id, v.version);
 /** Descending with nulls last (cards with no ranked match or no benchmark score). */
@@ -245,6 +260,20 @@ export class MarketController {
       }
       version = mine[0].version;
     }
+    // Outside dev mode the listing must be onchain: its nft_approve tx is read through RPC.
+    if (this.deps.config.AUTH_MODE !== 'dev') {
+      if (!b.txHash)
+        throw new ApiError(422, 'listing_unverified', 'list through your wallet first (nft_approve)');
+      const ver = await this.deps.repos.skills.get(sid, version);
+      if (ver?.tokenId)
+        await marketTx('listing_unverified', () =>
+          this.deps.near.market.verifyListing(b.txHash!, {
+            sellerId: account.nearAccountId,
+            tokenId: ver.tokenId!,
+            priceYocto: b.priceYocto,
+          }),
+        );
+    }
     const row = await this.deps.repos.market.list({
       skillId: sid,
       version,
@@ -253,6 +282,60 @@ export class MarketController {
       txHash: b.txHash ?? null,
     });
     return listingView(row, await this.deps.repos.skills.get(sid, version));
+  }
+
+  /**
+   * Cancels the caller's own active listing of a skill (`?version=`, or their newest). 403 when
+   * only someone else lists it, 409 `not_listed` when nothing is listed. Outside dev mode the
+   * listing also lives on the market contract: `onchain` names the wallet calls that take it down
+   * there (`market.delist`, then optionally `skills.nft_revoke` to drop the approval).
+   */
+  @Delete(':skillId/listing')
+  async cancelListing(
+    @Param('skillId') id: string,
+    @Query() query: unknown,
+    @CurrentAccount() acc?: AccountRow,
+  ) {
+    const account = mustAccount(acc);
+    const { version } = parse(versionQuery, query);
+    const sid = idOr404(skillId, id, 'skill');
+    const { repos, near, config } = this.deps;
+    const mine = await repos.market.activeListingOf(account.id, sid, version);
+    if (!mine) {
+      if (!(await repos.skills.get(sid))) throw notFound('skill');
+      if (await repos.market.activeListing(sid, version))
+        throw new ApiError(403, 'forbidden', 'only the seller can cancel this listing');
+      throw new ApiError(409, 'not_listed', 'you have no active listing of this skill');
+    }
+    const row = (await repos.market.cancel(mine.id, account.id)) ?? mine;
+    const onchain =
+      config.AUTH_MODE === 'dev'
+        ? null
+        : {
+            calls: [
+              {
+                receiverId: near.market.marketContract,
+                methodName: 'delist',
+                args: { token_id: row.tokenId },
+                deposit: '1',
+                gas: '30000000000000',
+                required: true,
+              },
+              {
+                receiverId: near.market.skillsContract,
+                methodName: 'nft_revoke',
+                args: { token_id: row.tokenId, account_id: near.market.marketContract },
+                deposit: '1',
+                gas: '30000000000000',
+                required: false,
+              },
+            ],
+          };
+    return {
+      cancelled: true,
+      listing: listingView({ ...row, status: 'cancelled' }, await repos.skills.get(sid, row.version)),
+      onchain,
+    };
   }
 
   /** `{ owned: true }` once the purchase is verified (dev mode: a `dev:<yocto>` hash is trusted). */
@@ -286,6 +369,7 @@ export class MarketController {
     if (listing?.sellerId === account.id)
       throw new ApiError(409, 'own_listing', 'you are the seller of this listing');
 
+    let salePrice = listing?.priceYocto;
     if (b.txHash.startsWith('dev:')) {
       if (config.AUTH_MODE !== 'dev')
         throw new ApiError(403, 'dev_disabled', 'dev purchases are disabled');
@@ -299,6 +383,13 @@ export class MarketController {
         throw new ApiError(503, 'ownership_unavailable', 'NEAR ownership cannot be checked now');
       if (!account.nearAccountId)
         throw new ApiError(422, 'near_account_required', 'link a NEAR account to buy');
+      // The tx itself: a successful market.buy of this token, signed by the caller, with a sale event.
+      const paid = await marketTx('purchase_unverified', () =>
+        near.market.verifyPurchase(b.txHash, { buyerId: account.nearAccountId, tokenId: v.tokenId! }),
+      );
+      if (listing && paid.priceYocto < BigInt(listing.priceYocto))
+        throw new ApiError(422, 'underpaid', 'the amount is below the listed price');
+      salePrice = paid.priceYocto.toString();
       let owner: string | null | undefined;
       try {
         owner = await near.ownership.ownerOf(v.tokenId);
@@ -318,7 +409,7 @@ export class MarketController {
       version,
       buyerId: account.id,
       txHash: b.txHash,
-      ...(listing ? { priceYocto: listing.priceYocto } : {}),
+      ...(salePrice !== undefined ? { priceYocto: salePrice } : {}),
     });
     return { owned: true, sale: saleView(sale) };
   }

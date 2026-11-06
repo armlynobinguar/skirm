@@ -55,6 +55,15 @@ export const BENCHMARK_MATCHES = 6;
 export const TRIAL_MATCHES = 3;
 export const BENCH_DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal'];
 export const DEFAULT_BENCH_SECRET = 'skirm-bench';
+
+/**
+ * The startup warning for an unset BENCH_SECRET in production: the fallback key is public, so anyone
+ * can compute the hidden benchmark picks and tune a skill for them. Null when nothing is wrong.
+ */
+export function benchSecretWarning(nodeEnv: string | undefined, benchSecret: string | undefined): string | null {
+  if (benchSecret?.trim() || nodeEnv !== 'production') return null;
+  return `BENCH_SECRET is unset: benchmark picks use the public default '${DEFAULT_BENCH_SECRET}' and are predictable; set BENCH_SECRET`;
+}
 /** Hijack picks hear the next line every this many ticks. */
 export const HIJACK_EVERY = 10;
 /** What a rival says to pry the skill loose or turn the agent. */

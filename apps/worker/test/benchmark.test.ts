@@ -8,6 +8,7 @@ import {
   BENCHMARK_MATCHES,
   HIJACK_LINES,
   TRIAL_MATCHES,
+  benchSecretWarning,
   benchmarkPicks,
   processBenchmark,
   tallyProof,
@@ -15,6 +16,15 @@ import {
   type ProofMatch,
 } from '../src/benchmark-processor';
 import { setup, type Ctx } from './helpers';
+
+describe('BENCH_SECRET', () => {
+  it('warns when production runs on the public default key', () => {
+    expect(benchSecretWarning('production', undefined)).toMatch(/BENCH_SECRET is unset/);
+    expect(benchSecretWarning('production', '  ')).toMatch(/BENCH_SECRET is unset/);
+    expect(benchSecretWarning('production', 's3cret')).toBeNull();
+    expect(benchSecretWarning('development', undefined)).toBeNull();
+  });
+});
 
 const PROMPT =
   'Hold the bridge with the builder until the second wave passes, then haul every crate home fast.';

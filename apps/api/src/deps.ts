@@ -16,6 +16,7 @@ import type {
   SafePostOptions,
   SafePostResult,
   RentalVerifier,
+  MarketTxVerifier,
   Minter,
   OwnershipReader,
   ServerConfig,
@@ -82,6 +83,8 @@ export interface ApiDeps {
     deposits: DepositVerifier;
     /** Agent rental payments (`market.rent`); dev mode also takes `dev:` hashes. */
     rentals: RentalVerifier;
+    /** Skill NFT purchases and listings read through RPC (outside dev hashes). */
+    market: MarketTxVerifier;
     ownership: OwnershipReader;
     /** Soulbound achievement badges (`badges` contract; NoopBadges without a signer). */
     badges: BadgeMinter;

@@ -90,7 +90,7 @@ describe('relay disabled (RELAYER_* unset)', () => {
 
   it('reports it off and refuses relays with 404; the rest works as before', async () => {
     const ana = await linked(h, 'ana', 'ana.testnet');
-    expect((await ana.get('/relay')).body).toEqual({ enabled: false, freeTxs: 0, used: 0, remaining: 0 });
+    expect((await ana.get('/relay')).body).toEqual({ enabled: false, freeTxs: 0, used: 0, remaining: 0, linked: true });
     const res = await ana.post('/relay', { signedDelegate: sign() });
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('relay_disabled');
@@ -116,7 +116,7 @@ describe('relay enabled', () => {
   };
 
   it('relays a valid delegate from the relayer and counts it', async () => {
-    expect((await ana.get('/relay')).body).toEqual({ enabled: true, freeTxs: 3, used: 0, remaining: 3 });
+    expect((await ana.get('/relay')).body).toEqual({ enabled: true, freeTxs: 3, used: 0, remaining: 3, linked: true });
     const res = await ana.post('/relay', { signedDelegate: sign() });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ txHash: expect.stringMatching(/^RELAYHASH/), remaining: 2 });
@@ -191,7 +191,7 @@ describe('relay enabled', () => {
     it('a player without a linked NEAR account', async () => {
       const cy = await h.as('cy');
       await refused(sign({ sender: 'cy.testnet' }), 409, 'near_not_linked', cy);
-      expect((await cy.get('/relay')).body).toMatchObject({ enabled: true, remaining: 3 });
+      expect((await cy.get('/relay')).body).toMatchObject({ enabled: true, remaining: 3, linked: false });
     });
 
     it('RPC down: 503, nothing reserved', async () => {
@@ -203,10 +203,12 @@ describe('relay enabled', () => {
 
     it('a relay that never reached the chain gives the slot back; one that failed onchain keeps it', async () => {
       relayer.fail = 'offchain';
-      await refused(boSign(), 502, 'relay_failed', bo);
+      const signed = boSign();
+      await refused(signed, 502, 'relay_failed', bo);
       expect((await bo.get('/relay')).body.remaining).toBe(3);
+      // "Try again" sends the same signed delegate: it is relayed again, not a duplicate.
       relayer.fail = 'onchain';
-      const res = await bo.post('/relay', { signedDelegate: boSign() });
+      const res = await bo.post('/relay', { signedDelegate: signed });
       expect(res.status).toBe(422);
       expect(res.body.error).toMatchObject({ code: 'relay_tx_failed', details: { txHash: expect.stringMatching(/^FAILEDHASH/) } });
       expect((await bo.get('/relay')).body.remaining).toBe(2);

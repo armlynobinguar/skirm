@@ -108,8 +108,27 @@ export class MarketRepo {
       .orderBy(desc(listings.createdAt));
   }
 
-  async cancel(listingId: string, sellerId: string): Promise<void> {
-    await tx(this.db, async (t) => {
+  /** The seller's own active listing of a skill (one `version`, or the newest). */
+  async activeListingOf(sellerId: string, skillId: string, version?: number): Promise<ListingRow | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(listings)
+      .where(
+        and(
+          eq(listings.sellerId, sellerId),
+          eq(listings.skillId, skillId),
+          eq(listings.status, 'active'),
+          ...(version === undefined ? [] : [eq(listings.version, version)]),
+        ),
+      )
+      .orderBy(desc(listings.createdAt))
+      .limit(1);
+    return row;
+  }
+
+  /** Cancels the seller's active listing; the cancelled row, or undefined when there was none. */
+  async cancel(listingId: string, sellerId: string): Promise<ListingRow | undefined> {
+    return tx(this.db, async (t) => {
       const [row] = await t
         .update(listings)
         .set({ status: 'cancelled', closedAt: new Date() })
@@ -126,8 +145,13 @@ export class MarketRepo {
           .update(skillVersions)
           .set({ status: 'minted' })
           .where(
-            and(eq(skillVersions.skillId, row.skillId), eq(skillVersions.version, row.version)),
+            and(
+              eq(skillVersions.skillId, row.skillId),
+              eq(skillVersions.version, row.version),
+              eq(skillVersions.status, 'listed'),
+            ),
           );
+      return row;
     });
   }
 

@@ -1,8 +1,22 @@
 // Request rate limits: a tight bucket for NEAR-RPC and paid-work routes, a loose one for the rest,
 // counted per client per minute; 429 rate_limited with Retry-After; /health never limited.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MemoryRateLimitStore, bucketOf, clientOf, type RateLimitStore } from '../src/rate-limit';
+import { MemoryRateLimitStore, bucketOf, clientOf, rateLimitsFromEnv, type RateLimitStore } from '../src/rate-limit';
 import { setup, type Harness } from './helpers';
+
+describe('rate limits from the environment', () => {
+  it('takes positive integers and ignores anything else with a warning (NaN would disable the limit)', () => {
+    const warned: string[] = [];
+    const warn = (m: string) => warned.push(m);
+    expect(rateLimitsFromEnv({ RATE_LIMIT_STRICT: '5', RATE_LIMIT_GENERAL: ' 120 ' }, warn)).toEqual({ strict: 5, general: 120 });
+    expect(warned).toEqual([]);
+    expect(rateLimitsFromEnv({ RATE_LIMIT_STRICT: 'abc', RATE_LIMIT_GENERAL: '0' }, warn)).toEqual({});
+    expect(rateLimitsFromEnv({ RATE_LIMIT_STRICT: '2.5', RATE_LIMIT_GENERAL: '-3' }, warn)).toEqual({});
+    expect(warned).toHaveLength(4);
+    expect(warned[0]).toMatch(/RATE_LIMIT_STRICT.*default 20/);
+    expect(rateLimitsFromEnv({}, warn)).toEqual({});
+  });
+});
 
 describe('rate limit buckets', () => {
   it('puts NEAR-RPC, paid-work and sign-in routes in the strict bucket', () => {

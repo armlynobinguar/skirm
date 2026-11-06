@@ -140,11 +140,39 @@ describe('deposits', () => {
       sender: 'ana.testnet',
       depositReceipt: '7',
       dev: false,
+      parts: [{ receipt: TX, amountYocto: 2n * NEAR, credits: 2000, depositReceipt: '7' }],
     });
     expect(calls.map((c) => new URL(c.url).host)).toEqual([
       'test.rpc.fastnear.com',
       'near-testnet.drpc.org',
     ]);
+  });
+
+  it('credits every deposit() action of a batched transaction, each under its own receipt', async () => {
+    const tx = depositTx();
+    const ev = (receipt: string, amount: bigint) =>
+      `EVENT_JSON:${JSON.stringify({
+        standard: 'skirm_deposits',
+        version: '1.0.0',
+        event: 'deposit',
+        data: [{ receipt, player: 'ana.testnet', amount: amount.toString(), block_height: '1', timestamp_ms: '1' }],
+      })}`;
+    tx.transaction.actions = [
+      { FunctionCall: { method_name: 'deposit', args: 'e30=', gas: 30e12, deposit: (2n * NEAR).toString() } },
+      { FunctionCall: { method_name: 'deposit', args: 'e30=', gas: 30e12, deposit: NEAR.toString() } },
+    ];
+    tx.receipts_outcome[0]!.outcome.logs = [ev('7', 2n * NEAR), ev('8', NEAR)];
+    const { fetch } = rpcFetch(() => ({ body: { result: tx } }));
+    const v = new RpcDepositVerifier(new NearRpc(['https://rpc.example'], { fetch }), 'deposits.playskirm.testnet', 1000);
+    const out = await v.verify(TX, { senderId: 'ana.testnet' });
+    expect(out).toMatchObject({ receipt: TX, amountYocto: 3n * NEAR, credits: 3000 });
+    expect(out.parts).toEqual([
+      { receipt: TX, amountYocto: 2n * NEAR, credits: 2000, depositReceipt: '7' },
+      { receipt: `${TX}#1`, amountYocto: NEAR, credits: 1000, depositReceipt: '8' },
+    ]);
+    // Two actions but one event: refused rather than half-credited.
+    tx.receipts_outcome[0]!.outcome.logs = [ev('7', 2n * NEAR)];
+    await expect(v.verify(TX, { senderId: 'ana.testnet' })).rejects.toMatchObject({ code: 'no_deposit' });
   });
 
   it('refuses wrong receivers, signers, failures and mismatched events', async () => {

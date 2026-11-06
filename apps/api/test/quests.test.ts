@@ -151,6 +151,11 @@ describe('POST /quests/:id/claim', () => {
     // Only 2 of the 12 spent are left to refill.
     res = await ana.post(`/quests/${q2.id}/claim`);
     expect(res.body).toMatchObject({ credited: 2, allowanceLeft: 42 });
+    // Each refill is a ledger row of free credits.
+    const refills = (await ana.get('/credits')).body.rows.filter(
+      (r: { type: string; source: string; matchId: string | null }) => r.type === 'refund' && r.source === 'free' && r.matchId === null,
+    );
+    expect(refills.map((r: { amount: number }) => r.amount).sort()).toEqual([10, 2].sort());
 
     // Settle returns the 18 unused: the allowance is full again, not above it.
     expect((await h.repos.ledger.settle(runId)).ok).toBe(true);

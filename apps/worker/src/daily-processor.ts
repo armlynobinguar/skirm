@@ -31,6 +31,7 @@ import {
 import { skillFitsRole } from '@skirm/shared';
 import type { BenchmarkAttempt, BenchmarkDeps, BenchmarkOutcome } from './benchmark-processor';
 import { WorkerError, errorCode } from './deps';
+import { settleRecorded } from './hold-sweep';
 
 /** What a finished attempt stores in `daily_attempts.result`. No prompt or speech text. */
 export interface DailyAttemptResult {
@@ -170,9 +171,7 @@ export async function processDailyAttempt(
         );
         if (!c.ok) logger.warn('daily charge failed', { attemptId, code: c.error });
       }
-      const st = await repos.ledger.settle(holdId);
-      if (!st.ok) logger.warn('daily settle failed', { attemptId, code: st.error });
-      held = false;
+      // Settled after finish below (settleRecorded): a retry never charges twice.
     }
 
     const w = r.result.winner;
@@ -203,6 +202,10 @@ export async function processDailyAttempt(
       logHash: r.logHash,
       result,
     });
+    if (held) {
+      held = false;
+      await settleRecorded(deps, holdId, 'daily settle failed', { attemptId });
+    }
     logger.info('daily attempt done', { attemptId, outcome, points, ticks: r.ticks, brain: brain.kind, credits });
     return out('done', { score: points });
   } catch (err) {

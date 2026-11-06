@@ -125,6 +125,34 @@ describe('market', () => {
     expect((await buyer.post(`/market/${skillId}/purchase`, { txHash: 'dev:5' })).status).toBe(409);
   });
 
+  it('DELETE listing: the seller cancels their own listing, which unblocks account deletion', async () => {
+    const n = await setup();
+    try {
+      const s = await n.as('cs');
+      const other = await n.as('co');
+      const id = (await s.post('/skills', SAMPLE_SKILL)).body.id;
+      await s.post(`/skills/${id}/mint`);
+      expect((await s.del(`/market/${id}/listing`)).body.error.code).toBe('not_listed');
+      expect((await s.post(`/market/${id}/listing`, { priceYocto: '9' })).status).toBe(200);
+      expect((await s.del('/me', { confirm: 'cs' })).body.error.code).toBe('listing_active');
+      // Not the seller.
+      const forbidden = await other.del(`/market/${id}/listing`);
+      expect(forbidden.status).toBe(403);
+      expect((await other.del('/market/skl_01JB7Z3K9QX4M2T8V6N5R1C0DF/listing')).status).toBe(404);
+      const res = await s.del(`/market/${id}/listing`);
+      expect(res.status).toBe(200);
+      // Dev mode: nothing to undo onchain.
+      expect(res.body).toMatchObject({ cancelled: true, listing: { status: 'cancelled', priceYocto: '9' }, onchain: null });
+      const detail = await other.get(`/market/${id}`);
+      expect(detail.body.listing).toBeUndefined();
+      expect(detail.body.skill.status).toBe('Minted');
+      expect((await s.del(`/market/${id}/listing`)).status).toBe(409);
+      expect((await s.del('/me', { confirm: 'cs' })).status).toBe(200);
+    } finally {
+      await n.close();
+    }
+  });
+
   it('non-dev purchases are verified against the NEAR owner', async () => {
     const n = await setup({ nearOwnership: true });
     try {
@@ -141,11 +169,26 @@ describe('market', () => {
       const tx = '4uJg1nZ1n1YQ1oYwJr3Tqf4m8Wk2H7zXcVbN5aSdFgHj';
       const send = () =>
         n.http().post(`/market/${id}/purchase`).set('x-dev-user', 'b2').send({ txHash: tx });
+      // The tx itself is read first: unknown, it proves nothing (even with the token in hand).
+      (n.ownership as FakeOwnership).owners.set(`${id}:1`, 'b2.testnet');
+      const unknown = await send();
+      expect(unknown.status).toBe(422);
+      expect(unknown.body.error).toMatchObject({ code: 'purchase_unverified', details: { reason: 'not_found' } });
+      // Another buyer's tx does not count either.
+      n.rpcMarket.buys.set(tx, { buyer: 'c2.testnet', tokenId: `${id}:1`, priceYocto: 5n });
+      expect((await send()).body.error.details).toEqual({ reason: 'wrong_sender' });
+      // Paid below the listed price.
+      n.rpcMarket.buys.set(tx, { buyer: 'b2.testnet', tokenId: `${id}:1`, priceYocto: 4n });
+      expect((await send()).body.error.code).toBe('underpaid');
+      n.rpcMarket.buys.set(tx, { buyer: 'b2.testnet', tokenId: `${id}:1`, priceYocto: 5n });
+      (n.ownership as FakeOwnership).owners.delete(`${id}:1`);
       const before = await send();
       expect(before.status).toBe(422);
       expect(before.body.error.code).toBe('purchase_unverified');
       (n.ownership as FakeOwnership).owners.set(`${id}:1`, 'b2.testnet');
-      expect((await send()).status).toBe(200);
+      const ok = await send();
+      expect(ok.status).toBe(200);
+      expect(ok.body.sale).toMatchObject({ priceYocto: '5' });
     } finally {
       await n.close();
     }
@@ -185,6 +228,22 @@ describe('credits', () => {
     expect(ok.status).toBe(200);
     expect(ok.body).toMatchObject({ credited: 250, balance: 250 });
     expect((await u.post('/credits/deposits', { txHash: 'unknownTx' })).status).toBe(404);
+  });
+
+  it('a batched deposit credits every deposit() action once, and a replay credits only what is missing', async () => {
+    const u = await h.as('batchpayer');
+    await h.http().post('/auth/session').set('x-dev-user', 'batchpayer').send({ nearAccountId: 'batchpayer.testnet' });
+    const tx = '7uJg1nZ1n1YQ1oYwJr3Tqf4m8Wk2H7zXcVbN5aSdFgHj';
+    // An earlier server credited only the first action (receipt = the bare hash).
+    await h.repos.ledger.topUp({ accountId: u.accountId, credits: 100, receipt: tx });
+    h.rpcDeposits.txs.set(tx, { sender: 'batchpayer.testnet', credits: 350, parts: [100, 200, 50] });
+    const res = await u.post('/credits/deposits', { txHash: tx });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ credited: 250, balance: 350 });
+    const dup = await u.post('/credits/deposits', { txHash: tx });
+    expect(dup.status).toBe(409);
+    expect(dup.body.error.code).toBe('duplicate_receipt');
+    expect((await u.get('/credits')).body.balance).toBe(350);
   });
 
   it('dev hashes are refused outside dev mode', async () => {

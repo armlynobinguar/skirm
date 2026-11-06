@@ -100,6 +100,36 @@ describe('daily consumer', () => {
     for (const s of brain.seen) expect(JSON.stringify(done)).not.toContain(s);
   });
 
+  it('a retry after finish fails charges the player once', async () => {
+    ctx = await setup({ brain: readingBrain() });
+    const { account, row } = await queue(ctx);
+    await ctx.repos.ledger.topUp({ accountId: account.id, credits: 1000 });
+    const before = await ctx.repos.ledger.balance(account.id);
+    const daily = ctx.repos.daily;
+    const realFinish = daily.finish.bind(daily);
+    let failNext = true;
+    daily.finish = (async (id: string, input: Parameters<typeof realFinish>[1]) => {
+      if (failNext && input.status === 'done') {
+        failNext = false;
+        throw new Error('db blip');
+      }
+      return realFinish(id, input);
+    }) as typeof daily.finish;
+    await expect(
+      processBenchmark(ctx.deps, { kind: 'daily', attemptId: row.id }, { attemptsMade: 0, attempts: 3 }),
+    ).rejects.toThrow('db blip');
+    // The failed attempt's hold was aborted: its charges came back.
+    expect(await ctx.repos.ledger.getHold(`daily-${row.id}-0`)).toMatchObject({ status: 'aborted' });
+    expect((await ctx.repos.ledger.balance(account.id)).available).toBe(before.available);
+    const out = await processBenchmark(ctx.deps, { kind: 'daily', attemptId: row.id }, { attemptsMade: 1, attempts: 3 });
+    expect(out.status).toBe('done');
+    const done = (await ctx.repos.daily.get(row.id))!;
+    expect(done.credits).toBeGreaterThan(0);
+    const after = await ctx.repos.ledger.balance(account.id);
+    expect(after.held).toBe(0);
+    expect(before.available - after.available).toBe(done.credits);
+  });
+
   it('a model attempt that cannot cover its hold ends insufficient_credits and gives the attempt back', async () => {
     ctx = await setup({ brain: readingBrain() }, { ledger: { config: { freeAllowance: 0 } } });
     const { account, row } = await queue(ctx);

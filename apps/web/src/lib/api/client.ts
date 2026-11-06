@@ -47,6 +47,7 @@ import type {
   ExternalAgentSecret,
   EarnBack,
   Listing,
+  CancelListingResponse,
   ListingRequest,
   MarketCard,
   MarketDetail,
@@ -148,6 +149,8 @@ export interface ApiClient {
   listSkill(skillId: string, body: ListingRequest): Promise<Listing>;
   /** Dev mode accepts `txHash: 'dev:<yocto>[:<nonce>]'`. */
   purchaseSkill(skillId: string, body: { txHash: string; version?: number }): Promise<PurchaseResponse>;
+  /** DELETE /market/:id/listing: cancels the caller's own listing (`onchain` names the delist call outside dev mode). */
+  cancelListing(skillId: string, version?: number): Promise<CancelListingResponse>;
   /** POST /market/:id/trial: 202 queued; 429 `trial_limit` after 3 trials of the version. */
   startTrial(skillId: string, body: TrialRequest): Promise<StartTrialResponse>;
   /** GET /market/:id/trials: the caller's trials of the skill, newest first. */
@@ -425,6 +428,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     marketSkill: (id, version) => get(`/market/${enc(id)}`, { version }),
     listSkill: (id, body) => json('POST', `/market/${enc(id)}/listing`, { body }),
     purchaseSkill: (id, body) => json('POST', `/market/${enc(id)}/purchase`, { body }),
+    cancelListing: (id, version) => json('DELETE', `/market/${enc(id)}/listing`, { query: { version } }),
     startTrial: (id, body) => json('POST', `/market/${enc(id)}/trial`, { body }),
     trials: (id, version) => get(`/market/${enc(id)}/trials`, { version }),
 
