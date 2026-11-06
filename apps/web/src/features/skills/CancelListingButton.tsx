@@ -1,14 +1,17 @@
 'use client';
 
-// S10: the seller takes their own listing down (DELETE /market/:id/listing). Outside dev mode the
-// listing also lives on the market contract: the api names the wallet call (`market.delist`) and
-// the seller's wallet signs it right after, so nobody can buy it onchain at the old price.
+// S10: the seller takes their own listing down. Outside dev mode the listing lives on the market
+// contract, so the seller's wallet signs `market.delist` FIRST and only then is it taken off the
+// game (DELETE /market/:id/listing): a refused or failed delist leaves the listing showing, with
+// Cancel still there to retry, instead of hiding a listing anyone could still buy onchain.
 import { Button } from '@skirm/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/toast/ToastProvider';
 import { qk } from '@/lib/api/queries';
 import type { Listing } from '@/lib/api/types';
+import { useSession } from '@/lib/auth/session';
 import { useApi } from '@/lib/services';
+import { delistTx, tokenIdOf } from '@/lib/wallet/contracts';
 import { useNearSigner } from '@/lib/wallet/hooks';
 import { WalletError } from '@/lib/wallet/types';
 
@@ -25,11 +28,17 @@ export function CancelListingButton({
   const qc = useQueryClient();
   const toast = useToast();
   const signer = useNearSigner();
+  const { mode } = useSession();
 
   const cancel = useMutation({
     mutationFn: async () => {
+      if (mode !== 'dev') {
+        if (!nearAccountId) throw new WalletError('wallet_no_account', 'Connect a NEAR wallet first.');
+        await signer.send(delistTx(signer.contracts, listing.tokenId ?? tokenIdOf(skillId, listing.version)), nearAccountId);
+      }
       const res = await api.cancelListing(skillId, listing.version);
-      for (const c of res.onchain?.calls.filter((x) => x.required) ?? []) {
+      // Any other call the api still requires (the delist is signed already).
+      for (const c of res.onchain?.calls.filter((x) => x.required && x.methodName !== 'delist') ?? []) {
         if (!nearAccountId) throw new WalletError('wallet_no_account', 'Connect a NEAR wallet first.');
         await signer.send(
           {

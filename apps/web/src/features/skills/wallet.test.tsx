@@ -219,7 +219,7 @@ describe('S10 with a NEAR wallet', () => {
     let up = false;
     const purchaseSkill = async () => {
       if (!up) throw new ApiError(503, 'rpc_unavailable', 'NEAR RPC is unavailable, try again');
-      return { owned: true, sale: {} as never };
+      return { owned: true as const, sale: {} as never };
     };
     const first = renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, { ...privy, wallet, api: base({ purchaseSkill }) });
     await first.user.click(await screen.findByTestId('s10-buy'));
