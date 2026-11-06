@@ -1,6 +1,9 @@
 // /market* (S09, S10). Cards and proof are public metadata, ranked records and the benchmark only;
 // a bought skill grants use, never its text. Purchases are verified through the NEAR
 // owner (dev mode: `dev:` hashes). Buyers can trial a version with one of their agents first.
+// GET /market and GET /market/:skillId are public (signed-out visitors browse the Exchange): they
+// return the same public metadata, with the caller-only fields (owned, trials) at their signed-out
+// defaults and drafts hidden. Every write and the trial routes still need a session.
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
 import {
   TRIAL_LIMIT,
@@ -11,7 +14,7 @@ import {
 } from '@skirm/db';
 import { AGENT_ROLES, TAGS, normalizeSkillRoles, skillFitsRole, skillRolesLabel, type Tag } from '@skirm/shared';
 import { z } from 'zod';
-import { CurrentAccount, mustAccount } from '../auth';
+import { CurrentAccount, Public, mustAccount } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
 import { ApiError, notFound } from '../errors';
 import { agentId, listingBody, optIntQuery, parse, purchaseBody, skillId } from '../validation';
@@ -39,8 +42,8 @@ export class MarketController {
   constructor(@Inject(DEPS) private readonly deps: ApiDeps) {}
 
   @Get()
-  async list(@Query() query: unknown, @CurrentAccount() acc?: AccountRow) {
-    const account = mustAccount(acc);
+  @Public()
+  async list(@Query() query: unknown, @CurrentAccount() account?: AccountRow) {
     const q = parse(marketQuery, query);
     const { repos } = this.deps;
     let versions = await repos.skills.listPublic();
@@ -48,7 +51,7 @@ export class MarketController {
     if (q.role) versions = versions.filter((v) => skillFitsRole(v.roles, q.role!));
     const [listings, owned, proof] = await Promise.all([
       repos.market.activeListings(),
-      repos.skills.listOwned(account.id),
+      account ? repos.skills.listOwned(account.id) : Promise.resolve([]),
       repos.proof.marketRates(versions.map((v) => ({ skillId: v.id, version: v.version }))),
     ]);
     const listingBy = new Map<string, ListingRow>();
@@ -95,9 +98,9 @@ export class MarketController {
     return cards;
   }
 
-  /** The newest public version (or `?version=`); drafts only for their creator or holder. */
+  /** The newest public version (or `?version=`); drafts only for their creator or holder (never signed out). */
   private async version(
-    account: AccountRow,
+    account: AccountRow | undefined,
     id: string,
     version?: number,
   ): Promise<SkillVersionView> {
@@ -112,20 +115,20 @@ export class MarketController {
     if (!v) throw notFound('skill');
     if (
       v.status === 'draft' &&
-      v.creatorId !== account.id &&
-      !(await skills.owns(account.id, v.id, v.version))
+      (!account ||
+        (v.creatorId !== account.id && !(await skills.owns(account.id, v.id, v.version))))
     )
       throw notFound('skill');
     return v;
   }
 
   @Get(':skillId')
+  @Public()
   async detail(
     @Param('skillId') id: string,
     @Query() query: unknown,
-    @CurrentAccount() acc?: AccountRow,
+    @CurrentAccount() account?: AccountRow,
   ) {
-    const account = mustAccount(acc);
     const { version } = parse(versionQuery, query);
     const v = await this.version(account, id, version);
     const { repos } = this.deps;
@@ -133,11 +136,11 @@ export class MarketController {
       await Promise.all([
         repos.market.salesOf(v.id),
         repos.market.activeListing(v.id, v.version),
-        repos.skills.owns(account.id, v.id, v.version),
+        account ? repos.skills.owns(account.id, v.id, v.version) : Promise.resolve(false),
         repos.proof.benchmark(v.id, v.version),
         repos.proof.rankedRecord(v.id, v.version),
         repos.proof.counters(v.id, v.version),
-        repos.proof.trialsUsed(account.id, v.id, v.version),
+        account ? repos.proof.trialsUsed(account.id, v.id, v.version) : Promise.resolve(0),
       ]);
     const lastSale = sales.find((s) => s.version === v.version);
     const owner = lastSale ? await repos.accounts.get(lastSale.buyerId) : undefined;

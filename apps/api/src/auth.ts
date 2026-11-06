@@ -1,5 +1,5 @@
-// Session guard (contract: every route needs a session except health, leaderboards, seasons and v2
-// matches). AUTH_MODE=dev trusts `x-dev-user`; privy verifies the Bearer JWT.
+// Session guard (contract: every route needs a session except health, leaderboards, seasons, v2
+// matches and the Exchange reads GET /market, /market/:skillId). AUTH_MODE=dev trusts `x-dev-user`; privy verifies the Bearer JWT.
 // A session is a verified identity whose account exists (created by POST /auth/session).
 import {
   Inject,

@@ -35,6 +35,25 @@ function base(o: Partial<ApiClient> = {}): Partial<ApiClient> {
 afterEach(() => window.history.replaceState(null, '', '/'));
 
 describe('S10 Skill detail', () => {
+  it('signed out: the proof and price read-only, with sign-in buttons in place of buy and trial', async () => {
+    const { api } = renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, { path: `/market/${SKILL_ID}`, api: base() });
+    expect(await screen.findByTestId('s10-name')).toHaveTextContent('Dam First');
+    expect(screen.getByTestId('s10-price')).toHaveTextContent('1.5 NEAR');
+    expect(screen.getByTestId('s10-encrypted')).toBeInTheDocument();
+    expect(screen.getByTestId('s10-benchmark')).toBeInTheDocument();
+    expect(screen.queryByTestId('s10-buy')).not.toBeInTheDocument();
+    const buy = screen.getByTestId('s10-buy-signin');
+    expect(buy).toHaveTextContent('Sign in to buy · 1.5 NEAR');
+    expect(buy).toHaveAttribute('href', `/?next=${encodeURIComponent(`/market/${SKILL_ID}`)}`);
+    expect(screen.getByTestId('s10-trial-signin')).toHaveTextContent('Sign in to try it');
+    expect(screen.queryByTestId('s10-trial-start')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('signin-required')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(SECRET_PROMPT);
+    expect(api.marketSkill).toHaveBeenCalledWith(SKILL_ID);
+    expect(api.me).not.toHaveBeenCalled();
+    expect(api.trials).not.toHaveBeenCalled();
+  });
+
   it('shows the header and sales, never the text', async () => {
     const { api } = renderWithProviders(<SkillDetailScreen skillId={SKILL_ID} />, { handle: 'ada', api: base() });
     expect(await screen.findByTestId('s10-name')).toHaveTextContent('Dam First');
