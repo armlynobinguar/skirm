@@ -5,7 +5,7 @@ import { SignJWT, importPKCS8 } from 'jose';
 import { KeyPair, KeyPairSigner } from 'near-api-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { linkMessage } from '../src/near-link';
-import { setup, type Harness } from './helpers';
+import { SAMPLE_SKILL, setup, type Harness } from './helpers';
 
 const APP = 'privy-app-1';
 const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
@@ -99,5 +99,41 @@ describe('privy mode', () => {
     const ok = await link(proof);
     expect(ok.status).toBe(200);
     expect(ok.body.account.nearAccountId).toBe(near);
+  });
+});
+
+describe('privy mode market', () => {
+  it('a listing needs its verified nft_approve tx; cancel names the onchain delist', async () => {
+    const t = await token('did:privy:sella03');
+    const { account } = (await h.http().post('/auth/session').send({ token: t })).body;
+    await h.repos.accounts.linkNearAccount(account.id, 'sella03.testnet');
+    const bearer = { authorization: `Bearer ${t}` };
+    const id = (await h.http().post('/skills').set(bearer).send(SAMPLE_SKILL)).body.id as string;
+    await h.repos.skills.markMinted(id, 1, `${id}:1`);
+    const list = (body: object) => h.http().post(`/market/${id}/listing`).set(bearer).send(body);
+
+    const none = await list({ priceYocto: '7' });
+    expect(none.status).toBe(422);
+    expect(none.body.error.code).toBe('listing_unverified');
+    const tx = '5uJg1nZ1n1YQ1oYwJr3Tqf4m8Wk2H7zXcVbN5aSdFgHj';
+    const unknown = await list({ priceYocto: '7', txHash: tx });
+    expect(unknown.status).toBe(422);
+    expect(unknown.body.error).toMatchObject({ code: 'listing_unverified', details: { reason: 'not_found' } });
+    h.rpcMarket.approvals.set(tx, { seller: 'sella03.testnet', tokenId: `${id}:1`, priceYocto: '7' });
+    // The approval is for 7 yocto, not 8.
+    expect((await list({ priceYocto: '8', txHash: tx })).body.error.details).toEqual({ reason: 'wrong_price' });
+    expect((await list({ priceYocto: '7', txHash: tx })).status).toBe(200);
+
+    const del = await h.http().delete(`/market/${id}/listing`).set(bearer);
+    expect(del.status).toBe(200);
+    expect(del.body).toMatchObject({ cancelled: true, listing: { status: 'cancelled', tokenId: `${id}:1` } });
+    expect(del.body.onchain.calls[0]).toMatchObject({
+      receiverId: 'market.playskirm.testnet',
+      methodName: 'delist',
+      args: { token_id: `${id}:1` },
+      deposit: '1',
+      required: true,
+    });
+    expect(del.body.onchain.calls[1]).toMatchObject({ methodName: 'nft_revoke', required: false });
   });
 });

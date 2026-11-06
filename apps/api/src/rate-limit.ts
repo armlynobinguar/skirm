@@ -47,6 +47,29 @@ export interface RateLimits {
 
 export const DEFAULT_RATE_LIMITS: RateLimits = { strict: 20, general: 300 };
 
+/**
+ * RATE_LIMIT_STRICT / RATE_LIMIT_GENERAL as limits. A value that is not a positive integer (NaN
+ * would let every request through, since `n > NaN` is false) is ignored with a warning, keeping
+ * that bucket's default.
+ */
+export function rateLimitsFromEnv(
+  env: Record<string, string | undefined>,
+  warn: (msg: string) => void = () => undefined,
+): Partial<RateLimits> {
+  const out: Partial<RateLimits> = {};
+  for (const [bucket, name] of [
+    ['strict', 'RATE_LIMIT_STRICT'],
+    ['general', 'RATE_LIMIT_GENERAL'],
+  ] as const) {
+    const raw = env[name]?.trim();
+    if (!raw) continue;
+    const n = Number(raw);
+    if (Number.isSafeInteger(n) && n > 0) out[bucket] = n;
+    else warn(`${name}=${JSON.stringify(raw)} is not a positive integer; using the default ${DEFAULT_RATE_LIMITS[bucket]}`);
+  }
+  return out;
+}
+
 /** Routes that call NEAR RPC, start paid work, or create accounts: METHOD and a path pattern. */
 const STRICT: readonly [string, RegExp][] = [
   ['POST', /^\/auth\/session$/],

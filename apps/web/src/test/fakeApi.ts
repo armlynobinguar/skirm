@@ -45,6 +45,7 @@ const METHODS: (keyof ApiClient)[] = [
   'marketSkill',
   'listSkill',
   'purchaseSkill',
+  'cancelListing',
   'startTrial',
   'trials',
   'benchInfo',

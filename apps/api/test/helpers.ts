@@ -7,12 +7,16 @@ import {
   CompositeDepositVerifier,
   CompositeRentalVerifier,
   DepositError,
+  depositPartReceipt,
   DevDepositVerifier,
   DevRentalVerifier,
   RentalError,
   type RentalPayment,
   type RentalVerifier,
   LocalKeyWrapper,
+  MarketTxError,
+  type MarketPurchase,
+  type MarketTxVerifier,
   NoopBadges,
   NoopMinter,
   NoopOwnershipReader,
@@ -37,7 +41,8 @@ export class FakeOwnership implements OwnershipReader {
 
 /** RPC deposit verifier stand-in: knows a fixed set of tx hashes. */
 export class FakeRpcDeposits implements DepositVerifier {
-  txs = new Map<string, { sender: string; credits: number }>();
+  /** `parts`: credits per deposit() action of a batched tx (receipts `<hash>`, `<hash>#1`, ...). */
+  txs = new Map<string, { sender: string; credits: number; parts?: number[] }>();
   async verify(txHash: string, opts: { senderId?: string | null } = {}) {
     const t = this.txs.get(txHash);
     if (!t) throw new DepositError('not_found', 'transaction not found');
@@ -49,6 +54,15 @@ export class FakeRpcDeposits implements DepositVerifier {
       credits: t.credits,
       sender: t.sender,
       dev: false,
+      ...(t.parts
+        ? {
+            parts: t.parts.map((c, i) => ({
+              receipt: depositPartReceipt(txHash, i),
+              credits: c,
+              amountYocto: BigInt(c) * 10n ** 21n,
+            })),
+          }
+        : {}),
     };
   }
 }
@@ -64,6 +78,29 @@ export class FakeRpcRentals implements RentalVerifier {
   }
 }
 
+/** RPC market verifier stand-in: knows a fixed set of buy and nft_approve tx hashes. */
+export class FakeRpcMarket implements MarketTxVerifier {
+  readonly marketContract = 'market.playskirm.testnet';
+  readonly skillsContract = 'skills.playskirm.testnet';
+  buys = new Map<string, { buyer: string; tokenId: string; priceYocto: bigint }>();
+  approvals = new Map<string, { seller: string; tokenId: string; priceYocto: string }>();
+  async verifyPurchase(txHash: string, opts: { buyerId: string | null | undefined; tokenId: string }): Promise<MarketPurchase> {
+    const t = this.buys.get(txHash);
+    if (!t) throw new MarketTxError('not_found', 'transaction not found');
+    if (t.buyer !== opts.buyerId) throw new MarketTxError('wrong_sender', 'signed by another account');
+    if (t.tokenId !== opts.tokenId) throw new MarketTxError('wrong_call', 'another token');
+    return { receipt: txHash, tokenId: t.tokenId, buyer: t.buyer, seller: null, priceYocto: t.priceYocto };
+  }
+  async verifyListing(txHash: string, opts: { sellerId: string | null | undefined; tokenId: string; priceYocto: string }) {
+    const t = this.approvals.get(txHash);
+    if (!t) throw new MarketTxError('not_found', 'transaction not found');
+    if (t.seller !== opts.sellerId) throw new MarketTxError('wrong_sender', 'signed by another account');
+    if (t.tokenId !== opts.tokenId) throw new MarketTxError('wrong_call', 'another token');
+    if (t.priceYocto !== opts.priceYocto) throw new MarketTxError('wrong_price', 'another price');
+    return { receipt: txHash };
+  }
+}
+
 export interface Harness {
   app: INestApplication;
   db: Db;
@@ -75,6 +112,7 @@ export interface Harness {
   ownership: FakeOwnership | NoopOwnershipReader;
   rpcDeposits: FakeRpcDeposits;
   rpcRentals: FakeRpcRentals;
+  rpcMarket: FakeRpcMarket;
   clock: { now: number };
   costs: MemoryDailyCosts;
   http: () => ReturnType<typeof request>;
@@ -119,6 +157,7 @@ export async function setup(
   const ownership = opts.nearOwnership ? new FakeOwnership() : new NoopOwnershipReader();
   const rpcDeposits = new FakeRpcDeposits();
   const rpcRentals = new FakeRpcRentals();
+  const rpcMarket = new FakeRpcMarket();
   const costs = new MemoryDailyCosts();
   const config: ApiConfig = {
     AUTH_MODE: 'dev',
@@ -138,6 +177,7 @@ export async function setup(
         config.AUTH_MODE === 'dev' ? new DevDepositVerifier(config.CREDITS_PER_NEAR) : undefined,
       ),
       rentals: new CompositeRentalVerifier(rpcRentals, config.AUTH_MODE === 'dev' ? new DevRentalVerifier() : undefined),
+      market: rpcMarket,
       ownership,
       badges,
       ...(opts.nearKeys ? { keys: opts.nearKeys } : {}),
@@ -178,6 +218,7 @@ export async function setup(
     ownership,
     rpcDeposits,
     rpcRentals,
+    rpcMarket,
     clock,
     costs,
     http,

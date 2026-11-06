@@ -21,7 +21,7 @@ import {
   scheduleTournamentTick,
   type ServerConfig,
 } from '@skirm/server';
-import { processBenchmark } from './benchmark-processor';
+import { benchSecretWarning, processBenchmark } from './benchmark-processor';
 import {
   errorCode,
   jsonLogger,
@@ -164,6 +164,9 @@ export async function startWorkerApp(
     await closeAll();
     throw err;
   }
+
+  const benchWarning = benchSecretWarning(config.NODE_ENV, env.BENCH_SECRET);
+  if (benchWarning) logger.error(benchWarning);
 
   const near = createNearAdapters(config);
   const costs = costMonitor(redis, config.COST_ALERT_DAILY_USD, logger);

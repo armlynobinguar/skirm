@@ -33,6 +33,7 @@ import {
 } from '@skirm/engine/v2';
 import type { BenchmarkAttempt, BenchmarkDeps, BenchmarkOutcome } from './benchmark-processor';
 import { WorkerError, errorCode } from './deps';
+import { settleRecorded } from './hold-sweep';
 
 /** The tested agent's id; the bot's are `bot-<n>`. */
 export const BENCH_AGENT_ID = 'bench-1';
@@ -235,9 +236,7 @@ export async function processBenchRun(
         );
         if (!c.ok) logger.warn('bench charge failed', { runId, code: c.error });
       }
-      const st = await repos.ledger.settle(holdId);
-      if (!st.ok) logger.warn('bench settle failed', { runId, code: st.error });
-      held = false;
+      // Settled after finish below (settleRecorded): a retry never charges twice.
     }
 
     const w = r.result.winner;
@@ -264,6 +263,10 @@ export async function processBenchRun(
       debrief: crewReport(last!, 'A', difficulty),
     };
     await repos.bench.finish(runId, { status: 'done', brain: brain.kind, credits, result });
+    if (held) {
+      held = false;
+      await settleRecorded(deps, holdId, 'bench settle failed', { runId });
+    }
     logger.info('bench run done', {
       runId,
       outcome: result.outcome,

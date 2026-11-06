@@ -13,6 +13,26 @@ export const WORKER_HOLD_PREFIXES = ['bench-', 'daily-', 'puzzle-'] as const;
 /** A worker hold older than this is treated as orphaned. Far longer than one match takes. */
 export const WORKER_HOLD_STALE_MS = 60 * 60_000;
 
+/**
+ * Settles a worker hold once its run is recorded as done. Jobs charge turns, finish the row, then
+ * settle: if finish throws, the job's catch aborts the hold (charges reversed) and the retry holds
+ * afresh, so a retried job never charges twice. A settle error here never fails the (already
+ * recorded) run; a hold it leaves open is released by the sweep below.
+ */
+export async function settleRecorded(
+  deps: Pick<WorkerDeps, 'repos' | 'logger'>,
+  holdId: string,
+  event: string,
+  ctx: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const st = await deps.repos.ledger.settle(holdId);
+    if (!st.ok) deps.logger.warn(event, { ...ctx, code: st.error });
+  } catch (err) {
+    deps.logger.warn(event, { ...ctx, code: errorCode(err) });
+  }
+}
+
 export async function sweepWorkerHolds(deps: HoldSweepDeps, staleMs = WORKER_HOLD_STALE_MS): Promise<string[]> {
   const { repos, logger, clock } = deps;
   const released: string[] = [];

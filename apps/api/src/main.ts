@@ -21,7 +21,7 @@ import { createApp } from './app.module';
 import type { ApiDeps } from './deps';
 import { BullBenchmarkQueue, RedisDailyCosts } from './infra';
 import { RpcNearKeyChecker } from './near-link';
-import { RedisRateLimitStore } from './rate-limit';
+import { RedisRateLimitStore, rateLimitsFromEnv } from './rate-limit';
 import { RedisReplayFrames, createApiCaster } from './replays';
 
 async function main(): Promise<void> {
@@ -71,6 +71,7 @@ async function main(): Promise<void> {
       minter: near.minter,
       deposits: near.deposits,
       rentals: near.rentals,
+      market: near.market,
       ownership: near.ownership,
       badges: near.badges,
       keys: new RpcNearKeyChecker(near.rpc),
@@ -101,10 +102,7 @@ async function main(): Promise<void> {
     }),
     rateLimit: {
       store: new RedisRateLimitStore(readRedis),
-      limits: {
-        ...(process.env.RATE_LIMIT_STRICT ? { strict: Number(process.env.RATE_LIMIT_STRICT) } : {}),
-        ...(process.env.RATE_LIMIT_GENERAL ? { general: Number(process.env.RATE_LIMIT_GENERAL) } : {}),
-      },
+      limits: rateLimitsFromEnv(process.env, (m) => console.error(`[api] ${m}`)),
       // 1 on plain Cloud Run; 2 behind an external HTTPS load balancer.
       trustedHops: Number(process.env.TRUSTED_PROXY_HOPS ?? 1) || 1,
     },

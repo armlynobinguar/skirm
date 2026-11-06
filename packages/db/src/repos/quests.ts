@@ -13,6 +13,7 @@ import {
   achievementsUnlocked,
   cosmeticsOwned,
   ledgerAccounts,
+  ledgerRows,
   questClaims,
   runHolds,
   v2Matches,
@@ -202,6 +203,15 @@ export class QuestsRepo {
           .update(ledgerAccounts)
           .set({ allowanceLeft: left + credited, allowanceDay: today, updatedAt: new Date(now) })
           .where(eq(ledgerAccounts.accountId, input.accountId));
+        // The refill shows in the ledger like any other free-credit movement.
+        await t.insert(ledgerRows).values({
+          accountId: input.accountId,
+          type: 'refund',
+          amount: credited,
+          source: 'free',
+          runId: `quest:${input.questId}:${input.periodKey}`,
+          createdAt: new Date(now),
+        });
         return { ok: true, claim: claim!, allowanceLeft: left + credited } as const;
       });
     } catch (err) {

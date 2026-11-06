@@ -2,7 +2,7 @@
 // transactions to skirm's contracts. The wallet signs a NEP-366 delegate action instead of a
 // transaction, the web posts it here, and the relayer wraps it in a transaction of its own.
 //
-//   GET  /relay                       { enabled, freeTxs, used, remaining } for the caller
+//   GET  /relay                       { enabled, freeTxs, used, remaining, linked } for the caller
 //   POST /relay { signedDelegate }    base64 borsh SignedDelegate → { txHash, remaining }
 //
 // Off unless RELAYER_ACCOUNT_ID and RELAYER_PRIVATE_KEY are set (deps.relay absent): GET answers
@@ -40,17 +40,23 @@ const relayBody = z.object({
 export class RelayController {
   constructor(@Inject(DEPS) private readonly deps: ApiDeps) {}
 
-  private async remaining(relay: RelayDeps, account: AccountRow): Promise<{ used: number; remaining: number }> {
-    if (!account.nearAccountId) return { used: 0, remaining: relay.freeTxs };
-    const used = await this.deps.repos.relay.used(account.id, account.nearAccountId);
-    return { used, remaining: Math.max(0, relay.freeTxs - used) };
+  /**
+   * The caller's quota. Without a linked NEAR account nothing can be relayed (`linked: false`), and
+   * what the skirm account already used still counts (a player who unlinks gets no fresh quota).
+   */
+  private async remaining(
+    relay: RelayDeps,
+    account: AccountRow,
+  ): Promise<{ used: number; remaining: number; linked: boolean }> {
+    const used = await this.deps.repos.relay.used(account.id, account.nearAccountId ?? null);
+    return { used, remaining: Math.max(0, relay.freeTxs - used), linked: !!account.nearAccountId };
   }
 
   @Get()
   async status(@CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
     const relay = this.deps.relay;
-    if (!relay) return { enabled: false, freeTxs: 0, used: 0, remaining: 0 };
+    if (!relay) return { enabled: false, freeTxs: 0, used: 0, remaining: 0, linked: !!account.nearAccountId };
     return { enabled: true, freeTxs: relay.freeTxs, ...(await this.remaining(relay, account)) };
   }
 
@@ -75,6 +81,9 @@ export class RelayController {
       throw err;
     }
     checkDelegate(d, { linkedNearAccount: account.nearAccountId, contracts: relay.contracts, verifySignature: verifyDelegateSignature });
+
+    // Relays a dead process left pending stop holding their slots (and their delegate) back.
+    await this.deps.repos.relay.expireStale().catch(() => undefined);
 
     // Cheap refusal before any RPC; reserve() below re-checks under the account lock.
     const before = await this.remaining(relay, account);

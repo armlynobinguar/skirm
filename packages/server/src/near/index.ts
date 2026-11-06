@@ -16,6 +16,7 @@ import {
   type Minter,
   type Registry,
 } from './registry';
+import { RpcMarketTxVerifier, type MarketTxVerifier } from './market';
 import { NearRpc, type NearRpcOptions } from './rpc';
 import { NearSeasons, NoopSeasons, type SeasonsChain } from './seasons';
 import { NearMetaTxRelayer, type MetaTxRelayer } from './relayer';
@@ -25,6 +26,7 @@ export * from './backing';
 export * from './badges';
 export * from './delegate';
 export * from './deposits';
+export * from './market';
 export * from './rentals';
 export * from './ownership';
 export * from './registry';
@@ -40,6 +42,8 @@ export interface NearAdapters {
   deposits: DepositVerifier;
   /** Agent rental payments to the market contract (`market.rent`). */
   rentals: RentalVerifier;
+  /** Skill NFT purchases (`market.buy`) and listings (`skills.nft_approve`) read through RPC. */
+  market: MarketTxVerifier;
   ownership: OwnershipReader;
   seasons: SeasonsChain;
   /** Soulbound achievement badges (`badges` contract). */
@@ -106,6 +110,7 @@ export function createNearAdapters(
       new RpcDepositVerifier(rpc, config.NEAR_CONTRACT_DEPOSITS, config.CREDITS_PER_NEAR, relayers),
       config.AUTH_MODE === 'dev' ? new DevDepositVerifier(config.CREDITS_PER_NEAR) : undefined,
     ),
+    market: new RpcMarketTxVerifier(rpc, config.NEAR_CONTRACT_MARKET, config.NEAR_CONTRACT_SKILLS, relayers),
     rentals: new CompositeRentalVerifier(
       new RpcRentalVerifier(rpc, config.NEAR_CONTRACT_MARKET, relayers),
       config.AUTH_MODE === 'dev' ? new DevRentalVerifier() : undefined,

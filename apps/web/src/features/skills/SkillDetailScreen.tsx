@@ -41,6 +41,7 @@ import { buyTx, listTx, tokenIdOf } from '@/lib/wallet/contracts';
 import { useNearSigner } from '@/lib/wallet/hooks';
 import { WalletError } from '@/lib/wallet/types';
 import { BackWriterPanel } from '@/features/backing/BackWriterPanel';
+import { CancelListingButton } from './CancelListingButton';
 import { ConfirmTransactionModal } from './ConfirmTransactionModal';
 import { ConnectWalletModal } from './ConnectWalletModal';
 import { MarketplaceScreen } from './MarketplaceScreen';
@@ -659,6 +660,7 @@ function Actions({ d, me, ownListing, creator }: { d: MarketDetail; me: Me | und
         </>
       ) : null}
       {ownListing ? <span className="app-small sk-muted" data-testid="s10-own-listing">Your listing. Buyers see it on the market.</span> : null}
+      {ownListing && listing ? <CancelListingButton skillId={sk.id} listing={listing} nearAccountId={nearId} /> : null}
       {sk.status === 'Draft' && isCreator ? (
         <ButtonLink href={routes.editSkill(sk.id)} data-testid="s10-edit">
           Test and mint in the editor

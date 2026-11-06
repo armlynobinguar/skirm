@@ -2,7 +2,7 @@
 // give theirs back, the NEAR account counts as well as the skirm account, and one delegate is
 // relayed once.
 import { describe, expect, it } from 'vitest';
-import { RepoError } from '../src/index';
+import { RELAY_PENDING_STALE_MS, RepoError } from '../src/index';
 import { setup, signUp } from './helpers';
 
 const input = (accountId: string, n: number, near = 'ana.testnet') => ({
@@ -46,6 +46,37 @@ describe('relay quota', () => {
     const dup = await ctx.repos.relay.reserve(input(ben.id, 1, 'ben.testnet')).catch((e: unknown) => e);
     expect(dup).toBeInstanceOf(RepoError);
     expect((dup as RepoError).code).toBe('relay_duplicate');
+  });
+
+  it('a failed delegate can be reserved again; a sent or in-flight one cannot', async () => {
+    const ctx = await setup();
+    const ana = await signUp(ctx, 'ana');
+    const r1 = await ctx.repos.relay.reserve(input(ana.id, 1));
+    await expect(ctx.repos.relay.reserve(input(ana.id, 1))).rejects.toMatchObject({ code: 'relay_duplicate' });
+    await ctx.repos.relay.markFailed(r1.id);
+    const again = await ctx.repos.relay.reserve(input(ana.id, 1));
+    expect(again).toMatchObject({ id: r1.id, status: 'pending' });
+    await ctx.repos.relay.markSent(again.id, 'TX');
+    await expect(ctx.repos.relay.reserve(input(ana.id, 1))).rejects.toMatchObject({ code: 'relay_duplicate' });
+    expect(await ctx.repos.relay.used(ana.id, 'ana.testnet')).toBe(1);
+  });
+
+  it('a stale pending row stops counting and is swept to failed', async () => {
+    const ctx = await setup();
+    const ana = await signUp(ctx, 'ana');
+    const t0 = new Date('2026-11-06T10:00:00Z');
+    const r1 = await ctx.repos.relay.reserve({ ...input(ana.id, 1), now: t0 });
+    await ctx.repos.relay.reserve({ ...input(ana.id, 2), now: t0 });
+    const soon = new Date(t0.getTime() + 5 * 60_000);
+    const later = new Date(t0.getTime() + RELAY_PENDING_STALE_MS + 1);
+    expect(await ctx.repos.relay.used(ana.id, 'ana.testnet', undefined, soon)).toBe(2);
+    expect(await ctx.repos.relay.used(ana.id, 'ana.testnet', undefined, later)).toBe(0);
+    // Quota is free again, and the stuck delegate can be retried.
+    await expect(ctx.repos.relay.reserve({ ...input(ana.id, 3), now: later })).resolves.toMatchObject({ status: 'pending' });
+    await expect(ctx.repos.relay.reserve({ ...input(ana.id, 1), now: later })).resolves.toMatchObject({ id: r1.id });
+    // The sweep marks the remaining stale row failed.
+    expect(await ctx.repos.relay.expireStale(later)).toBe(1);
+    expect(await ctx.repos.relay.used(ana.id, 'ana.testnet', undefined, later)).toBe(2);
   });
 
   it('serialises concurrent reservations for one account', async () => {
