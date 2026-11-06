@@ -180,10 +180,10 @@ function MatchBox({ m, handles, you }: { m: BracketMatch | null; handles: Map<st
     return (
       <div className={l.match} data-testid="t-match-empty">
         <div className={l.slot}>
-          <span className={l.muted}>TBD</span>
+          <span className={l.muted}>Awaiting winner</span>
         </div>
         <div className={l.slot}>
-          <span className={l.muted}>TBD</span>
+          <span className={l.muted}>Awaiting winner</span>
         </div>
       </div>
     );
@@ -194,7 +194,7 @@ function MatchBox({ m, handles, you }: { m: BracketMatch | null; handles: Map<st
       <div className={l.slot} data-won={decided && m.winnerId === id} data-lost={decided && m.winnerId !== id}>
         <span>
           {e?.seed ? <span className={l.seed}>#{e.seed} </span> : null}
-          {e?.account.handle ?? 'TBD'}
+          {e?.account.handle ?? 'Awaiting winner'}
         </span>
       </div>
     );

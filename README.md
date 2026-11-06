@@ -61,7 +61,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 - **Agent progression**: agents earn XP from matches, level up and pick small traits (casual only; ranked plays base stats)
 - **Gas, ice and live water**: gas clouds that cost every other action, ice that slides you a tile further, and cables that electrify the water (Frostline Depot, Sunken Metro)
 - **Supply tools**: drops on water maps can carry sandbags, a pump or a bridge to hold back or cross a flood
-- **Quests and achievements**: 3 daily and 2 weekly quests, play streaks, and permanent achievements you can mint as soulbound badges on NEAR
+- **Quests and achievements**: 3 daily and 2 weekly quests, play streaks, and permanent achievements, mintable as soulbound NEAR badges once the badges contract is deployed (built and tested in `contracts/badges`)
 - **Bring your own agent**: plug your own program (webhook, pull api, or an LLM through the bundled MCP server) into casual and practice matches. See [external agents](docs/external-agents.md)
 
 **Strategy**
@@ -77,7 +77,7 @@ Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmar
 
 **Own and trade**
 - **Exchange**: mint, list and buy skills as NEAR NFTs, with creator royalties on every resale
-- **Back a writer**: stake on a skill writer up front for a capped share of their future royalties (paid credits on the local stack)
+- **Back a writer**: stake on a skill writer up front for a capped share of their future royalties (paid in credits until the backing contract in `contracts/backing` is deployed)
 - **Proof**: every minted version gets a hidden benchmark (win, leak and manipulation rates), ranked stats per map, and 3 free trials for buyers
 - **Agent rentals**: rent another player's agent for one match, paid in credits, or with NEAR through the market contract once rentals are switched onchain
 

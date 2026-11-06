@@ -68,8 +68,8 @@ describe('v2 result screen', () => {
     const tally = screen.getByTestId('v2-tally');
     expect(tally).toHaveTextContent('Bluffs told · believed by the rival3 · 1');
     expect(tally).toHaveTextContent('Rival bluffs · your agents saw through2 · 2');
-    // Only season points are still "Soon".
-    expect(within(tally).getAllByText('Soon')).toHaveLength(1);
+    // No placeholders: rows without data are left out.
+    expect(soonCount()).toBe(0);
   });
 
   it('lays out the debrief from the stored record: verdict, stars, Elo, MVP, report, registry and hash', async () => {
@@ -94,9 +94,10 @@ describe('v2 result screen', () => {
     expect(tally).toHaveTextContent('Rival team chat your agents overheard3');
     expect(tally).toHaveTextContent('Themed verbs used6');
     expect(screen.getByTestId('v2-credits')).toHaveTextContent('36 of 60 held · 24 back');
-    // A debrief stored before bluffs were judged has no bluff counts: "Soon" (×2), as are season points.
-    expect(soonCount()).toBe(3);
-    expect(within(tally).getAllByText('Soon')).toHaveLength(3);
+    // A debrief stored before bluffs were judged has no bluff rows, and no "Soon" placeholders anywhere.
+    expect(tally).not.toHaveTextContent('Bluffs told');
+    expect(soonCount()).toBe(0);
+    expect(within(tally).queryByText('Soon')).toBeNull();
     expect(screen.getByTestId('v2-registry')).toHaveTextContent('Writing result · Elo · replay hash to registry.playskirm.testnet');
     expect(screen.getByTestId('v2-hash')).toHaveTextContent('abab');
     expect(screen.getByTestId('v2-again')).toHaveAttribute('href', '/pvp');
@@ -122,10 +123,10 @@ describe('v2 result screen', () => {
     expect(screen.getByTestId('v2-elo')).toHaveTextContent('—');
     expect(screen.getByTestId('v2-again')).toHaveAttribute('href', '/maps/copper-hollow/crew?d=hard');
     expect(screen.getByTestId('v2-registry')).toHaveTextContent('Casual match · not written to the registry');
-    // A goal the engine cannot judge yet (bluffs) is "Soon" on its star and its report row.
-    expect(within(screen.getByTestId('v2-stars')).getByText('Soon')).toBeInTheDocument();
-    // Season points are not "Soon" on a casual match: it says "Ranked only".
-    expect(soonCount()).toBe(4);
+    // A goal the engine cannot judge yet (bluffs) is left out: no star and no report row for it.
+    expect(screen.queryByTestId('v2-stars')).toBeNull();
+    expect(screen.getByTestId('v2-tally')).not.toHaveTextContent('Ears on the pier');
+    expect(soonCount()).toBe(0);
     expect(screen.getByTestId('v2-season-points')).toHaveTextContent('Ranked only');
   });
 

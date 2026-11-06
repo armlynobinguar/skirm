@@ -5,11 +5,12 @@ import { usePathname } from 'next/navigation';
 import { screenOf } from '@/lib/routes';
 import { DECK_NOTES, notesFor, useNotesOpen } from './notes';
 import styles from './shell.module.css';
+import { config } from '@/lib/config';
 
 export function NotesAside() {
   const open = useNotesOpen();
   const pathname = usePathname() ?? '/';
-  if (!open) return null;
+  if (!open || !config.designNotes) return null;
   const n = notesFor(screenOf(pathname)?.key);
   return (
     <aside className={styles.notes} aria-label="Design notes" data-testid="notes-aside">

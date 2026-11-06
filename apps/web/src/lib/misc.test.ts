@@ -18,7 +18,7 @@ describe('routes', () => {
   });
 
   it('names each screen for the HUD crumb, Back and the wipe', () => {
-    expect(screenOf(routes.home())).toEqual({ key: 'home', title: 'Command', sub: '// home', back: null });
+    expect(screenOf(routes.home())).toEqual({ key: 'home', title: 'Play', sub: '// home', back: null });
     expect(screenOf(routes.crew('flood-gate'))).toMatchObject({ key: 'crew', title: 'Lock in', back: '/play' });
     expect(screenOf(routes.atlas())).toMatchObject({ key: 'maps', title: 'Atlas' });
     expect(screenOf(routes.matchResult('mat_1'))).toMatchObject({ key: 'match-result', back: '/pvp' });

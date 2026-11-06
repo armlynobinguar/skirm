@@ -14,11 +14,12 @@ import { sfxEngine, useSfx } from '@/lib/sfx';
 import { AccountDock } from './AccountDock';
 import { notesStore, useNotesOpen } from './notes';
 import { matchBack } from '@/lib/match-origin';
+import { config } from '@/lib/config';
 
 const NAV: { id: NavGroup; label: string; href: string; icon: AkIconName; serial: string }[] = [
   { id: 'play', label: 'Play', href: routes.home(), icon: 'play', serial: 'PLY·01' },
-  { id: 'skills', label: 'My skills', href: routes.skills(), icon: 'mine', serial: 'SKL·02' },
-  { id: 'market', label: 'Market', href: routes.market(), icon: 'market', serial: 'MKT·03' },
+  { id: 'skills', label: 'Skills', href: routes.skills(), icon: 'mine', serial: 'SKL·02' },
+  { id: 'market', label: 'Exchange', href: routes.market(), icon: 'market', serial: 'MKT·03' },
   { id: 'pvp', label: 'PvP', href: routes.pvp(), icon: 'pvp', serial: 'PVP·04' },
   { id: 'leaderboards', label: 'Leaderboards', href: routes.leaderboards(), icon: 'lb', serial: 'LDR·05' },
 ];
@@ -94,20 +95,22 @@ export function TopBar() {
           <AkIcon name="sfx" />
           SFX
         </button>
-        <button
-          type="button"
-          className="app-topbar-toggle app-topbar-chip"
-          aria-pressed={notesOpen}
-          title="Design notes (N)"
-          data-testid="topbar-notes"
-          onClick={() => {
-            notesStore.toggle();
-            sfx.play('click');
-          }}
-        >
-          <AkIcon name="notes" />
-          Notes
-        </button>
+        {config.designNotes ? (
+          <button
+            type="button"
+            className="app-topbar-toggle app-topbar-chip"
+            aria-pressed={notesOpen}
+            title="Design notes (N)"
+            data-testid="topbar-notes"
+            onClick={() => {
+              notesStore.toggle();
+              sfx.play('click');
+            }}
+          >
+            <AkIcon name="notes" />
+            Notes
+          </button>
+        ) : null}
         <AccountDock />
       </div>
     </header>

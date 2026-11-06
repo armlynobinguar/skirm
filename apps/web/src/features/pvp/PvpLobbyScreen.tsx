@@ -533,6 +533,17 @@ function Lobby() {
           <dt>TICKS</dt>
           <dd>2 s ticks · 1.5 s to act, or the agent waits · 150 ticks (5:00)</dd>
         </dl>
+        <div className="app-row" data-testid="s11-more">
+          <ButtonLink href={routes.lobbies()} size="sm" data-testid="s11-more-lobbies">
+            Private lobbies
+          </ButtonLink>
+          <ButtonLink href={routes.tournaments()} size="sm" data-testid="s11-more-tournaments">
+            Tournaments
+          </ButtonLink>
+          <ButtonLink href={routes.verify()} size="sm" data-testid="s11-more-verify">
+            Verify a match on NEAR
+          </ButtonLink>
+        </div>
         <p className={h.note}>
           When a rival is found you have 10 s to accept, then 30 s to lock in talk tiers.
           {me.data ? (
