@@ -35,8 +35,8 @@ export interface CrewOwnership {
   }[];
 }
 
-/** v2 roles and talk tiers (the engine's Role and TalkTier; @skirm/db does not depend on the engine). */
-export const V2_ROLES = ['Builder', 'Digger', 'Firefighter', 'Scout', 'Runner', 'Hauler'] as const;
+/** v2 roles (the original six, then the four added later; agents.role is plain text, so a new role needs no migration) and talk tiers (the engine's Role and TalkTier; @skirm/db does not depend on the engine). */
+export const V2_ROLES = ['Builder', 'Digger', 'Firefighter', 'Scout', 'Runner', 'Hauler', 'Medic', 'Engineer', 'Saboteur', 'Courier'] as const;
 export type V2Role = (typeof V2_ROLES)[number];
 export const V2_TALK_TIERS = ['quiet', 'standard', 'open'] as const;
 export type V2TalkTier = (typeof V2_TALK_TIERS)[number];

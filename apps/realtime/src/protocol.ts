@@ -35,6 +35,7 @@ export type ErrorCode =
   | 'not_in_lockin'
   | 'practice_unranked'
   | 'external_unranked'
+  | 'role_unranked'
   | 'draft_casual'
   | 'mission_locked'
   | 'not_your_turn'

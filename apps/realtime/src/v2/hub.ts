@@ -48,7 +48,7 @@ import {
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
-import { DEFAULTS, skillFitsRole } from '@skirm/shared';
+import { DEFAULTS, rankedRoleRefusal, skillFitsRole } from '@skirm/shared';
 import { V2_MATCH_LAST_TTL_S, v2MatchChannel, v2MatchLastKey, type ExternalTurnStore, type V2CrewEntry, type V2EndReason, type V2ServerMessage, type Vault } from '@skirm/server';
 import type { Logger, RegistryQueue } from '../deps';
 import { Matchmaker, type Lane, type QueueEntry } from '../matchmaker';
@@ -151,6 +151,7 @@ export class V2HubError extends Error {
       | 'unavailable'
       | 'not_in_lockin'
       | 'external_unranked'
+      | 'role_unranked'
       | 'lobby_closed'
       | 'draft_casual'
       | 'mission_locked'
@@ -220,6 +221,7 @@ export class V2Hub {
     }
     await this.ownCrew(user.accountId, crew);
     if (ranked) await this.noExternal(user.accountId, crew);
+    if (ranked) await this.rankedRoles(crew);
     if (!this.fitting(crew.length).length) throw new V2HubError('invalid_crew', 'no map takes a crew this size');
     const account = await this.deps.repos.accounts.get(user.accountId);
     check();
@@ -299,6 +301,16 @@ export class V2Hub {
   private async noExternal(accountId: string, crew: V2CrewEntry[]): Promise<void> {
     const bound = await this.deps.repos.externalAgents.boundTo(accountId, crew.map((c) => c.agentId));
     if (bound.length) throw new V2HubError('external_unranked', 'an agent played by an external agent plays casual and practice only');
+  }
+
+  /**
+   * Ranked plays the original six roles unless DEFAULTS.roles.rankedNewRoles: a crew with a Medic,
+   * Engineer, Saboteur or Courier is refused (the engine refuses such a ranked match too).
+   */
+  private async rankedRoles(crew: V2CrewEntry[]): Promise<void> {
+    const rows = await Promise.all(crew.map((c) => this.deps.repos.agents.get(c.agentId)));
+    const why = rankedRoleRefusal(rows.map((r) => r?.role ?? 'Runner'));
+    if (why) throw new V2HubError('role_unranked', why);
   }
 
   /**
@@ -424,6 +436,7 @@ export class V2Hub {
     if (crew.length < 1 || crew.length > match.crewLimit) throw new V2HubError('invalid_crew', `this map takes 1 to ${match.crewLimit} agents`);
     await this.ownCrew(accountId, crew, matchId);
     if (match.setup.ranked) await this.noExternal(accountId, crew);
+    if (match.setup.ranked) await this.rankedRoles(crew);
     const roster = await this.roster(accountId, crew, { matchId, ranked: match.setup.ranked });
     if (!match.lockIn(team, tiers, roster, playbook)) throw missed();
     this.deps.log.info(`v2 match ${matchId} ${team}: crew changed at lock-in (${roster.crew.length} agents)`);
@@ -685,6 +698,9 @@ export class V2Hub {
       bought.push(rented || meta.some((m) => m.creatorId !== accountId));
       instructions.push(v.systemPrompt ?? null);
     }
+    // A role changed to a new one while the crew was queued for ranked: refused before the match exists.
+    const unranked = match.ranked ? rankedRoleRefusal(crew.map((a) => a.role)) : null;
+    if (unranked) throw new V2HubError('role_unranked', unranked);
     const brains = await this.externalBrains(accountId, crew, bought, match);
     return { crew, skills, skillKeys, skillNames, skillMeta, bought, instructions, ...(brains ? { brains } : {}) };
   }

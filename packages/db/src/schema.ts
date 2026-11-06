@@ -129,7 +129,7 @@ export const agents = pgTable(
     wins: integer('wins').notNull().default(0),
     losses: integer('losses').notNull().default(0),
     draws: integer('draws').notNull().default(0),
-    /** v2: role (Builder, Digger, Firefighter, Scout, Runner, Hauler), sight and voice range (1–5), talk tier. */
+    /** v2: role (Builder, Digger, Firefighter, Scout, Runner, Hauler, Medic, Engineer, Saboteur, Courier; plain text, no check), sight and voice range (1–5), talk tier. */
     role: text('role').notNull().default('Runner'),
     vision: integer('vision').notNull().default(3),
     comms: integer('comms').notNull().default(3),
