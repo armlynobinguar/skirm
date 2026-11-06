@@ -1,10 +1,14 @@
 'use client';
 // React side of the NEAR wallet: the shared instance, its connected account, and the two flows every
 // money screen needs (link an account with a NEP-413 proof; sign a contract call as the linked account).
+// A contract call goes gas-free through skirm's relayer when the api and the wallet both allow it
+// (./gasless.ts); the player then sees a short "Gas paid by skirm" note.
 import { useMemo, useSyncExternalStore } from 'react';
+import { useToast } from '@/components/toast/ToastProvider';
 import type { NearProof } from '../api/types';
 import { config } from '../config';
 import { useServices } from '../services';
+import { sendTransaction, type SentTransaction } from './gasless';
 import { linkRecipient, linkSignInMessage, newNonce, proofOf, signLinkProof } from './contracts';
 import { WalletError, type NearTransaction, type NearWallet, type WalletOption } from './types';
 
@@ -28,10 +32,16 @@ export interface NearSigner {
    * `tx`; resolves with the transaction hash for the api.
    */
   send(tx: NearTransaction, linked: string): Promise<string>;
+  /** As send(), and says whether skirm's relayer paid the gas. */
+  sendTx(tx: NearTransaction, linked: string): Promise<SentTransaction>;
 }
+
+export const GAS_PAID_NOTE = 'Gas paid by skirm';
 
 export function useNearSigner(): NearSigner {
   const wallet = useWallet();
+  const { api } = useServices();
+  const toast = useToast();
   return useMemo<NearSigner>(() => {
     async function ensure(linked: string): Promise<void> {
       let id = wallet.accountId() ?? (await wallet.restore().catch(() => null));
@@ -44,6 +54,13 @@ export function useNearSigner(): NearSigner {
           `The wallet is signed in as ${id}, but this skirm account is linked to ${linked}. Try again and pick ${linked}.`,
         );
       }
+    }
+    async function sendTx(tx: NearTransaction, linked: string): Promise<SentTransaction> {
+      await ensure(linked);
+      const sent = await sendTransaction(wallet, api, tx);
+      if (sent.gasless)
+        toast.show({ tone: 'good', title: GAS_PAID_NOTE, message: 'This transaction cost you no network fee.' });
+      return sent;
     }
     return {
       contracts: config.near.contracts,
@@ -62,10 +79,10 @@ export function useNearSigner(): NearSigner {
         const nearProof = await signLinkProof(wallet, skirmAccountId, nearAccountId);
         return { nearAccountId, nearProof };
       },
+      sendTx,
       async send(tx, linked) {
-        await ensure(linked);
-        return (await wallet.signAndSendTransaction(tx)).txHash;
+        return (await sendTx(tx, linked)).txHash;
       },
     };
-  }, [wallet]);
+  }, [wallet, api, toast]);
 }

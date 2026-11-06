@@ -71,6 +71,16 @@ export interface NearWallet {
   /** Signs and sends one transaction; resolves once it is final with its hash. */
   signAndSendTransaction(tx: NearTransaction): Promise<{ txHash: string }>;
   signAndSendTransactions(txs: NearTransaction[]): Promise<Array<{ txHash: string }>>;
+  /**
+   * Can the connected wallet sign NEP-366 delegate actions (NEAR Connect `signDelegateActions`)?
+   * Optional: a wallet without it is never asked, and every transaction goes the usual way.
+   */
+  canSignDelegate?(): Promise<boolean>;
+  /**
+   * Signs `tx` as a delegate action without sending it: base64 borsh SignedDelegate for the relay
+   * (gasless onboarding, ./gasless.ts). The relayer pays the gas; attached deposits stay the player's.
+   */
+  signDelegateAction?(tx: NearTransaction): Promise<string>;
 }
 
 export type WalletErrorCode =

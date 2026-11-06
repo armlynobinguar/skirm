@@ -298,6 +298,28 @@ describe('NEAR Connect wallet', () => {
     expect(conn.connect).toHaveBeenCalledWith({ walletId: 'mynearwallet' });
   });
 
+  it('signs delegate actions only with a wallet whose manifest says it can (gasless onboarding)', async () => {
+    const plain = fakeConnector();
+    const without = createNearConnectWallet({ network: 'testnet', factory: async () => plain.conn as never });
+    await without.connect();
+    expect(await without.canSignDelegate!()).toBe(false);
+    await expect(without.signDelegateAction!(depositTx(c, '1'))).rejects.toMatchObject({ code: 'wallet_unsupported' });
+
+    const able = fakeConnector();
+    const sign = vi.fn(async () => ({ signedDelegateActions: ['BASE64DELEGATE'] }));
+    Object.assign(able.w, { manifest: { features: { signDelegateActions: true } }, signDelegateActions: sign });
+    const wallet = createNearConnectWallet({ network: 'testnet', factory: async () => able.conn as never });
+    await wallet.connect();
+    expect(await wallet.canSignDelegate!()).toBe(true);
+    const tx = depositTx(c, '1');
+    expect(await wallet.signDelegateAction!(tx)).toBe('BASE64DELEGATE');
+    expect(sign).toHaveBeenCalledWith({ delegateActions: [tx], network: 'testnet', signerId: 'ada.testnet' });
+    sign.mockRejectedValueOnce(new Error('User rejected'));
+    await expect(wallet.signDelegateAction!(tx)).rejects.toMatchObject({ code: 'wallet_rejected' });
+    sign.mockResolvedValueOnce({ signedDelegateActions: [] });
+    await expect(wallet.signDelegateAction!(tx)).rejects.toMatchObject({ code: 'wallet_failed' });
+  });
+
   it('fails a transaction NEAR reports as failed', () => {
     expect(() =>
       txHashOf({ transaction: { hash: 'H' }, status: { Failure: { ActionError: {} } } }),

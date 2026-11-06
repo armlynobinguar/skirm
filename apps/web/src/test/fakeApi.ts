@@ -128,6 +128,8 @@ const METHODS: (keyof ApiClient)[] = [
   'claimBacking',
   'distributeBacking',
   'syncBacking',
+  'relayStatus',
+  'relay',
 ];
 
 export function createFakeApi(overrides: Partial<ApiClient> = {}): FakeApi {
