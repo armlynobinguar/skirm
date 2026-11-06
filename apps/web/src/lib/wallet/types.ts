@@ -24,6 +24,20 @@ export interface NearTransaction {
   actions: FunctionCallAction[];
 }
 
+/** A plain NEAR transfer (wallet-selector `Transfer` action), e.g. funding an agent account. */
+export interface TransferAction {
+  type: 'Transfer';
+  params: { deposit: string };
+}
+
+export interface NearTransferTransaction {
+  receiverId: string;
+  actions: TransferAction[];
+}
+
+/** Anything the wallet signs: contract calls, or a transfer. */
+export type AnyNearTransaction = NearTransaction | NearTransferTransaction;
+
 /** NEP-413 `signMessage` input. `nonce` is 32 random bytes. */
 export interface SignMessageInput {
   message: string;
@@ -69,7 +83,7 @@ export interface NearWallet {
   disconnect(): Promise<void>;
   signMessage(input: SignMessageInput): Promise<SignedMessage>;
   /** Signs and sends one transaction; resolves once it is final with its hash. */
-  signAndSendTransaction(tx: NearTransaction): Promise<{ txHash: string }>;
+  signAndSendTransaction(tx: AnyNearTransaction): Promise<{ txHash: string }>;
   signAndSendTransactions(txs: NearTransaction[]): Promise<Array<{ txHash: string }>>;
 }
 

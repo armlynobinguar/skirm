@@ -5,6 +5,7 @@
 import type { NearNetwork } from '../config';
 import {
   WalletError,
+  type AnyNearTransaction,
   type NearTransaction,
   type NearWallet,
   type SignedMessage,
@@ -20,7 +21,7 @@ interface ConnectorWallet {
     p: SignMessageInput & { network?: NearNetwork; signerId?: string },
   ): Promise<SignedMessage>;
   signAndSendTransaction(
-    p: NearTransaction & { network?: NearNetwork; signerId?: string },
+    p: AnyNearTransaction & { network?: NearNetwork; signerId?: string },
   ): Promise<unknown>;
   signAndSendTransactions(p: {
     transactions: NearTransaction[];

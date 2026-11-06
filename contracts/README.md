@@ -87,6 +87,10 @@ The market on testnet predates `rent` (agent rentals): until the operator redepl
 ([contracts/market/README.md](market/README.md), no state migration needed) the api keeps
 `NEAR_RENTALS_ONCHAIN` off and rentals are paid in credits.
 
+Agents can also pay `rent` from their own NEAR account (`<agent>.<AGENT_ACCOUNTS_PARENT>`). These
+accounts are **custodial**: the api holds their full-access keys, because a function-call key cannot
+attach the deposit that `rent` needs. See [docs/agent-accounts.md](../docs/agent-accounts.md).
+
 The backend's season job opens each season onchain with the ops key. While no season is open,
 the market forwards the season share of each fee to the treasury.
 

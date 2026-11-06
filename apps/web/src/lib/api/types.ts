@@ -598,6 +598,29 @@ export interface RentalPass {
   createdAt: string;
 }
 
+/**
+ * An agent's own NEAR account (docs/agent-accounts.md). Custodial: the server holds its key and
+ * spends under `capYocto` per match; the owner funds it from their wallet and can withdraw the rest.
+ */
+export interface AgentAccount {
+  agentId: string;
+  nearAccountId: string;
+  /** null when NEAR RPC did not answer. */
+  balanceYocto: string | null;
+  /** Balance minus storage and the gas reserve. */
+  spendableYocto: string | null;
+  capYocto: string;
+  /** Already committed to passes for the coming match. */
+  committedYocto: string;
+  custodial: true;
+}
+
+/** GET /agents/:id/account: `enabled` is false while the server has agent accounts off. */
+export interface AgentAccountStatus {
+  enabled: boolean;
+  account: AgentAccount | null;
+}
+
 /** One agent's results over its v2 matches (practice against the bot left out). */
 export interface AgentRecordCounts {
   matches: number;

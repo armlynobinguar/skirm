@@ -35,6 +35,8 @@ export const qk = {
   rentalOffers: ['rentals'] as const,
   /** Under `me`, so a match end (qk.me invalidated) refreshes the passes left. */
   myRentals: ['me', 'rentals'] as const,
+  /** Under `me`, so a match end refreshes what the agent account committed. */
+  agentAccount: (agentId: string) => ['me', 'agent-account', agentId] as const,
   backing: {
     all: ['backing'] as const,
     config: ['backing', 'config'] as const,

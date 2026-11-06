@@ -6,7 +6,7 @@ import type { NearProof } from '../api/types';
 import { config } from '../config';
 import { useServices } from '../services';
 import { linkRecipient, linkSignInMessage, newNonce, proofOf, signLinkProof } from './contracts';
-import { WalletError, type NearTransaction, type NearWallet, type WalletOption } from './types';
+import { WalletError, type AnyNearTransaction, type NearWallet, type WalletOption } from './types';
 
 export const useWallet = (): NearWallet => useServices().wallet;
 
@@ -27,7 +27,7 @@ export interface NearSigner {
    * Makes sure the wallet is signed in as `linked` (restoring or opening it), then signs and sends
    * `tx`; resolves with the transaction hash for the api.
    */
-  send(tx: NearTransaction, linked: string): Promise<string>;
+  send(tx: AnyNearTransaction, linked: string): Promise<string>;
 }
 
 export function useNearSigner(): NearSigner {
