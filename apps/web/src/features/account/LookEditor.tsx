@@ -197,6 +197,7 @@ export function LookEditor({ agentId, name, unlocks, initial, saving, onSave, on
           head={SKIN_TONES[look.skin] ?? SKIN_TONES[0]}
           team="A"
           label={`${name}, ${role}, preview`}
+          role={role}
           className={s.lookCanvas}
         />
         <div className={s.lookCaption}>

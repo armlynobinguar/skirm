@@ -121,7 +121,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   // Draw this frame in the arena (without subscribing: the canvas does). The 3D cam tweens from the last one.
   const prevArena = useRef<ArenaState | null>(null);
   useEffect(() => {
-    const arena = frame ? composeV2Arena(frame) : null;
+    const arena = frame ? composeV2Arena(frame, arenaStore().get().live?.arena) : null;
     prevArena.current = arenaStore().get().live?.arena.state ?? null;
     arenaStore().setLive(arena, view.mapId);
   }, [frame, view.mapId]);

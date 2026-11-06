@@ -128,6 +128,7 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
         sides: onAtlas,
         lanes: onAtlas ? proto.laneSetOf(A) : null,
         drops: onAtlas ? A.drops : null,
+        still,
       };
       // Live frames ease from the previous one over 400 ms; the map at rest does not move.
       const alpha = lm && L.prevState && !still ? Math.min(1, (Date.now() - lm.at) / 400) : 1;
@@ -146,6 +147,9 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
         const tpv = L.scene === 'tpv';
         opts = {
           intro: 9,
+          // Agent poses: one-shots (a fall, a celebration) play from the frame's arrival.
+          age: (nowMs - lm.at) / 1000,
+          still,
           reveal,
           deploy,
           revealSet: revealSetOf(m),

@@ -247,7 +247,7 @@ export function SignInScreen() {
               and carries further.
             </p>
             <div className="app-row">
-              <AgentAvatar size={32} label="Rook" />
+              <AgentAvatar size={32} label="Rook" role="Scout" body="#8fa8ff" crew="a" />
               <span className="sk-mono sk-muted">Rook · Builder · Standard</span>
             </div>
           </article>
