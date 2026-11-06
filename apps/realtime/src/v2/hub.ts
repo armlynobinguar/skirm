@@ -183,6 +183,8 @@ export class V2Hub {
   private readonly lobbyMatches = new Set<string>();
   /** Campaign matches: match id → the player and the mission, recorded when they end. */
   private readonly campaignMatches = new Map<string, { accountId: string; missionId: string }>();
+  /** Agents of pairs being set up (paired, no live v2_matches row yet), so no other crew can take them meanwhile. */
+  private readonly startingAgents = new Set<string>();
   private closing = false;
 
   constructor(private readonly deps: V2HubDeps) {
@@ -275,7 +277,35 @@ export class V2Hub {
     }
     const busy = await repos.agents.busyAgents(crew.map((c) => c.agentId), matchId !== undefined ? { exceptMatch: matchId } : {});
     if (busy.length) throw new V2HubError('agent_busy', 'an agent is in a match that has not ended');
+    const held = this.heldAgents(accountId);
+    if (crew.some((c) => held.has(c.agentId))) throw new V2HubError('agent_busy', 'an agent is already in another search or a match being set up');
     this.knownModels(crew);
+  }
+
+  /**
+   * Agents no live v2_matches row shows yet but that are taken on this instance: in another
+   * account's queued search, or in a pair being set up. (An owner and a renter may otherwise both
+   * queue the same agent and play it in two matches at once.)
+   */
+  private heldAgents(exceptAccount?: string): Set<string> {
+    const held = new Set(this.startingAgents);
+    for (const e of this.matchmaker.list()) if (e.key !== exceptAccount) for (const c of e.payload.crew) held.add(c.agentId);
+    return held;
+  }
+
+  /**
+   * At pairing, the searches whose crew lost an agent since they queued: to a match that went live
+   * (on any instance) or to the other search of the pair. Their keys; empty when the pair may play.
+   */
+  private async pairClash(a: QueueEntry<V2Search>, b: QueueEntry<V2Search>): Promise<string[]> {
+    const ids = (e: QueueEntry<V2Search>) => e.payload.crew.map((c) => c.agentId);
+    const held = this.heldAgents();
+    const [busyA, busyB] = await Promise.all([a, b].map((e) => this.deps.repos.agents.busyAgents(ids(e))));
+    const clash: string[] = [];
+    if (busyA!.length || ids(a).some((id) => held.has(id))) clash.push(a.key);
+    // The same agent in both crews: the later search gives way.
+    if (busyB!.length || ids(b).some((id) => held.has(id) || (!clash.length && ids(a).includes(id)))) clash.push(b.key);
+    return clash;
   }
 
   /** The operator's model catalog, the default first. */
@@ -763,6 +793,41 @@ export class V2Hub {
   }
 
   private async start(a: QueueEntry<V2Search>, b: QueueEntry<V2Search>): Promise<void> {
+    // Recheck the crews now that the pair formed: an agent may have gone into a match since it
+    // queued. Only the offending search is dropped; the other goes back to searching.
+    const keys = [a.key, b.key];
+    for (const k of keys) this.playing.set(k, undefined);
+    let clash: string[];
+    try {
+      clash = await this.pairClash(a, b);
+    } catch (err) {
+      this.deps.log.warn(`v2 pairing ${a.key} / ${b.key}: busy check failed: ${(err as Error).message}`);
+      clash = [];
+    } finally {
+      for (const k of keys) if (this.playing.get(k) === undefined) this.playing.delete(k);
+    }
+    if (clash.length) {
+      for (const e of [a, b]) {
+        if (clash.includes(e.key)) {
+          this.deps.log.warn(`v2 pairing: ${e.key}'s search dropped: an agent of its crew is already playing`);
+          this.deps.send(e.key, { type: 'error', code: 'agent_busy', message: 'an agent of your crew is already in another match; search again' });
+        } else if (!this.closing && !this.isBusy(e.key)) this.matchmaker.add({ key: e.key, lane: e.lane, ...(e.pool !== undefined ? { pool: e.pool } : {}), rating: e.rating, payload: e.payload });
+      }
+      return;
+    }
+    const agents = [a, b].flatMap((e) => e.payload.crew.map((c) => c.agentId));
+    for (const id of agents) this.startingAgents.add(id);
+    const unhold = () => {
+      for (const id of agents) this.startingAgents.delete(id);
+    };
+    try {
+      await this.launchPair(a, b, unhold);
+    } finally {
+      unhold();
+    }
+  }
+
+  private async launchPair(a: QueueEntry<V2Search>, b: QueueEntry<V2Search>, unhold: () => void): Promise<void> {
     const matchId = newId('mat');
     await this.launch(matchId, [a.key, b.key], async () => {
       const at = { matchId, ranked: a.payload.ranked };
@@ -780,6 +845,8 @@ export class V2Hub {
       // Draft searches pair only with draft searches (v2PoolsMatch).
       const draft = !ranked && !!a.payload.draft;
       await this.deps.repos.v2Matches.create({ id: matchId, mapId: map.id, ranked, teamA: a.key, teamB: b.key, crews: { A: crewRecords(sides.A), B: crewRecords(sides.B) }, ...(ranked ? {} : { difficulty }) });
+      // The live row now marks the agents busy (busyAgents).
+      unhold();
       this.countPlay(map);
       return this.newMatch({ matchId, map, ranked, difficulty, sides, ...(draft ? { draft } : {}) }, { A: this.deps.brain, B: this.deps.brain }, (t, msg) => this.deps.send(sides[t].accountId, msg));
     });
