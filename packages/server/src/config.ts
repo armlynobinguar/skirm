@@ -1,5 +1,5 @@
 // Env config for api, worker and realtime, parsed with zod (docs/backend-contract.md, Environment).
-import { DEFAULTS } from '@skirm/shared';
+import { DEFAULTS, ModelCatalogError, parseModelCatalog, type ModelChoice } from '@skirm/shared';
 import { z } from 'zod';
 
 /** Local stand-in for Cloud KMS `skill-prompt-kek`: 32 bytes, base64. Never use outside dev. */
@@ -115,6 +115,11 @@ export const envSchema = z
     LLM_MODEL: withDefault(ENV_DEFAULTS.LLM_MODEL),
     /** Unset → LLM_MODEL. */
     LLM_PLANNER_MODEL: optional(),
+    /**
+     * Models players may pick per agent outside ranked, as JSON [{id, label?, rateMultiplierBps}]
+     * (@skirm/shared parseModelCatalog). Unset → LLM_MODEL alone at 1.0x.
+     */
+    LLM_MODELS: optional(),
     /** Cost estimate when the provider returns no cost (OpenRouter returns one). */
     LLM_PRICE_INPUT_USD: usdPerMTok(),
     LLM_PRICE_OUTPUT_USD: usdPerMTok(),
@@ -199,6 +204,12 @@ export const envSchema = z
           message: 'required when AUTH_MODE=privy',
         });
     }
+    try {
+      parseModelCatalog(env.LLM_MODELS, env.LLM_MODEL);
+    } catch (err) {
+      if (!(err instanceof ModelCatalogError)) throw err;
+      ctx.addIssue({ code: 'custom', path: ['LLM_MODELS'], message: err.message.replace(/^LLM_MODELS: /, '') });
+    }
     if (!!env.NEAR_OPS_ACCOUNT !== !!env.NEAR_OPS_KEY)
       ctx.addIssue({
         code: 'custom',
@@ -228,6 +239,8 @@ export interface ServerConfig extends EnvConfig {
   nearOpsConfigured: boolean;
   /** RPC endpoints in order of preference. */
   nearRpcUrls: string[];
+  /** The model catalog (LLM_MODELS parsed): LLM_MODEL first at 1.0x. */
+  llmModels: ModelChoice[];
 }
 
 export class ConfigError extends Error {
@@ -283,5 +296,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     warnings,
     nearOpsConfigured: !!(c.NEAR_OPS_ACCOUNT && c.NEAR_OPS_KEY),
     nearRpcUrls: [...new Set([c.NEAR_RPC_URL, c.NEAR_RPC_FALLBACK_URL])],
+    llmModels: parseModelCatalog(c.LLM_MODELS, c.LLM_MODEL),
   };
 }

@@ -1,8 +1,9 @@
 // v2 brains: what decides an agent's action (and speech) each tick from its Observation.
 // - model: the operator's model (LLM_MODEL on any OpenAI-compatible provider, ../llm) acts, speaks
-//   and plans (one model for every agent in every mode, so no player can buy a smarter one). One
-//   call per agent per tick returns the action and, when the agent may speak, its message, which
-//   then goes through the filter.
+//   and plans. Outside ranked an agent may act with another model from the operator's catalog
+//   (LLM_MODELS, @skirm/shared models.ts; V2AgentContext.model), priced into its talk rate by the
+//   server; ranked always plays LLM_MODEL. One call per agent per tick returns the action and, when
+//   the agent may speak, its message, which then goes through the filter.
 // - greedy: deterministic and offline, for dev, tests and benchmarks without keys.
 // A brain that misses the deadline or answers with nothing legal waits that tick.
 import { TALK_TIERS, skillTriggerHolds, type Action, type Channel, type CommandPreset, type Observation, type SkillTrigger } from '@skirm/engine/v2';
@@ -81,6 +82,11 @@ export interface V2AgentContext {
   recent?: string[];
   /** A live command from its player still in force (DEFAULTS.commands.activeTicks), or none. */
   command?: V2AgentCommand | null;
+  /**
+   * The catalog model this agent acts with when not the brain's own (the server resolved and priced
+   * it). Absent: the brain's model. The crew planner always uses the planner model.
+   */
+  model?: string | null;
 }
 
 /** A player's live command as an agent receives it. */
@@ -157,8 +163,10 @@ export function createModelBrain(opts: ModelBrainOptions = {}): V2Brain {
     }
   };
 
-  const call = async (role: V2Call['role'], system: string, user: string, maxTokens: number, deadline: number) => {
-    const model = role === 'planner' ? plannerModel : actorModel;
+  const call = async (role: V2Call['role'], system: string, user: string, maxTokens: number, deadline: number, chosen?: string | null) => {
+    const model = role === 'planner' ? plannerModel : (chosen ?? actorModel);
+    // Configured LLM_PRICE_* are the default model's; another catalog model is priced by its provider bill.
+    const prices = model === actorModel || model === plannerModel ? opts.prices : null;
     const req = chatRequest({ baseUrl, apiKey, model, maxTokens, temperature: 0.4, system, user });
     const started = nowMs();
     const out = await runWithPolicy((signal) => postJson({ fetch, url: req.url, headers: req.headers, signal, body: req.body }), { timeLimitMs: deadline });
@@ -169,7 +177,7 @@ export function createModelBrain(opts: ModelBrainOptions = {}): V2Brain {
       return { text: null, reason: out.reason, call: c };
     }
     const text = String(dig(out.value, 'choices', 0, 'message', 'content') ?? '');
-    const c: V2Call = { role, model, ok: true, latencyMs, ...usageCost(out.value, model, pricesFor(model, opts.prices), opts.warn) };
+    const c: V2Call = { role, model, ok: true, latencyMs, ...usageCost(out.value, model, pricesFor(model, prices), opts.warn) };
     report(c);
     return { text, reason: null, call: c };
   };
@@ -182,7 +190,7 @@ export function createModelBrain(opts: ModelBrainOptions = {}): V2Brain {
       // The system prompt numbers the non-blank skills whose trigger holds this tick; a SKILL line maps
       // back to ctx.skills.
       const numbered = ctx.skills.flatMap((t, i) => (t.trim() && skillTriggerHolds(ctx.skillTriggers?.[i], o) ? [i] : []));
-      const r = await call('actor', systemPrompt(numbered.map((i) => ctx.skills[i]!), ctx.instructions, { text: ctx.playbook ?? null, short: true }), turnPrompt(o, ctx.plan, ctx.canSpeak, ctx.recent ?? [], ctx.command ?? null, numbered.length), V2_ACTOR_MAX_TOKENS, opts.deadlineMs ?? V2_ACTION_DEADLINE_MS);
+      const r = await call('actor', systemPrompt(numbered.map((i) => ctx.skills[i]!), ctx.instructions, { text: ctx.playbook ?? null, short: true }), turnPrompt(o, ctx.plan, ctx.canSpeak, ctx.recent ?? [], ctx.command ?? null, numbered.length), V2_ACTOR_MAX_TOKENS, opts.deadlineMs ?? V2_ACTION_DEADLINE_MS, ctx.model);
       if (r.text === null) return { action: wait, reason: r.reason === 'timeout' ? 'timeout' : 'error', say: null, call: r.call };
       const parsed = parseReply(r.text, o.legal, ctx.canSpeak, numbered.length);
       const skill = parsed.action && parsed.skill ? numbered[parsed.skill - 1] : undefined;

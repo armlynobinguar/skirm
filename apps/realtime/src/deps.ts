@@ -3,6 +3,7 @@
 import type { Repos } from '@skirm/db';
 import type { V2Brain } from '@skirm/decision-engine/v2';
 import type { MapDefV2 } from '@skirm/engine/v2';
+import type { ModelChoice } from '@skirm/shared';
 import type { V2Timing } from './v2/match';
 import type { ExternalTurnStore, RegistryJobData, ServerConfig, Vault } from '@skirm/server';
 import type { WebhookPost } from './v2/external';
@@ -46,6 +47,8 @@ export interface RealtimeDeps {
   queueTiming?: Partial<QueueTiming>;
   /** v2: the brain every agent uses (default: the offline greedy brain; production passes the model brain). */
   v2Brain?: V2Brain;
+  /** v2: the models a crew may pick per agent (config llmModels; default: the default model alone). */
+  v2Models?: readonly ModelChoice[];
   v2Timing?: Partial<V2Timing>;
   /** Bring your own agent: the pull relay shared with the api (Redis in production). */
   externalTurns?: ExternalTurnStore;

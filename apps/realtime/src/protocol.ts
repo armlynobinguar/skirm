@@ -1,7 +1,7 @@
 // WebSocket protocol on /ws (docs/backend-contract.md, WebSocket). Every client message is checked
 // here before the hub acts on it; anything else gets `{type:'error', code, message}`.
 import { isCommandPreset, isDifficulty, parseSteerInput } from '@skirm/engine/v2';
-import { DEFAULTS, campaignMission } from '@skirm/shared';
+import { DEFAULTS, MODEL_ID_RE, campaignMission } from '@skirm/shared';
 import {
   isV2Opponent,
   type V2ClientMessage,
@@ -71,11 +71,13 @@ function parseV2Crew(v: unknown): V2CrewEntry[] | string {
   if (!Array.isArray(v) || v.length < 1 || v.length > 3) return 'crew must have 1 to 3 agents';
   const out: V2CrewEntry[] = [];
   for (const [i, e] of v.entries()) {
-    if (!isObj(e) || extraKeys(e, ['agentId', 'tier'])) return `crew[${i}] is {agentId, tier}`;
+    if (!isObj(e) || extraKeys(e, ['agentId', 'tier', 'model'])) return `crew[${i}] is {agentId, tier, model?}`;
     if (typeof e.agentId !== 'string' || !ID_RE.test(e.agentId)) return `crew[${i}].agentId must be an id`;
     if (!TIERS.includes(e.tier as never)) return `crew[${i}].tier must be quiet, standard or open`;
+    // Shape only: the hub checks the id against the operator's catalog (and prices it), never the client.
+    if (e.model !== undefined && (typeof e.model !== 'string' || !MODEL_ID_RE.test(e.model))) return `crew[${i}].model must be a model id`;
     if (out.some((x) => x.agentId === e.agentId)) return 'an agent is listed twice';
-    out.push({ agentId: e.agentId, tier: e.tier as V2CrewEntry['tier'] });
+    out.push({ agentId: e.agentId, tier: e.tier as V2CrewEntry['tier'], ...(typeof e.model === 'string' ? { model: e.model } : {}) });
   }
   return out;
 }

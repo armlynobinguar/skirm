@@ -181,6 +181,52 @@ describe('v2 matches over the hub', () => {
     expect(ana.inbox.ofType('error')).toHaveLength(0);
   });
 
+  it('prices a catalog model from the server, refuses an unknown one, and plays the default in ranked', async () => {
+    const v2Models = [
+      { id: 'anthropic/claude-haiku-5.5', label: 'Haiku', rateMultiplierBps: 10000 },
+      { id: 'x/big', label: 'Big', rateMultiplierBps: 15000 },
+    ];
+    const deps = await makeDeps({ v2Timing: FAST_V2, v2Models });
+    hub = new RealtimeHub(deps);
+    const ana = await player(hub, deps, 'ana');
+    const ben = await player(hub, deps, 'ben');
+    // Not in the catalog: refused whatever the mode.
+    await ana.send({ type: 'v2_queue', crew: [{ agentId: ana.agents[0]!.id, tier: 'open', model: 'x/unlisted' }], ranked: false });
+    expect(await ana.inbox.next('error')).toMatchObject({ code: 'invalid_crew', message: expect.stringContaining('x/unlisted') });
+
+    // Casual: the agent plays x/big at 1.5x (a client cannot send a price; the hub reads the catalog).
+    const before = (await deps.repos.ledger.balance(ana.acc.id)).available;
+    await ana.send({ type: 'v2_queue', crew: [{ agentId: ana.agents[0]!.id, tier: 'open', model: 'x/big' }], ranked: false, mapId: 'copper-hollow' });
+    await ben.send({ type: 'v2_queue', crew: [{ agentId: ben.agents[0]!.id, tier: 'standard' }], ranked: false, mapId: 'copper-hollow' });
+    const found = await ana.inbox.next('v2_found');
+    await ben.inbox.next('v2_found');
+    await ana.send({ type: 'v2_accept', matchId: found.matchId });
+    await ben.send({ type: 'v2_accept', matchId: found.matchId });
+    await ana.inbox.next('v2_lockin');
+    await ana.send({ type: 'v2_lock_in', matchId: found.matchId, tiers: ['open'] });
+    await ben.send({ type: 'v2_lock_in', matchId: found.matchId, tiers: ['standard'] });
+    const end = await ana.inbox.next('v2_end', () => true, 30_000);
+    // Open 40 × 1.5 = 60 hundredths a tick over the 150-tick Normal clock: 90 held.
+    expect(end.debrief!.credits.held).toBe(90);
+    expect(before - (await deps.repos.ledger.balance(ana.acc.id)).available).toBe(Math.ceil((end.result!.ticks * 60) / 100));
+    const row = (await deps.repos.v2Matches.get(found.matchId))!;
+    expect(row.crews!.A[0]).toMatchObject({ model: 'x/big', rateBps: 15000 });
+    expect(row.crews!.B[0]!.model).toBeUndefined();
+
+    // Ranked: the same choice plays the default at Standard (30 held for one agent).
+    await ana.send({ type: 'v2_queue', crew: [{ agentId: ana.agents[0]!.id, tier: 'open', model: 'x/big' }], ranked: true });
+    await ben.send({ type: 'v2_queue', crew: [{ agentId: ben.agents[0]!.id, tier: 'standard' }], ranked: true });
+    const ranked = await ana.inbox.next('v2_found', (m) => m.matchId !== found.matchId);
+    await ben.inbox.next('v2_found', (m) => m.matchId !== found.matchId);
+    await ana.send({ type: 'v2_accept', matchId: ranked.matchId });
+    await ben.send({ type: 'v2_accept', matchId: ranked.matchId });
+    await ana.send({ type: 'v2_lock_in', matchId: ranked.matchId, tiers: ['open'] });
+    await ben.send({ type: 'v2_lock_in', matchId: ranked.matchId, tiers: ['standard'] });
+    const rend = await ana.inbox.next('v2_end', (m) => m.matchId === ranked.matchId, 30_000);
+    expect(rend.debrief!.credits.held).toBe(30);
+    expect((await deps.repos.v2Matches.get(ranked.matchId))!.crews!.A[0]!.model).toBeUndefined();
+  });
+
   it('refuses a crew with someone else’s agent', async () => {
     const deps = await makeDeps();
     hub = new RealtimeHub(deps);

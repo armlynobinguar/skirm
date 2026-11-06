@@ -140,6 +140,56 @@ describe('S04 v2 crew screen', () => {
     ]);
   });
 
+  const CATALOG = {
+    default: 'anthropic/claude-haiku-5.5',
+    models: [
+      { id: 'anthropic/claude-haiku-5.5', label: 'Haiku', rateMultiplierBps: 10000 },
+      { id: 'x/big', label: 'Big', rateMultiplierBps: 15000 },
+    ],
+  };
+
+  it('picks a model per agent, prices it into the estimate and queues it', async () => {
+    const { user, realtime } = setup('', { v2Models: async () => CATALOG });
+    const card = await screen.findByTestId(`s04-card-${WICK.id}`);
+    const pick = await within(card).findByRole('combobox', { name: 'Model for Wick' });
+    expect(pick).toHaveValue('anthropic/claude-haiku-5.5');
+    expect(within(pick).getAllByRole('option').map((o) => o.textContent)).toEqual(['Haiku · 1x', 'Big · 1.5x']);
+    expect(card).toHaveTextContent('0.20 credits per tick');
+    expect(screen.getByTestId('s04-estimate')).toHaveTextContent('150 ticks × (0.20) credits per tick');
+
+    // Standard 20 × 1.5 = 30 hundredths a tick: 150 × 0.30 = 45.
+    await user.selectOptions(pick, 'x/big');
+    expect(card).toHaveTextContent('0.30 credits per tick');
+    expect(screen.getByTestId('s04-estimate')).toHaveTextContent('150 ticks × (0.30) credits per tick');
+    expect(screen.getByTestId('s04-estimate')).toHaveTextContent('45');
+
+    await user.click(screen.getByTestId('s04-queue'));
+    expect(realtime.sentOf('v2_queue')[0]!.crew).toEqual([{ agentId: WICK.id, tier: 'standard', model: 'x/big' }]);
+    expect(v2StoreFor(realtime).queued).toEqual([{ agentId: WICK.id, name: 'Wick', tier: 'standard', model: 'x/big', rateBps: 15000 }]);
+  });
+
+  it('ranked plays the default model: the pick is locked and left out of the queue', async () => {
+    const { user, realtime } = setup('', { v2Models: async () => CATALOG });
+    const card = await screen.findByTestId(`s04-card-${WICK.id}`);
+    await user.selectOptions(await within(card).findByRole('combobox', { name: 'Model for Wick' }), 'x/big');
+    await user.click(within(screen.getByTestId('s04-mode')).getByRole('button', { name: 'Ranked' }));
+    const pick = within(card).getByRole('combobox', { name: 'Model for Wick' });
+    expect(pick).toBeDisabled();
+    expect(pick).toHaveValue('anthropic/claude-haiku-5.5');
+    expect(card).toHaveTextContent('Ranked plays the default model');
+    expect(screen.getByTestId('s04-estimate')).toHaveTextContent('150 ticks × (0.20) credits per tick');
+    await user.click(screen.getByTestId('s04-queue'));
+    expect(realtime.sentOf('v2_queue')[0]!.crew).toEqual([{ agentId: WICK.id, tier: 'standard' }]);
+  });
+
+  it('shows no model choice when the catalog has one model (or does not answer)', async () => {
+    setup('', { v2Models: async () => ({ default: CATALOG.default, models: CATALOG.models.slice(0, 1) }) });
+    const card = await screen.findByTestId(`s04-card-${WICK.id}`);
+    await screen.findByTestId('s04-estimate');
+    expect(within(card).queryByRole('combobox')).toBeNull();
+    expect(screen.getByTestId('screen-s04')).toHaveTextContent('One model plans and acts · same for everyone');
+  });
+
   it('caps the crew at three, keeps one, and cancels a search', async () => {
     const { user, realtime } = setup();
     await screen.findByTestId(`s04-card-${WICK.id}`);

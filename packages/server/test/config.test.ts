@@ -91,6 +91,24 @@ describe('loadConfig', () => {
     expect(loadConfig({ LLM_MODEL: 'a', LLM_PLANNER_MODEL: 'b' }).LLM_PLANNER_MODEL).toBe('b');
   });
 
+  it('reads the model catalog (LLM_MODELS): LLM_MODEL alone at 1.0x when unset', () => {
+    expect(loadConfig({}).llmModels).toEqual([{ id: 'anthropic/claude-haiku-5.5', label: 'claude-haiku-5.5', rateMultiplierBps: 10000 }]);
+    const c = loadConfig({ LLM_MODEL: 'a/base', LLM_MODELS: '[{"id":"x/big","label":"Big","rateMultiplierBps":15000}]' });
+    expect(c.llmModels.map((m) => [m.id, m.rateMultiplierBps])).toEqual([
+      ['a/base', 10000],
+      ['x/big', 15000],
+    ]);
+  });
+
+  it('rejects a malformed model catalog at boot', () => {
+    try {
+      loadConfig({ LLM_MODELS: '[{"id":"x/big","rateMultiplierBps":"lots"}]' });
+      expect.unreachable();
+    } catch (err) {
+      expect((err as ConfigError).issues).toEqual([{ path: 'LLM_MODELS', message: expect.stringContaining('rateMultiplierBps must be an integer') }]);
+    }
+  });
+
   it('rejects a bad provider URL or price', () => {
     try {
       loadConfig({ LLM_BASE_URL: 'ftp://x', LLM_PRICE_INPUT_USD: '-1', LLM_PRICE_OUTPUT_USD: 'cheap' });

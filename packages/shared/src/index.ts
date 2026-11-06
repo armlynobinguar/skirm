@@ -18,3 +18,4 @@ export * from './skill-trigger';
 export * from './progression';
 export * from './campaign';
 export * from './backing';
+export * from './models';

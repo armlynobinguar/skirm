@@ -91,6 +91,7 @@ export class RealtimeHub {
       pubsub: deps.pubsub,
       ...(deps.externalTurns ? { externalTurns: deps.externalTurns } : {}),
       ...(deps.externalPost ? { externalPost: deps.externalPost } : {}),
+      ...(deps.v2Models ? { models: deps.v2Models } : {}),
       log: this.log,
     });
     this.scheduleSweep(0);

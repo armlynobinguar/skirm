@@ -6,15 +6,16 @@
 // Ranked plays every agent at Standard. The rival's agent count shows, never who they are (practice:
 // the greedy bot, a Standard crew the size of yours). A free crew (practice on the offline brain)
 // holds nothing, so the hold line says so.
-// `v2_lock_in` carries the tiers, plus the crew when it differs from the queued one, and the crew
-// playbook (`playbookId`) when the picker moved off the one selected on the crew screen.
-import { DIFF_MODS, RANKED_DIFFICULTY, holdFor, type TalkTier } from '@skirm/engine/v2';
+// `v2_lock_in` carries the tiers, plus the crew when it differs from the queued one (each queued
+// agent keeps the model it was queued with), and the crew playbook (`playbookId`) when the picker
+// moved off the one selected on the crew screen. Rates scale by each queued agent's model multiplier.
+import { DIFF_MODS, RANKED_DIFFICULTY, agentRatePer100, holdFor, type TalkTier } from '@skirm/engine/v2';
 import { Button, fmt } from '@skirm/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CreditEstimate, CrewCard, EmptySlot, GoalBox, RosterStrip } from '@/features/agents/CrewParts';
 import { PlaybookPicker, playbookChange, usePlaybooks } from '@/features/agents/Playbooks';
-import { TIER_INFO, clock, fmtRate, headStartLine, ratePerTick } from '@/features/agents/agentView';
+import { clock, fmtRate, headStartLine } from '@/features/agents/agentView';
 import c from '@/features/agents/crew.module.css';
 import { DIFFS, diffIndex, mapById } from '@/features/arena/world';
 import { useNow } from '@/features/pvp/pvpUtil';
@@ -52,16 +53,22 @@ export function LockIn({ view }: { view: V2MatchView }) {
   const locked = view.locked.includes(view.team) || sent;
   const nameOf = (id: string) => byId.get(id)?.name ?? queued.find((a) => a.agentId === id)?.name ?? 'Agent';
   const tierOf = (id: string): TalkTier => (view.ranked ? 'standard' : (tiers[id] ?? 'standard'));
-  const rates = crew.map((id) => TIER_INFO[tierOf(id)].rate);
-  const perTick = ratePerTick(crew.map(tierOf));
-  const hold = holdFor(crew.map((id) => ({ tier: tierOf(id) })), view.ranked, ticks);
+  /** The model an agent was queued with, when not the default (ranked plays the default). */
+  const queuedModel = (id: string) => (view.ranked ? undefined : queued.find((a) => a.agentId === id && a.model));
+  const priced = (id: string) => {
+    const q = queuedModel(id);
+    return { tier: tierOf(id), ...(q?.rateBps !== undefined ? { rateBps: q.rateBps } : {}) };
+  };
+  const rates = crew.map((id) => agentRatePer100(priced(id), view.ranked) / 100);
+  const perTick = crew.reduce((n, id) => n + agentRatePer100(priced(id), view.ranked), 0) / 100;
+  const hold = holdFor(crew.map(priced), view.ranked, ticks);
   const changed = crew.join() !== queued.map((a) => a.agentId).join();
   const mine = (skillId: string | undefined) => (skillId && written.data ? written.data.some((s) => s.id === skillId) : null);
 
   const lock = () => {
     if (locked) return;
     const msg: Extract<OutgoingMessage, { type: 'v2_lock_in' }> = { type: 'v2_lock_in', matchId: view.matchId, tiers: crew.map(tierOf) };
-    if (changed && crew.length) msg.crew = crew.map((id) => ({ agentId: id, tier: tierOf(id) }));
+    if (changed && crew.length) msg.crew = crew.map((id) => ({ agentId: id, tier: tierOf(id), ...(queuedModel(id)?.model ? { model: queuedModel(id)!.model! } : {}) }));
     const pick = playbookChange(playbooks.data, playbook);
     if (pick !== undefined) msg.playbookId = pick;
     rt.send(msg);

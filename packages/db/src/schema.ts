@@ -501,6 +501,9 @@ export interface V2CrewRecord {
   external?: true;
   /** Progression traits it played with (the log header's; absent when none). */
   traits?: readonly string[];
+  /** A catalog model other than the default and its talk-rate multiplier in basis points (absent: default, 1.0x). */
+  model?: string;
+  rateBps?: number;
 }
 
 /** XP one agent earned from a match (V2Debrief.xp), with its total and level after it. */

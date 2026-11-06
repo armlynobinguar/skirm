@@ -22,6 +22,9 @@ export interface V2QueuedAgent {
   agentId: string;
   name: string;
   tier: TalkTier;
+  /** A catalog model other than the default, and its rate multiplier (display; the server prices it). */
+  model?: string;
+  rateBps?: number;
 }
 
 export type V2Phase = 'found' | 'draft' | 'lockin' | 'live' | 'ended';

@@ -35,6 +35,8 @@ export const qk = {
   rentalOffers: ['rentals'] as const,
   /** Under `me`, so a match end (qk.me invalidated) refreshes the passes left. */
   myRentals: ['me', 'rentals'] as const,
+  /** The operator's model catalog (GET /v2/models). */
+  v2Models: ['v2', 'models'] as const,
   backing: {
     all: ['backing'] as const,
     config: ['backing', 'config'] as const,

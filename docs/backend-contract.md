@@ -25,6 +25,7 @@ The single reference for `apps/api`, `apps/worker`, `apps/realtime` and `apps/we
 | `OPENROUTER_API_KEY` | unset | old name of `LLM_API_KEY`, still read; `LLM_API_KEY` wins when both are set |
 | `LLM_MODEL` | `anthropic/claude-haiku-5.5` | the model id as the provider names it; one model acts, speaks and plans for every agent in every mode, and casts replays |
 | `LLM_PLANNER_MODEL` | `LLM_MODEL` | the crew planner's model |
+| `LLM_MODELS` | unset (`LLM_MODEL` alone) | models players may pick per agent outside ranked, JSON `[{"id", "label"?, "rateMultiplierBps"}]` (1000 to 100000; `LLM_MODEL` is always first at 10000); a malformed value fails at boot |
 | `LLM_PRICE_INPUT_USD`, `LLM_PRICE_OUTPUT_USD` | unset | USD per million prompt / completion tokens, for the daily cost monitor when the provider returns no cost (OpenRouter's `usage.cost` wins). Unset: the default model keeps its built-in prices (`DEFAULT_MODEL_PRICES`), any other model records its tokens at cost 0 and logs that once. Credit prices to players do not change (`DEFAULTS.price` in `@skirm/shared`) |
 | `BENCH_SECRET` | `skirm-bench` | worker: HMAC key that picks the hidden benchmark seeds. Set a private one in any shared environment |
 | `SKILL_KEK` | unset → `SKILL_KEK_KMS`, else the dev key | base64 32-byte local key-encryption key. When set it seals new skill versions; rows it sealed open only while it is set |
@@ -96,6 +97,7 @@ Auth: every route needs a session except `GET /health`, `POST /auth/session`, `G
 
 | Method | Path | Body / query | Returns |
 | --- | --- | --- | --- |
+| GET | `/v2/models` | | the models a crew may pick per agent outside ranked: `{ default, models: {id, label, rateMultiplierBps}[] }`, the default first at 10000 (1.0x). An agent's rate is `ceil(tier ratePer100 × rateMultiplierBps / 10000)`; ranked always plays `default`. Realtime prices every pick from its own catalog and refuses an unlisted `crew[].model` with `invalid_crew` |
 | GET | `/v2/matches/live` | | matches being played now, newest first: `{ id, mapId, difficulty, ranked, practice, startedAt, teams: {A, B}: {handle, size} }`. Crews stay hidden; the bot side of a practice match is `Greedy bot` |
 | GET | `/v2/matches/:id` | | `{ id, mapId, ranked, practice, status: 'live'\|'ended'\|'void', difficulty, teams: {A, B}: {accountId, handle, crew[]}, winner, reason, decidedBy, score: {A, B} \| null, ticks, elo: {accountId, team, before, delta, after}[], stats, logHash, registry: {status, txHash?}, createdAt, endedAt, you?, debrief? }`. While live the rival side is blank and only a player sees their own crew. `you` and `debrief` (that crew's, as sent with `v2_end`) only for a player. `logHash` is the final hash of the match log (served by `/log` below once the match ends). `registry.status` is `none` for casual, practice and void matches |
 | GET | `/v2/matches/:id/messages` | `?afterTick=&limit=` (≤ `MATCH_MESSAGES_MAX_LIMIT`, default 200) | `{ messages: {tick, team, agent: {id, name}, channel, text, heardBy, overheardBy}[], next? }`: the lines realtime saw delivered. `409 match_live` until the match ends. Page with `next` as the following `afterTick` |

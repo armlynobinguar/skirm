@@ -40,6 +40,22 @@ describe('model brain usage', () => {
     expect(seen).toHaveLength(1);
   });
 
+  it("acts with the agent's catalog model when the context names one, and plans with the planner model", async () => {
+    const seen: V2Call[] = [];
+    const fetch = fakeFetch();
+    const brain = createModelBrain({ apiKey: 'k', fetch, model: 'base/m', prices: { input: 1, output: 1 }, warn: () => undefined, onUsage: (c) => seen.push(c) });
+    await brain.act(obs(), { ...ctx, model: 'x/big' });
+    await brain.act(obs(), { ...ctx, model: null });
+    await brain.plan(obs(), { skills: [] });
+    expect(fetch.mock.calls.map((c) => JSON.parse(String(c[1].body)).model)).toEqual(['x/big', 'base/m', 'base/m']);
+    // LLM_PRICE_* price the configured model only; the other model with no billed cost records 0.
+    expect(seen.map((c) => [c.model, c.costUsd > 0])).toEqual([
+      ['x/big', false],
+      ['base/m', true],
+      ['base/m', true],
+    ]);
+  });
+
   it('reports failed calls and planner calls too', async () => {
     const seen: V2Call[] = [];
     const brain = createModelBrain({ apiKey: 'k', fetch: fakeFetch({ status: 400 }), onUsage: (c) => seen.push(c) });

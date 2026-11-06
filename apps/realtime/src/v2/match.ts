@@ -4,7 +4,8 @@
 // the start. Then the shared map plays in 2 s ticks at the match's difficulty: every agent that can
 // act or speak asks the brain, whatever is not back by the action deadline is a wait, talk is
 // delivered by the engine, and each crew gets its own fogged frame with its own plan. Credits: a hold
-// of every tick at the crew's talk rates up front (whole credits, rounded up once), then each tick
+// of every tick at the crew's talk rates (each agent's tier rate scaled by its model's multiplier,
+// engine agentRatePer100; ranked is Standard at 1.0x) up front (whole credits, rounded up once), then each tick
 // the crew's cost in hundredths of a credit is added to a running total and only the whole credits
 // it newly crosses are charged, so charges never exceed the hold; the rest is returned at the end
 // (all of it on a void). A free crew (the practice bot, or a practice player on the greedy brain)
@@ -887,7 +888,8 @@ export class V2Match {
     if (this.controlled[a.team] === id) return this.steerDecide(a.team, o);
     if (o.legal.length <= 1 && !canSpeak) return Promise.resolve({ action: o.legal[0] ?? wait, reason: 'chosen', say: null });
     const command = this.orderFor(s, id, s.tick + 1);
-    const ctx = { skills, skillTriggers, instructions: side.instructions?.[a.slot] ?? null, playbook: side.playbook?.text ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [], command };
+    // The agent's catalog model (absent: the brain's own; ranked state never carries one).
+    const ctx = { skills, skillTriggers, instructions: side.instructions?.[a.slot] ?? null, playbook: side.playbook?.text ?? null, plan: this.plans[a.team], canSpeak, recent: this.recent.get(id) ?? [], command, ...(a.model ? { model: a.model } : {}) };
     const sched = this.deps.scheduler;
     return new Promise((resolve) => {
       let settled = false;
