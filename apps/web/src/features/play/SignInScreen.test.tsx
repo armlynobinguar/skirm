@@ -65,6 +65,47 @@ describe('S01 Sign in', () => {
     expect(screen.getByTestId('s01-ladder')).toHaveAttribute('href', '/leaderboards');
   });
 
+  it('pitches NEAR: skill NFTs with royalties, ranked results on the chain, /verify and the ladder', () => {
+    renderWithProviders(<SignInScreen />);
+    const steps = screen.getByTestId('s01-steps');
+    expect(steps).toHaveTextContent('NFT on NEAR');
+    expect(steps).toHaveTextContent('royalty');
+    expect(steps).toHaveTextContent('recorded on NEAR testnet');
+    expect(screen.getByTestId('s01-verify')).toHaveAttribute('href', '/verify');
+    expect(screen.getByTestId('s01-steps-ladder')).toHaveAttribute('href', '/leaderboards');
+    expect(screen.getByTestId('s01-network')).toHaveTextContent('Testnet');
+  });
+
+  it('opens on the pitch with a gameplay clip, no boot loader', () => {
+    renderWithProviders(<SignInScreen />);
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('s01-media')).getByRole('img')).toHaveAttribute('src', '/media/gameplay.gif');
+  });
+
+  it('Start a practice match signs in with the typed handle, then opens practice vs the bot', async () => {
+    const { user, router } = renderWithProviders(<SignInScreen />);
+    await user.type(screen.getByLabelText('Handle'), 'ada');
+    await user.click(screen.getByTestId('s01-practice-start'));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/maps/copper-hollow/crew?d=easy&opponent=bot'));
+  });
+
+  it('Start a practice match with no handle focuses the field and says what happens next', async () => {
+    const { user, api } = renderWithProviders(<SignInScreen />);
+    await user.click(screen.getByTestId('s01-practice-start'));
+    expect(screen.getByLabelText('Handle')).toHaveFocus();
+    expect(screen.getByTestId('s01-practice-hint')).toHaveTextContent('Your practice match opens right after');
+    expect(api.createSession).not.toHaveBeenCalled();
+  });
+
+  it('privy mode: Start a practice match focuses Continue with Google, and sign-in goes on to practice', async () => {
+    const privy = new FakePrivy({ ready: true, authenticated: false, token: 'jwt_g' });
+    const { user, router } = renderWithProviders(<SignInScreen />, { authMode: 'privy', privy });
+    await user.click(await screen.findByTestId('s01-practice-start'));
+    expect(screen.getByTestId('s01-google')).toHaveFocus();
+    await user.click(screen.getByTestId('s01-google'));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/maps/copper-hollow/crew?d=easy&opponent=bot'));
+  });
+
   it('reads the handle from the field on submit (text typed before hydration counts)', async () => {
     const { user, credentials, router } = renderWithProviders(<SignInScreen />);
     // Uncontrolled: a value already in the DOM (typed before React attached) is what gets sent.
