@@ -27,6 +27,7 @@ import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
 import { depositTx } from '@/lib/wallet/contracts';
 import { useNearSigner } from '@/lib/wallet/hooks';
+import { isFinalRefusal, pendingStore } from '@/lib/wallet/pending';
 import { WalletError } from '@/lib/wallet/types';
 import { ConfirmTransactionModal } from '@/features/skills/ConfirmTransactionModal';
 import { ConnectWalletModal } from '@/features/skills/ConnectWalletModal';
@@ -67,6 +68,12 @@ interface Pending {
   txHash: string | null;
 }
 
+/** A deposit the wallet signed that POST /credits/deposits has not credited yet (survives a reload). */
+const signedDeposit = pendingStore<Pending>(
+  'deposit',
+  (v) => typeof v.txHash === 'string' && typeof v.yocto === 'string' && typeof v.credits === 'number',
+);
+
 function CreditsBody() {
   const api = useApi();
   const qc = useQueryClient();
@@ -87,9 +94,20 @@ function CreditsBody() {
   const [paused, setPaused] = useState(false);
 
   const [credited, setCredited] = useState<number | null>(null);
+  // Signed on an earlier visit (or before a failed POST) and not credited yet: finished before any
+  // new deposit, so the same NEAR is never sent twice.
+  const [unrecorded, setUnrecorded] = useState<Pending | null>(null);
+  useEffect(() => {
+    if (!dev) setUnrecorded(signedDeposit.load());
+  }, [dev]);
+  const settle = () => {
+    signedDeposit.save(null);
+    setUnrecorded(null);
+  };
 
   const begin = (choice: Omit<Pending, 'txHash'>) => {
-    const p: Pending = { ...choice, txHash: dev ? devDepositHash(choice.yocto) : null };
+    const held = dev ? null : signedDeposit.load();
+    const p: Pending = held ?? { ...choice, txHash: dev ? devDepositHash(choice.yocto) : null };
     setAmount(p);
     setCredited(null);
     setDepositError(null);
@@ -109,6 +127,9 @@ function CreditsBody() {
         const txHash = await signer.send(depositTx(signer.contracts, p.yocto), nearAccountId);
         p = { ...p, txHash };
         setAmount(p);
+        // Paid: keep the hash until the api credits it, whatever happens to this page.
+        signedDeposit.save(p);
+        setUnrecorded(p);
       } catch (err) {
         setDepositError(depositErrorCopy(err));
         throw err;
@@ -118,6 +139,7 @@ function CreditsBody() {
     setDepositing(p);
     try {
       const res = await api.deposit(txHash);
+      if (!dev) settle();
       setPaused(false);
       setCredited(res.credited);
       toast.show({
@@ -131,6 +153,8 @@ function CreditsBody() {
     } catch (err) {
       const copy = depositErrorCopy(err);
       setDepositError(copy);
+      // Credited already (duplicate_receipt) or refused for good: nothing left to re-send.
+      if (!dev && isFinalRefusal(err)) settle();
       if (copy.code === 'rpc_unavailable') setPaused(true);
       // Already credited (e.g. a retry after a lost response): show the balance that includes it.
       if (copy.code === 'duplicate_receipt') {
@@ -150,6 +174,27 @@ function CreditsBody() {
       </nav>
       <h1 className="app-h1">Credits</h1>
 
+      {unrecorded && !depositing ? (
+        <div className="app-banner is-warning" role="status" data-testid="s15-unrecorded">
+          <Icon name="warning" size={16} />
+          <span>
+            You sent {formatNear(unrecorded.yocto, 24)} NEAR and it is not credited yet. Finish it before topping up again; it will not be
+            charged twice.
+          </span>
+          <Button
+            size="sm"
+            onClick={() => {
+              setAmount(unrecorded);
+              setCredited(null);
+              setDepositError(null);
+              setConfirmOpen(true);
+            }}
+            data-testid="s15-unrecorded-finish"
+          >
+            Finish
+          </Button>
+        </div>
+      ) : null}
       {paused ? (
         <div className="app-banner is-warning" role="status" data-testid="s15-topups-paused">
           <Icon name="warning" size={16} />
