@@ -23,7 +23,7 @@ import { Badge, Button, Icon, TagChip, TextField, UnlockChip, fmt } from '@skirm
 import { DIFFS, diffIndex, mapById } from '@/features/arena/world';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { splitSale, type SkillRole } from '@skirm/shared';
 import { ButtonLink } from '@/components/ButtonLink';
 import { SignInButton } from '@/components/shell/RequireSession';
@@ -31,7 +31,7 @@ import { EmptyState } from '@/components/states/EmptyState';
 import { ErrorCard } from '@/components/states/ErrorCard';
 import { Skeleton } from '@/components/states/Skeleton';
 import { useToast } from '@/components/toast/ToastProvider';
-import { isApiError } from '@/lib/api/errors';
+import { errorCopy, isApiError } from '@/lib/api/errors';
 import { qk, useMe, useStartTrial, useTrials } from '@/lib/api/queries';
 import type { Agent, Listing, MarketBenchmark, MarketDetail, Me, RecordTally, Trial, TrialResult } from '@/lib/api/types';
 import { useSession } from '@/lib/auth/session';
@@ -39,6 +39,7 @@ import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
 import { buyTx, listTx, tokenIdOf } from '@/lib/wallet/contracts';
 import { useNearSigner } from '@/lib/wallet/hooks';
+import { isFinalRefusal, pendingStore } from '@/lib/wallet/pending';
 import { WalletError } from '@/lib/wallet/types';
 import { BackWriterPanel } from '@/features/backing/BackWriterPanel';
 import { CancelListingButton } from './CancelListingButton';
@@ -530,6 +531,13 @@ function TrialRow({ t, agentName }: { t: Trial; agentName: string }) {
 
 type Flow = null | { step: 'wallet' | 'confirm'; action: 'buy' | 'list' };
 
+/** A purchase the wallet signed that the api has not recorded yet. */
+interface SignedBuy {
+  listingId: string;
+  txHash: string;
+  version: number;
+}
+
 function Actions({ d, me, ownListing, creator }: { d: MarketDetail; me: Me | undefined; ownListing: boolean; creator: string }) {
   const api = useApi();
   const qc = useQueryClient();
@@ -570,8 +578,36 @@ function Actions({ d, me, ownListing, creator }: { d: MarketDetail; me: Me | und
   };
 
   const signer = useNearSigner();
-  // Signed but not yet recorded by the api (the POST failed): re-sent as is on "Try again".
-  const signedBuy = useRef<{ listingId: string; txHash: string } | null>(null);
+  // Signed but not yet recorded by the api (the POST failed, the drawer closed, the page reloaded):
+  // kept per skill in localStorage and re-sent as is, so the buyer never pays twice and a paid
+  // purchase can always be finished.
+  const buyStore = pendingStore<SignedBuy>(`skill-buy:${sk.id}`, (v) => typeof v.txHash === 'string' && typeof v.version === 'number');
+  const signedBuy = useRef<SignedBuy | null>(null);
+  const [unrecorded, setUnrecorded] = useState<SignedBuy | null>(null);
+  useEffect(() => {
+    if (mode === 'dev') return;
+    const held = buyStore.load();
+    signedBuy.current = held;
+    setUnrecorded(held);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sk.id, mode]);
+  const rememberBuy = (v: SignedBuy | null) => {
+    signedBuy.current = v;
+    buyStore.save(v);
+    setUnrecorded(v);
+  };
+  const finish = useMutation({
+    mutationFn: async (p: SignedBuy) => {
+      try {
+        await api.purchaseSkill(sk.id, { txHash: p.txHash, version: p.version });
+        rememberBuy(null);
+      } catch (err) {
+        if (isFinalRefusal(err)) rememberBuy(null);
+        throw err;
+      }
+    },
+    onSuccess: refresh,
+  });
   const signedList = useRef<{ key: string; txHash: string } | null>(null);
 
   const linkedOrThrow = (): string => {
@@ -583,15 +619,23 @@ function Actions({ d, me, ownListing, creator }: { d: MarketDetail; me: Me | und
     const listing = buying;
     if (!listing) return;
     let txHash: string;
+    let version = listing.version;
     if (mode === 'dev') txHash = devTxHash(listing.priceYocto);
-    else if (signedBuy.current?.listingId === listing.id) txHash = signedBuy.current.txHash;
-    else {
+    else if (signedBuy.current) {
+      // Already paid for this skill: finish that purchase, never sign a second one.
+      ({ txHash, version } = signedBuy.current);
+    } else {
       const tokenId = listing.tokenId ?? tokenIdOf(sk.id, listing.version);
       txHash = await signer.send(buyTx(signer.contracts, tokenId, listing.priceYocto), linkedOrThrow());
-      signedBuy.current = { listingId: listing.id, txHash };
+      rememberBuy({ listingId: listing.id, txHash, version });
     }
-    await api.purchaseSkill(sk.id, { txHash, version: listing.version });
-    signedBuy.current = null;
+    try {
+      await api.purchaseSkill(sk.id, { txHash, version });
+    } catch (err) {
+      if (mode !== 'dev' && isFinalRefusal(err)) rememberBuy(null);
+      throw err;
+    }
+    if (mode !== 'dev') rememberBuy(null);
     refresh();
   };
 
@@ -618,6 +662,15 @@ function Actions({ d, me, ownListing, creator }: { d: MarketDetail; me: Me | und
 
   return (
     <div className={x.buyBox}>
+      {unrecorded && !d.owned ? (
+        <div className="app-banner is-warning" role="status" data-testid="s10-unrecorded">
+          <span>You paid for this skill and it is not recorded yet. Finish it; you will not be charged again.</span>
+          <Button size="sm" variant="primary" loading={finish.isPending} onClick={() => finish.mutate(unrecorded)} data-testid="s10-unrecorded-finish">
+            Finish purchase
+          </Button>
+          {finish.isError ? <span className="app-small">{errorCopy(finish.error).message}</span> : null}
+        </div>
+      ) : null}
       {listing ? (
         <span className={x.drPrice} data-testid="s10-price">
           {near(listing.priceYocto)}

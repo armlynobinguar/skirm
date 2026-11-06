@@ -39,5 +39,7 @@ export function pendingStore<T extends object>(key: string, valid: (v: Record<st
  * not indexed yet, a network error) keeps the payment pending, to be re-sent as is.
  */
 export function isFinalRefusal(err: unknown): boolean {
-  return err instanceof ApiError && [400, 402, 403, 409, 422].includes(err.status);
+  if (!(err instanceof ApiError) || ![400, 402, 403, 409, 422].includes(err.status)) return false;
+  // "Transaction not found" from a NEAR check is the receipt not indexed yet: worth re-sending.
+  return err.details?.reason !== 'not_found';
 }
