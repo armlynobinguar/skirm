@@ -11,6 +11,7 @@ import type {
   BackingTxReader,
   BadgeMinter,
   BenchmarkJobData,
+  CosmeticsChain,
   DepositVerifier,
   ExternalTurnStore,
   SafePostOptions,
@@ -88,6 +89,11 @@ export interface ApiDeps {
     ownership: OwnershipReader;
     /** Soulbound achievement badges (`badges` contract; NoopBadges without a signer). */
     badges: BadgeMinter;
+    /**
+     * NEP-245 cosmetic items (`cosmetics` contract). Absent (NEAR_CONTRACT_COSMETICS unset, the
+     * default): cosmetics are credits-only.
+     */
+    cosmetics?: CosmeticsChain;
     /** Checks NEAR link proofs outside dev mode (absent: linking is refused with 503). */
     keys?: NearKeyChecker;
     /** Reads backing-contract transactions (set with BACKING_CONTRACT). */

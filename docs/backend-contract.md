@@ -35,6 +35,7 @@ The single reference for `apps/api`, `apps/worker`, `apps/realtime` and `apps/we
 | `NEAR_OPS_ACCOUNT`, `NEAR_OPS_KEY` | unset | the platform signer (set both or neither). Unset → `NoopRegistry` / `NoopMinter` / `NoopSeasons`: registry status `local`, season pools `local` |
 | `NEAR_CONTRACT_SKILLS` / `_MARKET` / `_REGISTRY` / `_DEPOSITS` / `_SEASONS` / `_BADGES` | `skills.playskirm.testnet` … `badges.playskirm.testnet` | `badges` is not deployed yet |
 | `CREDITS_PER_NEAR` | `1000` (`DEFAULTS.credits.perNear`) | credits one NEAR buys: $0.001 a credit at an assumed $1 NEAR |
+| `NEAR_CONTRACT_COSMETICS` | unset | api: the NEP-245 cosmetics contract (`contracts/cosmetics`, not deployed yet). Unset: skins, trails and nameplates are credits-only. Set, with the ops signer: bought ones are minted to the buyer's linked NEAR account (`mt_mint`, storage paid from the ops storage balance on the contract) and ownership of minted items is read with `mt_batch_balance_of`. Deploy and `mt_create` every item first (contracts/README.md) |
 | `NEAR_RENTALS_ONCHAIN` | `false` | api: `true` takes agent rentals through `market.rent` from the renter's wallet (needs the market redeployed with `rent`, contracts/market/README.md); off, rentals are paid in paid credits |
 | `RELAYER_ACCOUNT_ID`, `RELAYER_PRIVATE_KEY` | unset | gasless onboarding's relayer (set both or neither; [gasless.md](gasless.md)). Unset → `/relay` is off and nothing else changes |
 | `RELAYER_FREE_TXS` | `3` | relayed (gas-free) transactions per player |
@@ -234,8 +235,13 @@ Modes (`GET /backing/config` `mode`): `near` when `BACKING_CONTRACT` is set: eve
 
 | Method | Path | Body / query | Returns |
 | --- | --- | --- | --- |
-| GET | `/cosmetics` | | `{ items: {id, kind: 'outfit'\|'hair', name, index, priceCredits, color}[], owned: string[] }`. Premium palette entries appended after the free ones; purely visual |
-| POST | `/cosmetics/:id/buy` | | `{ owned }`. Paid credits only, never the free allowance: `402 insufficient_credits` with `need`, `have`. Buying an owned item is a no-op 200 |
+| GET | `/cosmetics` | | `{ items: {id, kind: 'outfit'\|'hair', name, index, priceCredits, color}[], equip: EquipCosmetic[], owned: string[], equipped: {[agentId]: AgentCosmetics}, mints: {[itemId]: {status: pending\|minted\|failed, txHash, owner}}, onchain: {standard: 'nep245', contractId} \| null }`. `items` are premium palette entries appended after the free ones; `equip` are the skins, trails and nameplates (below); `equipped` covers the caller's agents; `onchain` is null while `NEAR_CONTRACT_COSMETICS` is unset. All purely visual |
+| POST | `/cosmetics/:id/buy` | | `{ owned, mint? }`. Any item of either list. Paid credits only, never the free allowance: `402 insufficient_credits` with `need`, `have`. Buying an owned item is a no-op 200. With the NEP-245 contract on and a linked NEAR account, a newly bought equippable item is minted right away (`mint`; a failed mint keeps the purchase, retry with `/mint`) |
+| POST | `/cosmetics/:id/mint` | | `{ mint }`: mints an owned equippable item as one NEP-245 token (`mt_mint`, ops key, `mint_id` `<account id>:<item id>` so a resend mints nothing) to the caller's linked NEAR account, once. `503 cosmetics_offchain` while the contract is off, `422 near_account_required`, `409 not_owned` / `mint_in_progress`, `502 mint_failed` (retryable). Strict rate-limit bucket |
+| GET | `/agents/:id/cosmetics` | | `{ cosmetics: AgentCosmetics }`: what any agent wears |
+| PUT | `/agents/:id/cosmetics/:slot` | `{ itemId: string \| null }` | `{ cosmetics }`. `slot` is `skin`, `trail` or `nameplate`; `null` takes the slot off. Owner only (`403 not_agent_owner`); the item must be for that slot (`422 wrong_slot`) and owned (`403 cosmetic_not_owned`; with the contract on, minted items count while the linked NEAR account holds them onchain, and items received onchain count too; RPC down falls back to `cosmetics_owned`). Allowed any time, also mid-match; a match takes what each agent wears when it starts |
+
+`EquipCosmetic` (`EQUIP_COSMETICS` in `@skirm/shared`): `{ id, kind: 'skin', name, blurb, priceCredits, body, accent, pattern: solid|stripes|chevron|dots }`, `{ id, kind: 'trail', ..., color, style: dots|sparks|ribbon }` or `{ id, kind: 'nameplate', ..., fg, bg, border }`. `AgentCosmetics`: `{ skin?, trail?, nameplate? }` (item ids). Ownership lives in `cosmetics_owned` (its `mint_status`, `mint_tx`, `minted_to` track the NEP-245 mint) and what each agent wears in `agent_cosmetics` (one row per agent and slot). Realtime copies each agent's equipment onto every frame as `FrameAgent.cosmetics` (own, rival and watch views, so stored replays carry it too); the engine, the decision engines, scoring and the hash-chained match log never see it. The NEP-245 contract is `contracts/cosmetics` (not deployed yet; token id = item id).
 | GET | `/credits` | | `{ balance, held, allowanceLeft, allowanceResetAt, available, creditsPerNear, rows: {id, type, amount, source, note, matchId, txHash, createdAt}[] }` (latest 100) |
 | POST | `/credits/deposits` | `{ txHash }` | `{ credited, balance, amountYocto }`: a `deposits.deposit()` tx verified through RPC (dev mode: `dev:<yocto>`), credited once (`409 duplicate_receipt`). Every `deposit()` action of a batched tx is credited, each once: the first under the tx hash, action *i* under `<hash>#<i>` (paired with the *i*-th `deposit` event). A replay credits only the actions not yet credited (`credited` and `amountYocto` count those) and is `409 duplicate_receipt` when there are none |
 | GET | `/relay` | | `{ enabled, freeTxs, used, remaining, linked }`: gasless onboarding for the caller ([gasless.md](gasless.md)); `enabled: false` without a relayer. `used` counts the skirm account's relayed transactions (and the linked NEAR account's): `sent` ones and `pending` ones under 10 minutes old. `linked: false` until a NEAR account is linked (nothing is relayed before) |
@@ -331,12 +337,12 @@ Besides `bad_request` (400), `unauthenticated` / `no_session` / `invalid_agent_t
 | Status | Codes |
 | --- | --- |
 | 402 | `insufficient_credits` (with `need`, `have`) |
-| 403 | `dev_disabled`, `cosmetic_not_owned`, `mission_locked` |
-| 409 | `agent_busy`, `agent_bound`, `external_limit`, `stale_turn`, `too_late`, `already_answered`, `match_live`, `not_ended`, `replay_expired`, `share_limit`, `mint_in_progress`, `quest_incomplete`, `already_claimed`, `allowance_full`, `not_unlocked`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch`, `own_lobby`, `lobby_full`, `lobby_closed`, `lobby_ready`, `tournament_match`, `tournament_full`, `not_open` |
-| 422 | `bad_clip`, `invalid_webhook`, `invalid_action`, `near_account_required`, `near_proof_required`, `near_proof_invalid`, `not_minted`, `invalid_hash`, `underpaid`, `purchase_unverified` |
+| 403 | `dev_disabled`, `cosmetic_not_owned`, `not_agent_owner`, `mission_locked` |
+| 409 | `agent_busy`, `agent_bound`, `external_limit`, `stale_turn`, `too_late`, `already_answered`, `match_live`, `not_ended`, `replay_expired`, `share_limit`, `mint_in_progress`, `not_owned`, `quest_incomplete`, `already_claimed`, `allowance_full`, `not_unlocked`, `skill_owned`, `near_account_taken`, `listing_active`, `duplicate_receipt`, `duplicate_tx`, `not_listed`, `own_listing`, `conflict`, `invalid_transition`, `hold_mismatch`, `own_lobby`, `lobby_full`, `lobby_closed`, `lobby_ready`, `tournament_match`, `tournament_full`, `not_open` |
+| 422 | `wrong_slot`, `bad_clip`, `invalid_webhook`, `invalid_action`, `near_account_required`, `near_proof_required`, `near_proof_invalid`, `not_minted`, `invalid_hash`, `underpaid`, `purchase_unverified` |
 | 429 | `trial_limit`, `bench_limit`, `daily_limit` |
 | 502 | `mint_failed` |
-| 503 | `relay_unavailable`, `queue_unavailable`, `rpc_unavailable`, `near_unavailable`, `ownership_unavailable` |
+| 503 | `cosmetics_offchain`, `relay_unavailable`, `queue_unavailable`, `rpc_unavailable`, `near_unavailable`, `ownership_unavailable` |
 
 ## WebSocket (`apps/realtime`, path `/ws`)
 

@@ -58,6 +58,12 @@ export interface FrameAgent {
   tool?: ToolKind;
   /** An Engineer's own bridges or a Saboteur's decoys left (roles.ts): own crew and the watch view only. */
   kit?: number;
+  /**
+   * What the agent wears in the arena: item ids from @skirm/shared EQUIP_COSMETICS per slot.
+   * Rendering only: added by the match server after `frameFor`, never read by the engine and never
+   * part of the match log. Absent: the default look.
+   */
+  cosmetics?: { skin?: string; trail?: string; nameplate?: string };
 }
 
 /** One equipped skill in the mind panel: public metadata and whether it is active this tick. */

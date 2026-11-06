@@ -437,7 +437,7 @@ describe('a match with the new roles replays to the same hash', () => {
     const run = () => {
       const crews = { A: [agent('a1', 'Medic'), agent('a2', 'Saboteur')], B: [agent('b1', 'Engineer'), agent('b2', 'Courier')] };
       const s = createMatch(def, crews);
-      const log = startLog({ schema: 'skirm.match/v2', map: id, crews: { A: crews.A.map((c) => logAgent({ ...c })), B: crews.B.map((c) => logAgent({ ...c })) }, ranked: false, models: { planner: 'p', actor: 'a', speech: 's' } });
+      const log = startLog({ schema: 'skirm.match/v2', map: id, crews: { A: crews.A.map((c) => logAgent({ ...c, traits: c.traits ? [...c.traits] : undefined })), B: crews.B.map((c) => logAgent({ ...c, traits: c.traits ? [...c.traits] : undefined })) }, ranked: false, models: { planner: 'p', actor: 'a', speech: 's' } });
       while (!s.result) {
         const actions: Record<string, Action> = {};
         for (const a of s.agents) {

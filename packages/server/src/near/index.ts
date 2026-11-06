@@ -1,5 +1,6 @@
 import type { ServerConfig } from '../config';
 import { NearBadges, NoopBadges, type BadgeMinter } from './badges';
+import { NearCosmetics, type CosmeticsChain } from './cosmetics';
 import {
   CompositeDepositVerifier,
   DevDepositVerifier,
@@ -24,6 +25,7 @@ import { OpsFunctionCaller, type FunctionCaller } from './signer';
 
 export * from './backing';
 export * from './badges';
+export * from './cosmetics';
 export * from './delegate';
 export * from './deposits';
 export * from './market';
@@ -48,6 +50,8 @@ export interface NearAdapters {
   seasons: SeasonsChain;
   /** Soulbound achievement badges (`badges` contract). */
   badges: BadgeMinter;
+  /** NEP-245 cosmetic items; absent unless NEAR_CONTRACT_COSMETICS and the ops signer are set (credits-only). */
+  cosmetics?: CosmeticsChain;
   /** Gasless onboarding's relayer (NEP-366); absent unless RELAYER_ACCOUNT_ID and _PRIVATE_KEY are set. */
   relayer?: MetaTxRelayer;
 }
@@ -71,11 +75,12 @@ type NearConfig = Pick<
   | 'CREDITS_PER_NEAR'
   | 'nearRpcUrls'
 > &
-  Partial<Pick<ServerConfig, 'RELAYER_ACCOUNT_ID' | 'RELAYER_PRIVATE_KEY'>>;
+  Partial<Pick<ServerConfig, 'RELAYER_ACCOUNT_ID' | 'RELAYER_PRIVATE_KEY' | 'NEAR_CONTRACT_COSMETICS'>>;
 
 /**
  * Registry/Minter/OwnershipReader/Seasons/Badges are Near* when the ops signer is configured, Noop*
- * otherwise. The relayer exists only with RELAYER_ACCOUNT_ID and RELAYER_PRIVATE_KEY set.
+ * otherwise. The relayer exists only with RELAYER_ACCOUNT_ID and RELAYER_PRIVATE_KEY set, and the
+ * cosmetics chain only with NEAR_CONTRACT_COSMETICS and the ops signer.
  * Deposits and rentals always verify through RPC; `dev:` hashes are accepted only with AUTH_MODE=dev.
  */
 export function createNearAdapters(
@@ -96,6 +101,10 @@ export function createNearAdapters(
   const relayers = relayer ? [relayer.relayerId] : [];
   return {
     ...(relayer ? { relayer } : {}),
+    // Cosmetics go onchain only when their contract is named (it is not deployed yet).
+    ...(caller && config.NEAR_CONTRACT_COSMETICS
+      ? { cosmetics: new NearCosmetics(caller, rpc, config.NEAR_CONTRACT_COSMETICS) }
+      : {}),
     rpc,
     registry: caller ? new NearRegistry(caller, config.NEAR_CONTRACT_REGISTRY) : new NoopRegistry(),
     minter: caller ? new NearMinter(caller, config.NEAR_CONTRACT_SKILLS) : new NoopMinter(),

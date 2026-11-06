@@ -77,7 +77,7 @@ const STRICT: readonly [string, RegExp][] = [
   ['POST', /^\/rentals\/[^/]+$/],
   ['POST', /^\/market\/[^/]+\/(purchase|listing|trial)$/],
   ['POST', /^\/skills\/[^/]+\/mint$/],
-  ['POST', /^\/cosmetics\/[^/]+\/buy$/],
+  ['POST', /^\/cosmetics\/[^/]+\/(buy|mint)$/],
   ['POST', /^\/external-agents\/[^/]+\/ping$/],
   ['POST', /^\/bench\/runs$/],
   ['POST', /^\/community-maps\/(test-play|[^/]+\/publish)$/],

@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react';
 import { usePreferences } from '@/lib/preferences';
 import { screenOf } from '@/lib/routes';
 import { drawEmotes } from './emotes';
+import { drawCosmetics2D, type CosmeticDrawOpts } from './cosmetics';
 import { drawGear2D } from './gear';
 import * as proto from './proto/world';
 import { cameraFor, easeRateFor, fitBox, sceneForMatchView, sceneForScreen, stepCamera, type ArenaScene, type Camera } from './scene';
@@ -185,6 +186,8 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
       if (lm && inMatch && opts.tags) drawEmotes(ctx, drawn, lm.arena, { T, ox, oy, now: Date.now(), still, placed: opts._placed as number[][] | undefined });
       const gear = lm?.arena.state.gear;
       if (gear) drawGear2D(ctx, gear, T, ox, oy, time, opts.light as number[] | null | undefined, A.w);
+      // Equipped cosmetics (skin pattern, trails, nameplates): one call into ./cosmetics.
+      if (lm?.arena.cosmetics) drawCosmetics2D(ctx, lm.arena, prev, alpha, T, ox, oy, { ...opts, still } as CosmeticDrawOpts);
       proto.drawWeather(ctx, m, time, vw, vh);
     };
 

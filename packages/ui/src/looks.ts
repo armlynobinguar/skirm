@@ -229,7 +229,7 @@ export const ROLE_LOOKS: Readonly<Record<string, RoleLook>> = {
     ],
     verb: 'dash',
     stride: 1.3,
-    carry: 2,
+    carry: 1,
   },
 };
 

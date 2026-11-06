@@ -48,7 +48,7 @@ import {
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
-import { DEFAULTS, rankedRoleRefusal, skillFitsRole } from '@skirm/shared';
+import { DEFAULTS, rankedRoleRefusal, skillFitsRole, type AgentCosmetics } from '@skirm/shared';
 import { V2_MATCH_LAST_TTL_S, v2MatchChannel, v2MatchLastKey, type ExternalTurnStore, type V2CrewEntry, type V2EndReason, type V2ServerMessage, type Vault } from '@skirm/server';
 import type { Logger, RegistryQueue } from '../deps';
 import { Matchmaker, type Lane, type QueueEntry } from '../matchmaker';
@@ -740,7 +740,23 @@ export class V2Hub {
     const unranked = match.ranked ? rankedRoleRefusal(crew.map((a) => a.role)) : null;
     if (unranked) throw new V2HubError('role_unranked', unranked);
     const brains = await this.externalBrains(accountId, crew, bought, match);
-    return { crew, skills, skillKeys, skillNames, skillMeta, bought, instructions, ...(brains ? { brains } : {}) };
+    // What each agent wears (rendering only); a lookup that fails never holds up a match.
+    const worn = await repos.cosmetics.equippedMany(crew.map((a) => a.id)).catch((err: unknown) => {
+      log.warn(`v2: crew plays in default looks: ${(err as Error).message}`);
+      return {} as Record<string, AgentCosmetics>;
+    });
+    const cosmetics = crew.map((a) => worn[a.id] ?? null);
+    return {
+      crew,
+      skills,
+      skillKeys,
+      skillNames,
+      skillMeta,
+      bought,
+      instructions,
+      ...(brains ? { brains } : {}),
+      ...(cosmetics.some((c) => c) ? { cosmetics } : {}),
+    };
   }
 
   /**

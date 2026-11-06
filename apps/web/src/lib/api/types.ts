@@ -5,11 +5,11 @@
 //
 // Game types (SkillPublic, Tag, …) come from @skirm/shared (type-only imports,
 // browser-safe).
-import type { ActionKind, AgentAppearance, AgentProgression, CosmeticItem, PlayerTier, RankedTierName, SkillPublic, SkillRole, SkillTrigger, Tag, TraitInfo, Unlock } from '@skirm/shared';
+import type { ActionKind, AgentAppearance, AgentCosmetics, AgentProgression, CosmeticItem, EquipCosmetic, PlayerTier, RankedTierName, SkillPublic, SkillRole, SkillTrigger, Tag, TraitInfo, Unlock } from '@skirm/shared';
 
 import type { Difficulty, V2Debrief, V2Frame } from '../realtime/protocol';
 
-export type { AgentAppearance, CosmeticItem, SkillPublic, SkillRole, SkillTrigger, Tag, Unlock };
+export type { AgentAppearance, AgentCosmetics, CosmeticItem, EquipCosmetic, SkillPublic, SkillRole, SkillTrigger, Tag, Unlock };
 
 /** Skill version reference used everywhere a crew or agent names a skill. */
 export interface SkillRef {
@@ -730,10 +730,26 @@ export interface SeasonStandings {
 
 // ---------- Cosmetics ----------
 
+/** A NEP-245 mint of an owned skin, trail or nameplate (contracts/cosmetics). */
+export interface CosmeticMint {
+  status: 'pending' | 'minted' | 'failed';
+  txHash: string | null;
+  /** The NEAR account it was minted to. */
+  owner: string | null;
+}
+
 /** GET /cosmetics: the premium catalog and what the caller owns. */
 export interface Cosmetics {
   items: CosmeticItem[];
   owned: string[];
+  /** Equippable skins, trails and nameplates (@skirm/shared EQUIP_COSMETICS). */
+  equip?: EquipCosmetic[];
+  /** What each of the caller's agents wears, by agent id. */
+  equipped?: Record<string, AgentCosmetics>;
+  /** NEP-245 mint state per owned item (absent: credits only). */
+  mints?: Record<string, CosmeticMint>;
+  /** The NEP-245 cosmetics contract when it is on (null: credits only, the default). */
+  onchain?: { standard: 'nep245'; contractId: string } | null;
 }
 
 // ---------- Replays ----------

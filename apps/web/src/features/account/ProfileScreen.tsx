@@ -37,6 +37,7 @@ import { DataCard } from './DataCard';
 import { AchievementsCard } from './AchievementsCard';
 import { ExternalAgentsCard } from './ExternalAgentsCard';
 import { SkillLoadout } from './SkillLoadout';
+import { CosmeticsEditor } from './CosmeticsEditor';
 import { LookEditor } from './LookEditor';
 
 const RECENT_MATCHES = 5;
@@ -124,8 +125,8 @@ function AgentsCard({ agents }: { agents: Agent[] }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [editing, setEditing] = useState<Agent | null>(null);
-  const [tab, setTab] = useState<'look' | 'skills'>('look');
-  const open = (a: Agent, t: 'look' | 'skills') => {
+  const [tab, setTab] = useState<'look' | 'skills' | 'style'>('look');
+  const open = (a: Agent, t: 'look' | 'skills' | 'style') => {
     setTab(t);
     setEditing(a);
   };
@@ -220,10 +221,11 @@ function AgentsCard({ agents }: { agents: Agent[] }) {
           <Tabs
             label="Customize"
             value={tab}
-            onChange={(id) => setTab(id as 'look' | 'skills')}
+            onChange={(id) => setTab(id as 'look' | 'skills' | 'style')}
             tabs={[
               { id: 'look', label: 'Look', testId: 's16-customize-look' },
               { id: 'skills', label: 'Skills', count: editing.skills.length, testId: 's16-customize-skills' },
+              { id: 'style', label: 'Arena style', testId: 's16-customize-style' },
             ]}
           />
         ) : null}
@@ -247,6 +249,9 @@ function AgentsCard({ agents }: { agents: Agent[] }) {
             onSave={(appearance) => save.mutate({ id: editing.id, patch: { appearance } })}
             onCancel={() => setEditing(null)}
           />
+        ) : null}
+        {editing && tab === 'style' ? (
+          <CosmeticsEditor key={`${editing.id}-style`} agentId={editing.id} name={editing.name} onDone={() => setEditing(null)} />
         ) : null}
       </Modal>
     </section>

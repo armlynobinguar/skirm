@@ -2,7 +2,7 @@
 // Every method returns the parsed JSON body or throws an ApiError (./errors.ts).
 // Credentials are read per request from the CredentialsStore, so signing in or out needs no new
 // client. In components use `useApi()` (src/lib/providers.tsx), never construct one.
-import type { ModelChoice, TraitId } from '@skirm/shared';
+import type { AgentCosmetics, CosmeticSlot, ModelChoice, TraitId } from '@skirm/shared';
 import type { CredentialsStore } from '../auth/credentials';
 import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
@@ -37,6 +37,7 @@ import type {
   DailyAttempt,
   DailyBoard,
   DailyToday,
+  CosmeticMint,
   Cosmetics,
   CreditsWithRows,
   CurrentSeason,
@@ -182,8 +183,15 @@ export interface ApiClient {
 
   /** GET /cosmetics: the premium catalog and what the caller owns. */
   cosmetics(): Promise<Cosmetics>;
-  /** POST /cosmetics/:id/buy: paid credits only (402 `insufficient_credits` with need/have). */
-  buyCosmetic(itemId: string): Promise<{ owned: string[] }>;
+  /**
+   * POST /cosmetics/:id/buy: paid credits only (402 `insufficient_credits` with need/have). With the
+   * NEP-245 contract on and a linked NEAR account, a bought skin, trail or nameplate is minted (`mint`).
+   */
+  buyCosmetic(itemId: string): Promise<{ owned: string[]; mint?: CosmeticMint | null }>;
+  /** POST /cosmetics/:id/mint: mint an owned item as a NEP-245 token (503 `cosmetics_offchain` while off). */
+  mintCosmetic(itemId: string): Promise<{ mint: CosmeticMint | null }>;
+  /** PUT /agents/:id/cosmetics/:slot: wear an owned item (`null` takes the slot off). */
+  equipCosmetic(agentId: string, slot: CosmeticSlot, itemId: string | null): Promise<{ cosmetics: AgentCosmetics }>;
 
   /** GET /quests: today's and this week's quests, progress and the play streak. */
   quests(): Promise<QuestBoard>;
@@ -448,6 +456,9 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
 
     cosmetics: () => get('/cosmetics'),
     buyCosmetic: (id) => json('POST', `/cosmetics/${enc(id)}/buy`),
+    mintCosmetic: (id) => json('POST', `/cosmetics/${enc(id)}/mint`),
+    equipCosmetic: (agentId, slot, itemId) =>
+      json('PUT', `/agents/${enc(agentId)}/cosmetics/${enc(slot)}`, { body: { itemId } }),
 
     quests: () => get('/quests'),
     claimQuest: (id) => json('POST', `/quests/${enc(id)}/claim`),
