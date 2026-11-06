@@ -14,6 +14,7 @@ import { useEffect, useRef } from 'react';
 import { screenOf } from '@/lib/routes';
 import { useSfx } from '@/lib/sfx';
 import { notesStore } from './notes';
+import { matchBack } from '@/lib/match-origin';
 
 /** Escape layers, handled first to last: the first active one takes the key. */
 export const ESCAPE_LAYERS = ['takeover', 'intro', 'tpv'] as const;
@@ -127,7 +128,7 @@ export function GlobalKeys() {
       // A screen's own Escape handler (an open picker, a queue search) calls preventDefault when it
       // uses the key; it runs after this listener, so decide once the event has gone through.
       setTimeout(() => {
-        if (!e.defaultPrevented && backRef.current === back) goBack.current(back);
+        if (!e.defaultPrevented && backRef.current === back) goBack.current(matchBack(window.location.pathname, back));
       }, 0);
     };
     window.addEventListener('keydown', onKey, true);

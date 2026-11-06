@@ -135,4 +135,10 @@ describe('Decisions', () => {
     renderWithProviders(<Decisions matchId="mat_v2" />, { handle: 'ada', api: { v2MatchDecisions: async () => Promise.reject(new ApiError(403, 'forbidden', 'no')) } });
     expect(await screen.findByTestId('v2-decisions-none')).toBeInTheDocument();
   });
+
+  it('shows a load failure with a retry instead of claiming no timeline was kept', async () => {
+    renderWithProviders(<Decisions matchId="mat_v2" />, { handle: 'ada', api: { v2MatchDecisions: async () => Promise.reject(new ApiError(0, 'network', 'down')) } });
+    expect(await screen.findByTestId('error-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('v2-decisions-none')).toBeNull();
+  });
 });

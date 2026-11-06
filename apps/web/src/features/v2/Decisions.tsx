@@ -8,6 +8,8 @@
 import { TICK_MS } from '@skirm/engine/v2';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState, type CSSProperties } from 'react';
+import { ErrorCard } from '@/components/states/ErrorCard';
+import { ApiError } from '@/lib/api/errors';
 import type { DecisionCrew, MatchDecisions } from '@/lib/api/decisions';
 import { qk } from '@/lib/api/queries';
 import { useApi } from '@/lib/services';
@@ -23,6 +25,15 @@ export function Decisions({ matchId }: { matchId: string }) {
       <section className={`sk-panel ${d.panel}`} aria-label="Decisions" aria-busy="true" data-testid="v2-decisions">
         <span className="sk-kick">Why did it do that?</span>
         <p className={d.note}>Loading the decision timeline…</p>
+      </section>
+    );
+  // Refused (403: not a player) or unknown (404) reads as "no timeline"; anything else is a failure
+  // to load, shown with a retry instead of claiming nothing was kept.
+  if (q.isError && !(q.error instanceof ApiError && (q.error.status === 403 || q.error.status === 404)))
+    return (
+      <section className={`sk-panel ${d.panel}`} aria-label="Decisions" data-testid="v2-decisions">
+        <span className="sk-kick">Why did it do that?</span>
+        <ErrorCard error={q.error} onRetry={() => void q.refetch()} title="Could not load the decision timeline" />
       </section>
     );
   const crews = q.data?.crews.filter((c) => c.decisions.length) ?? [];

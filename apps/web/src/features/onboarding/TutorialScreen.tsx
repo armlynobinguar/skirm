@@ -26,6 +26,7 @@ import { routes } from '@/lib/routes';
 import { useRealtime } from '@/lib/services';
 import { tutorialMatch, useOnboarding, useUpdateTutorial } from './hooks';
 import o from './onboarding.module.css';
+import { matchOrigin } from '@/lib/match-origin';
 
 const BRIEF = tutorialStepsIn('brief');
 /** Errors of other screens' watches on the shared socket, not about the queue. */
@@ -98,6 +99,7 @@ function Briefing({ me, progress }: { me: Me; progress: Onboarding | undefined }
     if (phaseRef.current !== 'starting') return;
     if (m.type === 'v2_found') {
       tutorialMatch.set(m.matchId);
+      matchOrigin.set(m.matchId, { kind: 'command' });
       void qc.invalidateQueries({ queryKey: qk.me });
       router.push(routes.match(m.matchId));
     } else if (m.type === 'error' && !NOT_QUEUE_ERRORS.has(m.code)) {

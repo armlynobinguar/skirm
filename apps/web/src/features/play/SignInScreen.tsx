@@ -45,11 +45,24 @@ function useOnline(): boolean {
   );
 }
 
-/** `?next=/maps/copper-hollow/crew` → that path; only same-origin paths are followed. */
-function nextPath(): string {
+/**
+ * `?next=/maps/copper-hollow/crew` → that path; only same-origin paths are followed. Browsers read
+ * `/\evil.com` like `//evil.com`, so the path is resolved and its origin compared, not just its prefix.
+ */
+export function nextPath(): string {
   if (typeof window === 'undefined') return routes.home();
-  const next = new URLSearchParams(window.location.search).get('next');
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : routes.home();
+  return safeNext(new URLSearchParams(window.location.search).get('next'), window.location.origin) ?? routes.home();
+}
+
+/** `next` as a same-origin path (with its query and hash), or null when it would leave the site. */
+export function safeNext(next: string | null, origin: string): string | null {
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return null;
+  try {
+    const url = new URL(next, origin);
+    return url.origin === origin ? `${url.pathname}${url.search}${url.hash}` : null;
+  } catch {
+    return null;
+  }
 }
 
 export function SignInScreen() {

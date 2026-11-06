@@ -23,6 +23,7 @@ import { ApiError } from '@/lib/api/errors';
 import { qk, useMe } from '@/lib/api/queries';
 import type { Me } from '@/lib/api/types';
 import { useRealtimeMessage } from '@/lib/realtime/hooks';
+import { matchOrigin } from '@/lib/match-origin';
 import { routes } from '@/lib/routes';
 import { useRealtime } from '@/lib/services';
 import { useCampaign, useStartMission } from './hooks';
@@ -197,6 +198,7 @@ function Briefing({ me, mission }: { me: Me; mission: CampaignMissionView }) {
     if (phaseRef.current !== 'starting') return;
     if (m.type === 'v2_found') {
       void qc.invalidateQueries({ queryKey: qk.me });
+      matchOrigin.set(m.matchId, { kind: 'campaign', missionId: mission.id });
       router.push(routes.match(m.matchId));
     } else if (m.type === 'error' && !NOT_QUEUE_ERRORS.has(m.code)) {
       setError(queueError(m.code));

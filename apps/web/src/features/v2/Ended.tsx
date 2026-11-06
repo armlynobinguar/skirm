@@ -11,7 +11,7 @@
 import { DIFF_MODS, TICK_MS, mapV2 } from '@skirm/engine/v2';
 import { Button, Soon, fmt } from '@skirm/ui';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ButtonLink } from '@/components/ButtonLink';
 import { ErrorCard } from '@/components/states/ErrorCard';
 import { Skeleton } from '@/components/states/Skeleton';
@@ -20,6 +20,7 @@ import { arenaStore } from '@/features/arena/store';
 import { MAPS, mapById } from '@/features/arena/world';
 import { qk } from '@/lib/api/queries';
 import { config } from '@/lib/config';
+import { matchOrigin, originLink, type MatchOrigin } from '@/lib/match-origin';
 import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
 import { ReplayPanel } from '../replays/ReplayPanel';
@@ -101,6 +102,10 @@ export function V2ResultScreen({ matchId }: { matchId: string }) {
 }
 
 function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?: () => void; replayHref?: string }) {
+  // Where the match was started from (campaign, a lobby, a bracket), read after mount: it lives in
+  // this tab's session storage, which the server render cannot see.
+  const [origin, setOrigin] = useState<MatchOrigin | null>(null);
+  useEffect(() => setOrigin(data.watch ? null : matchOrigin.get(data.matchId)), [data.matchId, data.watch]);
   const def = mapV2(data.mapId);
   const look = mapById(data.mapId);
   const r = data.result;
@@ -129,7 +134,14 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
   const [goal, ...checks] = d?.goals ?? [];
   const stars = watch ? [] : d ? [...(goal ? [{ ...goal, title: `Goal · ${goal.title}` }] : []), ...checks] : [{ title: 'Won the match', met: win, available: true }];
   const verbs = d ? d.agents.reduce((s, a) => s + a.used, 0) : 0;
-  const again = watch || data.ranked ? routes.pvp() : data.practice ? routes.practice({ mapId: data.mapId, difficulty: data.difficulty }) : routes.crew(data.mapId, data.difficulty);
+  const back = origin ? originLink(origin) : null;
+  const again = back
+    ? back.href
+    : watch || data.ranked
+      ? routes.pvp()
+      : data.practice
+        ? routes.practice({ mapId: data.mapId, difficulty: data.difficulty })
+        : routes.crew(data.mapId, data.difficulty);
   const registry = config.near.contracts.registry;
   return (
     <div className={v.result} data-testid="v2-ended">
@@ -166,7 +178,7 @@ function Debrief({ data, onReplay, replayHref }: { data: DebriefData; onReplay?:
         ) : null}
         <div className={v.acts}>
           <ButtonLink variant="primary" href={again} data-testid="v2-again">
-            {watch ? 'Back to the hub' : data.practice ? 'Practice again' : 'Queue again'}
+            {back ? back.label : watch ? 'Back to the hub' : data.practice ? 'Practice again' : 'Queue again'}
           </ButtonLink>
           {onReplay ? (
             <Button onClick={onReplay} data-testid="v2-replay">
