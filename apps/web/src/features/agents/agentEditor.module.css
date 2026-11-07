@@ -220,7 +220,7 @@ button.act:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px;
 }
 
 /* The top bar takes a second row for the tabs here. */
-@media (max-width: 1040px) { .wrap { height: calc(100dvh - 172px); } }
+@media (max-width: 1180px) { .wrap { height: calc(100dvh - 172px); } }
 
 /* Phones: one column at its natural height; the page scrolls. */
 @media (max-width: 820px) {
@@ -246,3 +246,10 @@ button.act:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px;
 .renameInput { width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 0; font: 800 26px/1 var(--font-display); text-transform: uppercase; color: var(--bone); background: rgba(0, 0, 0, .34); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .renameInput:focus { outline: 2px solid var(--amber); outline-offset: 0; }
 .renameInput[aria-invalid] { box-shadow: inset 0 0 0 1px var(--rival); }
+
+/* Phones: the role chips wrap to fit their names (five columns ran FIREFIGHTER into SCOUT), and the
+   beam stays inside the 16 px gutter (it scrolled the page sideways). */
+@media (max-width: 820px) {
+  .roleGrid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .beam { inset: -24px 0 -48px; }
+}

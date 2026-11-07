@@ -201,11 +201,12 @@ a.app-dock-tutorial:hover { color: var(--bone); }
 .s01-step p { margin: 0; }
 .s01-step-num { font: 800 32px/32px var(--font-display); color: var(--you); }
 
-/* The prototype's breakpoints: the crumb goes first, then the tab size; under 1040px the tabs take
- * their own scrolling row. */
+/* The prototype's breakpoints: the crumb goes first, then the tab size; under 1180px the tabs take
+ * their own scrolling row (from 1040 to 1180 the five tabs, the toggles and the account did not fit
+ * one row, and the toggles covered the last tab). */
 @media (max-width: 1560px) { .app-topbar-crumb { display: none; } }
 @media (max-width: 1300px) { .app-topbar-link { padding: 0 12px 0 5px; font-size: 14.5px; } }
-@media (max-width: 1040px) {
+@media (max-width: 1180px) {
   .app-topbar { flex-wrap: wrap; row-gap: 8px; }
   .app-topbar-nav { order: 3; flex: 1 0 100%; overflow-x: auto; scrollbar-width: none; filter: none; }
   .app-topbar-nav::-webkit-scrollbar { display: none; }
@@ -237,6 +238,8 @@ a.app-dock-tutorial:hover { color: var(--bone); }
   .app-topbar-grp > *, .app-topbar-right > * { flex: none; }
   .app-topbar-right > .app-acct { flex: 0 1 auto; min-width: 0; }
   .app-acct-badge { min-width: 0; padding: 0 11px 0 9px; }
+  /* The logo group keeps its width (it shrank and the wordmark ran into the Menu button). */
+  .app-topbar > .app-topbar-grp:first-child { flex: none; }
 }
 /* Phones: the Menu button keeps its icon (its accessible name says the section), the Sign in chip
  * drops the network label, and the internal Notes toggle (dev builds only) hides; N still opens it. */
@@ -245,6 +248,8 @@ a.app-dock-tutorial:hover { color: var(--bone); }
   .app-topbar-menu > span { display: none; }
   .app-acct-badge .app-dock-net { display: none; }
   .app-topbar-chip.app-topbar-notes { display: none; }
+  /* The tier pill goes (it is on the account card) so the handle and the chevron fit. */
+  .app-acct-badge .app-acct-tier { display: none; }
 }
 /* The smallest phones keep the mark; the wordmark goes only where nothing else would fit. */
 @media (max-width: 359px) { .app-topbar-logo .sk-logo-word { display: none; } }

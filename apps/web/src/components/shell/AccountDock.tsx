@@ -94,7 +94,11 @@ export function AccountDock() {
       >
         <i className="app-acct-dia" aria-hidden="true" />
         <b className="app-acct-handle">{handle}</b>
-        {me.data ? <TierBadge tier={tierFrom(me.data.rank)} size="sm" testId="topbar-tier" /> : null}
+        {me.data ? (
+          <span className="app-acct-tier">
+            <TierBadge tier={tierFrom(me.data.rank)} size="sm" testId="topbar-tier" />
+          </span>
+        ) : null}
         {credits ? (
           <span className="app-acct-cr" title={creditsTitle(credits)} data-testid="topbar-cr">
             {fmt(spendable(credits))} CR

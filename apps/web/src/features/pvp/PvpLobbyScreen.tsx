@@ -533,7 +533,7 @@ function Lobby() {
           <dt>TICKS</dt>
           <dd>2 s ticks · 1.5 s to act, or the agent waits · 150 ticks (5:00)</dd>
         </dl>
-        <div className="app-row" data-testid="s11-more">
+        <div className="app-row app-wrap" data-testid="s11-more">
           <ButtonLink href={routes.lobbies()} size="sm" data-testid="s11-more-lobbies">
             Private lobbies
           </ButtonLink>

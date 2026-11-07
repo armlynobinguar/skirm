@@ -112,7 +112,7 @@
   .drawer { position: static; align-self: start; max-height: 100%; }
 }
 /* The top bar takes a second row for the tabs here. */
-@media (min-width: 761px) and (max-width: 1040px) and (min-height: 700px) { .page { height: calc(100dvh - 172px); } }
+@media (min-width: 761px) and (max-width: 1180px) and (min-height: 700px) { .page { height: calc(100dvh - 172px); } }
 
 @media (max-width: 1180px) {
   .mk { grid-template-columns: minmax(0, 1fr) minmax(0, 360px); }
