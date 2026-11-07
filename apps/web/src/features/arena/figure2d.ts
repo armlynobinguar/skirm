@@ -196,7 +196,13 @@ export function drawFigure(
   if (pose.kind === 'act')
     verbFx(c, look, sx + fx * 0.55, b + fy * 0.55, T, time, still, pose.fx, dir);
   if (pose.kind === 'defeat') drawRainCloud(c, sx, headY - T * 0.18, T, time, still);
-  if (a.social?.think && (pose.kind === 'idle' || pose.kind === 'carry')) drawThought(c, sx + dir * T * 0.16, headY - T * 0.14, T, time, still);
+  const so = a.social;
+  const up = pose.kind === 'idle' || pose.kind === 'carry' || pose.kind === 'walk';
+  if (so?.think && (pose.kind === 'idle' || pose.kind === 'carry')) drawThought(c, sx + dir * T * 0.16, headY - T * 0.14, T, time, still);
+  if (so?.fooled && up) drawMark(c, sx, headY - T * 0.16, T, '?', '#ffd23f', time, still);
+  if (so?.overhear && up) drawEar(c, sx - dir * T * 0.2, headY - T * 0.06, T, time, still);
+  if (so?.cough && up) drawPuffs(c, sx + dir * T * 0.18, headY + T * 0.08, T, time, still, opts.age ?? 9);
+  if (so?.flinch && up) drawSweat(c, sx - dir * T * 0.12, headY + T * 0.02, T, time, still);
   if ((pose.kind === 'cheer' || pose.kind === 'victory') && pose.fx > 0) {
     c.globalAlpha = pose.fx * ba;
     for (let i = 0; i < 7; i++) {
@@ -403,5 +409,68 @@ function drawThought(c: CanvasRenderingContext2D, x: number, y: number, T: numbe
     c.arc(x + (i - 1) * r * 0.7, y, r * 0.18, 0, 7);
     c.fill();
   }
+  c.restore();
+}
+
+/** A bold mark over the head ("?" when fooled by a bluff), bobbing a little. */
+function drawMark(c: CanvasRenderingContext2D, x: number, y: number, T: number, ch: string, col: string, time: number, still: boolean) {
+  const fy = y + (still ? 0 : Math.sin(time * 4) * T * 0.02);
+  c.save();
+  c.font = `800 ${Math.max(9, T * 0.32)}px system-ui, sans-serif`;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.lineWidth = Math.max(2, T * 0.06);
+  c.strokeStyle = 'rgba(5,8,13,.85)';
+  c.strokeText(ch, x, fy);
+  c.fillStyle = col;
+  c.fillText(ch, x, fy);
+  c.restore();
+}
+
+/** An ear beside the head (it overheard the rival crew), with two sound arcs. */
+function drawEar(c: CanvasRenderingContext2D, x: number, y: number, T: number, time: number, still: boolean) {
+  const r = T * 0.07;
+  c.save();
+  c.strokeStyle = '#ffb547';
+  c.lineWidth = Math.max(1.4, T * 0.03);
+  c.beginPath();
+  c.arc(x, y, r, Math.PI * 0.6, Math.PI * 2.1);
+  c.stroke();
+  for (let i = 1; i <= 2; i++) {
+    c.globalAlpha = still ? 0.7 : 0.35 + 0.65 * Math.max(0, Math.sin(time * 6 - i));
+    c.beginPath();
+    c.arc(x, y, r + i * T * 0.05, Math.PI * 1.15, Math.PI * 1.6);
+    c.stroke();
+  }
+  c.restore();
+}
+
+/** Grey puffs drifting up from the mouth (coughing in gas). */
+function drawPuffs(c: CanvasRenderingContext2D, x: number, y: number, T: number, time: number, still: boolean, age: number) {
+  c.save();
+  for (let i = 0; i < 3; i++) {
+    const k = still ? i / 3 : (time * 1.4 + i / 3) % 1;
+    c.globalAlpha = (1 - k) * 0.7 * Math.max(0, 1 - age / 2.5);
+    c.fillStyle = '#b8c4a8';
+    c.beginPath();
+    c.arc(x + k * T * 0.12, y - k * T * 0.25, T * (0.03 + k * 0.04), 0, 7);
+    c.fill();
+  }
+  c.restore();
+}
+
+/** A sweat drop by the head (a hazard right next to it). */
+function drawSweat(c: CanvasRenderingContext2D, x: number, y: number, T: number, time: number, still: boolean) {
+  const k = still ? 0.3 : (time * 1.2) % 1;
+  const s = T * 0.045;
+  const fy = y + k * T * 0.08;
+  c.save();
+  c.globalAlpha = still ? 0.9 : 1 - k * 0.6;
+  c.fillStyle = '#7fd4ff';
+  c.beginPath();
+  c.moveTo(x, fy - s * 1.6);
+  c.quadraticCurveTo(x + s, fy, x, fy + s);
+  c.quadraticCurveTo(x - s, fy, x, fy - s * 1.6);
+  c.fill();
   c.restore();
 }

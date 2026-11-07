@@ -3,6 +3,7 @@
 import { STUN_TICKS, type Team, type V2Frame } from '@skirm/engine/v2';
 import { lookColours, type AgentCosmetics } from '@skirm/shared';
 import type { Social } from '@skirm/ui';
+import type { AgentSound } from '@/lib/sfx';
 import { cosmeticsOf, tintAgents } from './cosmetics';
 import type { LiveEmote } from './emotes';
 import { gearOf } from './gear';
@@ -195,12 +196,17 @@ const FACEOFF_RANGE = 2;
 const POINT_RANGE = 6;
 /** Rivals this close to a steal shake their fists. */
 const SHAKE_RANGE = 3;
+/** Frame row characters an agent flinches from next to it: water, lava, fire. */
+const HAZARD_TILES = new Set(['~', 'L', '^']);
+const NEIGHBOURS: readonly [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 /**
  * How each agent reacts to the others this frame, read off the frame's events (render only):
+ * a believed bluff (liar's crew and spectators only), gas coughing and ice slips first; then
  * a speaker turns to the nearest crewmate that heard it and gestures, those who heard it turn to it
  * and nod; crewmates near a delivery pump their fists; rivals side by side square up; a blocked
- * move bumps back; a steal makes the rivals nearby shake their fists; an agent getting closer to an
+ * move bumps back; a steal makes the rivals nearby shake their fists; a hazard next to an agent
+ * makes it lean away; rivals that overhear team talk cup an ear; an agent getting closer to an
  * item (or, carrying, to the exit) points the way; one of your own agents that stood still thinks.
  * One reaction each, in that order of priority.
  */
@@ -220,13 +226,30 @@ export function socialOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'vi
     }
     return best;
   };
-  // Talk: the speaker faces the nearest crewmate that heard it; they face it and nod.
+  // A bluff that landed: the liar rubs its hands, the one it fooled scratches its head. Only the
+  // liar's crew and spectators see it: the fooled crew's own frame must not tip its player off.
+  const team = new Map(frame.agents.map((g) => [g.id, g.team]));
+  for (const e of frame.events) {
+    if (e.kind !== 'bluff' || !e.believed) continue;
+    const liar = team.get(e.agent);
+    if (frame.view !== 'watch' && frame.view !== liar) continue;
+    set(e.agent, { scheme: true }, at.get(e.victim));
+    set(e.victim, { fooled: true }, at.get(e.agent));
+  }
+  // Gas and ice: coughing, slipping.
+  for (const e of frame.events) {
+    if (e.kind === 'choked') set(e.agent, { cough: true });
+    else if (e.kind === 'slid') set(e.agent, { slip: true }, e.to);
+  }
+  // Talk: the speaker faces the nearest crewmate that heard it; they face it and nod; rivals that
+  // overheard it cup a hand to their ear and turn toward it.
   for (const e of frame.events) {
     if (e.kind !== 'said') continue;
     const from = at.get(e.agent);
     if (!from) continue;
     set(e.agent, { talk: true }, nearest(from, e.heardBy));
     for (const id of e.heardBy) set(id, { listen: true }, from);
+    for (const id of e.overheardBy) set(id, { overhear: true }, from);
   }
   // A delivery: crewmates in range pump their fists toward the one who delivered.
   for (const e of frame.events) {
@@ -250,6 +273,16 @@ export function socialOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'vi
     let rival: [number, number] | undefined;
     for (const r of live) if (r.team !== g.team && manhattan([g.x, g.y], [r.x, r.y]) <= FACEOFF_RANGE && (!rival || manhattan([g.x, g.y], [r.x, r.y]) < manhattan([g.x, g.y], rival))) rival = [r.x, r.y];
     if (rival) set(g.id, { square: true }, rival);
+  }
+  // A hazard on a tile next to it: leans away from it (harder when a wave just came in).
+  const wave = frame.events.some((e) => e.kind === 'hazard' && !e.receding);
+  const hazardAt = (x: number, y: number) => HAZARD_TILES.has(frame.rows[y]?.[x] ?? '');
+  for (const g of live) {
+    for (const [dx, dy] of NEIGHBOURS) {
+      if (!hazardAt(g.x + dx, g.y + dy)) continue;
+      set(g.id, wave ? { flinch: true, wave: true } : { flinch: true }, [g.x + dx, g.y + dy]);
+      break;
+    }
   }
   // Getting closer to an item (or, carrying, to the exit): points the way. Standing still: thinks.
   const items: [number, number][] = [];
@@ -350,4 +383,50 @@ export function walkMs(gapMs: number | null | undefined): number {
 /** The body's bob while walking: two footfalls a tile, a few hundredths of a tile high (0 to 1). */
 export function walkBob(alpha: number): number {
   return Math.abs(Math.sin(2 * Math.PI * Math.min(1, Math.max(0, alpha))));
+}
+
+/** A sound to play for a live frame, `delay` ms after it arrives. */
+export interface FrameSound {
+  delay: number;
+  sound: AgentSound;
+}
+
+/** Each crew slot gets its own voice; the B crew a little lower. */
+export function voicePitch(team: Team, slot: number): number {
+  return ([1, 1.2, 0.85][slot % 3] ?? 1) * (team === 'B' ? 0.88 : 1);
+}
+
+/** Footfalls are played for at most this many walking agents a frame (a crowd would clatter). */
+const STEP_VOICES = 2;
+
+/**
+ * What a new live frame sounds like: a babble of syllables for each agent that spoke (one per
+ * word, up to 7), two soft footfalls for walking agents over the step (`walk`: the step's length
+ * in ms), a cough in gas, a whoosh on ice, and a sting for a bluff that landed. Pure, for the tests.
+ */
+export function frameSounds(arena: LiveArena, prev: ArenaState | null, walk: number): FrameSound[] {
+  const out: FrameSound[] = [];
+  const was = new Map((prev?.agents ?? []).map((a) => [a.id, a]));
+  let steps = 0;
+  for (const a of arena.state.agents) {
+    if (a.out) continue;
+    const pitch = voicePitch(a.team, a.slot);
+    const so = a.social;
+    if (so?.talk) {
+      const text = arena.barks?.[a.id]?.text ?? '';
+      const words = text.split(/\s+/).filter(Boolean).length;
+      out.push({ delay: 0, sound: { kind: 'voice', syllables: Math.max(2, Math.min(7, words)), pitch, seed: (arena.tick ?? 0) * 7 + a.slot } });
+    }
+    if (so?.cough) out.push({ delay: 0, sound: { kind: 'cough' } });
+    if (so?.slip) out.push({ delay: 0, sound: { kind: 'slide' } });
+    if (so?.scheme) out.push({ delay: 80, sound: { kind: 'scheme' } });
+    if (so?.fooled) out.push({ delay: 120, sound: { kind: 'fooled' } });
+    const p = was.get(a.id);
+    if (p && steps < STEP_VOICES && Math.abs(p.x - a.x) + Math.abs(p.y - a.y) === 1) {
+      steps++;
+      out.push({ delay: Math.round(walk * 0.3), sound: { kind: 'step', pitch } });
+      out.push({ delay: Math.round(walk * 0.8), sound: { kind: 'step', pitch: pitch * 0.94 } });
+    }
+  }
+  return out;
 }

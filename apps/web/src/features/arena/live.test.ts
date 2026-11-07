@@ -166,3 +166,61 @@ describe('agents reacting to each other (socialOf)', () => {
     expect(s.get('b1')).toEqual({ social: { bump: true } });
   });
 });
+
+describe('bluffs, overhearing and hazards (socialOf)', () => {
+  const ag = (id: string, team: 'A' | 'B', x: number, y: number) =>
+    ({ id, name: id, team, x, y, role: 'Builder', out: false, down: false, items: [] }) as never;
+  const rows = ['#########', '#..~....#', '#.......#', '#.......#', '#########'];
+  const bluff = { kind: 'bluff', agent: 'a1', victim: 'b1', at: [5, 2], believed: true };
+
+  it('shows a landed bluff to the liar crew and spectators, never to the fooled crew', async () => {
+    const { socialOf } = await import('./live');
+    const agents = [ag('a1', 'A', 1, 3), ag('b1', 'B', 6, 3)];
+    const liar = socialOf({ view: 'A', rows, agents, events: [bluff] } as never, null, [7, 3]);
+    expect(liar.get('a1')).toEqual({ social: { scheme: true }, faceTo: [6, 3] });
+    expect(liar.get('b1')).toEqual({ social: { fooled: true }, faceTo: [1, 3] });
+    expect(socialOf({ view: 'watch', rows, agents, events: [bluff] } as never, null, [7, 3]).get('b1')?.social).toEqual({ fooled: true });
+    const victim = socialOf({ view: 'B', rows, agents, events: [bluff] } as never, null, [7, 3]);
+    expect(victim.get('b1')?.social.fooled).toBeUndefined();
+    expect(victim.get('a1')?.social.scheme).toBeUndefined();
+  });
+
+  it('a rival that overheard cups an ear toward the speaker; gas coughs, ice slips, a hazard next door flinches', async () => {
+    const { socialOf } = await import('./live');
+    const agents = [ag('a1', 'A', 1, 3), ag('a2', 'A', 2, 3), ag('b1', 'B', 4, 3), ag('b2', 'B', 6, 2), ag('a3', 'A', 2, 1)];
+    const events = [
+      { kind: 'said', agent: 'a1', channel: 'team', text: 'east', heardBy: ['a2'], overheardBy: ['b1'] },
+      { kind: 'choked', agent: 'b2' },
+      { kind: 'hazard', hazard: 'water', wave: 2, receding: false },
+    ];
+    const s = socialOf({ view: 'watch', rows, agents, events } as never, null, [7, 3]);
+    expect(s.get('b1')).toEqual({ social: { overhear: true }, faceTo: [1, 3] });
+    expect(s.get('b2')).toEqual({ social: { cough: true } });
+    expect(s.get('a3')).toEqual({ social: { flinch: true, wave: true }, faceTo: [3, 1] });
+  });
+});
+
+describe('match sounds (frameSounds)', () => {
+  it('babbles a syllable a word for a speaker, two footfalls for a walker, a cough and a bluff sting', async () => {
+    const { frameSounds, voicePitch } = await import('./live');
+    const arena = {
+      tick: 4,
+      barks: { a1: { text: 'lamp oil east of the lift', ch: 'team' } },
+      state: {
+        grid: [],
+        agents: [
+          { id: 'a1', team: 'A', slot: 0, x: 1, y: 1, social: { talk: true } },
+          { id: 'a2', team: 'A', slot: 1, x: 3, y: 2 },
+          { id: 'b1', team: 'B', slot: 0, x: 5, y: 2, social: { cough: true } },
+          { id: 'b2', team: 'B', slot: 1, x: 6, y: 2, social: { fooled: true } },
+        ],
+      },
+    } as never;
+    const prev = { grid: [], agents: [{ id: 'a2', x: 2, y: 2 }] } as never;
+    const s = frameSounds(arena, prev, 1000);
+    expect(s).toContainEqual({ delay: 0, sound: { kind: 'voice', syllables: 6, pitch: voicePitch('A', 0), seed: 28 } });
+    expect(s.filter((x) => x.sound.kind === 'step').map((x) => x.delay)).toEqual([300, 800]);
+    expect(s).toContainEqual({ delay: 0, sound: { kind: 'cough' } });
+    expect(s).toContainEqual({ delay: 120, sound: { kind: 'fooled' } });
+  });
+});

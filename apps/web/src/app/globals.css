@@ -80,6 +80,8 @@ a.app-topbar-chip:hover, button.app-topbar-chip:hover { color: var(--bone); back
 /* Toggles are secondary: muted chips. On: bone text with a teal accent; off: faint, accent dimmed. */
 .app-topbar-toggle { color: var(--faint); --nacc: var(--faint); }
 .app-topbar-toggle[aria-pressed='true'] { color: var(--ink); --nacc: var(--you); }
+.app-topbar-note { width: 18px; height: 18px; flex: none; }
+.app-topbar-toggle[aria-pressed='true'] .app-topbar-note { color: var(--you); }
 button.app-topbar-toggle:hover { color: var(--bone); }
 
 /* ---------- Account badge and card (AccountDock) ---------- */
@@ -201,15 +203,15 @@ a.app-dock-tutorial:hover { color: var(--bone); }
 .s01-step p { margin: 0; }
 .s01-step-num { font: 800 32px/32px var(--font-display); color: var(--you); }
 
-/* The prototype's breakpoints: the crumb goes first, then the tab size; under 1180px the tabs take
- * their own scrolling row (from 1040 to 1180 the five tabs, the toggles and the account did not fit
+/* The prototype's breakpoints: the crumb goes first, then the tab size; under 1240px the tabs take
+ * their own scrolling row (from 1040 to 1240 the five tabs, the SFX and Music toggles and the account did not fit
  * one row, and the toggles covered the last tab). */
 @media (max-width: 1560px) { .app-topbar-crumb { display: none; } }
 @media (max-width: 1300px) { .app-topbar-link { padding: 0 12px 0 5px; font-size: 14.5px; } }
 /* --topbar-extra: what the second row adds to the bar, for screens that pin things under it (the
  * match HUD, the replay strip). Back to 0 under 720px, where the bar is one row again. */
 :root { --topbar-extra: 0px; }
-@media (max-width: 1180px) {
+@media (max-width: 1240px) {
   :root { --topbar-extra: 46px; }
   .app-topbar { flex-wrap: wrap; row-gap: 8px; }
   .app-topbar-nav { order: 3; flex: 1 0 100%; overflow-x: auto; scrollbar-width: none; filter: none; }

@@ -220,7 +220,7 @@ button.act:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px;
 }
 
 /* The top bar takes a second row for the tabs here. */
-@media (max-width: 1180px) { .wrap { height: calc(100dvh - 172px); } }
+@media (max-width: 1240px) { .wrap { height: calc(100dvh - 172px); } }
 
 /* Phones: one column at its natural height; the page scrolls. */
 @media (max-width: 820px) {
