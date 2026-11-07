@@ -131,6 +131,8 @@ describe('Playbook at lock-in and in the mind panel', () => {
     act(() => void fireEvent.keyDown(window, { key: 'Enter' }));
     fireEvent.click(screen.getByTestId(`v2-card-${base.agents[0]!.id}`));
     act(() => void fireEvent.keyDown(window, { key: 'v' }));
+    // Third person opens clear; I shows the card and the mind.
+    act(() => void fireEvent.keyDown(window, { key: 'i' }));
     await waitFor(() => expect(screen.getByTestId('v2-mind-playbook')).toHaveTextContent('Playbook: Haul and scout'));
     act(() => void fireEvent.keyDown(window, { key: 'ArrowRight' }));
     expect(within(screen.getByTestId('v2-tpv')).getByText('rival crew')).toBeInTheDocument();

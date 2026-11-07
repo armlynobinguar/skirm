@@ -139,6 +139,11 @@
 .cine.tpv .lbox { height: 6vh; }
 /* Third person: the bottom row sits above the letterbox, not under it. */
 .tpv .mbot { bottom: calc(6vh + 8px); }
+/* Zoom on the 2D board: − 100% + in the control bar. */
+.zoom { display: inline-flex; align-items: center; gap: 2px; }
+.zoomN { min-width: 48px; min-height: 30px; padding: 0 4px; border: 0; background: transparent; color: var(--muted); font: 500 11px/1 var(--font-mono); letter-spacing: .06em; cursor: pointer; }
+.zoomN:hover { color: var(--bone); }
+.zoomN:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .flash { position: absolute; inset: 0; z-index: 58; background: #fff; opacity: 0; animation: flash 1s ease-out both; }
 @keyframes flash { 0% { opacity: .9; } 100% { opacity: 0; } }
 
@@ -199,6 +204,14 @@
 .heard b { margin-right: 6px; font: 500 10px/14px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
 .heard em { margin-right: 6px; padding: 0 4px; font-style: normal; color: var(--bg); background: var(--amber); }
 .heard em .ear { width: 11px; height: 11px; vertical-align: -1px; }
+/* Third person, clear view: a slim chip top left and one caption line at the bottom, so the board
+   around the agent stays visible. */
+.tpchip { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(6vh + 64px + var(--topbar-extra, 0px)); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; max-width: min(560px, calc(50vw - 210px)); /* clear of the clock card in the middle */ padding: 6px 8px 6px 12px; }
+.tpchip b { font: 800 20px/1 var(--font-display); text-transform: uppercase; }
+.tpbtns { display: flex; flex-wrap: wrap; gap: 6px; }
+.capline { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(6vh + 128px); width: min(720px, calc(100vw - 32px)); display: grid; justify-items: center; pointer-events: none; }
+.capline .sub { max-width: 100%; padding: 4px 12px 5px; font-size: 14px; line-height: 1.35; background: rgba(0, 0, 0, .5); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-wrap: pretty; }
+.capline .sub .sw { display: inline; margin: 0 8px 0 0; font-size: 10px; }
 .subs { position: absolute; left: 340px; right: 410px; bottom: calc(6vh + 220px); display: grid; gap: 8px; justify-items: center; text-align: center; }
 .sub { max-width: 100%; padding: 7px 16px 9px; font-size: clamp(17px, 1.6vw, 23px); line-height: 1.38; color: #fff; text-shadow: 0 2px 6px #000, 0 0 2px #000; text-wrap: balance; background: rgba(0, 0, 0, .6); }
 .sub .sw { display: block; margin-bottom: 2px; font: 400 11px/14px var(--font-mono); font-style: normal; letter-spacing: .2em; text-transform: uppercase; color: var(--c); text-shadow: none; }
@@ -266,6 +279,10 @@
   .subs { left: 16px; right: 16px; bottom: 460px; }
   .crews { grid-template-columns: 1fr; row-gap: 8px; }
   .sideA, .sideB { justify-items: center; text-align: center; }
+  /* Third person, clear view: the chip under the clock card, the caption above the Commands bar. */
+  .tpchip { top: calc(184px + var(--topbar-extra, 0px)); max-width: calc(100vw - 32px); }
+  .capline { bottom: 262px; }
+  .capline .sub { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .msg, .x, .haz .huge, .tape, .sideA, .sideB, .vsx, .count span, .banner::before, .banner span, .float, .slot[data-pop], .islot[data-pop] .slot, .callout, .flash, .tpid, .mind, .sub[data-enter], .held, .thk::after { animation: none; }

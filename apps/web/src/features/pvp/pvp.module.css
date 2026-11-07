@@ -118,6 +118,10 @@
 .table td { padding: var(--space-2) var(--space-1); border-bottom: 1px solid var(--line); }
 .table .num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .table .rank { font-family: var(--font-mono); color: var(--ink-muted); }
+/* Phones: numbers and handles stay on one line; the table scrolls inside its wrap instead of
+   squeezing every column into three-line rows. */
+.table .num { white-space: nowrap; }
+@media (max-width: 600px) { .table { min-width: 520px; } }
 .youRow { background: var(--chalk-soft); }
 .agentCell { display: flex; gap: 6px; align-items: center; font-weight: 700; }
 
