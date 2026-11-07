@@ -140,6 +140,8 @@ export interface ArenaAgent {
   social?: Social;
   /** The tile it turns toward for that reaction (who it talks to, the rival it squares up to). */
   faceTo?: [number, number];
+  /** What it is going for right now (live.ts intentsOf; render only): drawn beside its nameplate. */
+  intent?: 'item' | 'exit' | 'switch';
 }
 
 /** A board state the renderer draws: tiles plus agents with their crew side. */

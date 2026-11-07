@@ -131,8 +131,18 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
       const T = proto.fitT(A, box.w, box.h) * cam.zoom * L.zoomShown;
       const fx = cam.fx * vw;
       const fy = cam.fy * vh;
-      const cxm = (A.w - 1) / 2;
-      const cym = (A.h - 1) / 2;
+      let cxm = (A.w - 1) / 2;
+      let cym = (A.h - 1) / 2;
+      // Zoomed in on the overview: the view drifts from the map's middle toward your crew (all the way
+      // by 2x), so zooming in shows your agents instead of pushing them under the HUD.
+      if (lm && L.scene === 'match' && L.zoomShown > 1) {
+        const mine = lm.arena.state.agents.filter((a) => !a.out && (!lm.arena.team || a.team === lm.arena.team));
+        if (mine.length) {
+          const k = Math.min(1, L.zoomShown - 1);
+          cxm += (mine.reduce((n, a) => n + a.x, 0) / mine.length - cxm) * k;
+          cym += (mine.reduce((n, a) => n + a.y, 0) / mine.length - cym) * k;
+        }
+      }
       let ox = fx - ((cxm - cym) * T) / 2;
       let oy = fy - ((cxm + cym) * T) / 4;
       const onAtlas = L.scene === 'maps';

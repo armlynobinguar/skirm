@@ -93,6 +93,7 @@ export function composeV2Arena(frame: V2Frame, prev?: LiveArena | null): LiveAre
   const slots = { A: 0, B: 0 };
   const acts = actsOf(frame, prev);
   const social = socialOf(frame, prev, m.A.exit as [number, number]);
+  const intents = intentsOf(frame, prev, m.A.exit as [number, number]);
   const agents: ArenaState['agents'] = frame.agents.map((g) => {
     const slot = slots[g.team]++;
     const act = acts.get(g.id);
@@ -100,6 +101,7 @@ export function composeV2Arena(frame: V2Frame, prev?: LiveArena | null): LiveAre
     return {
       ...act,
       ...(so ? { social: so.social, ...(so.faceTo ? { faceTo: so.faceTo } : {}) } : {}),
+      ...(intents.has(g.id) ? { intent: intents.get(g.id)!.kind } : {}),
       id: g.id,
       name: g.name,
       team: g.team,
@@ -285,10 +287,7 @@ export function socialOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'vi
     }
   }
   // Getting closer to an item (or, carrying, to the exit): points the way. Standing still: thinks.
-  const items: [number, number][] = [];
-  frame.rows.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) if (row[x] === '*') items.push([x, y]);
-  });
+  const intents = intentsOf(frame, prev, exit);
   const was = new Map((prev?.state.agents ?? []).map((a) => [a.id, [a.x, a.y] as [number, number]]));
   for (const g of live) {
     if (out.has(g.id)) continue;
@@ -296,9 +295,67 @@ export function socialOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'vi
     const before = was.get(g.id);
     const moved = !!before && manhattan(before, now) === 1;
     if (moved) {
-      const goal = g.items.length ? exit : nearestTile(now, items);
-      if (goal && manhattan(now, goal) <= POINT_RANGE && manhattan(now, goal) < manhattan(before!, goal)) set(g.id, { point: true }, goal);
+      const it = intents.get(g.id);
+      if (it && it.kind !== 'switch' && manhattan(now, it.goal) <= POINT_RANGE) set(g.id, { point: true }, it.goal);
     } else if (before && frame.view !== 'watch' && g.team === frame.view) set(g.id, { think: true });
+  }
+  return out;
+}
+
+/** What an agent is going for right now (its nameplate icon): an item, the exit, or a switch. */
+export type IntentKind = 'item' | 'exit' | 'switch';
+export interface AgentIntent {
+  kind: IntentKind;
+  goal: [number, number];
+}
+
+/** A switch this close, nearer than any item and getting closer, is what it is heading for. */
+const SWITCH_RANGE = 3;
+
+/**
+ * What each agent is going for, read only off what this frame shows (render only): carrying an item
+ * and a step closer to the exit, the exit; one of its own switches pulled this tick, or a step closer
+ * to a visible switch within SWITCH_RANGE that is nearer than every visible item, a switch; a step
+ * closer to the nearest visible item, an item. An agent that did not step (or teleported), is down
+ * or out, or stepped toward nothing gets no intent: never a guess. Rivals are only in the frame when
+ * this crew sees them, and items and switches only count where this crew sees them ('?' hides them).
+ */
+export function intentsOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows'>, prev: LiveArena | null | undefined, exit: [number, number]): Map<string, AgentIntent> {
+  const out = new Map<string, AgentIntent>();
+  const items: [number, number][] = [];
+  const switches: [number, number][] = [];
+  frame.rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === '*') items.push([x, y]);
+      else if (row[x] === 'V') switches.push([x, y]);
+    }
+  });
+  const pulled = new Set(frame.events.filter((e) => e.kind === 'switch').map((e) => (e as { agent: string }).agent));
+  const was = new Map((prev?.state.agents ?? []).map((a) => [a.id, [a.x, a.y] as [number, number]]));
+  for (const g of frame.agents) {
+    if (g.out || g.down) continue;
+    const now: [number, number] = [g.x, g.y];
+    const before = was.get(g.id);
+    if (pulled.has(g.id)) {
+      const sw = nearestTile(now, switches);
+      if (sw && manhattan(now, sw) <= 1) {
+        out.set(g.id, { kind: 'switch', goal: sw });
+        continue;
+      }
+    }
+    if (!before || manhattan(before, now) !== 1) continue;
+    const closer = (t: [number, number]) => manhattan(now, t) < manhattan(before, t);
+    if (g.items.length && closer(exit)) {
+      out.set(g.id, { kind: 'exit', goal: exit });
+      continue;
+    }
+    const item = nearestTile(now, items);
+    const sw = nearestTile(now, switches);
+    if (sw && closer(sw) && manhattan(now, sw) <= SWITCH_RANGE && (!item || manhattan(now, sw) < manhattan(now, item))) {
+      out.set(g.id, { kind: 'switch', goal: sw });
+      continue;
+    }
+    if (item && closer(item)) out.set(g.id, { kind: 'item', goal: item });
   }
   return out;
 }

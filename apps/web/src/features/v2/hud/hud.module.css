@@ -290,3 +290,16 @@
   .banner::before { transform: skewY(-3deg); }
   .lbox, .mtop, .comms, .mbot, .crewbox { transition: none; }
 }
+
+/* Inspect (Inspect.tsx): what a clicked tile or agent is, beside the click. */
+.inspect { position: fixed; z-index: 35; width: 280px; display: grid; gap: 6px; padding: 10px 12px 12px; box-shadow: inset 3px 0 0 var(--c), var(--elev-2, var(--elev-1)); animation: inspIn .18s var(--ease-out) both; }
+.inspect p { margin: 0; font-size: 13px; line-height: 18px; color: var(--text); }
+.inspHd { display: flex; justify-content: space-between; align-items: center; }
+.inspHd :global(.sk-kick) { color: var(--c); }
+.inspTitle { font: 800 22px/1 var(--font-display); text-transform: uppercase; color: var(--bone); }
+.inspAt { font: 500 10px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.inspX { width: 26px; height: 26px; border: 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.inspX:hover { color: var(--bone); }
+.inspX:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@keyframes inspIn { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .inspect { animation: none; } }
