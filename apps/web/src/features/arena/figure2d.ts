@@ -474,3 +474,80 @@ function drawSweat(c: CanvasRenderingContext2D, x: number, y: number, T: number,
   c.fill();
   c.restore();
 }
+
+/**
+ * What an agent is going for, as a small chip beside its nameplate (live.ts intentsOf): a gem for
+ * an item (in the map's item colour), a doorway with an arrow in for the exit, a lever for a switch.
+ * `r` is the chip radius (half the nameplate height, so it scales with the tile like the plate).
+ * Bobs gently unless `still` (reduced motion).
+ */
+export function drawIntent(
+  c: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  kind: 'item' | 'exit' | 'switch',
+  item: string,
+  time: number,
+  still: boolean,
+) {
+  const cy = y + (still ? 0 : Math.sin(time * 3) * r * 0.12);
+  c.save();
+  c.fillStyle = 'rgba(5,8,13,.84)';
+  c.beginPath();
+  c.arc(x, cy, r, 0, 7);
+  c.fill();
+  const s = r * 0.62;
+  c.lineWidth = Math.max(1.2, r * 0.16);
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
+  if (kind === 'item') {
+    // A cut gem: a diamond with a lighter top facet.
+    c.fillStyle = item;
+    c.beginPath();
+    c.moveTo(x, cy - s);
+    c.lineTo(x + s * 0.78, cy);
+    c.lineTo(x, cy + s);
+    c.lineTo(x - s * 0.78, cy);
+    c.closePath();
+    c.fill();
+    c.fillStyle = 'rgba(255,255,255,.45)';
+    c.beginPath();
+    c.moveTo(x, cy - s);
+    c.lineTo(x + s * 0.78, cy);
+    c.lineTo(x - s * 0.78, cy);
+    c.closePath();
+    c.fill();
+  } else if (kind === 'exit') {
+    // A doorway (arched frame) with an arrow walking into it.
+    c.strokeStyle = '#5fe08f';
+    c.beginPath();
+    c.moveTo(x - s * 0.15, cy + s * 0.85);
+    c.lineTo(x - s * 0.15, cy - s * 0.35);
+    c.arc(x + s * 0.3, cy - s * 0.35, s * 0.45, Math.PI, 0);
+    c.lineTo(x + s * 0.75, cy + s * 0.85);
+    c.stroke();
+    c.strokeStyle = '#ece8e1';
+    c.beginPath();
+    c.moveTo(x - s * 0.9, cy + s * 0.2);
+    c.lineTo(x + s * 0.35, cy + s * 0.2);
+    c.moveTo(x + s * 0.05, cy - s * 0.1);
+    c.lineTo(x + s * 0.35, cy + s * 0.2);
+    c.lineTo(x + s * 0.05, cy + s * 0.5);
+    c.stroke();
+  } else {
+    // A lever: a base plate and a tilted stick with a knob.
+    c.strokeStyle = '#ffb547';
+    c.beginPath();
+    c.moveTo(x - s * 0.7, cy + s * 0.7);
+    c.lineTo(x + s * 0.7, cy + s * 0.7);
+    c.moveTo(x, cy + s * 0.7);
+    c.lineTo(x + s * 0.4, cy - s * 0.45);
+    c.stroke();
+    c.fillStyle = '#ffb547';
+    c.beginPath();
+    c.arc(x + s * 0.45, cy - s * 0.6, s * 0.26, 0, 7);
+    c.fill();
+  }
+  c.restore();
+}
