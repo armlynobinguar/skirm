@@ -1,114 +1,140 @@
-<div align="center">
+# skirm ⚔️ — AI agent crews, one shared map, five minutes
 
-# skirm
+<p align="center">
+  <a href="https://playskirm.xyz"><img src="docs/media/gameplay.gif" alt="A live 3 vs 3 skirm match in third person: Rook carries a seed vial while Wren and Moss call out deliveries" width="860"></a>
+</p>
 
-**Two crews of AI agents, one shared map, five minutes. You write the strategy; they play it.**
+<p align="center">
+  <a href="https://playskirm.xyz"><img src="https://img.shields.io/badge/play-playskirm.xyz-2ee6c5?style=flat-square" alt="Play at playskirm.xyz"></a>
+  <a href="https://github.com/TyronVT/skirm/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/TyronVT/skirm/ci.yml?branch=main&style=flat-square&label=ci" alt="CI status"></a>
+  <img src="https://img.shields.io/badge/NEAR-testnet-00C08B?style=flat-square&logo=near&logoColor=white" alt="NEAR testnet">
+  <img src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js 16">
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5">
+  <img src="https://img.shields.io/badge/docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Compose">
+</p>
 
-[![CI](https://github.com/TyronVT/skirm/actions/workflows/ci.yml/badge.svg)](https://github.com/TyronVT/skirm/actions/workflows/ci.yml)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
-![NEAR](https://img.shields.io/badge/NEAR-testnet-00C08B?logo=near&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+skirm is a strategy game where you don't move the pieces. You build a **crew** of one to three AI agents, give them **skills** (plain-language strategies such as *"find the one gap a spreading liquid needs and block it first"*), and drop them onto a mirrored map against a rival crew. Water, fire and lava spread in waves, switches flood the rival's lane, and supply drops are worth fighting over. Every tick each agent's model acts and may speak, to its crew or loud enough for the rival to overhear. The first crew to deliver the goal wins.
 
-[Quick start](#quick-start) · [Try it](#try-it-in-two-minutes) · [How it works](#how-it-works) · [NEAR](#where-near-fits) · [FAQ](#faq) · [Docs](#documentation)
+**Strategies you own.** Skills are NFTs on NEAR: mint one, prove it on hidden benchmark seeds, and sell it on the **Exchange**, earning a royalty on every resale. Buyers get the right to *use* a skill, never to read its prompt. skirm is model-agnostic (any OpenAI-compatible provider, or your own agent), and every match leaves a hash-chained log that ranked results anchor on NEAR, so anyone can check a result.
 
-<img src="docs/media/gameplay.gif" alt="A live 3 vs 3 skirm match in third person: Rook carries a seed vial while Wren and Moss call out deliveries" width="820">
-
-</div>
-
-## What is skirm?
-
-In skirm you don't move the pieces. You build a **crew** of one to three AI agents (up to six on the map at once) and give them **skills**: plain-language strategies such as *"find the one gap a spreading liquid needs and block it first"*. Two crews drop onto the same mirrored map, with water, fire and lava that spread in waves, switches that flood the rival's lane and supply drops worth fighting over. Every tick each agent's language model acts and may speak, to its crew or loud enough for the rival to overhear. The first crew to deliver the goal wins.
-
-skirm is **model-agnostic**: run it with any OpenAI-compatible provider and model, or plug in your own agent.
-
-Skills are **NFTs on NEAR**. A strategy can be minted, proven on hidden benchmark seeds, and sold on the **Exchange**, and its writer earns a royalty on every resale. Buyers get the right to *use* a skill, never to read its prompt.
+[Play now](https://playskirm.xyz) · [Walkthrough](docs/walkthrough.md) · [How it works](#how-it-fits-together) · [NEAR contracts](#where-near-fits) · [FAQ](#faq) · [Docs](#documentation)
 
 > Built for **NEAR Hackathon 2026**: *Games With Real Economies*, *NFTs That Do Something*, *Agent Economy*.
 
-<table>
-  <tr>
-    <td><img src="docs/media/crew.png" alt="Crew builder with Rook, Wren and Moss"></td>
-    <td><img src="docs/media/live-overview.png" alt="Live 3 vs 3 match, overview"></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>Build a crew of up to three agents</sub></td>
-    <td align="center"><sub>3 vs 3 on a shared map</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/media/live-third-person.png" alt="Third person with the agent's mind"></td>
-    <td><img src="docs/media/debrief.png" alt="Debrief"></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>Third person: the agent's plan and inner voice</sub></td>
-    <td align="center"><sub>Debrief with the verifiable match log hash</sub></td>
-  </tr>
-</table>
+## Play
 
-## Features
+The hosted build runs on NEAR testnet at **[playskirm.xyz](https://playskirm.xyz)**. Sign in, open **Practice** (free, against the Greedy bot), and your first match starts in under a minute.
 
-**Play**
-- **Ranked and casual** matches with Elo matchmaking, ranked tiers from Bronze to Master, and 14-day seasons with a NEAR prize pool
-- **Practice** against the Greedy bot, free and instant, plus a guided first match for new players
-- **Daily challenge**: one seed a day for everyone, a few attempts with your crew against the bot, and a global board with verifiable log hashes
-- **Campaign**: three chapters of missions against the bot; each chapter cleared unlocks a starter skill
-- **Puzzles**: six fixed boards solved by your crew in the fewest ticks, with medals and a leaderboard per puzzle
-- **Private lobbies and tournaments**: challenge a friend with a code, or run a 4 to 16 player bracket
-- **Draft mode**: each crew bans one of the rival's skills before the match
-- **Map editor and community maps**: paint your own mirrored map, test-play it greedy vs greedy, publish it, and play other players' maps in practice and casual
-- **Live commands**: three orders a match to steer your crew without taking control
-- **Hybrid control**: in casual and practice, steer one of your agents yourself (keys or click-to-move) while the AI runs the rest
-- **Agent progression**: agents earn XP from matches, level up and pick small traits (casual only; ranked plays base stats)
-- **Gas, ice and live water**: gas clouds that cost every other action, ice that slides you a tile further, and cables that electrify the water (Frostline Depot, Sunken Metro)
-- **Ten roles**: Builder, Digger, Firefighter, Scout, Runner and Hauler, plus four newer ones for casual, practice, lobbies, the campaign and puzzles: a **Medic** gets knocked-down or stunned crewmates back sooner, an **Engineer** works valves from 2 tiles and lays its own bridges, a **Saboteur** plants decoy items the rival sees through fog as real, and a **Courier** moves 2 tiles a step but carries 1. Ranked stays on the original six for now (`DEFAULTS.roles.rankedNewRoles`). Exact rules in the [walkthrough](docs/walkthrough.md#roles)
-- **Supply tools**: drops on water maps can carry sandbags, a pump or a bridge to hold back or cross a flood
-- **Quests and achievements**: 3 daily and 2 weekly quests, play streaks, and permanent achievements, mintable as soulbound NEAR badges once the badges contract is deployed (built and tested in `contracts/badges`)
-- **Bring your own agent**: plug your own program (webhook, pull api, or an LLM through the bundled MCP server) into casual and practice matches. See [external agents](docs/external-agents.md)
-
-**Strategy**
-- **Skills** are sealed prompts injected server-side; only their writer ever sees the text
-- **Skill triggers** make a skill play only when its condition holds (hazard close, behind on score, time running out)
-- **Model choice per agent**: in casual and practice, pick a model for each agent in the crew builder, trading cost against strength; each model scales the agent's talk rate. The picker appears when the operator lists more than one model in `LLM_MODELS`; ranked always plays the default model ([economy](docs/economy.md))
-- **Talk**: agents coordinate every tick, and the rival overhears what is said in range. A leak and abuse filter checks every line
-- **"Why did it do that?"**: after a match, a per-agent, per-tick timeline of what it saw, planned and did, and which skill drove it
-
-**Watch and share**
-- **Spectate** any live match, or follow one agent in third person
-- **Shareable replays**: public links and clips with highlights and a one-line caster
-- **Verify on NEAR**: recompute any match log's hash chain in your browser and check it against the onchain registry (`/verify`)
-
-**Own and trade**
-- **Exchange**: mint, list and buy skills as NEAR NFTs, with creator royalties on every resale
-- **Back a writer**: stake on a skill writer up front for a capped share of their future royalties. Closing a round pays the whole raise to the writer; backers then earn their share only of royalties routed to the round. On the keyless local stack (`AUTH_MODE=dev`) it runs on paid credits and every resale of a covered skill routes its royalty automatically; with the backing contract (`contracts/backing`, not deployed yet, `BACKING_CONTRACT`) royalties reach backers only when the writer forwards them with `distribute`. On a hosted server without the contract, backing is off
-- **Proof**: every minted version gets a hidden benchmark (win, leak and manipulation rates), ranked stats per map, and 3 free trials for buyers
-- **Arena cosmetics (NEP-245 multi-token items)**: agent skins (a colour palette and pattern), trails and nameplate styles, bought with paid credits and worn per agent from the agent's Arena style tab. Purely visual: matches carry them as plain ids for the arena to draw, never the engine or the match log. The NEP-245 contract is built and tested (`contracts/cosmetics`) but not deployed yet, so they are credits-only by default; with `NEAR_CONTRACT_COSMETICS` set the api mints each bought item to the player's NEAR account and reads ownership from the chain. Badges and skills keep their own contracts
-- **Agent rentals**: rent another player's agent for one match, paid in credits, or with NEAR through the market contract once rentals are switched onchain
-- **Gasless onboarding**: a relayer can pay the gas for a new player's first transactions to skirm's contracts (NEP-366 meta-transactions, 3 per player by default). Off until an operator configures a funded relayer account (`RELAYER_ACCOUNT_ID`, `RELAYER_PRIVATE_KEY`) and the wallet supports delegate actions; see [gasless onboarding](docs/gasless.md)
-
-## Quick start
-
-Requires **Docker** with Compose 2.24 or newer (for the optional `.env` file). No API keys or wallet needed.
+To run the whole stack yourself you need only **Docker** (Compose 2.24+). No API keys or wallet:
 
 ```sh
 git clone https://github.com/TyronVT/skirm.git && cd skirm
 docker compose up --build
 ```
 
-Open **http://localhost:3000** and sign in with any handle. For quick matches, start with `V2_TICK_MS=200 docker compose up --build`. Stop with `docker compose down -v`.
+Open **http://localhost:3000** and sign in with any handle. `V2_TICK_MS=200 docker compose up --build` plays matches out in seconds; `docker compose down -v` stops everything.
 
-### Try it in two minutes
+## Quick start
 
-1. Sign in with any handle. Home shows **60 free** credits.
-2. Click **Practice** (Vs Greedy bot). On the crew screen, add **Wren** and **Moss** from your roster for a full crew of three; the bot fields as many agents as you do.
+1. Sign in. Home shows **60 free** credits.
+2. Click **Practice** (Vs Greedy bot) and add **Wren** and **Moss** for a full crew of three.
 3. **Start practice**, **Accept**, then **Lock in**. Practice is free.
-4. Watch the match. Press **V** for third person and **←/→** to switch agents.
-5. Read the verdict, the match log hash, the comms transcript and the per-agent timeline in the debrief.
+4. Watch: press **V** for third person, **←/→** to switch agents, **I** for the agent's mind, or click anything on the board.
+5. Read the verdict, the highlight clip, the comms transcript and the per-agent *why did it do that?* timeline in the debrief.
 
-The stack runs the offline **greedy brain** by default, so nothing calls a model. The [walkthrough](docs/walkthrough.md) covers every other flow, including ranked play in two browsers, spectating, the Exchange and an API-only path.
+The local stack plays with the offline **greedy brain**, so nothing calls a model. The [walkthrough](docs/walkthrough.md) covers ranked play in two browsers, spectating, the Exchange and an API-only path.
 
-### Bring your own model
+## Screenshots
 
-skirm talks to any **OpenAI-compatible** chat API: OpenRouter, OpenAI, Anthropic, Groq, Together, or a local Ollama, LM Studio or vLLM. Switch the brain to `model` and set the provider and model in a `.env` file next to `docker-compose.yml`, then restart (the compose file defaults `V2_BRAIN` to `greedy`, which plays offline even with a key):
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/home.png" alt="Home: the command deck with ranked, map atlas, crew, skills, ladder, practice and daily tiles"></td>
+    <td width="50%"><img src="docs/media/crew.png" alt="Crew builder with Rook, Wren and Moss, skills, talk tiers and the credit estimate"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Home</b>: the command deck, your crew lead and a first-steps bulb</sub></td>
+    <td align="center"><sub><b>Build your crew</b>: up to three agents, a skill each, talk tier and cost</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/live-overview.png" alt="Live match overview: score, flood waves, a supply drop announcement and the comms feed"></td>
+    <td><img src="docs/media/live-board.png" alt="Live match with intent icons, a landed bluff in comms and a clicked tile explained"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Live match</b>: hazards in waves, supply drops, live comms</sub></td>
+    <td align="center"><sub><b>Read the board</b>: intent icons, bluffs, click any tile to see what it is</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/live-third-person.png" alt="Third person view with the agent's inventory, plan, inner voice and active skill"></td>
+    <td><img src="docs/media/verdict.png" alt="Match verdict with the MVP, crew reactions, match report and log hash"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Third person</b>: the agent's plan, reasoning and inner voice</sub></td>
+    <td align="center"><sub><b>Verdict</b>: MVP, crew poses, match report and the log hash</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/debrief.png" alt="Debrief with caster highlights, replay sharing, comms and the per-tick decision timeline"></td>
+    <td><img src="docs/media/exchange.png" alt="The Exchange: skill NFTs listed in NEAR with handles, sort and search"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Debrief</b>: highlights, shareable clips, <i>why did it do that?</i></sub></td>
+    <td align="center"><sub><b>Exchange</b>: buy and sell skills as NEAR NFTs, judged by proof</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/campaign.png" alt="Campaign chapters with missions and starter skill unlocks"></td>
+    <td><img src="docs/media/map-editor.png" alt="Map editor with brushes, mirrored painting, test play and publish"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Campaign</b>: three chapters against the bot, starter skills to unlock</sub></td>
+    <td align="center"><sub><b>Map editor</b>: paint a mirrored map, test-play it, publish it</sub></td>
+  </tr>
+</table>
+
+## What's new
+
+- **Match-start cinematic**: a camera sweep across the map, then both crews as name cards.
+- **Debrief highlight clip**: the match's best moment, looped like a trailer.
+- **Intent icons** by each nameplate show what every agent is going for; **click anything** on the live board to see what it is.
+- **Agent reactions**: bluffs, overheard lines and hazard calls, with crew poses in the debrief.
+- **Sound and music**: match effects above a background music bed, with SFX and music toggles.
+- **Clearer third person** with zoom that centres on your crew, plus walking animations.
+- **Agent looks everywhere**: 3D cosmetics, renaming agents, and a home deck with a first-steps bulb.
+- **NEAR payment fixes**: signed transaction hashes are kept until confirmed, so a top-up survives a reload.
+- **Phone layouts**: tables turn into cards instead of hiding columns off-screen.
+
+## Features
+
+**Play**
+- **Ranked and casual** with Elo matchmaking, Bronze to Master tiers, and 14-day seasons with a NEAR prize pool
+- **Practice** against the Greedy bot, a guided first match, a **daily challenge** with a global board, a three-chapter **campaign** and six **puzzles** with medals
+- **Private lobbies and tournaments** (4 to 16 player brackets) and **draft mode** (each crew bans one rival skill)
+- **Map editor and community maps**: paint, test-play greedy vs greedy, publish, and play other players' maps
+- **Live commands** (three orders a match) and **hybrid control** (steer one agent yourself in casual and practice)
+- **Ten roles**: Builder, Digger, Firefighter, Scout, Runner, Hauler, plus Medic, Engineer, Saboteur and Courier outside ranked ([rules](docs/walkthrough.md#roles))
+- **Hazards and tools**: water, fire, lava, gas, ice and live water; sandbags, pumps and bridges in supply drops
+- **Progression**: agent XP and traits (casual), daily and weekly quests, streaks and achievements, mintable as soulbound badges
+- **Bring your own agent** through a webhook, a pull API or the bundled MCP server ([external agents](docs/external-agents.md))
+
+**Strategy**
+- **Sealed skills** injected server-side; only their writer ever sees the text
+- **Skill triggers** that fire only when a condition holds (hazard close, behind on score, time running out)
+- **Model choice per agent** in casual and practice, trading cost against strength ([economy](docs/economy.md))
+- **Talk** every tick, overheard by the rival in range, with a leak and abuse filter on every line
+
+**Watch and share**
+- **Spectate** any live match or follow one agent in third person
+- **Shareable replays and clips** with caster highlights
+- **Verify on NEAR**: recompute a match log's hash chain in the browser and check it against the registry (`/verify`)
+
+**Own and trade**
+- **Exchange**: mint, list and buy skills as NEAR NFTs with creator royalties on every resale
+- **Proof** on every version: a hidden benchmark (win, leak and manipulation rates), ranked stats per map, 3 free trials
+- **Back a writer**: stake on a skill writer for a capped share of future royalties
+- **Arena cosmetics** (NEP-245): skins, trails and nameplates, purely visual
+- **Agent rentals** for one match, and **gasless onboarding** through a NEP-366 relayer ([gasless](docs/gasless.md))
+
+## Bring your own model
+
+skirm talks to any **OpenAI-compatible** chat API: OpenRouter, OpenAI, Anthropic, Groq, Together, or a local Ollama, LM Studio or vLLM. Set the brain to `model` in a `.env` next to `docker-compose.yml` and restart:
 
 ```sh
 # Any model on OpenRouter (the default base URL)
@@ -117,87 +143,54 @@ echo 'LLM_API_KEY=sk-or-...'   >> .env
 echo 'LLM_MODEL=<model id>'    >> .env
 
 # or a local model through Ollama (no key needed)
-echo 'V2_BRAIN=model'                                   >> .env
+echo 'V2_BRAIN=model'                                    >> .env
 echo 'LLM_BASE_URL=http://host.docker.internal:11434/v1' >> .env
-echo 'LLM_MODEL=llama3.1'                               >> .env
+echo 'LLM_MODEL=llama3.1'                                >> .env
 
 docker compose up -d
 ```
 
-With a model, skills change how agents play and benchmarks run for real. See [`.env.example`](.env.example) for every setting, including per-token prices for cost tracking.
+With a model, skills change how agents play and benchmarks run for real. [`.env.example`](.env.example) lists every setting, including per-token prices for cost tracking.
 
-## How it works
+## How it fits together
 
-You never control an agent directly: you write the plan, and AI agents carry it out. Strategies that win can be minted, proven and sold.
+- The **engine** runs a deterministic shared-map tick with fog, hazards in waves, switches and supply drops, and writes a hash-chained log of every action and every delivered line.
+- **Policies** decide for each agent: the configured model acts and speaks in one call per agent per tick and replans the crew every 25 ticks; the greedy brain plays with no model at all.
+- The **skill vault** keeps prompts encrypted at rest and decrypts them only for the agent's model call.
+- The **web app**, **API**, **realtime** socket and **worker** serve matches, matchmaking and the credits ledger (held at lock-in, charged per tick, with a free daily allowance).
+- **NEAR contracts** hold what needs trust: skill ownership, trades, royalties, ranked results and prize pools.
 
-<p align="center"><img src="docs/media/fig1-overview.svg" alt="Figure 1: overview of skirm, from strategy to crew, match, verifiable result, and minting and trading on NEAR" width="900"></p>
-
-Inside a match, every agent runs the same loop each tick. It sees only its own part of the map, its model decides what to do and say, and the world moves for everyone at once. Every action and every line spoken is added to a tamper-evident log.
-
-<p align="center"><img src="docs/media/fig2-tick.svg" alt="Figure 2: one tick of a match, from observation through the policy to action, utterance, environment step, talk filter and the hash-chained match log" width="900"></p>
-
-### What lives where
-
-| | Where | Why |
-| --- | --- | --- |
-| Matches, maps and AI decisions | skirm services | Fast and cheap: thousands of decisions per match |
-| The text of your strategy | Encrypted vault | Only you can read it, even after you sell its use |
-| Skill ownership, trades and royalties | NEAR | You own what you write, and royalties pay out automatically |
-| Ranked results and prize pools | NEAR | Each ranked result and its log hash are public, and once standings are posted each winner claims their share straight from the contract. The standings themselves are posted by skirm's ops account, which the contract trusts without checking them against the registry, and nothing in the contract forces them to be posted |
+<p align="center"><img src="docs/media/fig1-overview.svg" alt="Figure 1: overview of skirm, from strategy to crew, match, verifiable result, and minting and trading on NEAR" width="860"></p>
 
 <details>
-<summary><b>Architecture (for developers)</b></summary>
+<summary><b>One tick, and the system architecture</b></summary>
 <br>
-<p align="center"><img src="docs/media/fig3-architecture.svg" alt="Figure 3: system architecture with the web client, API, realtime, worker, Postgres, Redis, LLM provider, external agents and five NEAR contracts" width="900"></p>
-
-- **Engine**: a deterministic shared-map tick with fog, hazards in waves, switches and supply drops, and a hash-chained log of every action and every delivered line.
-- **Policies**: the configured model acts and speaks in one call per agent per tick and replans the crew every 25 ticks. A deterministic greedy brain plays without any model or key.
-- **Skill vault**: prompts are encrypted at rest and only decrypted for the agent's model call.
-- **Credits**: a ledger that holds credits at lock-in and charges per tick, with a free daily allowance ([docs/economy.md](docs/economy.md)).
+<p align="center"><img src="docs/media/fig2-tick.svg" alt="Figure 2: one tick of a match, from observation through the policy to action, utterance, environment step, talk filter and the hash-chained match log" width="860"></p>
+<p align="center"><img src="docs/media/fig3-architecture.svg" alt="Figure 3: system architecture with the web client, API, realtime, worker, Postgres, Redis, LLM provider, external agents and the NEAR contracts" width="860"></p>
 
 **Stack:** Next.js 16 · React 19 · NestJS · BullMQ · WebSocket · Drizzle · PostgreSQL · Redis · Rust (near-sdk 5) · Turborepo · Vitest · Playwright · Docker · Cloud Run
 
 </details>
 
-## Hackathon tracks
-
-| Track | How skirm fits |
-| --- | --- |
-| **Games With Real Economies** | Credits bought with NEAR, a creator economy of skills with royalties, and season prize pools paid onchain |
-| **NFTs That Do Something** | A skill NFT is a working strategy: equip it and your agents play differently. Its proof (benchmarks, ranked stats) travels with it |
-| **Agent Economy** | AI agents compete and can be rented, and their strategies are traded as assets with verifiable track records |
-
-## Security
-
-- **Sealed strategies**: skill prompts are encrypted at rest and decrypted only for the model call; no API ever returns another player's prompt.
-- **Leak and abuse filter**: every line an agent speaks is checked before anyone hears it, so a skill cannot leak through talk. Benchmarks include hijack attempts and report a manipulation rate.
-- **Wallet proofs**: a NEAR account is linked only with a NEP-413 signature from one of its full-access keys, and with a NEAR signer configured every payment is verified onchain by transaction hash (the offline local stack accepts dev hashes; see below).
-- **Rate limits and error reporting** on the API and the realtime socket.
-
 ## Where NEAR fits
 
-Only what needs trust or ownership goes onchain: skill ownership, trades, royalties, ranked results and prize pools. Prompts and the simulation stay offchain; the log hash in the registry lets anyone check a match against its record.
+Only what needs trust or ownership goes onchain. Prompts and the simulation stay offchain; the log hash in the registry lets anyone check a match against its record.
 
 | Contract | Testnet account | Role |
 | --- | --- | --- |
 | `skills` | [`skills.playskirm.testnet`](https://testnet.nearblocks.io/address/skills.playskirm.testnet) | NEP-171 skill NFTs, one token per version, with NEP-199 royalties |
-| `market` | [`market.playskirm.testnet`](https://testnet.nearblocks.io/address/market.playskirm.testnet) | List, buy and rent. Splits the 5 % fee, creator royalty and seller; funds the season pool |
+| `market` | [`market.playskirm.testnet`](https://testnet.nearblocks.io/address/market.playskirm.testnet) | List, buy and rent; splits the 5 % fee, creator royalty and seller; funds the season pool |
 | `registry` | [`registry.playskirm.testnet`](https://testnet.nearblocks.io/address/registry.playskirm.testnet) | Ranked match records: log hash, per-player Elo, season standings |
 | `deposits` | [`deposits.playskirm.testnet`](https://testnet.nearblocks.io/address/deposits.playskirm.testnet) | NEAR top-ups that emit a NEP-297 event for the credits ledger |
-| `seasons` | [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | One prize pool per 14-day season: the ops account posts the top 10, who claim their shares |
-| `badges` | `badges.playskirm.testnet` (not deployed yet) | Soulbound achievement badges (NEP-171 shape, never transferable), minted by the ops account |
-| `backing` | `backing.playskirm.testnet` (not deployed yet) | Writer backing rounds: stakes up front, the whole raise to the writer at close; backers claim a capped share of the royalties someone forwards to the round with `distribute` (the skills contract pays royalties to the writer, not to the round) |
-| `cosmetics` | `cosmetics.playskirm.testnet` (not deployed yet) | NEP-245 multi-token cosmetic items (agent skins, trails, nameplates): item types and copies minted by the owner or ops account, transfers and `transfer_call`, storage paid by the caller |
+| `seasons` | [`seasons.playskirm.testnet`](https://testnet.nearblocks.io/address/seasons.playskirm.testnet) | One prize pool per 14-day season; the top 10 claim their shares |
+| `badges` | not deployed yet | Soulbound achievement badges |
+| `backing` | not deployed yet | Writer backing rounds with a capped share of forwarded royalties |
+| `cosmetics` | not deployed yet | NEP-245 multi-token cosmetic items |
 
-Wallets connect through [NEAR Connect](https://www.npmjs.com/package/@hot-labs/near-connect) (HOT, Meteor, MyNearWallet and others): pick a wallet and approve once.
+Wallets connect through [NEAR Connect](https://www.npmjs.com/package/@hot-labs/near-connect) (HOT, Meteor, MyNearWallet and others). The local Docker stack has **no NEAR signer**, so it plays fully offline: ranked results show registry status `local` and top-ups accept dev hashes. Deployment details: [contracts/README.md](contracts/README.md).
 
-### Local stack vs onchain
-
-The local Docker stack runs with **no NEAR signer**, so it plays fully offline: ranked results show registry status `local`, sign-in needs no wallet, and top-ups accept dev hashes. A deployment with an ops account (`NEAR_OPS_ACCOUNT`, `NEAR_OPS_KEY`) and Privy sign-in mints skills, records ranked matches and pays seasons on testnet. Contract details and deployment: [contracts/README.md](contracts/README.md).
-
-### Verify a match
-
-Every match ends with a log hash. Once a deployment records ranked matches, anyone can check one against the registry contract:
+<details>
+<summary><b>Verify a match yourself</b></summary>
 
 ```sh
 # The result and log hash from the API
@@ -210,61 +203,33 @@ curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \
   | jq -r '.result.result | implode | fromjson'
 ```
 
-## FAQ
+</details>
 
-**Do I need a wallet or an API key to try it?**
-No. The local stack signs you in with any handle and plays with a built-in offline bot. A wallet is only needed to mint, buy, sell or top up.
+## Security
 
-**Which AI models does skirm support?**
-Any model behind an OpenAI-compatible API, from hosted providers to a model running on your own machine. See [Bring your own model](#bring-your-own-model).
+Treat every skill and every line an agent speaks as untrusted input.
 
-**How many agents play?**
-One to three per crew and two crews per map, so up to six agents at once.
+- **Sealed strategies**: prompts are encrypted at rest and decrypted only for the model call; no API returns another player's prompt.
+- **Leak and abuse filter**: every line is checked before anyone hears it, and benchmarks include hijack attempts with a published manipulation rate.
+- **Wallet proofs**: a NEAR account links only with a NEP-413 signature from a full-access key, and with a signer configured every payment is verified onchain by transaction hash.
+- **Rate limits and error reporting** on the API and the realtime socket.
 
-**Can someone steal my strategy?**
-Buyers get the right to use a skill, never its text. Prompts are encrypted at rest, only decrypted for the model call, and a filter stops agents from saying them out loud. Benchmarks test this with hijack attempts and publish a leak rate.
+## Documentation
 
-**How do I know a result is real?**
-Every match produces a hash-chained log of every action and every line spoken. Ranked results are recorded on NEAR with that hash, so anyone can check them ([Verify a match](#verify-a-match)).
-
-## Roadmap
-
-Planned after the hackathon. Nothing below is in the codebase yet; gasless onboarding, model choice per agent and NEP-245 multi-token cosmetics, once on this list, are built and listed under [Features](#features) (the cosmetics contract is not deployed yet).
-
-**NEAR AI and agents**
-- **NEAR AI Cloud** as a model provider for agents, next to any OpenAI-compatible API
-- **Agent accounts**: each agent gets its own NEAR account with a function-call key and a spending budget, so it can pay for rentals and trials by itself
-- **Agent-to-agent trades**: agents list, rent and buy skills from each other within their owner's limits
-- **Shade Agents (TEE)**: run the skill vault and match settlement in a trusted enclave, with an attestation anyone can check
-- **Chain Signatures** to pay prizes and royalties on other chains
-- **Yield/resume (NEP-519)** to settle bounties and match results in one contract call
-
-**Payments**
-- **NEAR Intents (1Click)**: top up credits from any token on any chain
-- **USDC deposits** (NEP-141 / NEP-145), with prices shown in dollars
-- **Liquid-staking prize pools**: season pools earn staking yield until they are paid out
-- **Pyth price feed** for live NEAR/USD prices
-
-**Gameplay**
-- **New modes**: 2v2, free-for-all, co-op survival and king of the hill
-- **Breakable walls and collapsing bridges**
-- **Map modifiers** with a weekly map rotation
-
-**Also planned**
-- **Skill coach**: after a loss, suggested prompt edits from the decision timeline
-- **Clans** with a NEAR treasury
-
-## Repository layout
-
-```
-apps/        web (Next.js) · api (NestJS) · realtime (WebSocket) · worker (BullMQ)
-packages/    engine · decision-engine · db · ledger · server · shared · ui · mcp (MCP server for external agents)
-contracts/   skills · market · registry · deposits · seasons · badges · backing · cosmetics (Rust, near-sdk)
-spec/        the ten v2 maps
-docs/        walkthrough, backend contract, economy, benchmarks, deploy, development, external agents, gasless
-```
+| Goal | Start here |
+| --- | --- |
+| Play every flow step by step | [Walkthrough](docs/walkthrough.md) |
+| Understand credits, talk tiers and costs | [Economy](docs/economy.md) |
+| Prove a skill | [Benchmarks](docs/benchmarks.md) |
+| Plug in your own agent | [External agents](docs/external-agents.md) |
+| Build on the API | [Backend contract](docs/backend-contract.md) |
+| Sponsor new players' gas | [Gasless onboarding](docs/gasless.md) |
+| Deploy the stack | [Deploy](docs/deploy.md) · [Contracts](contracts/README.md) |
+| Run tests and the smoke | [Development](docs/development.md) |
 
 ## Development
+
+The repository is an npm workspace with Turborepo.
 
 ```sh
 npm ci                  # also enables the pre-push hook (typecheck + tests)
@@ -274,18 +239,46 @@ npm run smoke           # full stack in Docker: practice, ranked, credits, Elo, 
 cd contracts && cargo test
 ```
 
-CI runs typecheck, unit tests, the contract tests and the wasm build on every push to `main`; pull requests are not checked in CI. More in [docs/development.md](docs/development.md).
+```
+apps/        web (Next.js) · api (NestJS) · realtime (WebSocket) · worker (BullMQ)
+packages/    engine · decision-engine · db · ledger · server · shared · ui · mcp
+contracts/   skills · market · registry · deposits · seasons · badges · backing · cosmetics (Rust)
+spec/        the ten v2 maps
+docs/        walkthrough, backend contract, economy, benchmarks, deploy, development, external agents, gasless
+```
 
-## Documentation
+CI runs typecheck, unit tests, the contract tests and the wasm build on every push to `main`. More in [docs/development.md](docs/development.md).
 
-| | |
+## FAQ
+
+**Do I need a wallet or an API key?** No. The local stack signs you in with any handle and plays with an offline bot; a wallet is only needed to mint, buy, sell or top up.
+
+**Which models does skirm support?** Any model behind an OpenAI-compatible API, hosted or local. See [Bring your own model](#bring-your-own-model).
+
+**How many agents play?** One to three per crew, two crews per map: up to six at once.
+
+**Can someone steal my strategy?** Buyers get the right to use a skill, never its text. Prompts stay encrypted, and a filter stops agents from saying them out loud.
+
+**How do I know a result is real?** Every match produces a hash-chained log; ranked results are recorded on NEAR with that hash ([verify a match](#where-near-fits)).
+
+<details>
+<summary><b>Roadmap (after the hackathon)</b></summary>
+
+- **NEAR AI and agents**: NEAR AI Cloud as a model provider, agent accounts with spending budgets, agent-to-agent trades, Shade Agents (TEE) for the vault and settlement, Chain Signatures, yield/resume (NEP-519)
+- **Payments**: NEAR Intents (1Click) top-ups from any chain, USDC deposits, liquid-staking prize pools, a Pyth NEAR/USD feed
+- **Gameplay**: 2v2, free-for-all, co-op survival and king of the hill; breakable walls; map modifiers with a weekly rotation
+- **Also planned**: a skill coach that suggests prompt edits after a loss, and clans with a NEAR treasury
+
+</details>
+
+## Hackathon tracks
+
+| Track | How skirm fits |
 | --- | --- |
-| [Walkthrough](docs/walkthrough.md) | Every flow step by step, plus an API-only path |
-| [Backend contract](docs/backend-contract.md) | REST routes, WebSocket messages, queues, environment |
-| [Economy](docs/economy.md) | Talk tiers, holds, the free allowance, margins |
-| [Benchmarks](docs/benchmarks.md) | The skill benchmark gauntlet and trials |
-| [External agents](docs/external-agents.md) | Bring your own agent: webhook, pull api and the MCP server |
-| [Gasless onboarding](docs/gasless.md) | NEP-366 meta-transactions through a relayer (off until configured) |
-| [Deploy](docs/deploy.md) | Docker Compose and Google Cloud Run |
-| [Development](docs/development.md) | Tests, the full stack smoke, CI |
-| [Contracts](contracts/README.md) | Build, test and deploy the NEAR contracts |
+| **Games With Real Economies** | Credits bought with NEAR, a creator economy of skills with royalties, season prize pools paid onchain |
+| **NFTs That Do Something** | A skill NFT is a working strategy: equip it and your agents play differently, with its proof attached |
+| **Agent Economy** | AI agents compete and can be rented; their strategies trade as assets with verifiable track records |
+
+## Contributors
+
+<a href="https://github.com/armlynobinguar"><img src="https://avatars.githubusercontent.com/u/65301944?v=4&s=48" width="48" height="48" alt="armlynobinguar"></a> <a href="https://github.com/TyronVT"><img src="https://avatars.githubusercontent.com/u/100325746?v=4&s=48" width="48" height="48" alt="TyronVT"></a>
