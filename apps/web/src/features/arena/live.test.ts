@@ -95,3 +95,23 @@ describe('owner looks on live agents', () => {
     if (b) expect(b.dress).toBeUndefined();
   });
 });
+
+describe('walking between tiles', () => {
+  it('walks a step over most of the tick, within bounds, and 400 ms before the second frame', async () => {
+    const { walkMs } = await import('./live');
+    expect(walkMs(null)).toBe(400);
+    expect(walkMs(2000)).toBe(1800);
+    expect(walkMs(700)).toBe(630);
+    expect(walkMs(100)).toBe(300);
+    expect(walkMs(60_000)).toBe(1800);
+  });
+
+  it('bobs twice a tile and lands flat at both ends, never a hop', async () => {
+    const { walkBob } = await import('./live');
+    expect(walkBob(0)).toBeCloseTo(0);
+    expect(walkBob(0.5)).toBeCloseTo(0);
+    expect(walkBob(1)).toBeCloseTo(0);
+    expect(walkBob(0.25)).toBeCloseTo(1);
+    expect(walkBob(0.75)).toBeCloseTo(1);
+  });
+});

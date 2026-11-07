@@ -236,3 +236,18 @@ export function liveFx(): LiveFx {
 export function setLiveFx(patch: Partial<LiveFx> | null): void {
   fx = patch ? { ...fx, ...patch } : NO_FX;
 }
+
+/**
+ * How long an agent takes to walk one tile: most of the time between two frames (a live tick is 2 s),
+ * so it walks the whole way at a steady pace instead of hopping in 400 ms and standing until the next
+ * frame. `gapMs` is the time between the last two frames (null before the second one).
+ */
+export function walkMs(gapMs: number | null | undefined): number {
+  if (gapMs == null || !Number.isFinite(gapMs) || gapMs <= 0) return 400;
+  return Math.max(300, Math.min(1800, gapMs * 0.9));
+}
+
+/** The body's bob while walking: two footfalls a tile, a few hundredths of a tile high (0 to 1). */
+export function walkBob(alpha: number): number {
+  return Math.abs(Math.sin(2 * Math.PI * Math.min(1, Math.max(0, alpha))));
+}

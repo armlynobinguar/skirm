@@ -15,7 +15,7 @@ import { drawCosmetics2D, type CosmeticDrawOpts } from './cosmetics';
 import { drawGear2D } from './gear';
 import * as proto from './proto/world';
 import { cameraFor, easeRateFor, fitBox, sceneForMatchView, sceneForScreen, stepCamera, type ArenaScene, type Camera } from './scene';
-import { liveFx, type LiveArena } from './live';
+import { liveFx, type LiveArena, walkMs } from './live';
 import { setArenaProjection } from './pick';
 import { useArena, type ArenaStateSnapshot } from './store';
 import { MAPS, mapById, restingState, type ArenaState, type V2Map } from './world';
@@ -62,6 +62,8 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
     prevState: null as ArenaState | null,
     view,
     layer: null as MatchLayer | null,
+    /** Time between the last two live frames (the tick), for the walk's length. */
+    gap: null as number | null,
   });
   live.current.scene = scene;
   live.current.view = view;
@@ -70,6 +72,7 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
   if (live.current.match?.at !== liveMatch?.at) {
     // A new live frame: tween from the last one (only within the same match).
     live.current.prevState = live.current.match && liveMatch ? live.current.match.arena.state : null;
+    live.current.gap = live.current.match && liveMatch ? liveMatch.at - live.current.match.at : null;
     live.current.match = liveMatch;
     if (!liveMatch) live.current.layer = null;
   }
@@ -132,8 +135,9 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
         drops: onAtlas ? A.drops : null,
         still,
       };
-      // Live frames ease from the previous one over 400 ms; the map at rest does not move.
-      const alpha = lm && L.prevState && !still ? Math.min(1, (Date.now() - lm.at) / 400) : 1;
+      // Live frames tween from the previous one over most of a tick (agents walk, they do not hop);
+      // the map at rest does not move.
+      const alpha = lm && L.prevState && !still ? Math.min(1, (Date.now() - lm.at) / walkMs(L.gap)) : 1;
       let prev: ArenaState | null = null;
       if (lm) {
         const k = still ? 1 : 1 - Math.exp(-dt * 4.2);
