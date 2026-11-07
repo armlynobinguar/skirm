@@ -61,7 +61,8 @@ describe('chase cam world', () => {
     const w = buildWorld(a0, LOOK);
     const rig = newRig();
     const c = cam();
-    stepWorld(w, rig, c, input({ arena: a0, prev: null, at: 0, focus: 'wick', look: LOOK }));
+    // Frames 400 ms apart: the step walks over most of that (walkMs), turning on the spot first.
+    stepWorld(w, rig, c, input({ arena: a0, prev: null, at: 9_600, focus: 'wick', look: LOOK }));
     // wick steps down (+z on the ground plane).
     const a1 = moved(a0, 'wick', 0, 1);
     const st: ChaseCamState = { arena: a1, prev: a0.state, at: 10_000, focus: 'wick', look: LOOK };

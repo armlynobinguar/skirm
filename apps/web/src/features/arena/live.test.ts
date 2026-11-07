@@ -115,3 +115,54 @@ describe('walking between tiles', () => {
     expect(walkBob(0.75)).toBeCloseTo(1);
   });
 });
+
+describe('agents reacting to each other (socialOf)', () => {
+  const ag = (id: string, team: 'A' | 'B', x: number, y: number, o: Record<string, unknown> = {}) =>
+    ({ id, name: id, team, x, y, role: 'Builder', out: false, down: false, items: [], ...o }) as never;
+  const rows = ['#########', '#.......#', '#.......#', '#......*#', '#########'];
+  const prevAt = (pos: Record<string, [number, number]>) =>
+    ({ state: { grid: [], agents: Object.entries(pos).map(([id, [x, y]]) => ({ id, x, y })) } }) as never;
+
+  it('a speaker turns to the nearest crewmate that heard it, and they nod back toward it', async () => {
+    const { socialOf } = await import('./live');
+    const frame = {
+      view: 'A',
+      rows,
+      agents: [ag('a1', 'A', 1, 1), ag('a2', 'A', 3, 1), ag('a3', 'A', 6, 2)],
+      events: [{ kind: 'said', agent: 'a1', channel: 'team', text: 'lamp east', heardBy: ['a3', 'a2'], overheardBy: [] }],
+    } as never;
+    const s = socialOf(frame, null, [7, 3]);
+    expect(s.get('a1')).toEqual({ social: { talk: true }, faceTo: [3, 1] });
+    expect(s.get('a2')).toEqual({ social: { listen: true }, faceTo: [1, 1] });
+    expect(s.get('a3')).toEqual({ social: { listen: true }, faceTo: [1, 1] });
+  });
+
+  it('crewmates near a delivery pump their fists; rivals side by side square up', async () => {
+    const { socialOf } = await import('./live');
+    const frame = {
+      view: 'watch',
+      rows,
+      agents: [ag('a1', 'A', 1, 1), ag('a2', 'A', 2, 2), ag('b1', 'B', 6, 3), ag('a3', 'A', 6, 2)],
+      events: [{ kind: 'delivered', agent: 'a1', team: 'A', count: 1, score: 1 }],
+    } as never;
+    const s = socialOf(frame, null, [7, 3]);
+    expect(s.get('a2')).toEqual({ social: { hype: true }, faceTo: [1, 1] });
+    expect(s.get('a1')).toBeUndefined();
+    expect(s.get('b1')).toEqual({ social: { square: true }, faceTo: [6, 2] });
+    expect(s.get('a3')).toEqual({ social: { square: true }, faceTo: [6, 3] });
+  });
+
+  it('points at the item it is getting closer to, and an own agent standing still thinks (a rival never)', async () => {
+    const { socialOf } = await import('./live');
+    const frame = {
+      view: 'A',
+      rows,
+      agents: [ag('a1', 'A', 5, 3), ag('a2', 'A', 2, 1), ag('b1', 'B', 1, 3)],
+      events: [{ kind: 'blocked', agent: 'b1' }],
+    } as never;
+    const s = socialOf(frame, prevAt({ a1: [4, 3], a2: [2, 1], b1: [1, 3] }), [7, 3]);
+    expect(s.get('a1')).toEqual({ social: { point: true }, faceTo: [7, 3] });
+    expect(s.get('a2')).toEqual({ social: { think: true } });
+    expect(s.get('b1')).toEqual({ social: { bump: true } });
+  });
+});

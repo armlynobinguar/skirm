@@ -335,6 +335,29 @@ function palOf(m) {
 
 /* agents: the role figure (../figure2d.ts draws the look and pose per role) */
 function drawAgent(c, sx, b, T, a, time, hop, opts={}) { drawFigure(c, sx, b, T, a, time, hop, opts); }
+// Which way each agent faces on screen (1: lower right, -1: lower left), kept from frame to frame,
+// and the step it last turned for (so a turn plays once per step).
+const FACING = new Map();
+function faceOf(a, pa, stepping) {
+  const was = FACING.get(a.id);
+  const before = was ? was.dir : (a.team === 'B' ? -1 : 1);
+  let dir = before, turning = false;
+  if (stepping) {
+    const step = pa.x+','+pa.y+'>'+a.x+','+a.y;
+    // Screen x grows with x and shrinks with y: +x and -y steps face right, +y and -x face left.
+    dir = (a.x - a.y) - (pa.x - pa.y) > 0 ? 1 : -1;
+    if (was && was.step === step) turning = was.turning;
+    else turning = dir !== before;
+    FACING.set(a.id, { dir, step, turning });
+  } else {
+    if (a.faceTo) {
+      const d = (a.faceTo[0] - a.faceTo[1]) - (a.x - a.y);
+      if (d) dir = d > 0 ? 1 : -1;
+    }
+    FACING.set(a.id, { dir, step: was ? was.step : null, turning: false });
+  }
+  return { dir, turning };
+}
 
 function drawThing(c, t, x, y, sx, sy, T, pal, time, fresh, gone) {
   const b = sy, grow = fresh != null ? ease(fresh) : 1;
@@ -408,19 +431,24 @@ function renderArena(c, A, pal, prev, cur, alpha, T, ox, oy, time, opts={}) {
     const dk = opts.deploy == null ? 1 : ease(opts.deploy*1.7 - (a.slot||0)*.2 - (a.team === 'B' ? .3 : 0)); if (dk <= .01) return;
     const pa = prev ? prev.agents[i] : a;
     const teleport = Math.abs(pa.x-a.x)+Math.abs(pa.y-a.y) > 1;
-    // A step is walked at a steady pace (linear), not eased like a hop.
-    const k = !teleport && (pa.x !== a.x || pa.y !== a.y) ? Math.max(0, Math.min(1, alpha)) : ease(alpha);
+    const stepping = !teleport && (pa.x !== a.x || pa.y !== a.y);
+    // Facing: the way it steps; standing, toward whoever it reacts to (faceTo); else as it was.
+    const f = faceOf(a, pa, stepping);
+    // A step is walked at a steady pace (linear), not eased like a hop; when the step turns it, it
+    // turns on the spot first, then walks.
+    const turnLead = f.turning && !opts.still ? 0.22 : 0;
+    const k = stepping ? Math.max(0, Math.min(1, (alpha - turnLead) / (1 - turnLead))) : ease(alpha);
     let ix = teleport ? a.x : pa.x + (a.x-pa.x)*k, iy = teleport ? a.y : pa.y + (a.y-pa.y)*k;
     const key = Math.round(ix)+','+Math.round(iy), n = pos.get(key) || 0; pos.set(key, n+1);
     if (n) { ix += n*0.22; iy -= n*0.22; }
-    const moving = !teleport && (pa.x !== a.x || pa.y !== a.y);
-    items.push({d:ix+iy+0.01, agent:a, af, ix, iy, moving, hop: (moving && !opts.still ? Math.abs(Math.sin(2*Math.PI*Math.min(1,alpha)))*T*0.025 : 0) + (1-dk)*T*5});
+    const moving = stepping && k > 0;
+    items.push({d:ix+iy+0.01, agent: f.dir !== a.face ? {...a, face: f.dir} : a, af, ix, iy, moving, walk: k, hop: (moving && !opts.still ? Math.abs(Math.sin(2*Math.PI*k))*T*0.025 : 0) + (1-dk)*T*5});
   });
   items.sort((p,q) => p.d - q.d);
   for (const it of items) {
     if (it.agent) {
       const [sx,sy] = P(it.ix,it.iy), a = it.agent;
-      drawAgent(c, sx, sy - slab, T, a, time, it.hop, {team: a.team === 'A' ? '#34e0c8' : '#ff4655', ring: opts.focus === a.id, item: pal.accent, alpha: it.af, moving: it.moving, walk: alpha, age: opts.age, still: opts.still});
+      drawAgent(c, sx, sy - slab, T, a, time, it.hop, {team: a.team === 'A' ? '#34e0c8' : '#ff4655', ring: opts.focus === a.id, item: pal.accent, alpha: it.af, moving: it.moving, walk: it.walk, age: opts.age, still: opts.still});
       it.sx = sx; it.sy = sy - slab; continue;
     }
     const [sx,sy] = P(it.x,it.y), [dy,k] = drop(it.x,it.y); if (k <= 0.01) continue;

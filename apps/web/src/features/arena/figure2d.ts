@@ -13,6 +13,7 @@ import {
   type Dress,
   type Pose,
   type RoleLook,
+  type Social,
 } from '@skirm/ui';
 
 /** An agent as the 2D board knows it (the prototype's agent object plus the live status). */
@@ -34,6 +35,10 @@ export interface Figure2DAgent {
   inv?: readonly unknown[];
   /** How its owner dressed it (hair, trousers, build, headgear). Absent: the role's plain look. */
   dress?: Dress;
+  /** Which way it faces on screen: 1 toward the lower right, -1 toward the lower left. Absent: its crew's side. */
+  face?: 1 | -1;
+  /** How it reacts to the others this frame (talk, listen, think, ...; render only). */
+  social?: Social;
 }
 
 /** The look this agent wears: its role's, dressed when its owner chose a look. */
@@ -82,6 +87,7 @@ export function figurePose(
     walk: opts.walk,
     still: opts.still,
     seed: (a.slot ?? 0) + (a.team === 'B' ? 2 : 0),
+    social: a.social ?? null,
   });
 }
 
@@ -123,7 +129,7 @@ export function drawFigure(
   const look = figureLook(a);
   const pose = figurePose(a, look, time, opts);
   const still = !!opts.still;
-  const dir: 1 | -1 = a.team === 'B' ? -1 : 1;
+  const dir: 1 | -1 = a.face ?? (a.team === 'B' ? -1 : 1);
   const faded = a.out ? 0.45 : a.down ? 0.75 : 1;
   c.save();
   c.globalAlpha = ba;
@@ -190,6 +196,7 @@ export function drawFigure(
   if (pose.kind === 'act')
     verbFx(c, look, sx + fx * 0.55, b + fy * 0.55, T, time, still, pose.fx, dir);
   if (pose.kind === 'defeat') drawRainCloud(c, sx, headY - T * 0.18, T, time, still);
+  if (a.social?.think && (pose.kind === 'idle' || pose.kind === 'carry')) drawThought(c, sx + dir * T * 0.16, headY - T * 0.14, T, time, still);
   if ((pose.kind === 'cheer' || pose.kind === 'victory') && pose.fx > 0) {
     c.globalAlpha = pose.fx * ba;
     for (let i = 0; i < 7; i++) {
@@ -374,4 +381,27 @@ function verbFx(
       star(c, x, y - T * 0.4, T * 0.04, look.accent);
   }
   c.globalAlpha = base;
+}
+
+/** A small thought cloud with three dots that light up in turn (an agent deciding its next move). */
+function drawThought(c: CanvasRenderingContext2D, x: number, y: number, T: number, time: number, still: boolean) {
+  const r = T * 0.11;
+  c.save();
+  c.fillStyle = 'rgba(236,232,225,.92)';
+  c.beginPath();
+  c.ellipse(x, y, r * 1.5, r, 0, 0, 7);
+  c.fill();
+  // The trail of small puffs down toward the head.
+  c.beginPath();
+  c.arc(x - r * 0.9, y + r * 1.25, r * 0.28, 0, 7);
+  c.arc(x - r * 1.3, y + r * 1.75, r * 0.16, 0, 7);
+  c.fill();
+  for (let i = 0; i < 3; i++) {
+    const on = still ? 1 : 0.35 + 0.65 * Math.max(0, Math.sin(time * 5 - i * 0.9));
+    c.fillStyle = `rgba(20,28,38,${on.toFixed(3)})`;
+    c.beginPath();
+    c.arc(x + (i - 1) * r * 0.7, y, r * 0.18, 0, 7);
+    c.fill();
+  }
+  c.restore();
 }

@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { walkBob, walkMs } from '../live';
 import type { AgentCosmetics } from '@skirm/shared';
-import { dressLook, fillOf, lookFor, lookParts, lookTop, poseAt, poseKind, type LookGroup, type RoleLook } from '@skirm/ui';
+import { dressLook, fillOf, lookFor, lookParts, lookTop, poseAt, poseKind, type LookGroup, type RoleLook, type Social } from '@skirm/ui';
 import { trailOf, trailSteps } from '../cosmetics';
 import { PATTERN_R, patternMarks, rigSignature, skinOf, tagColours } from './cosmetics3d';
 import * as proto from '../proto/world';
@@ -110,6 +110,8 @@ interface AgentRig {
   shown: number;
   /** Verb, stun and celebration effects (hidden when idle). */
   fx: { ring: THREE.Mesh; bits: THREE.Mesh[]; bitMat: THREE.MeshBasicMaterial; ringMat: THREE.MeshBasicMaterial };
+  /** This frame's step turns it (it turns on the spot first, then walks). */
+  turning?: boolean;
   mats: THREE.Material[];
   /** Heading the agent faces (radians around y, 0 = +z). */
   face: number;
@@ -625,7 +627,7 @@ function placeTrail(ag: AgentRig, a: Agent3, worn: AgentCosmetics | undefined, k
 }
 
 /** Poses one agent's figure and its effects for this moment (poseAt in @skirm/ui). */
-function poseRig(ag: AgentRig, a: Agent3, o: { time: number; age: number; walk: number; moving: boolean; still: boolean; seed: number; accent: string }) {
+function poseRig(ag: AgentRig, a: Agent3, o: { time: number; age: number; walk: number; moving: boolean; still: boolean; seed: number; accent: string; social: Social | null }) {
   const kind = poseKind({ out: a.out, down: a.down, stun: a.stun, cheer: a.cheer, act: a.act, carrying: a.inv.length, moving: o.moving });
   const pose = poseAt(kind, ag.look, o);
   ag.body.rotation.z = pose.tilt;
@@ -805,8 +807,16 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
       const dx = a.x - pa.x;
       const dz = a.y - pa.y;
       const ag = w.agents.get(a.id);
-      if (!ag || Math.abs(dx) + Math.abs(dz) !== 1) continue;
-      ag.face = Math.atan2(dx, dz);
+      if (!ag) continue;
+      ag.turning = false;
+      if (Math.abs(dx) + Math.abs(dz) !== 1) {
+        // Standing: turns toward whoever it reacts to (talking, listening, a rival beside it).
+        if (a.faceTo && (a.faceTo[0] !== a.x || a.faceTo[1] !== a.y)) ag.face = Math.atan2(a.faceTo[0] - a.x, a.faceTo[1] - a.y);
+        continue;
+      }
+      const nf = Math.atan2(dx, dz);
+      ag.turning = Math.abs(angDiff(ag.face, nf)) > 0.5;
+      ag.face = nf;
       if (a.id === state.focus) {
         rig.steps.push([dx, dz]);
         if (rig.steps.length > HEADING_STEPS) rig.steps.shift();
@@ -856,15 +866,16 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
     const pa = prevById.get(a.id) ?? a;
     const tele = Math.abs(pa.x - a.x) + Math.abs(pa.y - a.y) > 1;
     const moving = !tele && (pa.x !== a.x || pa.y !== a.y);
-    const km = moving ? alpha : k;
+    const lead = moving && ag.turning && !still ? 0.22 : 0;
+    const km = moving ? Math.max(0, Math.min(1, (alpha - lead) / (1 - lead))) : k;
     const x = tele ? a.x : pa.x + (a.x - pa.x) * km;
     const z = tele ? a.y : pa.y + (a.y - pa.y) * km;
     const af = fade[a.id] ?? 1;
     ag.g.visible = !a.out && af >= 0.02;
-    const hop = moving && !still ? walkBob(alpha) * 0.025 : 0;
+    const hop = moving && !still ? walkBob(km) * 0.025 : 0;
     ag.g.position.set(x, hop, z);
     ag.g.rotation.y += still ? angDiff(ag.g.rotation.y, ag.face) : angDiff(ag.g.rotation.y, ag.face) * Math.min(1, dt * 10);
-    poseRig(ag, a, { time, age: (f.now - state.at) / 1000, walk: alpha, moving: moving && !still, still, seed: i, accent: TEAM_RING[a.team] });
+    poseRig(ag, a, { time, age: (f.now - state.at) / 1000, walk: km, moving: moving && !still && km > 0, still, seed: i, accent: TEAM_RING[a.team], social: a.social ?? null });
     // Anyone between the camera and the watched agent fades so they never hide it.
     const blocking = !!rig.pos && !!rig.focusAt && a.id !== state.focus && segDist(x, z, rig.pos.x, rig.pos.z, rig.focusAt.x, rig.focusAt.z) < 0.75;
     const op = (a.down ? 0.5 : blocking ? 0.28 : 1) * af;

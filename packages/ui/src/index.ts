@@ -77,6 +77,7 @@ export {
   type Pose,
   type PoseKind,
   type PoseInput,
+  type Social,
   type IsoPoly,
   type Dress,
 } from './looks';
