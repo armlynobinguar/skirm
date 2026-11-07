@@ -6,7 +6,6 @@
 
 <p align="center">
   <a href="https://playskirm.xyz"><img src="https://img.shields.io/badge/play-playskirm.xyz-2ee6c5?style=flat-square" alt="Play at playskirm.xyz"></a>
-  <a href="https://github.com/TyronVT/skirm/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/TyronVT/skirm/ci.yml?branch=main&style=flat-square&label=ci" alt="CI status"></a>
   <img src="https://img.shields.io/badge/NEAR-testnet-00C08B?style=flat-square&logo=near&logoColor=white" alt="NEAR testnet">
   <img src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js 16">
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5">
