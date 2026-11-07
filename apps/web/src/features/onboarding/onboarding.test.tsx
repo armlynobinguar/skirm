@@ -51,8 +51,10 @@ describe('First steps on home', () => {
       path: '/play',
       api: { me: async () => meFixture(), onboarding: async () => onboarding({ status: 'in_progress', step: 2, done: { practice: true } }) },
     });
-    const bulb = await screen.findByTestId('first-steps-open');
-    expect(screen.getByTestId('first-steps-count')).toHaveTextContent('1/5');
+    const bulb = await screen.findByTestId('hub-open');
+    expect(await screen.findByTestId('first-steps-count')).toHaveTextContent('1/5');
+    // The bulb's badge counts the four steps left.
+    expect(screen.getByTestId('hub-badge')).toHaveTextContent('4');
     expect(screen.getByTestId('first-steps')).not.toBeVisible();
     await user.click(bulb);
     expect(bulb).toHaveAttribute('aria-expanded', 'true');
@@ -87,7 +89,7 @@ describe('First steps on home', () => {
       path: '/play',
       api: { me: async () => meFixture(), onboarding: async () => onboarding(), dismissChecklist: async () => onboarding({ dismissed: true }) },
     });
-    await user.click(await screen.findByTestId('first-steps-open'));
+    await user.click(await screen.findByTestId('hub-open'));
     await user.click(screen.getByTestId('first-steps-dismiss'));
     await waitFor(() => expect(screen.queryByTestId('first-steps')).not.toBeInTheDocument());
     expect(api.dismissChecklist).toHaveBeenCalledTimes(1);

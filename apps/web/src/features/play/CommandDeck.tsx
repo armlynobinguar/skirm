@@ -12,7 +12,7 @@ import { BOT_HANDLE, DAILY_TWISTS, DEFAULT_PRACTICE, DIFF_MODS, MAPS_V2, dailyCh
 import { OUTFIT_COLORS, SKIN_TONES, lookColours } from '@skirm/shared';
 import { AkIcon, DisplayHeading, type AkIconName } from '@skirm/ui';
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { AgentPortrait } from '@/features/arena/AgentPortrait';
 import { roleTitle } from '@/features/arena/roles';
 import { DIFFS, MAPS, ROTATION_INDEX, diffIndex, mapById } from '@/features/arena/world';
@@ -27,9 +27,11 @@ export interface CommandDeckProps {
   agents: Agent[] | undefined;
   /** Your ranked Elo (me.rank); undefined while loading. */
   elo?: number;
+  /** Drawn in the top-left corner over the lead agent (home's lightbulb hub). */
+  hub?: ReactNode;
 }
 
-export function CommandDeck({ lead, agents, elo }: CommandDeckProps) {
+export function CommandDeck({ lead, agents, elo, hub }: CommandDeckProps) {
   const role = lead ? roleTitle(lead.unlocks) : null;
   const skill = lead?.skills[0]?.name;
   const rotation = MAPS[ROTATION_INDEX]!;
@@ -45,6 +47,7 @@ export function CommandDeck({ lead, agents, elo }: CommandDeckProps) {
   return (
     <section className={styles.deck} aria-label="Command deck" data-testid="s02-deck">
       <div className={styles.assist} data-rise style={{ '--rise-i': 0 } as CSSProperties}>
+        {hub}
         {lead ? (
           <AgentPortrait
             body={OUTFIT_COLORS[lead.appearance.outfit] ?? OUTFIT_COLORS[0]}

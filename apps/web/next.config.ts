@@ -6,7 +6,7 @@ const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '
 
 const nextConfig: NextConfig = {
   // Workspace packages export TypeScript source (no build step), so Next compiles them.
-  transpilePackages: ['@skirm/ui', '@skirm/shared', '@skirm/engine'],
+  transpilePackages: ['@skirm/ui', '@skirm/shared', '@skirm/engine', '@skirm/decision-engine'],
   // The npm workspace root holds node_modules and the lockfile.
   turbopack: { root: repoRoot },
   outputFileTracingRoot: repoRoot,

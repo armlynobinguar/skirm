@@ -2,7 +2,8 @@
 // S02 Home quests panel: today's and this week's quests (GET /quests), the play streak, and Claim,
 // which refills free credits spent today (POST /quests/:id/claim; 409 allowance_full when there is
 // nothing to refill yet). Progress comes from match results, so it moves when a match ends.
-// It stays quiet when the quests do not load: the Command deck is the screen's job.
+// It stays quiet when the quests do not load: the Command deck is the screen's job. It sits in the
+// home hub (HomeHub, the lightbulb), which drops the card chrome (`bare`).
 import { Button, Meter } from '@skirm/ui';
 import { useToast } from '@/components/toast/ToastProvider';
 import { isApiError } from '@/lib/api/errors';
@@ -12,7 +13,14 @@ import s from './quests.module.css';
 
 const days = (n: number) => (n === 1 ? '1 day' : `${n} days`);
 
-export function QuestsPanel() {
+/** Quests finished and not yet claimed (0 while they load): the hub's badge counts them. */
+export function useClaimableQuests(): number {
+  const board = useQuests().data;
+  if (!board) return 0;
+  return [...board.daily.quests, ...board.weekly.quests].filter((q) => q.claimable && !q.claimed).length;
+}
+
+export function QuestsPanel({ bare = false }: { bare?: boolean }) {
   const quests = useQuests();
   const claim = useClaimQuest();
   const toast = useToast();
@@ -76,7 +84,7 @@ export function QuestsPanel() {
 
   const { streak } = board;
   return (
-    <section aria-labelledby="s02-quests" className={s.panel} data-testid="s02-quests">
+    <section aria-labelledby="s02-quests" className={bare ? s.bare : s.panel} data-testid="s02-quests">
       <div className={s.head}>
         <h2 id="s02-quests" className={s.title}>
           Quests
