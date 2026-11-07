@@ -25,6 +25,13 @@ interface Tone {
   to?: number;
 }
 
+/**
+ * Every sound effect plays at its listed gain times LEVEL. Measured (offline render, K-weighted):
+ * at 1 the cues sat 5-18 LU under the background music and the agent sounds were masked by it; at 4
+ * the cues sit 5-9 LU above the music bed, and six sounds at once still peak under -2.7 dBFS.
+ */
+const LEVEL = 4;
+
 /** The prototype's cues, tone by tone. */
 export const CUES: Record<SfxCue, Tone[]> = {
   hover: [{ f: 1800, d: 0.03, type: 'sine', g: 0.012 }],
@@ -81,12 +88,13 @@ export function agentTones(s: AgentSound): Tone[] {
       for (let i = 0; i < Math.max(1, Math.min(7, s.syllables)); i++) {
         r = (r * 9301 + 49297) % 233280;
         const f = 300 * s.pitch * scale[r % scale.length]!;
-        out.push({ f, d: 0.055, type: 'square', g: 0.012, at: i * 0.075, to: f * 0.92 });
+        out.push({ f, d: 0.055, type: 'square', g: 0.02, at: i * 0.075, to: f * 0.92 });
       }
       return out;
     }
     case 'step':
-      return [{ f: 120 * s.pitch, d: 0.045, type: 'triangle', g: 0.02, to: 70 * s.pitch }];
+      // An octave above the music's bass and kick (and above what laptop speakers drop).
+      return [{ f: 240 * s.pitch, d: 0.045, type: 'triangle', g: 0.03, to: 140 * s.pitch }];
     case 'scheme':
       return [
         { f: 392, d: 0.09, type: 'triangle', g: 0.03 },
@@ -102,7 +110,7 @@ export function agentTones(s: AgentSound): Tone[] {
 /** Filtered noise for the breathy sounds: [filter type, centre Hz, seconds, gain]. */
 function noiseOf(s: AgentSound): [BiquadFilterType, number, number, number] | null {
   if (s.kind === 'cough') return ['bandpass', 900, 0.16, 0.05];
-  if (s.kind === 'slide') return ['highpass', 2500, 0.3, 0.025];
+  if (s.kind === 'slide') return ['highpass', 2500, 0.3, 0.012];
   return null;
 }
 
@@ -128,7 +136,7 @@ export function createSfx(makeContext: () => AudioCtx | null = browserContext): 
       o.type = t.type;
       o.frequency.setValueAtTime(t.f, start);
       if (t.to) o.frequency.exponentialRampToValueAtTime(t.to, start + t.d);
-      v.gain.setValueAtTime(t.g, start);
+      v.gain.setValueAtTime(t.g * LEVEL, start);
       v.gain.exponentialRampToValueAtTime(0.0001, start + t.d);
       o.connect(v).connect(c.destination);
       o.start(start);
@@ -152,7 +160,7 @@ export function createSfx(makeContext: () => AudioCtx | null = browserContext): 
           f.type = type;
           f.frequency.value = hz;
           const v = c.createGain();
-          v.gain.value = g;
+          v.gain.value = g * LEVEL;
           src.connect(f).connect(v).connect(c.destination);
           src.start();
           return;

@@ -67,7 +67,7 @@ export interface MusicEngine {
 }
 
 const LOOKAHEAD_S = 0.15;
-/** Overall music level: well under the UI cues' peaks, but clearly audible on laptop speakers (0.08 was not). */
+/** Overall music level: a bed about 5-9 LU under the UI cues (sfx LEVEL), audible on laptop speakers (0.08 was not). */
 const MASTER = 0.45;
 
 export function createMusic(makeContext: () => AudioContext | null = browserContext): MusicEngine {
@@ -115,7 +115,8 @@ export function createMusic(makeContext: () => AudioContext | null = browserCont
     const v = ctx.createGain();
     o.frequency.setValueAtTime(120, t);
     o.frequency.exponentialRampToValueAtTime(42, t + 0.16);
-    v.gain.setValueAtTime(0.5, t);
+    // 0.3: at 0.5 the kick alone was louder than the menu song and set the match song's peak.
+    v.gain.setValueAtTime(0.3, t);
     v.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
     o.connect(v).connect(master);
     o.start(t);
