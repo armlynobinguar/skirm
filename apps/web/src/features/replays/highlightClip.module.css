@@ -1,0 +1,112 @@
+/* The debrief's highlight clip (HighlightClip.tsx): a cinema "screen" with letterbox bars, a HUD
+   strip on top, the caption as a lower third, a flash on the beat, then the replay link. Tokens
+   only; nothing scrolls the page sideways at 360 px. */
+
+.clip { grid-column: 1 / -1; display: grid; gap: 10px; width: 100%; max-width: 1100px; min-width: 0; margin: 0 auto; animation: clipIn .7s var(--ease-out) both; }
+
+.screen {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #05080d;
+  box-shadow: inset 0 0 0 1px var(--line-strong), 0 24px 70px rgba(0, 0, 0, .45);
+  clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 24px 100%, 0 calc(100% - 24px));
+}
+.canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.bars { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(#000 0 8%, transparent 8% 92%, #000 92%); }
+.vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, transparent 50%, rgba(0, 0, 0, .6)); }
+.flash { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, rgba(255, 236, 200, .55), rgba(255, 181, 71, .12) 60%, transparent); animation: flash .8s ease-out both; }
+@keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+
+.top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 8%;
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 32px 0 16px;
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tag { display: inline-flex; align-items: center; gap: 6px; color: var(--amber); font-weight: 700; }
+.tag i { width: 7px; height: 7px; border-radius: 50%; background: var(--rival); box-shadow: 0 0 8px var(--rival); animation: rec 1.2s steps(2, jump-none) infinite; }
+@keyframes rec { 50% { opacity: .2; } }
+.clock { color: var(--bone); font-variant-numeric: tabular-nums; }
+.score { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--bone); letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+.score i { font-style: normal; margin: 0 5px; color: var(--faint); }
+.score b[data-tone='you'] { color: var(--you); }
+.score b[data-tone='rival'] { color: var(--rival); }
+
+/* The caption: a lower third over the bottom bar. */
+.lower {
+  --tone: var(--amber);
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(8% + 10px);
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  pointer-events: none;
+}
+.lower[data-tone='you'] { --tone: var(--you); }
+.lower[data-tone='rival'] { --tone: var(--rival); }
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+  max-width: 100%;
+  margin: 0;
+  padding: 6px 14px 7px;
+  font: 800 clamp(18px, 3.4vw, 40px)/1.05 var(--font-display);
+  text-transform: uppercase;
+  color: var(--bone);
+  background: rgba(5, 8, 13, .82);
+  box-shadow: inset 4px 0 0 var(--tone);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, .6);
+  animation: capIn .5s var(--ease-out) .2s both;
+}
+.lower[data-beat] .caption { animation: capIn .5s var(--ease-out) .2s both, beat .45s var(--ease-out); }
+.kind { color: var(--tone); }
+.dot { color: var(--faint); }
+.what { min-width: 0; overflow-wrap: anywhere; }
+.line {
+  max-width: min(640px, 100%);
+  margin: 0;
+  padding: 3px 10px;
+  font: 600 13px/18px var(--font-sans);
+  color: var(--text);
+  background: rgba(5, 8, 13, .72);
+  animation: capIn .5s var(--ease-out) .45s both;
+}
+@keyframes capIn { from { opacity: 0; transform: translateY(8px); } }
+@keyframes beat { 40% { transform: scale(1.04); } }
+
+.progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255, 255, 255, .06); }
+.progress span { display: block; height: 100%; background: var(--amber); transform-origin: left; transition: transform .3s linear; }
+
+.foot { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; min-width: 0; }
+
+@keyframes clipIn { from { opacity: 0; transform: translateY(12px); } }
+
+@media (max-width: 640px) {
+  .screen { aspect-ratio: 4 / 3; clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px)); }
+  .top { gap: 8px; padding: 0 20px 0 10px; font-size: 10px; letter-spacing: .1em; }
+  .lower { left: 10px; right: 10px; }
+  .caption { padding: 5px 10px 6px; }
+  .line { font-size: 12px; line-height: 16px; }
+}
+/* The app's reduced-motion setting (data-still) and the system's. */
+.clip[data-still], .clip[data-still] .caption, .clip[data-still] .line, .clip[data-still] .tag i { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .clip, .caption, .lower[data-beat] .caption, .line, .tag i, .flash { animation: none; }
+}

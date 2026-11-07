@@ -23,6 +23,7 @@ import { config } from '@/lib/config';
 import { matchOrigin, originLink, type MatchOrigin } from '@/lib/match-origin';
 import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
+import { HighlightClip } from '../replays/HighlightClip';
 import { ReplayPanel } from '../replays/ReplayPanel';
 import { VerifyPanel } from '../verify/VerifyPanel';
 import { PracticeBadge, other } from './common';
@@ -319,6 +320,10 @@ function Debrief({
           </div>
         ) : null}
       </section>
+      {/* The match's best moment as a short loop, right under the verdict and the report. */}
+      {data.status === 'ended' ? (
+        <HighlightClip matchId={data.matchId} team={me} watch={watch} handles={data.handles} onReplay={onReplay} replayHref={replayHref} />
+      ) : null}
       {data.status === 'ended' ? <VerifyPanel matchId={data.matchId} /> : null}
       {data.status === 'ended' ? <ReplayPanel matchId={data.matchId} ticks={r.ticks} canShare={!watch} /> : null}
       {data.comms ? <Transcript lines={data.comms} team={me} watch={watch} /> : null}
