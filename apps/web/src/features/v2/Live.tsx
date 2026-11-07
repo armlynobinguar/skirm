@@ -41,6 +41,7 @@ import { MatchTop } from './hud/MatchTop';
 import { calloutOf, difficultyOf, type Callout, type FeedFilter } from './hud/model';
 import { Banner, CalloutBar, CountIn } from './hud/parts';
 import { ThirdPerson } from './hud/ThirdPerson';
+import { Inspect } from './hud/Inspect';
 import type { V2CommsLine, V2MatchView } from './v2Store';
 
 const ChaseCam = dynamic(() => import('@/features/arena/chase3d/ChaseCam'), { ssr: false });
@@ -376,6 +377,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
         <AgentCards team={team} mapId={view.mapId} tick={tick} cards={rivalCards} unseen={unseen} pressed={tpv ?? focus} onPick={onPick} onWatch={enterTpv} className={c.cardsB} />
       </div>
       {intro ? null : <GearLegend frame={frame} />}
+      <Inspect frame={frame} tickMs={view.tickMs} enabled={!intro && !tpv && !control.controlled} onWatch={enterTpv} />
       {watched ? (
         <ThirdPerson
           agent={watched.agent}
