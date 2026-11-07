@@ -42,11 +42,15 @@ const board = (o: Partial<QuestBoard> = {}): QuestBoard => ({
 
 describe('S02 quests panel', () => {
   it('shows daily and weekly quests with progress, claim state and the streak', async () => {
-    renderWithProviders(<HomeScreen />, {
+    const { user } = renderWithProviders(<HomeScreen />, {
       handle: 'ada',
       api: { me: async () => meFixture(), quests: async () => board() },
     });
+    // The quests live behind the home hub's lightbulb.
     const panel = await screen.findByTestId('s02-quests');
+    expect(panel).not.toBeVisible();
+    await user.click(screen.getByTestId('hub-open'));
+    expect(panel).toBeVisible();
     expect(within(screen.getByTestId('s02-quests-daily')).getAllByRole('listitem')).toHaveLength(3);
     expect(within(screen.getByTestId('s02-quests-weekly')).getByText('Win 5 matches')).toBeInTheDocument();
     expect(screen.getByTestId('quest-w_win_5')).toHaveTextContent('2 / 5');

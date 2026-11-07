@@ -1,0 +1,64 @@
+/* The home hub (HomeHub.tsx): the lightbulb over the Command deck and the panel it opens. Tokens only.
+   The panel never runs off a 360 px phone and scrolls inside itself when it is taller than the window. */
+
+.wrap { position: absolute; top: 0; left: 0; z-index: 20; }
+
+.bulb {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  color: var(--amber);
+  background: rgba(5, 8, 13, .72);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: box-shadow .25s, color .25s, background-color .25s;
+}
+.bulb:hover, .bulb[aria-expanded="true"] { color: var(--bone); background: rgba(16, 26, 38, .9); box-shadow: inset 0 0 0 1px var(--amber); }
+.bulb:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.bulbIcon { width: 24px; height: 24px; }
+/* A quest ready to claim: the bulb glows. */
+.bulb[data-hot] .bulbIcon { filter: drop-shadow(0 0 6px var(--amber)); animation: hubGlow 2.4s ease-in-out infinite; }
+@keyframes hubGlow { 50% { filter: drop-shadow(0 0 1px var(--amber)); } }
+@media (prefers-reduced-motion: reduce) { .bulb[data-hot] .bulbIcon { animation: none; } }
+
+.badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  font: 700 10px/1 var(--font-mono);
+  color: #05080d;
+  background: var(--amber);
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 160px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  background: #090f17;
+  box-shadow: inset 0 0 0 1px var(--line-strong), var(--elev-2, var(--elev-1));
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+}
+.panel[hidden] { display: none; }
+.panel > * + * { padding-top: var(--space-4); border-top: 1px solid var(--line); }
+
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-3); }

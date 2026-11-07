@@ -196,5 +196,3 @@
 .rentList li b { color: var(--bone); }
 .rentList li small { color: var(--faint); }
 
-/* Campaign and puzzles side by side as two short tiles (HomeScreen). */
-.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); max-width: 560px; }

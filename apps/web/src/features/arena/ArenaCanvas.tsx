@@ -291,7 +291,7 @@ export function alignPrev(prev: ArenaState, cur: ArenaState): ArenaState {
 }
 
 /** This frame's talk as the renderer's barks, timed from when the frame arrived. */
-function barksAt(arena: LiveArena, time: number, age: number) {
+export function barksAt(arena: LiveArena, time: number, age: number) {
   if (!arena.barks) return null;
   const out: Record<string, { text: string; t: number; ch: string; heard?: string }> = {};
   for (const [id, b] of Object.entries(arena.barks)) out[id] = { ...b, t: time - age };

@@ -1,0 +1,147 @@
+/* The showreel under the Command deck (Showreel.tsx): a widescreen "screen" with letterbox bars, a
+   HUD over it, a title card at every cut, then the reel list and the call to play. Tokens only;
+   nothing scrolls the page sideways at 360 px. */
+
+.section { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; padding-top: var(--space-8, 48px); }
+.head { display: flex; flex-direction: column; gap: 4px; }
+.title { margin: 0; font-size: clamp(40px, 5vw, 64px); }
+
+.screen {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 21 / 9;
+  min-height: 260px;
+  overflow: hidden;
+  background: #05080d;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 28px 100%, 0 calc(100% - 28px));
+}
+.canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* Letterbox bars and a vignette: the "cinema" look. */
+.bars { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(#000 0 7%, transparent 7% 93%, #000 93%); }
+.vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, transparent 55%, rgba(0, 0, 0, .55)); }
+
+.hudTop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 7%;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 40px 0 20px;
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.reelNo { color: var(--bone); }
+.reelNo i { font-style: normal; color: var(--faint); }
+.mapName { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.score { margin-left: auto; color: var(--bone); letter-spacing: .1em; }
+.score i { font-style: normal; margin: 0 6px; color: var(--faint); }
+.score small { color: var(--muted); font-size: inherit; }
+.a { color: var(--you); font-weight: 700; }
+.b { color: var(--rival); font-weight: 700; }
+
+/* Captions: subtitles over the bottom bar, newest last. */
+.captions {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: calc(7% + 12px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+}
+.captions li {
+  max-width: 100%;
+  padding: 4px 10px;
+  font: 600 13px/18px var(--font-sans);
+  color: var(--bone);
+  background: rgba(5, 8, 13, .78);
+  box-shadow: inset 3px 0 0 var(--muted);
+  animation: capIn .35s var(--ease-out) both;
+}
+.captions li:not(:last-child) { opacity: .6; }
+.captions .capA { box-shadow: inset 3px 0 0 var(--you); }
+.captions .capB { box-shadow: inset 3px 0 0 var(--rival); }
+.captions .capN { box-shadow: inset 3px 0 0 var(--amber); }
+@keyframes capIn { from { opacity: 0; transform: translateY(6px); } }
+
+.progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255, 255, 255, .06); }
+.progress span { display: block; height: 100%; background: var(--amber); transform-origin: left; transition: transform .4s linear; }
+
+/* The title card at every cut. */
+.card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  padding: 0 24px;
+  background: #05080d;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .45s;
+}
+.card[data-on] { opacity: 1; }
+.card[data-on] .cardName { animation: cardIn 1.4s var(--ease-out) both; }
+.cardName { font: 800 clamp(34px, 6vw, 84px)/.95 var(--font-display); text-transform: uppercase; color: var(--bone); }
+.cardSub { font: 500 12px/16px var(--font-mono); letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+@keyframes cardIn { from { opacity: 0; letter-spacing: .3em; } to { opacity: 1; letter-spacing: 0; } }
+
+.foot { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; justify-content: space-between; }
+.reels { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.reelBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  font: 600 13px/1 var(--font-sans);
+  color: var(--muted);
+  background: rgba(9, 15, 23, .85);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+.reelBtn i { font: 500 10px/1 var(--font-mono); font-style: normal; color: var(--faint); }
+.reelBtn:hover { color: var(--bone); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.reelBtn[aria-current] { color: var(--bone); box-shadow: inset 0 0 0 1px var(--amber); }
+.reelBtn[aria-current] i { color: var(--amber); }
+.reelBtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.cta { display: flex; gap: 10px; align-items: center; }
+.ctaMain, .ctaGhost { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; font: 700 16px/1 var(--font-display); letter-spacing: .1em; text-transform: uppercase; text-decoration: none; }
+.ctaMain { color: #fff; background: var(--rival); clip-path: polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+.ctaGhost { color: var(--bone); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.ctaMain:hover { color: #fff; filter: brightness(1.1); }
+.ctaGhost:hover { color: var(--bone); box-shadow: inset 0 0 0 1px var(--bone); }
+.ctaMain:focus-visible, .ctaGhost:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+@media (max-width: 720px) {
+  .screen { aspect-ratio: 4 / 3; }
+  .hudTop { gap: 10px; padding: 0 28px 0 12px; letter-spacing: .1em; font-size: 10px; }
+  .mapName { display: none; }
+  .captions { left: 12px; right: 12px; }
+  .captions li { font-size: 12px; line-height: 16px; }
+  .cta { width: 100%; }
+  .ctaMain { flex: 1; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .captions li, .card[data-on] .cardName { animation: none; }
+  .card, .progress span { transition: none; }
+}
