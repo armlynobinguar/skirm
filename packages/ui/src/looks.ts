@@ -430,6 +430,29 @@ export function lookTop(look: RoleLook): number {
  */
 export type PoseKind = 'out' | 'victory' | 'defeat' | 'down' | 'stun' | 'cheer' | 'act' | 'walk' | 'carry' | 'idle';
 
+/**
+ * How an agent reacts to the others this frame (render only: read off the frame's events, never fed
+ * back to the game). The renderer also turns the agent toward whoever the reaction is about.
+ */
+export interface Social {
+  /** It spoke this tick (hand gestures while it talks). */
+  talk?: boolean;
+  /** A crewmate's line reached it this tick (it nods). */
+  listen?: boolean;
+  /** Standing still to decide its next move (a thought bubble; own crew only). */
+  think?: boolean;
+  /** A crewmate nearby delivered (a fist pump). */
+  hype?: boolean;
+  /** Heading for an item or the exit (arm points the way). */
+  point?: boolean;
+  /** A rival is right next to it (squares up). */
+  square?: boolean;
+  /** Its move was blocked this tick (bumps back). */
+  bump?: boolean;
+  /** A rival just stole an item near it (shakes its fist). */
+  shake?: boolean;
+}
+
 /** The status a renderer knows about an agent this frame. */
 export interface PoseInput {
   out?: boolean;
@@ -487,6 +510,105 @@ const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
  * fixed, readable frame: no bob, no wobble, no hops.
  */
 export function poseAt(
+  kind: PoseKind,
+  look: RoleLook,
+  o: { time: number; age: number; walk?: number; still?: boolean; seed?: number; social?: Social | null },
+): Pose {
+  const base = basePose(kind, look, o);
+  return o.social && SOCIAL_KINDS.has(base.kind) ? withSocial(base, look, o.social, o) : base;
+}
+
+/** Poses a reaction may play over: the agent is up and not busy with a verb, a fall or a celebration. */
+const SOCIAL_KINDS = new Set<PoseKind>(['idle', 'carry', 'walk']);
+/** Seconds a one-shot reaction (fist pump, bump, shake) plays from the frame's arrival. */
+const REACT_S = 1.2;
+
+/** A reaction over the base pose; legs keep walking, the upper body reacts. */
+function withSocial(pose: Pose, look: RoleLook, s: Social, o: { time: number; age: number; still?: boolean; seed?: number }): Pose {
+  const still = !!o.still;
+  const t = still ? 0 : o.time + (o.seed ?? 0);
+  const k = clamp01(o.age / REACT_S);
+  const live = still || k < 1;
+  const off = { ...pose.off };
+  if (s.hype && live) {
+    // Fist pump: the hand shoots up twice, a small hop.
+    const pump = still ? 1 : Math.abs(Math.sin(k * Math.PI * 3));
+    off.hand = [0, 0.18 + pump * 0.16, 0.02];
+    return { ...pose, off, lift: pose.lift + (still ? 0 : pump * 0.06 * (1 - k)) };
+  }
+  if (s.bump && live) {
+    // Walked into something: rocks back, then settles.
+    return { ...pose, off, lean: pose.lean - (still ? 0.12 : 0.22 * Math.sin(Math.min(1, k * 2) * Math.PI)) };
+  }
+  if (s.shake && live) {
+    off.hand = [0, 0.2, 0.06 + (still ? 0 : Math.sin(t * 22) * 0.03)];
+    return { ...pose, off, lean: pose.lean + 0.06 };
+  }
+  if (s.talk) {
+    // Talking with its hands, a little bob of the head on the beats.
+    off.hand = [0, 0.08 + (still ? 0.03 : Math.abs(Math.sin(t * 6)) * 0.07), 0.08];
+    off.head = [0, still ? 0 : Math.max(0, Math.sin(t * 9)) * 0.012, 0.01];
+    return { ...pose, off };
+  }
+  if (s.listen) {
+    // Nods along.
+    off.head = [0, still ? -0.01 : -Math.max(0, Math.sin(t * 4.5)) * 0.022, 0.015];
+    return { ...pose, off };
+  }
+  if (s.square) {
+    // Squares up to the rival: leans in, hands up, a slow sway.
+    off.hand = [0, 0.12, 0.08];
+    return { ...pose, off, lean: pose.lean + 0.12, tilt: still ? 0 : Math.sin(t * 2.2) * 0.03 };
+  }
+  if (s.point) {
+    // Points the way it is heading.
+    off.hand = [0, 0.16, 0.16];
+    return { ...pose, off };
+  }
+  if (s.think && pose.kind !== 'walk') {
+    // Hand to the chin while it thinks.
+    off.hand = [0, 0.24, 0.07];
+    off.head = [0, still ? 0 : Math.sin(t * 1.3) * 0.006, 0];
+    return { ...pose, off, lean: pose.lean + 0.04 };
+  }
+  void look;
+  return pose;
+}
+
+/**
+ * Idle habits by role, so a crew waiting reads as characters: the dasher bounces on its toes, the
+ * digger leans on its shovel, the builder taps a block, the scout and the others look around now
+ * and then. Small and slow; reduced motion keeps the plain stance.
+ */
+function idleHabit(pose: Pose, look: RoleLook, t: number, seed: number): Pose {
+  const cycle = (t + seed * 1.7) % 6;
+  const glance = cycle > 4.2 ? Math.sin(((cycle - 4.2) / 1.8) * Math.PI) : 0;
+  switch (look.verb) {
+    case 'dash':
+      pose.lift = Math.abs(Math.sin(t * 5 + seed)) * 0.03;
+      pose.off.footL = [0, pose.lift * 0.5, 0];
+      pose.off.footR = [0, pose.lift * 0.5, 0];
+      break;
+    case 'dig':
+      pose.lean = 0.08;
+      pose.off.hand = [0, 0.02, 0.1];
+      pose.lift = Math.sin(t * 1.6 + seed) * 0.006;
+      break;
+    case 'build':
+    case 'wrench': {
+      const tap = cycle < 1.2 ? Math.abs(Math.sin(cycle * Math.PI * 2.5)) : 0;
+      pose.off.hand = [0, 0.04 + tap * 0.06, 0.08];
+      pose.lean = 0.05 * tap;
+      break;
+    }
+    default:
+      pose.lift = Math.sin(t * 3 + seed) * 0.015;
+  }
+  if (glance) pose.off.head = [glance * 0.035, 0, 0];
+  return pose;
+}
+
+function basePose(
   kind: PoseKind,
   look: RoleLook,
   o: { time: number; age: number; walk?: number; still?: boolean; seed?: number },
@@ -577,8 +699,7 @@ export function poseAt(
       pose.lift = still ? 0 : Math.sin(t * 3 + seed) * 0.012;
       return pose;
     default:
-      pose.lift = still ? 0 : Math.sin(t * 3 + seed) * 0.015;
-      return pose;
+      return still ? pose : idleHabit(pose, look, t, seed);
   }
 }
 

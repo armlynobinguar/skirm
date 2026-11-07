@@ -2,6 +2,7 @@
 // map's own arena, under soft fog, with this tick's talk as bubbles.
 import { STUN_TICKS, type Team, type V2Frame } from '@skirm/engine/v2';
 import { lookColours, type AgentCosmetics } from '@skirm/shared';
+import type { Social } from '@skirm/ui';
 import { cosmeticsOf, tintAgents } from './cosmetics';
 import type { LiveEmote } from './emotes';
 import { gearOf } from './gear';
@@ -90,11 +91,14 @@ export function composeV2Arena(frame: V2Frame, prev?: LiveArena | null): LiveAre
   });
   const slots = { A: 0, B: 0 };
   const acts = actsOf(frame, prev);
+  const social = socialOf(frame, prev, m.A.exit as [number, number]);
   const agents: ArenaState['agents'] = frame.agents.map((g) => {
     const slot = slots[g.team]++;
     const act = acts.get(g.id);
+    const so = social.get(g.id);
     return {
       ...act,
+      ...(so ? { social: so.social, ...(so.faceTo ? { faceTo: so.faceTo } : {}) } : {}),
       id: g.id,
       name: g.name,
       team: g.team,
@@ -174,6 +178,102 @@ export function actsOf(frame: Pick<V2Frame, 'events' | 'tick' | 'agents' | 'mapI
   }
   for (const [, a] of out) if (a.stunTill != null && a.stunTill >= frame.tick) a.stun = true;
   return out;
+}
+
+/** One agent's reaction this frame and the tile it turns toward. */
+export interface AgentSocial {
+  social: Social;
+  faceTo?: [number, number];
+}
+
+const manhattan = (a: readonly [number, number], b: readonly [number, number]) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+/** Crewmates this close to a delivery pump their fists. */
+const HYPE_RANGE = 4;
+/** Rivals this close square up. */
+const FACEOFF_RANGE = 2;
+/** An item or the exit this close (and getting closer) gets pointed at. */
+const POINT_RANGE = 6;
+/** Rivals this close to a steal shake their fists. */
+const SHAKE_RANGE = 3;
+
+/**
+ * How each agent reacts to the others this frame, read off the frame's events (render only):
+ * a speaker turns to the nearest crewmate that heard it and gestures, those who heard it turn to it
+ * and nod; crewmates near a delivery pump their fists; rivals side by side square up; a blocked
+ * move bumps back; a steal makes the rivals nearby shake their fists; an agent getting closer to an
+ * item (or, carrying, to the exit) points the way; one of your own agents that stood still thinks.
+ * One reaction each, in that order of priority.
+ */
+export function socialOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'view'>, prev: LiveArena | null | undefined, exit: [number, number]): Map<string, AgentSocial> {
+  const out = new Map<string, AgentSocial>();
+  const at = new Map(frame.agents.map((g) => [g.id, [g.x, g.y] as [number, number]]));
+  const up = new Map(frame.agents.filter((g) => !g.out && !g.down).map((g) => [g.id, g]));
+  const set = (id: string, social: Social, faceTo?: [number, number]) => {
+    if (!up.has(id) || out.has(id)) return;
+    out.set(id, { social, ...(faceTo ? { faceTo } : {}) });
+  };
+  const nearest = (from: [number, number], ids: readonly string[]) => {
+    let best: [number, number] | undefined;
+    for (const id of ids) {
+      const p = at.get(id);
+      if (p && (!best || manhattan(from, p) < manhattan(from, best))) best = p;
+    }
+    return best;
+  };
+  // Talk: the speaker faces the nearest crewmate that heard it; they face it and nod.
+  for (const e of frame.events) {
+    if (e.kind !== 'said') continue;
+    const from = at.get(e.agent);
+    if (!from) continue;
+    set(e.agent, { talk: true }, nearest(from, e.heardBy));
+    for (const id of e.heardBy) set(id, { listen: true }, from);
+  }
+  // A delivery: crewmates in range pump their fists toward the one who delivered.
+  for (const e of frame.events) {
+    if (e.kind !== 'delivered') continue;
+    const from = at.get(e.agent);
+    if (!from) continue;
+    for (const g of up.values()) if (g.id !== e.agent && g.team === e.team && manhattan(from, [g.x, g.y]) <= HYPE_RANGE) set(g.id, { hype: true }, from);
+  }
+  // Blocked: bumps back. A steal: rivals nearby shake their fists at the thief.
+  for (const e of frame.events) {
+    if (e.kind === 'blocked') set(e.agent, { bump: true });
+    if (e.kind === 'picked' && e.stolen) {
+      const thief = up.get(e.agent);
+      if (!thief) continue;
+      for (const g of up.values()) if (g.team !== thief.team && manhattan([thief.x, thief.y], [g.x, g.y]) <= SHAKE_RANGE) set(g.id, { shake: true }, [thief.x, thief.y]);
+    }
+  }
+  // Rivals side by side square up to each other.
+  const live = [...up.values()];
+  for (const g of live) {
+    let rival: [number, number] | undefined;
+    for (const r of live) if (r.team !== g.team && manhattan([g.x, g.y], [r.x, r.y]) <= FACEOFF_RANGE && (!rival || manhattan([g.x, g.y], [r.x, r.y]) < manhattan([g.x, g.y], rival))) rival = [r.x, r.y];
+    if (rival) set(g.id, { square: true }, rival);
+  }
+  // Getting closer to an item (or, carrying, to the exit): points the way. Standing still: thinks.
+  const items: [number, number][] = [];
+  frame.rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) if (row[x] === '*') items.push([x, y]);
+  });
+  const was = new Map((prev?.state.agents ?? []).map((a) => [a.id, [a.x, a.y] as [number, number]]));
+  for (const g of live) {
+    if (out.has(g.id)) continue;
+    const now: [number, number] = [g.x, g.y];
+    const before = was.get(g.id);
+    const moved = !!before && manhattan(before, now) === 1;
+    if (moved) {
+      const goal = g.items.length ? exit : nearestTile(now, items);
+      if (goal && manhattan(now, goal) <= POINT_RANGE && manhattan(now, goal) < manhattan(before!, goal)) set(g.id, { point: true }, goal);
+    } else if (before && frame.view !== 'watch' && g.team === frame.view) set(g.id, { think: true });
+  }
+  return out;
+}
+
+function nearestTile(from: [number, number], tiles: readonly [number, number][]): [number, number] | undefined {
+  let best: [number, number] | undefined;
+  for (const t of tiles) if (!best || manhattan(from, t) < manhattan(from, best)) best = t;
+  return best;
 }
 
 /**
