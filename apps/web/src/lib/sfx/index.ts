@@ -46,40 +46,127 @@ export const CUES: Record<SfxCue, Tone[]> = {
   ],
 };
 
-type AudioCtx = Pick<AudioContext, 'currentTime' | 'destination' | 'createOscillator' | 'createGain' | 'state' | 'resume'>;
+type AudioCtx = Pick<AudioContext, 'currentTime' | 'destination' | 'createOscillator' | 'createGain' | 'state' | 'resume'> &
+  Partial<Pick<AudioContext, 'createBuffer' | 'createBufferSource' | 'createBiquadFilter' | 'sampleRate'>>;
+
+/** Match sounds made per agent (pitch per voice, so crewmates sound different). */
+export type AgentSound =
+  /** A burst of babble syllables while it talks; `seed` varies the melody, `pitch` the voice. */
+  | { kind: 'voice'; syllables: number; pitch: number; seed: number }
+  /** One soft footfall. */
+  | { kind: 'step'; pitch: number }
+  /** A cough in gas. */
+  | { kind: 'cough' }
+  /** A slide on ice. */
+  | { kind: 'slide' }
+  /** A bluff that landed: a sly rising pair for the liar's crew. */
+  | { kind: 'scheme' }
+  /** Fooled by a bluff: a falling "boing". */
+  | { kind: 'fooled' };
 
 export interface SfxEngine {
   play(cue: SfxCue): void;
+  /** Agent sounds in a live match (optional: test fakes may leave it out). */
+  agent?(s: AgentSound): void;
+}
+
+/** Tones for an agent sound (noise-based ones return none: they use `noiseOf`). */
+export function agentTones(s: AgentSound): Tone[] {
+  switch (s.kind) {
+    case 'voice': {
+      // Babble: short square syllables on a small pentatonic melody, a step apart, per voice.
+      const scale = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3];
+      const out: Tone[] = [];
+      let r = s.seed * 9301 + 49297;
+      for (let i = 0; i < Math.max(1, Math.min(7, s.syllables)); i++) {
+        r = (r * 9301 + 49297) % 233280;
+        const f = 300 * s.pitch * scale[r % scale.length]!;
+        out.push({ f, d: 0.055, type: 'square', g: 0.012, at: i * 0.075, to: f * 0.92 });
+      }
+      return out;
+    }
+    case 'step':
+      return [{ f: 120 * s.pitch, d: 0.045, type: 'triangle', g: 0.02, to: 70 * s.pitch }];
+    case 'scheme':
+      return [
+        { f: 392, d: 0.09, type: 'triangle', g: 0.03 },
+        { f: 587, d: 0.14, type: 'triangle', g: 0.03, at: 0.08 },
+      ];
+    case 'fooled':
+      return [{ f: 520, d: 0.32, type: 'sine', g: 0.035, to: 180 }];
+    default:
+      return [];
+  }
+}
+
+/** Filtered noise for the breathy sounds: [filter type, centre Hz, seconds, gain]. */
+function noiseOf(s: AgentSound): [BiquadFilterType, number, number, number] | null {
+  if (s.kind === 'cough') return ['bandpass', 900, 0.16, 0.05];
+  if (s.kind === 'slide') return ['highpass', 2500, 0.3, 0.025];
+  return null;
 }
 
 /** A player over an AudioContext factory (tests pass a fake; null means no audio support). */
 export function createSfx(makeContext: () => AudioCtx | null = browserContext): SfxEngine {
   let ctx: AudioCtx | null | undefined;
-  return {
-    play(cue) {
-      if (ctx === undefined) {
-        try {
-          ctx = makeContext();
-        } catch {
-          ctx = null;
-        }
-      }
-      if (!ctx) return;
+  const ready = (): AudioCtx | null => {
+    if (ctx === undefined) {
       try {
-        if (ctx.state === 'suspended') void ctx.resume();
-        for (const t of CUES[cue]) {
-          const start = ctx.currentTime + (t.at ?? 0);
-          const o = ctx.createOscillator();
-          const v = ctx.createGain();
-          o.type = t.type;
-          o.frequency.setValueAtTime(t.f, start);
-          if (t.to) o.frequency.exponentialRampToValueAtTime(t.to, start + t.d);
-          v.gain.setValueAtTime(t.g, start);
-          v.gain.exponentialRampToValueAtTime(0.0001, start + t.d);
-          o.connect(v).connect(ctx.destination);
-          o.start(start);
-          o.stop(start + t.d + 0.02);
+        ctx = makeContext();
+      } catch {
+        ctx = null;
+      }
+    }
+    if (ctx && ctx.state === 'suspended') void ctx.resume();
+    return ctx ?? null;
+  };
+  const tones = (c: AudioCtx, list: readonly Tone[]) => {
+    for (const t of list) {
+      const start = c.currentTime + (t.at ?? 0);
+      const o = c.createOscillator();
+      const v = c.createGain();
+      o.type = t.type;
+      o.frequency.setValueAtTime(t.f, start);
+      if (t.to) o.frequency.exponentialRampToValueAtTime(t.to, start + t.d);
+      v.gain.setValueAtTime(t.g, start);
+      v.gain.exponentialRampToValueAtTime(0.0001, start + t.d);
+      o.connect(v).connect(c.destination);
+      o.start(start);
+      o.stop(start + t.d + 0.02);
+    }
+  };
+  return {
+    agent(s) {
+      const c = ready();
+      if (!c) return;
+      try {
+        const n = noiseOf(s);
+        if (n && c.createBuffer && c.createBufferSource && c.createBiquadFilter && c.sampleRate) {
+          const [type, hz, d, g] = n;
+          const buf = c.createBuffer(1, Math.ceil(c.sampleRate * d), c.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+          const src = c.createBufferSource();
+          src.buffer = buf;
+          const f = c.createBiquadFilter();
+          f.type = type;
+          f.frequency.value = hz;
+          const v = c.createGain();
+          v.gain.value = g;
+          src.connect(f).connect(v).connect(c.destination);
+          src.start();
+          return;
         }
+        tones(c, agentTones(s));
+      } catch {
+        // Audio is a nicety.
+      }
+    },
+    play(cue) {
+      const c = ready();
+      if (!c) return;
+      try {
+        tones(c, CUES[cue]);
       } catch {
         // Audio is a nicety: a failing context never breaks the screen.
       }
@@ -104,5 +191,11 @@ export function sfxEngine(): SfxEngine {
 export function useSfx(engine: SfxEngine = sfxEngine()): SfxEngine {
   const { prefs } = usePreferences();
   const on = prefs.sfx;
-  return useMemo(() => ({ play: (cue: SfxCue) => (on ? engine.play(cue) : undefined) }), [on, engine]);
+  return useMemo(
+    () => ({
+      play: (cue: SfxCue) => (on ? engine.play(cue) : undefined),
+      agent: (a: AgentSound) => (on ? engine.agent?.(a) : undefined),
+    }),
+    [on, engine],
+  );
 }

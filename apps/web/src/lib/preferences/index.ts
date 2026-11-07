@@ -15,6 +15,8 @@ export type ReplaySpeed = (typeof REPLAY_SPEEDS)[number];
 export interface Preferences {
   /** Interface sound effects (the v2 Arena clicks, wipes and match stings). On by default. */
   sfx: boolean;
+  /** Background music (lib/music): a calm loop in the menus, a tense one in a match. On by default. */
+  music: boolean;
   /** Replay speed picked on the S16 Settings card (1x by default); only that card reads it. */
   replaySpeed: ReplaySpeed;
   /** true/false: the player's choice; null: follow `prefers-reduced-motion`. */
@@ -27,6 +29,7 @@ export interface Preferences {
 
 export const DEFAULT_PREFERENCES: Readonly<Preferences> = Object.freeze({
   sfx: true,
+  music: true,
   replaySpeed: 1,
   reducedMotion: null,
   showProbabilities: true,
@@ -71,6 +74,7 @@ export function sanitizePreferences(raw: unknown): Preferences {
   const d = DEFAULT_PREFERENCES;
   return {
     sfx: typeof r.sfx === 'boolean' ? r.sfx : d.sfx,
+    music: typeof r.music === 'boolean' ? r.music : d.music,
     replaySpeed: (REPLAY_SPEEDS as readonly unknown[]).includes(r.replaySpeed)
       ? (r.replaySpeed as ReplaySpeed)
       : d.replaySpeed,

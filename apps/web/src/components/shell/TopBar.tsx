@@ -142,6 +142,22 @@ export function TopBar() {
           <AkIcon name="sfx" />
           <span className="app-topbar-toggle-label">SFX</span>
         </button>
+        <button
+          type="button"
+          className="app-topbar-toggle app-topbar-chip"
+          aria-pressed={prefs.music}
+          aria-label="Music"
+          title={prefs.music ? 'Music: on' : 'Music: off'}
+          data-testid="topbar-music"
+          onClick={() => set({ music: !prefs.music })}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="app-topbar-note">
+            <path d="M9 18V5l11-2v13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            <circle cx="6" cy="18" r="3" fill="currentColor" />
+            <circle cx="17" cy="16" r="3" fill="currentColor" />
+          </svg>
+          <span className="app-topbar-toggle-label">Music</span>
+        </button>
         {config.designNotes ? (
           <button
             type="button"

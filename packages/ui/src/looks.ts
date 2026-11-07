@@ -451,6 +451,19 @@ export interface Social {
   bump?: boolean;
   /** A rival just stole an item near it (shakes its fist). */
   shake?: boolean;
+  /** Its bluff was believed (rubs its hands). */
+  scheme?: boolean;
+  /** It believed a rival's bluff (scratches its head; a "?" over it). */
+  fooled?: boolean;
+  /** It overheard a rival crew's team talk (hand cupped to its ear). */
+  overhear?: boolean;
+  /** Lost its turn coughing in gas (bent over, hand to mouth). */
+  cough?: boolean;
+  /** Slid on ice (arms windmill). */
+  slip?: boolean;
+  /** A hazard right next to it (leans away, an arm up); `wave`: a wave just came in. */
+  flinch?: boolean;
+  wave?: boolean;
 }
 
 /** The status a renderer knows about an agent this frame. */
@@ -530,6 +543,29 @@ function withSocial(pose: Pose, look: RoleLook, s: Social, o: { time: number; ag
   const k = clamp01(o.age / REACT_S);
   const live = still || k < 1;
   const off = { ...pose.off };
+  if (s.cough && live) {
+    // Bent over coughing, hand to mouth, a jerk on each cough.
+    const jerk = still ? 0 : Math.max(0, Math.sin(t * 14)) * 0.03;
+    off.hand = [0, 0.22, 0.1];
+    off.head = [0, -jerk, 0.03];
+    return { ...pose, off, lean: pose.lean + 0.28 + jerk };
+  }
+  if (s.slip && live) {
+    // Arms windmill to keep its balance.
+    const a = still ? 0.6 : t * 16;
+    off.hand = [Math.cos(a) * 0.08, 0.16 + Math.sin(a) * 0.1, 0.04];
+    return { ...pose, off, tilt: still ? 0.08 : Math.sin(t * 9) * 0.12 };
+  }
+  if (s.scheme) {
+    // Rubs its hands: the hand jitters side to side in front of it.
+    off.hand = [still ? 0 : Math.sin(t * 18) * 0.025, 0.1, 0.1];
+    return { ...pose, off, lean: pose.lean + 0.08 };
+  }
+  if (s.fooled) {
+    // Scratches its head, head tipped.
+    off.hand = [0, 0.3 + (still ? 0 : Math.abs(Math.sin(t * 10)) * 0.02), 0.02];
+    return { ...pose, off, tilt: 0.1 };
+  }
   if (s.hype && live) {
     // Fist pump: the hand shoots up twice, a small hop.
     const pump = still ? 1 : Math.abs(Math.sin(k * Math.PI * 3));
@@ -550,6 +586,12 @@ function withSocial(pose: Pose, look: RoleLook, s: Social, o: { time: number; ag
     off.head = [0, still ? 0 : Math.max(0, Math.sin(t * 9)) * 0.012, 0.01];
     return { ...pose, off };
   }
+  if (s.overhear) {
+    // Hand cupped to its ear, head turned toward the voice.
+    off.hand = [0, 0.26, -0.02];
+    off.head = [0.03, 0, 0];
+    return { ...pose, off, tilt: -0.05 };
+  }
   if (s.listen) {
     // Nods along.
     off.head = [0, still ? -0.01 : -Math.max(0, Math.sin(t * 4.5)) * 0.022, 0.015];
@@ -559,6 +601,12 @@ function withSocial(pose: Pose, look: RoleLook, s: Social, o: { time: number; ag
     // Squares up to the rival: leans in, hands up, a slow sway.
     off.hand = [0, 0.12, 0.08];
     return { ...pose, off, lean: pose.lean + 0.12, tilt: still ? 0 : Math.sin(t * 2.2) * 0.03 };
+  }
+  if (s.flinch) {
+    // Leans away from the hazard next to it, an arm up; harder when a wave just came in.
+    const k2 = s.wave && live && !still ? 1 - k : 0;
+    off.hand = [0, 0.14 + k2 * 0.08, 0.1];
+    return { ...pose, off, lean: pose.lean - 0.12 - k2 * 0.16 };
   }
   if (s.point) {
     // Points the way it is heading.

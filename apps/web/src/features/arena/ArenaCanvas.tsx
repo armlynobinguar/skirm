@@ -9,13 +9,14 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { usePreferences } from '@/lib/preferences';
+import { useSfx } from '@/lib/sfx';
 import { screenOf } from '@/lib/routes';
 import { drawEmotes } from './emotes';
 import { drawCosmetics2D, type CosmeticDrawOpts } from './cosmetics';
 import { drawGear2D } from './gear';
 import * as proto from './proto/world';
 import { cameraFor, easeRateFor, fitBox, sceneForMatchView, sceneForScreen, stepCamera, type ArenaScene, type Camera } from './scene';
-import { liveFx, type LiveArena, walkMs } from './live';
+import { frameSounds, liveFx, type LiveArena, walkMs } from './live';
 import { setArenaProjection } from './pick';
 import { useArena, type ArenaStateSnapshot } from './store';
 import { MAPS, mapById, restingState, type ArenaState, type V2Map } from './world';
@@ -212,6 +213,22 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
       window.removeEventListener('resize', onResize);
     };
   }, [reducedMotion]);
+
+  // Match sounds: each new live frame's voices, footfalls, coughs and bluff stings (the SFX toggle
+  // gates them), only while a match is on screen.
+  const sfx = useSfx();
+  const sounded = useRef<{ at: number | null; state: ArenaState | null }>({ at: null, state: null });
+  useEffect(() => {
+    const was = sounded.current;
+    if (!liveMatch || was.at === liveMatch.at) return;
+    const prevState = was.at != null && was.state ? was.state : null;
+    const gap = was.at != null ? liveMatch.at - was.at : null;
+    sounded.current = { at: liveMatch.at, state: liveMatch.arena.state };
+    const inMatch = scene === 'match' || scene === 'follow' || scene === 'tpv';
+    if (!inMatch || typeof document === 'undefined' || document.visibilityState !== 'visible') return;
+    const timers = frameSounds(liveMatch.arena, prevState, walkMs(gap)).map((s) => setTimeout(() => sfx.agent?.(s.sound), s.delay));
+    return () => timers.forEach(clearTimeout);
+  }, [liveMatch, scene, sfx]);
 
   // With reduced motion nothing animates, so a scene or map change draws one new frame.
   useEffect(() => {
