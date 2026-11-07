@@ -409,6 +409,8 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
           rivalHandle={view.rivalHandle}
           crew={(frame?.agents.filter((a) => a.team === team).map((a) => a.name) ?? view.crew?.map((a) => a.name)) ?? []}
           rivalAgents={view.rivalAgents}
+          {...(!watch && frame ? { agents: frame.agents.filter((a) => a.team === team), rivals: view.rivals } : {})}
+          practice={!!view.practice}
           onDone={endIntro}
         />
       ) : null}
