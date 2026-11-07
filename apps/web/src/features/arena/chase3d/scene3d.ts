@@ -4,6 +4,7 @@
 // weather), the tiles that change are re-laid when a new frame arrives, and every animation frame
 // eases the agents, the fog light and the camera.
 import * as THREE from 'three';
+import { walkBob, walkMs } from '../live';
 import type { AgentCosmetics } from '@skirm/shared';
 import { dressLook, fillOf, lookFor, lookParts, lookTop, poseAt, poseKind, type LookGroup, type RoleLook } from '@skirm/ui';
 import { trailOf, trailSteps } from '../cosmetics';
@@ -129,6 +130,9 @@ interface WallSlot {
 
 interface World {
   key: string;
+  /** When the current frame arrived and the gap to the one before (the tick), for the walk's length. */
+  stepAt?: number;
+  stepGap?: number | null;
   W: number;
   H: number;
   cx0: number;
@@ -836,7 +840,12 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
   if (heading != null) rig.tyaw = heading;
 
   const fade = stepAgentFade(w.fade, agents, seen, team, w.W, still ? 1 : dt);
-  const alpha = prev && !still && !state.paused ? Math.min(1, (f.now - state.at) / TWEEN_MS) : 1;
+  if (w.stepAt !== state.at) {
+    w.stepGap = w.stepAt != null && prev ? state.at - w.stepAt : null;
+    w.stepAt = state.at;
+  }
+  // Agents walk a step over most of a tick at a steady pace (walkMs), instead of hopping in TWEEN_MS.
+  const alpha = prev && !still && !state.paused ? Math.min(1, (f.now - state.at) / walkMs(w.stepGap ?? (TWEEN_MS / 0.9))) : 1;
   const k = ease(alpha);
   let focus: THREE.Vector3 | null = null;
   const present = new Set<string>();
@@ -846,12 +855,13 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
     present.add(a.id);
     const pa = prevById.get(a.id) ?? a;
     const tele = Math.abs(pa.x - a.x) + Math.abs(pa.y - a.y) > 1;
-    const x = tele ? a.x : pa.x + (a.x - pa.x) * k;
-    const z = tele ? a.y : pa.y + (a.y - pa.y) * k;
     const moving = !tele && (pa.x !== a.x || pa.y !== a.y);
+    const km = moving ? alpha : k;
+    const x = tele ? a.x : pa.x + (a.x - pa.x) * km;
+    const z = tele ? a.y : pa.y + (a.y - pa.y) * km;
     const af = fade[a.id] ?? 1;
     ag.g.visible = !a.out && af >= 0.02;
-    const hop = moving && !still ? Math.sin(Math.PI * Math.min(1, alpha)) * 0.12 : 0;
+    const hop = moving && !still ? walkBob(alpha) * 0.025 : 0;
     ag.g.position.set(x, hop, z);
     ag.g.rotation.y += still ? angDiff(ag.g.rotation.y, ag.face) : angDiff(ag.g.rotation.y, ag.face) * Math.min(1, dt * 10);
     poseRig(ag, a, { time, age: (f.now - state.at) / 1000, walk: alpha, moving: moving && !still, still, seed: i, accent: TEAM_RING[a.team] });

@@ -406,13 +406,15 @@ function renderArena(c, A, pal, prev, cur, alpha, T, ox, oy, time, opts={}) {
     if (a.out && !(prev && !prev.agents[i].out)) return;
     const af = opts.agFade && opts.agFade[a.id] != null ? opts.agFade[a.id] : 1; if (af < .02) return;
     const dk = opts.deploy == null ? 1 : ease(opts.deploy*1.7 - (a.slot||0)*.2 - (a.team === 'B' ? .3 : 0)); if (dk <= .01) return;
-    const pa = prev ? prev.agents[i] : a, k = ease(alpha);
+    const pa = prev ? prev.agents[i] : a;
     const teleport = Math.abs(pa.x-a.x)+Math.abs(pa.y-a.y) > 1;
+    // A step is walked at a steady pace (linear), not eased like a hop.
+    const k = !teleport && (pa.x !== a.x || pa.y !== a.y) ? Math.max(0, Math.min(1, alpha)) : ease(alpha);
     let ix = teleport ? a.x : pa.x + (a.x-pa.x)*k, iy = teleport ? a.y : pa.y + (a.y-pa.y)*k;
     const key = Math.round(ix)+','+Math.round(iy), n = pos.get(key) || 0; pos.set(key, n+1);
     if (n) { ix += n*0.22; iy -= n*0.22; }
     const moving = !teleport && (pa.x !== a.x || pa.y !== a.y);
-    items.push({d:ix+iy+0.01, agent:a, af, ix, iy, moving, hop: (moving ? Math.sin(Math.PI*Math.min(1,alpha))*T*0.14 : 0) + (1-dk)*T*5});
+    items.push({d:ix+iy+0.01, agent:a, af, ix, iy, moving, hop: (moving && !opts.still ? Math.abs(Math.sin(2*Math.PI*Math.min(1,alpha)))*T*0.025 : 0) + (1-dk)*T*5});
   });
   items.sort((p,q) => p.d - q.d);
   for (const it of items) {

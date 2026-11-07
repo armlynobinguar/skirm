@@ -206,7 +206,11 @@ a.app-dock-tutorial:hover { color: var(--bone); }
  * one row, and the toggles covered the last tab). */
 @media (max-width: 1560px) { .app-topbar-crumb { display: none; } }
 @media (max-width: 1300px) { .app-topbar-link { padding: 0 12px 0 5px; font-size: 14.5px; } }
+/* --topbar-extra: what the second row adds to the bar, for screens that pin things under it (the
+ * match HUD, the replay strip). Back to 0 under 720px, where the bar is one row again. */
+:root { --topbar-extra: 0px; }
 @media (max-width: 1180px) {
+  :root { --topbar-extra: 46px; }
   .app-topbar { flex-wrap: wrap; row-gap: 8px; }
   .app-topbar-nav { order: 3; flex: 1 0 100%; overflow-x: auto; scrollbar-width: none; filter: none; }
   .app-topbar-nav::-webkit-scrollbar { display: none; }
@@ -222,6 +226,7 @@ a.app-dock-tutorial:hover { color: var(--bone); }
 /* Narrow screens: one row. The tabs fold into a Menu button (it names the current section) that
  * drops all five as a full-width list under the bar; the toggles show their icon only. */
 @media (max-width: 720px) {
+  :root { --topbar-extra: 0px; }
   .app-topbar { flex-wrap: nowrap; gap: 8px; }
   .app-topbar-navwrap { display: block; position: static; flex: none; }
   .app-topbar-chip.app-topbar-menu { display: flex; flex: none; gap: 8px; padding: 0 12px 0 10px; font: 700 14px/1 var(--font-display); letter-spacing: .07em; text-transform: uppercase; color: var(--bone); cursor: pointer; }

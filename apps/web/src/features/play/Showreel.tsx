@@ -8,7 +8,7 @@ import { DisplayHeading } from '@skirm/ui';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { alignPrev, barksAt } from '@/features/arena/ArenaCanvas';
-import { composeV2Arena, type LiveArena } from '@/features/arena/live';
+import { composeV2Arena, walkMs, type LiveArena } from '@/features/arena/live';
 import * as proto from '@/features/arena/proto/world';
 import { mapById, type ArenaState } from '@/features/arena/world';
 import { usePreferences } from '@/lib/preferences';
@@ -126,7 +126,8 @@ export function Showreel() {
       const ox = w / 2 - ((focus.x - focus.y) * T) / 2;
       const oy = h * 0.52 - ((focus.x + focus.y) * T) / 4;
       const age = (now - frameAt) / 1000;
-      const alpha = prev && !still ? Math.min(1, (now - frameAt) / 400) : 1;
+      // Walk each step over most of the tick, like the live board.
+      const alpha = prev && !still ? Math.min(1, (now - frameAt) / walkMs(TICK_MS)) : 1;
       if (!proto.drawScenery(ctx, m, A, T, ox, oy, time, w, h)) {
         ctx.fillStyle = '#070c13';
         ctx.fillRect(0, 0, w, h);
