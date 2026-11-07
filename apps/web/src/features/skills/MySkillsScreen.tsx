@@ -106,22 +106,23 @@ function MySkills() {
 function SkillTable({ rows, tab }: { rows: SkillRow[]; tab: Tab }) {
   return (
     <div className={s.tableCard}>
-      <table className={`${s.table} ${s.wide}`}>
-        <thead>
-          <tr>
-            <th scope="col">Skill</th>
-            <th scope="col">Status</th>
-            <th scope="col">Handles</th>
-            <th scope="col">Needs</th>
-            <th scope="col" className={s.right}>
+      {/* Explicit roles keep table semantics when the phone layout restyles rows as cards. */}
+      <table className={`${s.table} ${s.wide} ${s.skillsTable}`} role="table">
+        <thead role="rowgroup">
+          <tr role="row">
+            <th scope="col" role="columnheader">Skill</th>
+            <th scope="col" role="columnheader">Status</th>
+            <th scope="col" role="columnheader">Handles</th>
+            <th scope="col" role="columnheader">Needs</th>
+            <th scope="col" role="columnheader" className={s.right}>
               Royalties
             </th>
-            <th scope="col">
+            <th scope="col" role="columnheader">
               <span className={s.srOnly}>Actions</span>
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {rows.map((r) => (
             <SkillRowView key={`${r.id}:${r.version}`} row={r} tab={tab} />
           ))}
@@ -144,25 +145,25 @@ function SkillRowView({ row: r, tab }: { row: SkillRow; tab: Tab }) {
   const canEdit = tab === 'written' && !r.accountBound;
   const isPublic = r.status !== 'Draft' || tab === 'owned';
   return (
-    <tr data-testid={`s07-skill-row-${r.id}`}>
-      <td>
+    <tr role="row" data-testid={`s07-skill-row-${r.id}`}>
+      <td role="cell" className={s.cellSkill}>
         <div className={s.skillName}>
           <Icon name="skill" />
           <span data-testid="s07-skill-name">{r.name}</span>
         </div>
         <div className={s.skillSub}>{subLine(r, tab)}</div>
       </td>
-      <td data-testid="s07-status">
+      <td role="cell" className={s.cellStatus} data-testid="s07-status">
         <StatusBadge status={r.status} />
       </td>
-      <td>
+      <td role="cell" className={s.cellHandles} data-label="Handles">
         <div className={s.chips}>
           {r.handles_tags.map((t) => (
             <TagChip key={t} tag={t} />
           ))}
         </div>
       </td>
-      <td>
+      <td role="cell" className={s.cellNeeds} data-label="Needs">
         {r.requiredUnlocks.length ? (
           <div className={s.chips}>
             {r.requiredUnlocks.map((u) => (
@@ -174,19 +175,21 @@ function SkillRowView({ row: r, tab }: { row: SkillRow; tab: Tab }) {
         )}
       </td>
       {tab === 'written' && r.royaltiesYocto !== undefined ? (
-        <td className={`${s.right} ${s.mono}`} data-testid="s07-royalties">
+        <td role="cell" className={`${s.right} ${s.mono} ${s.cellRoyalties}`} data-label="Royalties" data-testid="s07-royalties">
           {near(r.royaltiesYocto)}
         </td>
       ) : (
         <td
-          className={`${s.right} ${s.mono} sk-muted`}
+          role="cell"
+          className={`${s.right} ${s.mono} ${s.cellRoyalties} sk-muted`}
+          data-label="Royalties"
           title={tab === 'owned' ? 'Royalties go to the creator' : undefined}
           data-testid="s07-royalties"
         >
           –
         </td>
       )}
-      <td>
+      <td role="cell" className={s.cellActions}>
         {canEdit ? (
           <Link className={s.rowLink} href={routes.editSkill(r.id)} data-testid={`s07-edit-${r.id}`}>
             {r.status === 'Draft' ? 'Edit' : 'New version'}

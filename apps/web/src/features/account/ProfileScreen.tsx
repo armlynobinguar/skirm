@@ -157,20 +157,21 @@ function AgentsCard({ agents }: { agents: Agent[] }) {
         <p className={s.note}>No agents on this account.</p>
       ) : (
         <div className={s.tableBare}>
-          <table className={`${s.table} ${s.agentsTable}`}>
-            <thead>
-              <tr>
-                <th scope="col">Agent</th>
-                <th scope="col">Unlock</th>
-                <th scope="col">Skills</th>
-                <th scope="col">Role</th>
-                <th scope="col">Talk</th>
+          {/* Explicit roles keep table semantics when the phone layout restyles rows as cards. */}
+          <table className={`${s.table} ${s.agentsTable}`} role="table">
+            <thead role="rowgroup">
+              <tr role="row">
+                <th scope="col" role="columnheader">Agent</th>
+                <th scope="col" role="columnheader">Unlock</th>
+                <th scope="col" role="columnheader">Skills</th>
+                <th scope="col" role="columnheader">Role</th>
+                <th scope="col" role="columnheader">Talk</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
               {agents.map((a) => (
-                <tr key={a.id} data-testid={`s16-agent-${a.id}`}>
-                  <td>
+                <tr key={a.id} role="row" data-testid={`s16-agent-${a.id}`}>
+                  <td role="cell" className={s.agentCell}>
                     <span className={s.agentName}>
                       <AgentAvatar size={28} label={a.name} role={a.role} body={agentColour(a)} head={agentBone(a)} dress={agentDress(a)} />
                       <span data-testid="s16-agent-name">{a.name}</span>
@@ -185,7 +186,7 @@ function AgentsCard({ agents }: { agents: Agent[] }) {
                       </button>
                     </span>
                   </td>
-                  <td>
+                  <td role="cell" className={s.agentUnlock} data-label="Unlock">
                     {a.unlocks.length ? (
                       <span className={s.chips}>
                         {a.unlocks.map((u) => (
@@ -196,17 +197,19 @@ function AgentsCard({ agents }: { agents: Agent[] }) {
                       <span className="sk-muted">None</span>
                     )}
                   </td>
-                  <td>
+                  <td role="cell" className={s.agentSkills} data-label="Skills">
                     {a.skills.length ? (
                       a.skills.map((sk) => `${sk.name} v${sk.version}`).join(', ')
                     ) : (
                       <span className="sk-muted">Map briefing only</span>
                     )}
                   </td>
-                  <td data-testid="s16-agent-role">
+                  <td role="cell" className={s.agentRole} data-label="Role" data-testid="s16-agent-role">
                     {a.role} · vision {a.vision} · comms {a.comms}
                   </td>
-                  <td>{TIER_LABEL[a.tier]}</td>
+                  <td role="cell" className={s.agentTalk} data-label="Talk">
+                    {TIER_LABEL[a.tier]}
+                  </td>
                 </tr>
               ))}
             </tbody>

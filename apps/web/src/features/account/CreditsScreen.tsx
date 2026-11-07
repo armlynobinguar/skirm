@@ -508,48 +508,50 @@ function Ledger({
       ) : (
         <>
           <div className={s.tableWrap}>
-            <table className={`${s.table} ${s.ledgerTable}`}>
-              <thead>
-                <tr>
-                  <th scope="col">Date (UTC)</th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Detail</th>
-                  <th scope="col">From</th>
-                  <th scope="col" style={{ textAlign: 'right' }}>
+            {/* Explicit roles keep table semantics when the phone layout restyles rows as cards. */}
+            <table className={`${s.table} ${s.ledgerTable}`} role="table">
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th scope="col" role="columnheader">Date (UTC)</th>
+                  <th scope="col" role="columnheader">Type</th>
+                  <th scope="col" role="columnheader">Detail</th>
+                  <th scope="col" role="columnheader">From</th>
+                  <th scope="col" role="columnheader" style={{ textAlign: 'right' }}>
                     Credits
                   </th>
-                  <th scope="col">Link</th>
+                  <th scope="col" role="columnheader">Link</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {pending ? (
-                  <tr className={s.pendingRow} data-testid="s15-ledger-pending">
-                    <td className={s.dateCell}>now</td>
-                    <td className={s.typeCell}>Top-up</td>
-                    <td>
+                  <tr role="row" className={s.pendingRow} data-testid="s15-ledger-pending">
+                    <td role="cell" className={s.dateCell}>now</td>
+                    <td role="cell" className={s.typeCell}>Top-up</td>
+                    <td role="cell" className={s.detailCell}>
                       <span className={s.spinner} aria-hidden="true" />
                       Waiting for NEAR to confirm {formatNear(pending.yocto, 24)} NEAR
                     </td>
-                    <td className={s.fromCell}>Balance</td>
-                    <td className={`${s.amount} ${s.amountNeutral}`}>+{fmt(pending.credits)}</td>
-                    <td />
+                    <td role="cell" className={s.fromCell}>Balance</td>
+                    <td role="cell" className={`${s.amount} ${s.amountNeutral}`}>+{fmt(pending.credits)}</td>
+                    <td role="cell" className={s.linkCell} />
                   </tr>
                 ) : null}
                 {rows.slice(0, shown).map((row) => {
                   const d = ledgerDisplay(row, matchLabel(row), rate);
                   const tx = row.txHash ? explorerTxUrl(row.txHash) : null;
                   return (
-                    <tr key={row.id} data-testid={`s15-ledger-row-${row.id}`} data-type={row.type}>
-                      <td className={s.dateCell}>{formatUtc(row.createdAt)}</td>
-                      <td className={s.typeCell}>{d.type}</td>
-                      <td>{d.detail}</td>
-                      <td className={s.fromCell}>{d.from}</td>
+                    <tr key={row.id} role="row" data-testid={`s15-ledger-row-${row.id}`} data-type={row.type}>
+                      <td role="cell" className={s.dateCell}>{formatUtc(row.createdAt)}</td>
+                      <td role="cell" className={s.typeCell}>{d.type}</td>
+                      <td role="cell" className={s.detailCell}>{d.detail}</td>
+                      <td role="cell" className={s.fromCell}>{d.from}</td>
                       <td
+                        role="cell"
                         className={`${s.amount} ${d.tone === 'in' ? s.amountIn : d.tone === 'neutral' ? s.amountNeutral : ''}`}
                       >
                         {d.amount}
                       </td>
-                      <td className={s.linkCell}>
+                      <td role="cell" className={s.linkCell}>
                         {row.matchId ? <Link href={routes.matchResult(row.matchId)}>Match</Link> : null}
                         {row.txHash ? (
                           tx ? (
