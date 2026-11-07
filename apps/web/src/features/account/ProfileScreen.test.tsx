@@ -258,6 +258,7 @@ describe('S16 Profile', () => {
     await user.click(screen.getByTestId('s16-save-settings'));
     expect(preferencesStore().get().prefs).toEqual({
       sfx: false,
+      music: true,
       replaySpeed: 2,
       reducedMotion: true,
       showProbabilities: false,

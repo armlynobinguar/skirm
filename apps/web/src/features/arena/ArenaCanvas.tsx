@@ -44,7 +44,7 @@ export interface ArenaCanvasProps {
 
 export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
   const pathname = usePathname() ?? '/';
-  const { mapIdx, introAt, live: liveMatch, view } = useArena();
+  const { mapIdx, introAt, live: liveMatch, view, zoom } = useArena();
   const scene = forced ?? sceneForMatchView(sceneForScreen(screenOf(pathname)?.key), view.mode);
   const tilted = scene === 'tpv';
   const { reducedMotion } = usePreferences();
@@ -65,7 +65,11 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
     layer: null as MatchLayer | null,
     /** Time between the last two live frames (the tick), for the walk's length. */
     gap: null as number | null,
+    /** The player's zoom on the match board (eased toward `zoom`). */
+    zoom: 1,
+    zoomShown: 1,
   });
+  live.current.zoom = zoom;
   live.current.scene = scene;
   live.current.view = view;
   live.current.mapIdx = mapIdx;
@@ -121,7 +125,10 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
       const m = (lm ? mapById(lm.look) : null) ?? MAPS[L.mapIdx] ?? MAPS[0]!;
       const A = lm ? lm.arena.A : m.A;
       const box = fitBox(L.scene, vw, vh);
-      const T = proto.fitT(A, box.w, box.h) * cam.zoom;
+      // The player's zoom applies on the match board (overview and follow), eased so a wheel step glides.
+      const userZoom = lm && (L.scene === 'match' || L.scene === 'follow') ? L.zoom : 1;
+      L.zoomShown = still ? userZoom : L.zoomShown + (userZoom - L.zoomShown) * Math.min(1, dt * 10);
+      const T = proto.fitT(A, box.w, box.h) * cam.zoom * L.zoomShown;
       const fx = cam.fx * vw;
       const fy = cam.fy * vh;
       const cxm = (A.w - 1) / 2;
@@ -233,7 +240,7 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
   // With reduced motion nothing animates, so a scene or map change draws one new frame.
   useEffect(() => {
     if (reducedMotion) redraw.current?.();
-  }, [reducedMotion, scene, mapIdx, liveMatch]);
+  }, [reducedMotion, scene, mapIdx, liveMatch, zoom]);
 
   return (
     <>

@@ -191,6 +191,8 @@ describe('v2 match screen', () => {
     key('Enter');
     fireEvent.click(screen.getByTestId('v2-card-wren'));
     key('v');
+    // Third person opens clear; I shows the card and the mind.
+    key('i');
     later(500);
     expect(screen.getByTestId('v2-mind-practice')).toHaveTextContent('Practice: you see the bot’s mind.');
     expect(screen.queryByTestId('v2-mind-private')).not.toBeInTheDocument();
@@ -220,6 +222,9 @@ describe('v2 match screen', () => {
     expect(screen.getByTestId('v2-tpv')).toHaveTextContent('Wick');
     expect(screen.getByTestId('v2-tpv-toggle')).toHaveAttribute('aria-pressed', 'true');
     expect(arenaStore().get().view).toEqual({ mode: 'tpv', focus: 'wick' });
+    // Clear by default: who it is in a chip, no mind panel over the view.
+    expect(screen.queryByTestId('v2-mind')).not.toBeInTheDocument();
+    key('i');
     later(500);
     expect(screen.getByTestId('v2-plan')).toHaveTextContent('Shore the tunnel, then the lamp.');
     expect(screen.getByTestId('v2-plan-why')).toHaveTextContent('The pump floods our side first.');

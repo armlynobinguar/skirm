@@ -25,7 +25,7 @@ import { useToast } from '@/components/toast/ToastProvider';
 import type { ChaseCamState } from '@/features/arena/chase3d';
 import { liveEmotesOf } from '@/features/arena/emotes';
 import { composeV2Arena, liveFx, setLiveFx } from '@/features/arena/live';
-import { OVERVIEW, arenaStore } from '@/features/arena/store';
+import { OVERVIEW, ZOOM_MAX, ZOOM_MIN, arenaStore, useArena } from '@/features/arena/store';
 import type { ArenaState } from '@/features/arena/world';
 import { useSession } from '@/lib/auth/session';
 import type { FrameAgent, V2Frame } from '@/lib/realtime/protocol';
@@ -185,7 +185,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
     setFocus(pick.id);
     if (!tpvHintShown) {
       tpvHintShown = true;
-      toast.show({ title: 'Third person', message: 'Drag to look around · scroll to zoom · ← → switch agent · Esc to leave' });
+      toast.show({ title: 'Third person', message: 'Drag to look around · scroll to zoom · ← → switch agent · I for its card and mind · Esc to leave' });
     }
   };
   const exitTpv = () => {
@@ -248,8 +248,31 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
     } else if (replay && (e.key === '1' || e.key === '2' || e.key === '4')) {
       take();
       replay.onSpeed(Number(e.key));
+    } else if (!tpv && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_' || e.key === '0')) {
+      take();
+      zoomBy(e.key === '0' ? 0 : e.key === '-' || e.key === '_' ? -1 : 1);
     }
   };
+
+  // Zoom on the 2D board: the wheel over the board (not over a panel), + and -, 0 to fit.
+  // Third person keeps its own wheel zoom (the chase cam).
+  const { zoom } = useArena();
+  const zoomBy = (dir: number) => {
+    const s = arenaStore();
+    s.setZoom(dir === 0 ? 1 : s.get().zoom * (dir > 0 ? 1.2 : 1 / 1.2));
+  };
+  useEffect(() => {
+    if (tpv || intro) return;
+    const onWheel = (e: WheelEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.ctrlKey || t?.closest('.sk-panel, input, textarea, select, [role="dialog"], .app-topbar')) return;
+      e.preventDefault();
+      const s = arenaStore();
+      s.setZoom(s.get().zoom * Math.exp(-e.deltaY * 0.0015));
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, [tpv, intro]);
   useEffect(() => {
     const on = (e: KeyboardEvent) => keys.current(e);
     window.addEventListener('keydown', on, true);
@@ -327,6 +350,19 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
             <AkIcon name="story" />
             <span className={c.bl}>Story</span>
           </Button>
+          {tpv ? null : (
+            <span className={c.zoom} role="group" aria-label="Zoom">
+              <Button size="sm" onClick={() => zoomBy(-1)} disabled={zoom <= ZOOM_MIN} aria-label="Zoom out" title="Zoom out (−, or scroll)" data-testid="v2-zoom-out">
+                −
+              </Button>
+              <button type="button" className={c.zoomN} onClick={() => zoomBy(0)} title="Fit the board (0)" data-testid="v2-zoom-reset">
+                {Math.round(zoom * 100)}%
+              </button>
+              <Button size="sm" onClick={() => zoomBy(1)} disabled={zoom >= ZOOM_MAX} aria-label="Zoom in" title="Zoom in (+, or scroll)" data-testid="v2-zoom-in">
+                +
+              </Button>
+            </span>
+          )}
           {paused && !replay ? <span className="sk-kick">View paused · the match goes on</span> : null}
           {replay ? (
             <>

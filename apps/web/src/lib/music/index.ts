@@ -67,7 +67,8 @@ export interface MusicEngine {
 }
 
 const LOOKAHEAD_S = 0.15;
-const MASTER = 0.08;
+/** Overall music level: well under the UI cues' peaks, but clearly audible on laptop speakers (0.08 was not). */
+const MASTER = 0.45;
 
 export function createMusic(makeContext: () => AudioContext | null = browserContext): MusicEngine {
   let ctx: AudioContext | null = null;

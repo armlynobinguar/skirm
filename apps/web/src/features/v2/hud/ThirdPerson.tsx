@@ -6,6 +6,10 @@
 // (so a skill never leaks through plan text), and nothing for a rival except in practice, where the
 // server sends the bot's mind too. Story pace keeps
 // every subtitle up for its full time; without it only the last three wait their turn.
+//
+// By default the view is clean, so the player sees what the agent sees: a slim chip with who it is
+// (top left), one caption line at the bottom, and no mind panel. Info (I) brings back the full
+// panels: the identity card with the inventory, the mind, and the large subtitles.
 import { carryOf, mapV2, type FrameAgent, type Team } from '@skirm/engine/v2';
 import { Button } from '@skirm/ui';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
@@ -49,6 +53,39 @@ export function ThirdPerson({ agent, team, ranked, mapId, inSight, tick, limit, 
   const subs = useSubtitles(agent, team, ranked, lines, tick, story);
   useEffect(() => onHeld(subs.held), [subs.held, onHeld]);
   useEffect(() => () => onHeld(false), [onHeld]);
+  const [info, setInfo] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return;
+      if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
+        setInfo((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  if (!info)
+    return (
+      <>
+        <div className={`sk-panel ${c.tpchip}`} data-testid="v2-tpv">
+          <b style={{ color: colour }}>{agent.name}</b>
+          <span className="sk-kick">
+            {agent.role} · {status} · {inSight ? `${agent.items.length}/${slots}` : '?'} items
+          </span>
+          <Button size="sm" variant="ghost" onClick={() => setInfo(true)} aria-pressed={false} title="Show its card and mind (I)" data-testid="v2-tpv-info">
+            Info · I
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onExit} data-testid="v2-tpv-exit">
+            Exit · Esc
+          </Button>
+        </div>
+        <div className={c.capline} aria-live="polite" data-testid="v2-subs">
+          {subs.cur ? <SubLine key={`c${subs.n}`} s={subs.cur} state="enter" /> : null}
+        </div>
+      </>
+    );
   return (
     <>
       <div className={`sk-panel ${c.tpid}`} data-testid="v2-tpv">
@@ -70,9 +107,14 @@ export function ThirdPerson({ agent, team, ranked, mapId, inSight, tick, limit, 
           </span>
           <BigSlots slots={slotsOf(agent, slots, inSight, tick)} mapId={mapId} item={item} accent={accent} limit={limit} tickMs={tickMs} />
         </div>
-        <Button size="sm" onClick={onExit} data-testid="v2-tpv-exit">
-          Exit view · Esc
-        </Button>
+        <span className={c.tpbtns}>
+          <Button size="sm" onClick={() => setInfo(false)} aria-pressed title="Hide the panels for a clear view (I)" data-testid="v2-tpv-info">
+            Clear view · I
+          </Button>
+          <Button size="sm" onClick={onExit} data-testid="v2-tpv-exit">
+            Exit view · Esc
+          </Button>
+        </span>
       </div>
       <Mind agent={agent} team={team} ranked={ranked} lines={lines} playbook={agent.team === team ? (playbook ?? null) : null} />
       <div className={c.subs} aria-live="polite" data-testid="v2-subs">

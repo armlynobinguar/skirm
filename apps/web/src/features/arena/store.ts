@@ -15,7 +15,14 @@ export interface ArenaStateSnapshot {
   live: { arena: LiveArena; look: string; at: number } | null;
   /** The live match camera: overview, following an agent, the intro, or 2D third person. */
   view: ArenaView;
+  /** The player's zoom on the 2D match board (wheel, + and -), 1 = fit. Back to 1 when the match leaves. */
+  zoom: number;
 }
+
+/** How far the player may zoom the 2D match board out and in. */
+export const ZOOM_MIN = 0.6;
+export const ZOOM_MAX = 2.6;
+export const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
 
 export interface ArenaView {
   mode: MatchCamMode;
@@ -32,11 +39,13 @@ export interface ArenaStore {
   setLive(arena: LiveArena | null, look?: string): void;
   /** Point the live match camera (back to the overview when the match screen leaves). */
   setView(view: ArenaView): void;
+  /** Zoom the 2D match board (clamped to ZOOM_MIN..ZOOM_MAX). */
+  setZoom(zoom: number): void;
   subscribe(l: () => void): () => void;
 }
 
 export function createArenaStore(): ArenaStore {
-  let snap: ArenaStateSnapshot = { mapIdx: ROTATION_INDEX, introAt: 0, live: null, view: OVERVIEW };
+  let snap: ArenaStateSnapshot = { mapIdx: ROTATION_INDEX, introAt: 0, live: null, view: OVERVIEW, zoom: 1 };
   const ls = new Set<() => void>();
   return {
     get: () => snap,
@@ -47,12 +56,18 @@ export function createArenaStore(): ArenaStore {
     },
     setLive(arena, look = 'saltmarsh-weir') {
       if (!arena && !snap.live) return;
-      snap = { ...snap, live: arena ? { arena, look, at: Date.now() } : null };
+      snap = { ...snap, live: arena ? { arena, look, at: Date.now() } : null, ...(arena ? {} : { zoom: 1 }) };
       for (const l of [...ls]) l();
     },
     setView(view) {
       if (view.mode === snap.view.mode && view.focus === snap.view.focus) return;
       snap = { ...snap, view };
+      for (const l of [...ls]) l();
+    },
+    setZoom(zoom) {
+      const z = clampZoom(zoom);
+      if (z === snap.zoom) return;
+      snap = { ...snap, zoom: z };
       for (const l of [...ls]) l();
     },
     subscribe(l) {
