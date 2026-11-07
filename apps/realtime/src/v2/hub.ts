@@ -32,6 +32,8 @@ import { DEFAULT_LLM_MODEL, createGreedyBrain, type V2Brain } from '@skirm/decis
 import {
   BOT_HANDLE,
   DEFAULT_PRACTICE,
+  DIFF_MODS,
+  holdFor,
   MAPS_V2,
   isCommunityMapId,
   isDifficulty,
@@ -156,6 +158,7 @@ export class V2HubError extends Error {
       | 'lobby_closed'
       | 'draft_casual'
       | 'mission_locked'
+      | 'insufficient_credits'
       | V2BanError
       | V2CommandError
       | V2ControlError,
@@ -226,6 +229,7 @@ export class V2Hub {
     if (ranked) await this.noExternal(user.accountId, crew);
     if (ranked) await this.rankedRoles(crew);
     if (!this.fitting(crew.length).length) throw new V2HubError('invalid_crew', 'no map takes a crew this size');
+    await this.affords(user.accountId, crew, ranked, difficulty);
     const account = await this.deps.repos.accounts.get(user.accountId);
     check();
     const payload: V2Search = {
@@ -239,6 +243,18 @@ export class V2Hub {
     };
     const pool = v2Pool(payload);
     this.matchmaker.add({ key: user.accountId, lane: lane(ranked), ...(pool ? { pool } : {}), rating: account?.elo ?? 1200, payload });
+  }
+
+  /**
+   * Refuses a crew whose match hold the account cannot cover now, before it is paired: the hold is
+   * only taken after lock-in, and a refused hold there voids the match for the rival too. The talk
+   * tiers give the hold's lower bound (holdFor, as the PvP screen prices it); lock-in may still swap
+   * the crew or its tiers, and the hold itself stays the real check.
+   */
+  private async affords(accountId: string, crew: V2CrewEntry[], ranked: boolean, difficulty: Difficulty): Promise<void> {
+    const need = holdFor(crew.map((c) => ({ tier: c.tier })), ranked, DIFF_MODS[difficulty].ticks);
+    const { available } = await this.deps.repos.ledger.balance(accountId);
+    if (available < need) throw new V2HubError('insufficient_credits', `this crew holds up to its whole match: need ${need}, have ${available}`);
   }
 
   /**

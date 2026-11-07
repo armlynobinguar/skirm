@@ -235,4 +235,24 @@ describe('v2 matches over the hub', () => {
     await ana.send({ type: 'v2_queue', crew: [{ agentId: ben.agents[0]!.id, tier: 'standard' }], ranked: false });
     expect(await ana.inbox.next('error')).toMatchObject({ code: 'invalid_crew' });
   });
+
+  it('refuses at the queue a crew whose hold the free credits cannot cover, before it is paired', async () => {
+    const deps = await makeDeps();
+    hub = new RealtimeHub(deps);
+    // A new player: only the 60 free credits. Three agents on Standard hold 90 in ranked.
+    const sock = new FakeSocket();
+    const c = hub.connect(sock);
+    await hub.message(c, JSON.stringify({ type: 'auth', devUser: 'newbie' }));
+    const acc = (await deps.repos.accounts.byHandle('newbie'))!;
+    const agents = await deps.repos.agents.listByOwner(acc.id);
+    const crew = agents.slice(0, 3).map((a) => ({ agentId: a.id, tier: 'standard' }));
+    await hub.message(c, JSON.stringify({ type: 'v2_queue', crew, ranked: true }));
+    const err = await sock.inbox.next('error');
+    expect(err).toMatchObject({ code: 'insufficient_credits' });
+    // The PvP screen reads the numbers out of the message.
+    expect((err as { message: string }).message).toMatch(/need 90, have 60/);
+    // One agent (30) fits, and queues.
+    await hub.message(c, JSON.stringify({ type: 'v2_queue', crew: crew.slice(0, 1), ranked: true }));
+    expect(await sock.inbox.next('queue_status')).toMatchObject({ type: 'queue_status' });
+  });
 });

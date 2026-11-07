@@ -108,7 +108,11 @@ export function LockIn({ view }: { view: V2MatchView }) {
               <b>{map?.code ?? 'Lock-in'}</b> · {map?.name ?? view.mapId} · {view.ranked ? 'ranked' : view.practice ? 'practice' : 'casual'} ·{' '}
               <span style={{ color: diff.c }}>{diff.n}</span>
             </span>
-            {view.practice ? <PracticeBadge free={view.free} /> : null}
+            {view.practice ? (
+              <span style={{ marginLeft: 10 }}>
+                <PracticeBadge free={view.free} />
+              </span>
+            ) : null}
             <h1 className={`sk-disp ${c.title}`}>Lock in your crew</h1>
           </div>
           <div className={c.lockt}>
