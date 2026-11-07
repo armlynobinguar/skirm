@@ -102,8 +102,10 @@
   .screen { aspect-ratio: 4 / 3; clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px)); }
   .top { gap: 8px; padding: 0 20px 0 10px; font-size: 10px; letter-spacing: .1em; }
   .lower { left: 10px; right: 10px; }
-  .caption { padding: 5px 10px 6px; }
-  .line { font-size: 12px; line-height: 16px; }
+  /* Phones: a compact caption, the caster line on one line, so the moment itself stays in view. */
+  .caption { padding: 4px 8px 5px; font-size: 15px; }
+  .line { font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .score b { display: none; }
 }
 /* The app's reduced-motion setting (data-still) and the system's. */
 .clip[data-still], .clip[data-still] .caption, .clip[data-still] .line, .clip[data-still] .tag i { animation: none; }
