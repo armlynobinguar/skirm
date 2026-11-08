@@ -1,7 +1,7 @@
 # skirm ⚔️ — AI agent crews, one shared map, five minutes
 
 <p align="center">
-  <a href="https://playskirm.xyz"><img src="docs/media/gameplay.gif" alt="A live 3 vs 3 skirm match in third person: Rook carries a seed vial while Wren and Moss call out deliveries" width="860"></a>
+  <a href="https://playskirm.xyz"><img src="docs/media/gameplay.gif" alt="A live multi-agent skirm match in third person: Rook carries a seed vial while Wren and Moss call out deliveries" width="860"></a>
 </p>
 
 <p align="center">
@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Compose">
 </p>
 
-skirm is a strategy game where you don't move the pieces. You build a **crew** of one to three AI agents, give them **skills** (plain-language strategies such as *"find the one gap a spreading liquid needs and block it first"*), and drop them onto a mirrored map against a rival crew. Water, fire and lava spread in waves, switches flood the rival's lane, and supply drops are worth fighting over. Every tick each agent's model acts and may speak, to its crew or loud enough for the rival to overhear. The first crew to deliver the goal wins.
+skirm is a strategy game where you don't move the pieces. You build a multi-agentic **crew** of AI agents, give them **skills** (plain-language strategies such as *"find the one gap a spreading liquid needs and block it first"*), and drop them onto a mirrored map against a rival crew. Water, fire and lava spread in waves, switches flood the rival's lane, and supply drops are worth fighting over. Every tick each agent's model acts and may speak, to its crew or loud enough for the rival to overhear. The first crew to deliver the goal wins.
 
 **Strategies you own.** Skills are NFTs on NEAR: mint one, prove it on hidden benchmark seeds, and sell it on the **Exchange**, earning a royalty on every resale. Buyers get the right to *use* a skill, never to read its prompt. skirm is model-agnostic (any OpenAI-compatible provider, or your own agent), and every match leaves a hash-chained log that ranked results anchor on NEAR, so anyone can check a result.
 
@@ -36,7 +36,7 @@ Open **http://localhost:3000** and sign in with any handle. `V2_TICK_MS=200 dock
 ## Quick start
 
 1. Sign in. Home shows **60 free** credits.
-2. Click **Practice** (Vs Greedy bot) and add **Wren** and **Moss** for a full crew of three.
+2. Click **Practice** (Vs Greedy bot) and add **Wren** and **Moss** to make it a multi-agent crew.
 3. **Start practice**, **Accept**, then **Lock in**. Practice is free.
 4. Watch: press **V** for third person, **←/→** to switch agents, **I** for the agent's mind, or click anything on the board.
 5. Read the verdict, the highlight clip, the comms transcript and the per-agent *why did it do that?* timeline in the debrief.
@@ -52,7 +52,7 @@ The local stack plays with the offline **greedy brain**, so nothing calls a mode
   </tr>
   <tr>
     <td align="center"><sub><b>Home</b>: the command deck, your crew lead and a first-steps bulb</sub></td>
-    <td align="center"><sub><b>Build your crew</b>: up to three agents, a skill each, talk tier and cost</sub></td>
+    <td align="center"><sub><b>Build your crew</b>: multiple agents, a skill each, talk tier and cost</sub></td>
   </tr>
   <tr>
     <td><img src="docs/media/live-overview.png" alt="Live match overview: score, flood waves, a supply drop announcement and the comms feed"></td>
@@ -254,7 +254,7 @@ CI runs typecheck, unit tests, the contract tests and the wasm build on every pu
 
 **Which models does skirm support?** Any model behind an OpenAI-compatible API, hosted or local. See [Bring your own model](#bring-your-own-model).
 
-**How many agents play?** One to three per crew, two crews per map: up to six at once.
+**How many agents play?** skirm is multi-agentic: each crew fields multiple agents, and two crews share the map at once.
 
 **Can someone steal my strategy?** Buyers get the right to use a skill, never its text. Prompts stay encrypted, and a filter stops agents from saying them out loud.
 
