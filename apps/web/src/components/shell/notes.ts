@@ -64,7 +64,7 @@ export const NOTES = {
     points: [
       'Difficulty sits under Mode. Each of the 5 levels has its own goal on every map; ranked locks to Normal.',
       'Edit on any agent card, or tap its skill, opens the agent editor.',
-      "Up to 3 agents. The head-start rule shows live: each agent beyond the rival's costs 10 s.",
+      "Multi-agentic crews. The head-start rule shows live: each agent beyond the rival's costs 10 s.",
       'Talk tier per agent. Ranked locks every agent to Standard; practice unlocks Quiet and Open.',
       'The credit estimate is 150 ticks × the sum of tier rates.',
       'The model is fixed for everyone: the server picks one model to plan and act for every agent.',

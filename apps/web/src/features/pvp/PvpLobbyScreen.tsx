@@ -520,7 +520,7 @@ function Lobby() {
           </dd>
           <dt>CREW</dt>
           <dd>
-            {names || 'None picked'} · your Elo {fmt(rating)}. Up to 3 agents; the larger crew waits 5 ticks per extra agent.
+            {names || 'None picked'} · your Elo {fmt(rating)}. Multi-agentic crews; the larger crew waits 5 ticks per extra agent.
           </dd>
           <dt>ELO RANGE</dt>
           <dd className="sk-mono" data-testid="s11-elo-range">
