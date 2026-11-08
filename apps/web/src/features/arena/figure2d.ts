@@ -11,6 +11,7 @@ import {
   poseAt,
   poseKind,
   type Dress,
+  type Persona,
   type Pose,
   type RoleLook,
   type Social,
@@ -39,6 +40,25 @@ export interface Figure2DAgent {
   face?: 1 | -1;
   /** How it reacts to the others this frame (talk, listen, think, ...; render only). */
   social?: Social;
+  /** Its tile, and the tile it is going for: the head turns toward the goal (live.ts intentsOf). */
+  x?: number;
+  y?: number;
+  gaze?: readonly [number, number];
+  /** How it stands around when idle (@skirm/ui personaOf). */
+  persona?: Persona;
+  /** The equipped skill that kicked in this frame: a glow under it (and a chip by its nameplate). */
+  skill?: string;
+}
+
+/**
+ * How far its head turns toward its goal, -1 (its left) to 1 (its right), from the way it faces on
+ * screen: facing lower right its right hand is on +y tiles, facing lower left on +x tiles (isoPolys).
+ */
+export function glanceOf(a: Pick<Figure2DAgent, 'x' | 'y' | 'gaze' | 'face' | 'team'>): number {
+  if (!a.gaze || a.x == null || a.y == null) return 0;
+  const dir = a.face ?? (a.team === 'B' ? -1 : 1);
+  const side = dir === 1 ? a.gaze[1] - a.y : a.gaze[0] - a.x;
+  return Math.max(-1, Math.min(1, side / 3));
 }
 
 /** The look this agent wears: its role's, dressed when its owner chose a look. */
@@ -88,6 +108,8 @@ export function figurePose(
     still: opts.still,
     seed: (a.slot ?? 0) + (a.team === 'B' ? 2 : 0),
     social: a.social ?? null,
+    gaze: glanceOf(a),
+    ...(a.persona ? { persona: a.persona } : {}),
   });
 }
 
@@ -166,6 +188,25 @@ export function drawFigure(
     c.stroke();
     c.globalAlpha = faded * ba;
   }
+  // A skill kicking in: a gold glow on the ground that swells and fades.
+  const sage = opts.age ?? 9;
+  if (a.skill && !a.down && !a.out && (still || sage < SKILL_GLOW_S)) {
+    const k = still ? 0.5 : sage / SKILL_GLOW_S;
+    const g = c.createRadialGradient(sx, b, 0, sx, b, T * (0.35 + k * 0.35));
+    g.addColorStop(0, 'rgba(255,210,63,0.55)');
+    g.addColorStop(1, 'rgba(255,210,63,0)');
+    c.globalAlpha = (still ? 0.8 : 1 - k) * ba;
+    c.fillStyle = g;
+    c.beginPath();
+    c.ellipse(sx, b, T * (0.35 + k * 0.35), T * (0.18 + k * 0.17), 0, 0, 7);
+    c.fill();
+    c.strokeStyle = '#ffd23f';
+    c.lineWidth = Math.max(1.5, T / 24);
+    c.beginPath();
+    c.ellipse(sx, b, T * (0.3 + k * 0.5), T * (0.15 + k * 0.25), 0, 0, 7);
+    c.stroke();
+    c.globalAlpha = faded * ba;
+  }
   const y0 = b - hop - pose.lift * T * ISO_V;
   c.translate(sx, y0);
   if (pose.tilt) c.rotate(pose.tilt * dir);
@@ -202,7 +243,8 @@ export function drawFigure(
   if (so?.fooled && up) drawMark(c, sx, headY - T * 0.16, T, '?', '#ffd23f', time, still);
   if (so?.overhear && up) drawEar(c, sx - dir * T * 0.2, headY - T * 0.06, T, time, still);
   if (so?.cough && up) drawPuffs(c, sx + dir * T * 0.18, headY + T * 0.08, T, time, still, opts.age ?? 9);
-  if (so?.flinch && up) drawSweat(c, sx - dir * T * 0.12, headY + T * 0.02, T, time, still);
+  if ((so?.flinch || so?.sweat) && up) drawSweat(c, sx - dir * T * 0.12, headY + T * 0.02, T, time, still);
+  if (so?.salute && up && (still || sage < 1.2)) drawMark(c, sx, headY - T * 0.16, T, '!', '#34e0c8', time, still);
   if ((pose.kind === 'cheer' || pose.kind === 'victory') && pose.fx > 0) {
     c.globalAlpha = pose.fx * ba;
     for (let i = 0; i < 7; i++) {
@@ -481,6 +523,40 @@ function drawSweat(c: CanvasRenderingContext2D, x: number, y: number, T: number,
  * `r` is the chip radius (half the nameplate height, so it scales with the tile like the plate).
  * Bobs gently unless `still` (reduced motion).
  */
+/** Seconds the skill glow plays under an agent, and its name chip shows over the nameplate. */
+export const SKILL_GLOW_S = 1.6;
+export const SKILL_CHIP_S = 2.6;
+
+/**
+ * The name of the skill that just kicked in, as a gold chip centred above the nameplate (x: the
+ * plate's centre, y: its top edge). It fades in fast and out over SKILL_CHIP_S. Returns its height
+ * (0 when not drawn) so the speech bubble can sit above it.
+ */
+export function drawSkillChip(c: CanvasRenderingContext2D, x: number, y: number, fs: number, name: string, age: number, still: boolean): number {
+  if (!still && age >= SKILL_CHIP_S) return 0;
+  const fade = still ? 1 : Math.min(1, age * 8, (SKILL_CHIP_S - age) * 2.5);
+  const text = `✦ ${name.length > 24 ? name.slice(0, 23) + '…' : name}`;
+  const f = fs * 0.82;
+  c.save();
+  c.font = `700 ${f}px Barlow, sans-serif`;
+  const w = c.measureText(text).width + f * 0.9;
+  const h = f * 1.45;
+  const rise = still ? 0 : (1 - fade) * f * 0.4;
+  const top = y - h - 3 - rise;
+  c.globalAlpha = fade;
+  c.fillStyle = 'rgba(40,30,4,.92)';
+  c.fillRect(x - w / 2, top, w, h);
+  c.strokeStyle = '#ffd23f';
+  c.lineWidth = 1.5;
+  c.strokeRect(x - w / 2, top, w, h);
+  c.fillStyle = '#ffe58a';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(text, x, top + h / 2);
+  c.restore();
+  return h + 3;
+}
+
 export function drawIntent(
   c: CanvasRenderingContext2D,
   x: number,

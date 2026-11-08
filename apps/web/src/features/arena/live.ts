@@ -2,7 +2,7 @@
 // map's own arena, under soft fog, with this tick's talk as bubbles.
 import { STUN_TICKS, type Team, type V2Frame } from '@skirm/engine/v2';
 import { lookColours, type AgentCosmetics } from '@skirm/shared';
-import type { Social } from '@skirm/ui';
+import { personaOf, type Social } from '@skirm/ui';
 import type { AgentSound } from '@/lib/sfx';
 import { cosmeticsOf, tintAgents } from './cosmetics';
 import type { LiveEmote } from './emotes';
@@ -94,14 +94,19 @@ export function composeV2Arena(frame: V2Frame, prev?: LiveArena | null): LiveAre
   const acts = actsOf(frame, prev);
   const social = socialOf(frame, prev, m.A.exit as [number, number]);
   const intents = intentsOf(frame, prev, m.A.exit as [number, number]);
+  const kicked = skillKicksOf(frame, prev);
   const agents: ArenaState['agents'] = frame.agents.map((g) => {
     const slot = slots[g.team]++;
     const act = acts.get(g.id);
     const so = social.get(g.id);
+    const on = activeSkills(g);
     return {
       ...act,
       ...(so ? { social: so.social, ...(so.faceTo ? { faceTo: so.faceTo } : {}) } : {}),
-      ...(intents.has(g.id) ? { intent: intents.get(g.id)!.kind } : {}),
+      ...(intents.has(g.id) ? { intent: intents.get(g.id)!.kind, gaze: intents.get(g.id)!.goal } : {}),
+      ...(kicked.has(g.id) ? { skill: kicked.get(g.id)! } : {}),
+      ...(on.length ? { skillsOn: on } : {}),
+      persona: personaOf(g.name, g.id),
       id: g.id,
       name: g.name,
       team: g.team,
@@ -211,8 +216,19 @@ const NEIGHBOURS: readonly [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1
  * makes it lean away; rivals that overhear team talk cup an ear; an agent getting closer to an
  * item (or, carrying, to the exit) points the way; one of your own agents that stood still thinks.
  * One reaction each, in that order of priority.
+ *
+ * Also, where the frame carries what they need: an agent its player just gave a live command
+ * salutes and turns toward the order's target (own crew only, like the commands); one of your own
+ * agents whose equipped skill just kicked in takes a power stance; a speaker whose line names
+ * something on the board points at it; a crew that just lost a race to a middle item or a supply drop
+ * huddles; a wave coming in a couple of tiles away makes an agent glance at it and sweat; at kick-off
+ * each crew huddles; in the last stretch everyone runs and each crew's lead waves the others on.
  */
-export function socialOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'view'>, prev: LiveArena | null | undefined, exit: [number, number]): Map<string, AgentSocial> {
+export function socialOf(
+  frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'view'> & Partial<Pick<V2Frame, 'commands' | 'tick' | 'limit' | 'result' | 'mapId'>>,
+  prev: LiveArena | null | undefined,
+  exit: [number, number],
+): Map<string, AgentSocial> {
   const out = new Map<string, AgentSocial>();
   const at = new Map(frame.agents.map((g) => [g.id, [g.x, g.y] as [number, number]]));
   const up = new Map(frame.agents.filter((g) => !g.out && !g.down).map((g) => [g.id, g]));
@@ -243,13 +259,30 @@ export function socialOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'vi
     if (e.kind === 'choked') set(e.agent, { cough: true });
     else if (e.kind === 'slid') set(e.agent, { slip: true }, e.to);
   }
-  // Talk: the speaker faces the nearest crewmate that heard it; they face it and nod; rivals that
-  // overheard it cup a hand to their ear and turn toward it.
+  const board = boardOf(frame.rows);
+  const crewOf = (g: { id: string; team: Team }) => [...up.values()].filter((o) => o.team === g.team && o.id !== g.id).map((o) => o.id);
+  // A live command just reached it: salutes, then turns toward what the order is about.
+  const since = prev?.tick != null && frame.tick != null && prev.tick < frame.tick ? prev.tick : (frame.tick ?? 0) - 1;
+  for (const c of frame.commands?.log ?? []) {
+    if (frame.tick == null || c.tick <= since || c.tick > frame.tick) continue;
+    for (const id of c.agents) {
+      const g = up.get(id);
+      if (!g) continue;
+      set(id, { salute: true }, commandTarget(c.preset, [g.x, g.y], board, exit, crewOf(g).map((o) => at.get(o)!)));
+    }
+  }
+  // One of its equipped skills kicked in (own crew only: the frame carries skills for no one else).
+  for (const id of skillKicksOf(frame, prev).keys()) set(id, { skill: true });
+  // Talk: the speaker faces the nearest crewmate that heard it (or points at what its line names);
+  // they face it and nod; rivals that overheard it cup a hand to their ear and turn toward it.
+  const noun = frame.mapId ? mapById(frame.mapId)?.item : undefined;
   for (const e of frame.events) {
     if (e.kind !== 'said') continue;
     const from = at.get(e.agent);
     if (!from) continue;
-    set(e.agent, { talk: true }, nearest(from, e.heardBy));
+    const named = calloutTarget(e.text, from, board, exit, noun);
+    if (named) set(e.agent, { talk: true, callout: true }, named);
+    else set(e.agent, { talk: true }, nearest(from, e.heardBy));
     for (const id of e.heardBy) set(id, { listen: true }, from);
     for (const id of e.overheardBy) set(id, { overhear: true }, from);
   }
@@ -259,6 +292,21 @@ export function socialOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'vi
     const from = at.get(e.agent);
     if (!from) continue;
     for (const g of up.values()) if (g.id !== e.agent && g.team === e.team && manhattan(from, [g.x, g.y]) <= HYPE_RANGE) set(g.id, { hype: true }, from);
+  }
+  // Lost a race to a middle item or a supply drop: the losers and their crewmates close by huddle.
+  const was = new Map((prev?.state.agents ?? []).map((a) => [a.id, [a.x, a.y] as [number, number]]));
+  for (const e of frame.events) {
+    if (e.kind !== 'picked' || (e.origin !== 'middle' && e.origin !== 'drop')) continue;
+    const winner = up.get(e.agent);
+    if (!winner) continue;
+    const near = (p: [number, number] | undefined) => !!p && manhattan(p, e.at) <= RACE_RANGE;
+    for (const l of up.values()) {
+      if (l.team === winner.team || !(near([l.x, l.y]) || near(was.get(l.id)))) continue;
+      const mates = [...up.values()].filter((o) => o.team === l.team && o.id !== l.id && manhattan([o.x, o.y], [l.x, l.y]) <= HYPE_RANGE);
+      if (!mates.length) continue;
+      set(l.id, { huddle: true }, nearest([l.x, l.y], mates.map((o) => o.id)));
+      for (const o of mates) set(o.id, { huddle: true }, [l.x, l.y]);
+    }
   }
   // Blocked: bumps back. A steal: rivals nearby shake their fists at the thief.
   for (const e of frame.events) {
@@ -286,9 +334,33 @@ export function socialOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'vi
       break;
     }
   }
+  // A wave coming in a couple of tiles away: glances at it and sweats.
+  if (wave)
+    for (const g of live) {
+      const near = board.hazards.find((h) => manhattan(h, [g.x, g.y]) === 2);
+      if (near) set(g.id, { sweat: true }, near);
+    }
+  // The last stretch: each crew's lead waves the others on as it starts.
+  const left = frame.limit != null && frame.tick != null && !frame.result ? frame.limit - frame.tick : null;
+  const hurry = left != null && left <= HURRY_TICKS && left >= 0;
+  const leftBefore = prev?.tick != null && frame.limit != null && frame.tick != null && prev.tick < frame.tick ? frame.limit - prev.tick : null;
+  const entering = hurry && (leftBefore == null ? left! >= HURRY_TICKS - 1 : leftBefore > HURRY_TICKS);
+  if (entering) {
+    for (const team of ['A', 'B'] as const) {
+      const lead = live.find((g) => g.team === team);
+      if (!lead) continue;
+      const mates = crewOf(lead);
+      if (mates.length) set(lead.id, { rally: true }, nearest([lead.x, lead.y], mates));
+    }
+  }
+  // Kick-off: each crew huddles, every agent leaning in toward its nearest crewmate.
+  if (frame.tick != null && frame.tick <= KICKOFF_TICKS)
+    for (const g of live) {
+      const mates = crewOf(g);
+      if (mates.length) set(g.id, { huddle: true }, nearest([g.x, g.y], mates));
+    }
   // Getting closer to an item (or, carrying, to the exit): points the way. Standing still: thinks.
   const intents = intentsOf(frame, prev, exit);
-  const was = new Map((prev?.state.agents ?? []).map((a) => [a.id, [a.x, a.y] as [number, number]]));
   for (const g of live) {
     if (out.has(g.id)) continue;
     const now: [number, number] = [g.x, g.y];
@@ -298,6 +370,118 @@ export function socialOf(frame: Pick<V2Frame, 'events' | 'agents' | 'rows' | 'vi
       const it = intents.get(g.id);
       if (it && it.kind !== 'switch' && manhattan(now, it.goal) <= POINT_RANGE) set(g.id, { point: true }, it.goal);
     } else if (before && frame.view !== 'watch' && g.team === frame.view) set(g.id, { think: true });
+  }
+  // The last stretch: everyone up runs, under whatever else it does.
+  if (hurry)
+    for (const g of live) {
+      const so = out.get(g.id);
+      out.set(g.id, so ? { ...so, social: { ...so.social, hurry: true } } : { social: { hurry: true } });
+    }
+  return out;
+}
+
+/** Rivals this close to a middle item or a drop someone else took lost the race to it (as arena/emotes.ts). */
+const RACE_RANGE = 3;
+/** The last stretch: this many ticks before the clock runs out (about 30 s at 2 s a tick). */
+const HURRY_TICKS = 15;
+/** Ticks at the start of a match that the crews huddle for. */
+const KICKOFF_TICKS = 1;
+
+/** What a crew can see on its frame: items, switches and hazard tiles. */
+interface Board {
+  w: number;
+  h: number;
+  items: [number, number][];
+  switches: [number, number][];
+  hazards: [number, number][];
+}
+
+function boardOf(rows: readonly string[]): Board {
+  const b: Board = { w: Math.max(0, ...rows.map((r) => r.length)), h: rows.length, items: [], switches: [], hazards: [] };
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      const ch = row[x]!;
+      if (ch === '*') b.items.push([x, y]);
+      else if (ch === 'V') b.switches.push([x, y]);
+      else if (HAZARD_TILES.has(ch)) b.hazards.push([x, y]);
+    }
+  });
+  return b;
+}
+
+/**
+ * Where an agent turns after saluting a live command: the nearest item it can see for "go for the
+ * drop", the exit for "hold the gate", the nearest crewmate for "regroup", the nearest hazard for
+ * "block the flow". Free text alone has no target: it just salutes.
+ */
+export function commandTarget(
+  preset: string | null,
+  from: [number, number],
+  board: Board,
+  exit: [number, number],
+  crew: readonly [number, number][],
+): [number, number] | undefined {
+  switch (preset) {
+    case 'go_drop':
+      return nearestTile(from, board.items);
+    case 'hold_gate':
+      return exit;
+    case 'regroup':
+      return nearestTile(from, crew.filter(Boolean));
+    case 'block_flow':
+      return nearestTile(from, board.hazards);
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The tile a line of talk names, if any: a coordinate pair ("(4, 7)" or "4,7") on the board; the
+ * exit ("exit", "deliver", "home", "base", "gate"); the nearest switch it can see ("switch",
+ * "valve", "lever"); or the nearest item it can see ("item", "drop", "supply", or the map's own item
+ * noun). Never the speaker's own tile.
+ */
+export function calloutTarget(
+  text: string,
+  from: [number, number],
+  board: Board,
+  exit: [number, number],
+  itemNoun?: string,
+): [number, number] | undefined {
+  const t = text.toLowerCase();
+  const not = (p: [number, number] | undefined) => (p && (p[0] !== from[0] || p[1] !== from[1]) ? p : undefined);
+  const xy = /\(?\b(\d{1,2})\s*,\s*(\d{1,2})\b\)?/.exec(t);
+  if (xy) {
+    const p: [number, number] = [Number(xy[1]), Number(xy[2])];
+    if (p[0] < board.w && p[1] < board.h) return not(p);
+  }
+  if (/\b(exit|deliver(y|ing)?|home|base|gate)\b/.test(t)) return not(exit);
+  if (/\b(switch|valve|lever)\b/.test(t)) return not(nearestTile(from, board.switches));
+  const own = itemNoun ? itemNoun.toLowerCase().split(/\s+/).map((w) => w.replace(/[^a-z]/g, '')).filter((w) => w.length > 2) : [];
+  const nouns = ['item', 'drop', 'supply', ...own];
+  if (nouns.some((w) => new RegExp(`\\b${w}s?\\b`).test(t))) return not(nearestTile(from, board.items));
+  return undefined;
+}
+
+/** An agent's equipped skills active this tick, by name (own crew only: absent for anyone else). */
+function activeSkills(g: Pick<V2Frame['agents'][number], 'skills'>): string[] {
+  return (g.skills ?? []).filter((s) => s.active).map((s) => s.name);
+}
+
+/**
+ * Agents whose equipped skill kicked in this frame: active now and not on the agent's last frame of
+ * the same match. The skill's name, for the glow and the chip. Own crew only, never a rival.
+ */
+export function skillKicksOf(frame: Pick<V2Frame, 'agents'> & Partial<Pick<V2Frame, 'tick'>>, prev: LiveArena | null | undefined): Map<string, string> {
+  const out = new Map<string, string>();
+  const same = !!prev && prev.tick != null && frame.tick != null && prev.tick < frame.tick;
+  const was = new Map((same ? prev!.state.agents : []).map((a) => [a.id, new Set(a.skillsOn ?? [])]));
+  for (const g of frame.agents) {
+    if (g.out || g.down) continue;
+    const before = was.get(g.id);
+    if (!before) continue;
+    const fresh = activeSkills(g).find((n) => !before.has(n));
+    if (fresh) out.set(g.id, fresh);
   }
   return out;
 }
