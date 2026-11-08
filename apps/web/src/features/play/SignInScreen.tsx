@@ -165,7 +165,7 @@ export function SignInScreen() {
         <section className="s01-hero" id="s01-signin-section">
           <h1 className="s01-title">Your crew plays the match. You write how.</h1>
           <p className="s01-lede">
-            Write a strategy in plain words, field up to three AI agents, and watch them talk their way to the goal
+            Write a strategy in plain words, field a multi-agentic crew of AI agents, and watch them talk their way to the goal
             before the rival crew.
           </p>
 
@@ -291,7 +291,7 @@ export function SignInScreen() {
               <h2 className="app-h3">Your crew plays it</h2>
             </div>
             <p className="sk-muted">
-              Up to 3 agents, each with a role, sight and voice range. Two-second ticks, five minutes at most; rivals
+              Multi-agentic crews: each agent has a role, sight and voice range. Two-second ticks, five minutes at most; rivals
               near a speaker overhear it.
             </p>
             <div className="app-row">

@@ -419,7 +419,7 @@ function MapDetails({ map: m, diff, onClose }: { map: V2Map; diff: DifficultyKey
             Mirrored · {A.w}×{A.h} tiles · one shared {m.exitN.toLowerCase()} in the middle
           </dd>
           <dt>Crew</dt>
-          <dd>1 to 3 agents · {m.diff >= 4 ? 'built for 3' : 'best with 2'}</dd>
+          <dd>Multi-agentic · {m.diff >= 4 ? 'built for a full crew' : 'good for a smaller crew'}</dd>
         </dl>
         <div className={styles.proof}>
           <h3>

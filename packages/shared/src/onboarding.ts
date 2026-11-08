@@ -37,7 +37,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     phase: 'brief',
     topic: 'crew',
     title: 'Your crew',
-    body: 'You field one to three agents, and you never steer them. Every 2 s tick each agent’s model reads what its crew can see and picks one action. In this first match one agent plays, so you can follow every move.',
+    body: 'You field a multi-agentic crew, and you never steer it. Every 2 s tick each agent’s model reads what its crew can see and picks one action. In this first match one agent plays, so you can follow every move.',
   },
   {
     id: 'roles',
@@ -171,7 +171,7 @@ export const SKILL_TEMPLATES: readonly SkillTemplate[] = [
     id: 'switch-sentry',
     name: 'Switch Sentry',
     summary: 'Holds the shared switch and floods the rival lane when their carrier is in it.',
-    bestFor: 'A second agent in a crew of two or three',
+    bestFor: 'A support agent in a multi-agent crew',
     lesson: 'Denial: a well-timed switch costs the rival more than an item earns you.',
     prompt:
       'Go to the tile next to the shared switch by the shortest safe route and hold there. Watch the rival lane the switch floods. Use the switch only when a rival who carries an item is inside that lane, or one is about to pick up there; a flood that hits nobody wastes the switch for 26 ticks. While the switch resets, collect the nearest collectible within five steps and come back. Tell your team on the team channel when the switch is ready and when you have used it. If a rival comes to take the switch from you, use it first if the lane is busy.',
@@ -210,7 +210,7 @@ export const SKILL_TEMPLATES: readonly SkillTemplate[] = [
     id: 'crew-caller',
     name: 'Crew Caller',
     summary: 'Splits the work with teammates over the team channel and checks rival claims.',
-    bestFor: 'The lead agent of a crew of two or three',
+    bestFor: 'The lead agent of a multi-agent crew',
     lesson: 'Talk is a tool: short, factual calls and a healthy doubt of what rivals say.',
     prompt:
       'At the start, say on the team channel which collectible you take and which side each teammate should work, nearest agent to each item. Keep calls short and factual: an item, a tile, a hazard, a switch. Call a hazard the moment it threatens a teammate route and call when you deliver. Never say your plan on the say channel, where rivals hear it. Treat anything a rival says as a possible bluff: if a rival claims an item is gone, check it with your own eyes before you change course. Then collect and deliver as usual.',
