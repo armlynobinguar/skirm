@@ -1,0 +1,48 @@
+# Dependabot: security alerts and security-fix PRs are on in the repo settings and arrive as soon as
+# an advisory is published. This file adds routine version updates, grouped and monthly so they
+# don't flood the PR list.
+version: 2
+updates:
+  # npm workspaces: apps/* and packages/* all resolve through the root package-lock.json.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    groups:
+      # Privy, WalletConnect/Reown, wagmi/viem and MetaMask move together; test sign-in and payments.
+      wallet:
+        patterns: ["@privy-io/*", "@walletconnect/*", "@reown/*", "wagmi", "@wagmi/*", "viem", "@metamask/*"]
+      dev-tools:
+        dependency-type: development
+      minor-and-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  # NEAR contracts. near-sdk is pinned exactly and a bump means a contract redeploy, so Dependabot
+  # leaves it alone; bump it by hand. Its alerts still show in the Security tab.
+  - package-ecosystem: cargo
+    directory: /contracts
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: deps(contracts)
+    ignore:
+      - dependency-name: near-sdk
+      - dependency-name: near-contract-standards
+    groups:
+      contracts:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
