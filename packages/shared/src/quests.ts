@@ -77,7 +77,7 @@ export const DAILY_QUESTS: readonly QuestDef[] = Object.freeze([
   { id: 'd_goal_3min', period: 'daily', title: 'Deliver the goal before 3:00', target: 1, count: (m) => one(goalBy(m, 180)) },
   { id: 'd_play_2', period: 'daily', title: 'Play 2 matches', target: 2, count: () => 1 },
   { id: 'd_win_1', period: 'daily', title: 'Win a match', target: 1, count: (m) => one(won(m)) },
-  { id: 'd_full_crew', period: 'daily', title: 'Play a match with a crew of three', target: 1, count: (m) => one(m.tiers.length >= 3) },
+  { id: 'd_full_crew', period: 'daily', title: 'Play a match with a full crew', target: 1, count: (m) => one(m.tiers.length >= 3) },
   { id: 'd_ranked_1', period: 'daily', title: 'Play a ranked match', target: 1, count: (m) => one(m.ranked) },
   { id: 'd_talk_20', period: 'daily', title: 'Get 20 lines through to your crew', target: 20, count: (m) => m.talkSent },
   { id: 'd_deliver_5', period: 'daily', title: 'Deliver 5 items', target: 5, count: (m) => m.delivered },

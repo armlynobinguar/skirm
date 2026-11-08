@@ -219,7 +219,7 @@ function V2Crew({ me, mapId, initialDifficulty, initialBot }: { me: Me; mapId: s
   const toggle = (id: string) => {
     setError(null);
     if (crew.includes(id)) return remove(id);
-    if (crew.length >= CREW_CAP) return toast.show({ tone: 'warning', title: 'Three agents is the most a crew can field.' });
+    if (crew.length >= CREW_CAP) return toast.show({ tone: 'warning', title: 'Your crew is full.' });
     setCrew((p) => [...p, id]);
   };
   const focusRoster = () => document.getElementById('s04-roster')?.querySelector('button')?.focus();

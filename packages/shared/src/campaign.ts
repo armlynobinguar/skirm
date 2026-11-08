@@ -85,7 +85,7 @@ export const CAMPAIGN_CHAPTERS: readonly CampaignChapter[] = [
         id: 'c1-m3',
         title: 'Terrace Sweep',
         briefing:
-          'Monsoon Terraces drains downhill in waves. Field two agents this time and split the work: one on the route, one on the water.',
+          'Monsoon Terraces drains downhill in waves. Field more than one agent this time and split the work: one on the route, one on the water.',
         mapId: 'monsoon-terraces',
         difficulty: 'easy',
         crewSize: 2,
@@ -142,7 +142,7 @@ export const CAMPAIGN_CHAPTERS: readonly CampaignChapter[] = [
         id: 'c2-m4',
         title: 'Depot Lockdown',
         briefing:
-          'Frostline Depot has no hazard at all, only a faster clock and a bot that bluffs more. Field all three agents, out-talk it and out-run it.',
+          'Frostline Depot has no hazard at all, only a faster clock and a bot that bluffs more. Field your full crew, out-talk it and out-run it.',
         mapId: 'frostline-depot',
         difficulty: 'hard',
         crewSize: 3,
@@ -163,13 +163,13 @@ export const CAMPAIGN_CHAPTERS: readonly CampaignChapter[] = [
   {
     id: 'c3',
     title: 'Lights Out',
-    blurb: 'Night, fog and a full crew of three. The last boards in the atlas.',
+    blurb: 'Night, fog and a full crew. The last boards in the atlas.',
     missions: [
       {
         id: 'c3-m1',
         title: 'Metro Flood',
         briefing:
-          'Sunken Metro floods tunnel by tunnel under fog. Field all three agents on a faster hazard and a shorter clock.',
+          'Sunken Metro floods tunnel by tunnel under fog. Field your full crew on a faster hazard and a shorter clock.',
         mapId: 'sunken-metro',
         difficulty: 'hard',
         crewSize: 3,

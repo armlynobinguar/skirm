@@ -195,7 +195,7 @@ describe('S04 v2 crew screen', () => {
     await screen.findByTestId(`s04-card-${WICK.id}`);
     for (const a of [MOSS, ROOK, PIKE]) await user.click(screen.getByTestId(`s04-roster-${a.id}`));
     expect(screen.queryByTestId(`s04-card-${PIKE.id}`)).not.toBeInTheDocument();
-    expect(await screen.findByText('Three agents is the most a crew can field.')).toBeInTheDocument();
+    expect(await screen.findByText('Your crew is full.')).toBeInTheDocument();
     for (const a of [MOSS, ROOK]) await user.click(screen.getByRole('button', { name: `Remove ${a.name}` }));
     await user.click(screen.getByRole('button', { name: 'Remove Wick' }));
     expect(screen.getByTestId(`s04-card-${WICK.id}`)).toBeInTheDocument();
