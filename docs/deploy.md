@@ -159,7 +159,7 @@ Notes:
 
 `.github/workflows/deploy.yml` runs `scripts/deploy-gcp.sh` for staging on every push to `main` (it does not wait for `ci`), and from the Actions tab ("Run workflow"). The Cloud Build image build is the only check: if an app fails to build, the script stops before anything is deployed. Deploys queue and never cancel each other. Each push deploys only the pieces whose inputs changed since their running image, so a frontend-only push leaves api, worker and realtime alone; a push that touches realtime's inputs still ends live matches. Run the workflow by hand with `services=all` after changing something outside git, such as a secret or a repository variable (including the `PUBLIC_*` URLs baked into web). `V2_BRAIN` is `model`, so staging matches, benchmarks and trials call the configured model (OpenRouter and `anthropic/claude-haiku-5.5` unless the `LLM_*` repository variables say otherwise) and spend from the `<env>-llm-api-key` (or `<env>-openrouter-api-key`) key; keep a spend limit on that key.
 
-GitHub signs in with Workload Identity Federation (no key). The provider only accepts `TyronVT/skirm` on `refs/heads/main`, and the deployer account can attach only `skirm-run-<env>` and the Compute Engine default account (which Cloud Build runs as), and can't read secret values. One-time setup:
+GitHub signs in with Workload Identity Federation (no key). The provider only accepts this repository on `refs/heads/main`, matched by its numeric ID (`1441348378`) rather than its name so a rename or transfer doesn't break deploys, and the deployer account can attach only `skirm-run-<env>` and the Compute Engine default account (which Cloud Build runs as), and can't read secret values. One-time setup:
 
 ```sh
 P=<project id> NUM=<project number>
@@ -168,8 +168,8 @@ gcloud services enable iamcredentials.googleapis.com sts.googleapis.com
 gcloud iam workload-identity-pools create github --location=global --display-name="GitHub Actions"
 gcloud iam workload-identity-pools providers create-oidc skirm --location=global --workload-identity-pool=github \
   --issuer-uri=https://token.actions.githubusercontent.com \
-  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
-  --attribute-condition="assertion.repository == 'TyronVT/skirm' && assertion.ref == 'refs/heads/main'"
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.ref=assertion.ref" \
+  --attribute-condition="assertion.repository_id == '1441348378' && assertion.ref == 'refs/heads/main'"
 gcloud iam service-accounts create skirm-deploy-github --display-name="GitHub Actions deployer"
 for role in run.admin cloudbuild.builds.editor serviceusage.serviceUsageConsumer viewer; do
   gcloud projects add-iam-policy-binding $P --member=serviceAccount:$SA --role=roles/$role --condition=None
@@ -181,7 +181,19 @@ gcloud iam service-accounts add-iam-policy-binding skirm-run-staging@$P.iam.gser
 gcloud iam service-accounts add-iam-policy-binding $NUM-compute@developer.gserviceaccount.com \
   --member=serviceAccount:$SA --role=roles/iam.serviceAccountUser
 gcloud iam service-accounts add-iam-policy-binding $SA --role=roles/iam.workloadIdentityUser \
-  --member="principalSet://iam.googleapis.com/projects/$NUM/locations/global/workloadIdentityPools/github/attribute.repository/TyronVT/skirm"
+  --member="principalSet://iam.googleapis.com/projects/$NUM/locations/global/workloadIdentityPools/github/attribute.repository_id/1441348378"
+```
+
+The ID comes from `gh api repos/armlynobinguar/skirm -q .id`. A provider set up before this change matched the old name `TyronVT/skirm`, so after the repo moved to `armlynobinguar/skirm` every deploy failed at `google-github-actions/auth` with "The given credential is rejected by the attribute condition". To move an existing setup over to the ID:
+
+```sh
+P=<project id> NUM=<project number>
+SA=skirm-deploy-github@$P.iam.gserviceaccount.com
+gcloud iam workload-identity-pools providers update-oidc skirm --project=$P --location=global --workload-identity-pool=github \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.ref=assertion.ref" \
+  --attribute-condition="assertion.repository_id == '1441348378' && assertion.ref == 'refs/heads/main'"
+gcloud iam service-accounts add-iam-policy-binding $SA --project=$P --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/projects/$NUM/locations/global/workloadIdentityPools/github/attribute.repository_id/1441348378"
 ```
 
 Repository variables (Settings → Secrets and variables → Actions → Variables; none are secret): `GCP_PROJECT`, `GCP_WIF_PROVIDER` (`projects/<number>/locations/global/workloadIdentityPools/github/providers/skirm`), `GCP_DEPLOY_SA` and `PRIVY_APP_ID`. Optional: `NEAR_OPS_ACCOUNT` (the platform signer; read only when the `<env>-near-ops-key` secret exists) and the model settings `LLM_BASE_URL`, `LLM_MODEL`, `LLM_PLANNER_MODEL`, `LLM_PRICE_INPUT_USD` and `LLM_PRICE_OUTPUT_USD` (unset: OpenRouter and its default model; the deploy sets `V2_BRAIN=model`, and without the `<env>-llm-api-key` or `<env>-openrouter-api-key` secret every agent plays the greedy brain). For the custom domain, also `PUBLIC_API_URL` (`https://api.playskirm.xyz`), `PUBLIC_WS_URL` (`wss://rt.playskirm.xyz/ws`) and `CORS_ORIGINS` (`https://playskirm.xyz,<web run.app URL>`); without them the deploy points web at the run.app URLs and the api refuses the custom domain's origin. Run `scripts/deploy-gcp.sh` by hand with the same three variables. Also optional, passed to the services only when set: `LLM_MODELS` (the per-agent model catalog, JSON; [economy.md](economy.md)), `BACKING_CONTRACT` (empty keeps writer backing off on staging), `NEAR_RENTALS_ONCHAIN`, `RELAYER_ACCOUNT_ID` and `RELAYER_FREE_TXS` (gasless onboarding, with the `<env>-relayer-private-key` secret), and `SAMPLE_MATCH_ID`, which is baked into the web image as `NEXT_PUBLIC_SAMPLE_MATCH_ID` (the ranked, recorded match behind `/verify`'s "Try a sample match"; empty hides the button). No value may contain `@`.

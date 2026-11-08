@@ -27,7 +27,7 @@ The hosted build runs on NEAR testnet at **[playskirm.xyz](https://playskirm.xyz
 To run the whole stack yourself you need only **Docker** (Compose 2.24+). No API keys or wallet:
 
 ```sh
-git clone https://github.com/TyronVT/skirm.git && cd skirm
+git clone https://github.com/armlynobinguar/skirm.git && cd skirm
 docker compose up --build
 ```
 

@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { routes } from '@/lib/routes';
 
 export const LEGAL_UPDATED = '2026-11-03';
-const REPO = 'https://github.com/TyronVT/skirm';
+const REPO = 'https://github.com/armlynobinguar/skirm';
 
 function Doc({ title, testId, children }: { title: string; testId: string; children: ReactNode }) {
   return (
