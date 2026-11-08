@@ -6,7 +6,8 @@
 import * as THREE from 'three';
 import { walkBob, walkMs } from '../live';
 import type { AgentCosmetics } from '@skirm/shared';
-import { dressLook, fillOf, lookFor, lookParts, lookTop, poseAt, poseKind, type LookGroup, type RoleLook, type Social } from '@skirm/ui';
+import { dressLook, fillOf, lookFor, lookParts, lookTop, poseAt, poseKind, type LookGroup, type Persona, type RoleLook, type Social } from '@skirm/ui';
+import { SKILL_GLOW_S } from '../figure2d';
 import { trailOf, trailSteps } from '../cosmetics';
 import { PATTERN_R, patternMarks, rigSignature, skinOf, tagColours } from './cosmetics3d';
 import * as proto from '../proto/world';
@@ -627,7 +628,11 @@ function placeTrail(ag: AgentRig, a: Agent3, worn: AgentCosmetics | undefined, k
 }
 
 /** Poses one agent's figure and its effects for this moment (poseAt in @skirm/ui). */
-function poseRig(ag: AgentRig, a: Agent3, o: { time: number; age: number; walk: number; moving: boolean; still: boolean; seed: number; accent: string; social: Social | null }) {
+function poseRig(
+  ag: AgentRig,
+  a: Agent3,
+  o: { time: number; age: number; walk: number; moving: boolean; still: boolean; seed: number; accent: string; social: Social | null; gaze?: number; persona?: Persona },
+) {
   const kind = poseKind({ out: a.out, down: a.down, stun: a.stun, cheer: a.cheer, act: a.act, carrying: a.inv.length, moving: o.moving });
   const pose = poseAt(kind, ag.look, o);
   ag.body.rotation.z = pose.tilt;
@@ -647,11 +652,20 @@ function poseRig(ag: AgentRig, a: Agent3, o: { time: number; age: number; walk: 
   }
   const { ring, bits, bitMat, ringMat } = ag.fx;
   const t = o.still ? 0.4 : o.time;
-  ring.visible = pose.kind === 'act' && ag.look.verb === 'pulse';
-  if (ring.visible) {
+  const pulse = pose.kind === 'act' && ag.look.verb === 'pulse';
+  // A skill kicking in: the same ground ring in gold, swelling and fading (figure2d's glow).
+  const glow = !pulse && !!a.skill && !a.down && !a.out && (o.still || o.age < SKILL_GLOW_S);
+  ring.visible = pulse || glow;
+  if (pulse) {
     const k = o.still ? 0.6 : (o.time * 0.9) % 1;
     ring.scale.setScalar(0.7 + k * 2);
+    ringMat.color.set(ag.look.accent);
     ringMat.opacity = o.still ? 0.5 : 0.9 * (1 - k);
+  } else if (glow) {
+    const k = o.still ? 0.5 : o.age / SKILL_GLOW_S;
+    ring.scale.setScalar(0.8 + k * 1.4);
+    ringMat.color.set('#ffd23f');
+    ringMat.opacity = o.still ? 0.8 : 0.95 * (1 - k);
   }
   const topY = carryY(ag.look);
   let n = 0;
@@ -875,7 +889,20 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
     const hop = moving && !still ? walkBob(km) * 0.025 : 0;
     ag.g.position.set(x, hop, z);
     ag.g.rotation.y += still ? angDiff(ag.g.rotation.y, ag.face) : angDiff(ag.g.rotation.y, ag.face) * Math.min(1, dt * 10);
-    poseRig(ag, a, { time, age: (f.now - state.at) / 1000, walk: km, moving: moving && !still && km > 0, still, seed: i, accent: TEAM_RING[a.team], social: a.social ?? null });
+    // Looks where it is going: how far the goal is to its side, from the way it faces (local +x).
+    const gaze = a.gaze ? Math.max(-1, Math.min(1, Math.sin(Math.atan2(a.gaze[0] - x, a.gaze[1] - z) - ag.g.rotation.y) * 1.4)) : 0;
+    poseRig(ag, a, {
+      time,
+      age: (f.now - state.at) / 1000,
+      walk: km,
+      moving: moving && !still && km > 0,
+      still,
+      seed: i,
+      accent: TEAM_RING[a.team],
+      social: a.social ?? null,
+      gaze,
+      ...(a.persona ? { persona: a.persona } : {}),
+    });
     // Anyone between the camera and the watched agent fades so they never hide it.
     const blocking = !!rig.pos && !!rig.focusAt && a.id !== state.focus && segDist(x, z, rig.pos.x, rig.pos.z, rig.focusAt.x, rig.focusAt.z) < 0.75;
     const op = (a.down ? 0.5 : blocking ? 0.28 : 1) * af;

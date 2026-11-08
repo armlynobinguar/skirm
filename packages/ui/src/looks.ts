@@ -464,6 +464,38 @@ export interface Social {
   /** A hazard right next to it (leans away, an arm up); `wave`: a wave just came in. */
   flinch?: boolean;
   wave?: boolean;
+  /** One of its equipped skills kicked in this tick (a power stance; the renderers add a glow and its name). */
+  skill?: boolean;
+  /** Its player's live command just reached it (a salute, then it turns toward the order's target). */
+  salute?: boolean;
+  /** Its line names something on the board: it points at it while it talks. */
+  callout?: boolean;
+  /** A hazard wave is coming in a couple of tiles away: it glances at it, a bead of sweat. */
+  sweat?: boolean;
+  /** The crew lead at the start of the last stretch, waving the others on. */
+  rally?: boolean;
+  /** Huddling with its crew (kick-off, or after the crew lost a race): leans in, a hand to the middle. */
+  huddle?: boolean;
+  /** The last stretch of the match: it runs (deeper lean, arms pumping) under any other reaction. */
+  hurry?: boolean;
+}
+
+/**
+ * How an agent stands around when it has nothing to react to, on top of its role's idle habit:
+ * stoic (arms folded, steady), fidget (shifts its weight, quick glances) or calm (slow breathing).
+ */
+export type Persona = 'stoic' | 'fidget' | 'calm';
+
+const PERSONAS: readonly Persona[] = ['stoic', 'fidget', 'calm'];
+/** The starter crew's own characters; any other agent gets one from its id, the same every match. */
+const NAMED_PERSONAS: Readonly<Record<string, Persona>> = { rook: 'stoic', wren: 'fidget', moss: 'calm' };
+
+export function personaOf(name: string | undefined, id: string): Persona {
+  const named = name ? NAMED_PERSONAS[name.trim().toLowerCase()] : undefined;
+  if (named) return named;
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return PERSONAS[h % PERSONAS.length]!;
 }
 
 /** The status a renderer knows about an agent this frame. */
@@ -525,10 +557,34 @@ const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
 export function poseAt(
   kind: PoseKind,
   look: RoleLook,
-  o: { time: number; age: number; walk?: number; still?: boolean; seed?: number; social?: Social | null },
+  o: {
+    time: number;
+    age: number;
+    walk?: number;
+    still?: boolean;
+    seed?: number;
+    social?: Social | null;
+    /** Its head turned toward where it is going, -1 (its left) to 1 (its right); 0 or absent: straight ahead. */
+    gaze?: number;
+    persona?: Persona;
+  },
 ): Pose {
   const base = basePose(kind, look, o);
-  return o.social && SOCIAL_KINDS.has(base.kind) ? withSocial(base, look, o.social, o) : base;
+  // The last stretch: a walk becomes a run, whatever else it does.
+  if (o.social?.hurry && base.kind === 'walk' && !o.still) {
+    base.lean += 0.14;
+    base.lift *= 1.6;
+    const hand = base.off.hand;
+    if (hand) base.off.hand = [hand[0], hand[1] + 0.04, hand[2] * 2.2];
+  }
+  const pose = o.social && SOCIAL_KINDS.has(base.kind) ? withSocial(base, look, o.social, o) : base;
+  // Looks where it is going: the head turns toward the goal (on top of the reaction's own head move).
+  if (o.gaze && SOCIAL_KINDS.has(pose.kind)) {
+    const g = Math.max(-1, Math.min(1, o.gaze));
+    const head = pose.off.head ?? [0, 0, 0];
+    pose.off = { ...pose.off, head: [head[0] + g * 0.04, head[1], head[2] + Math.abs(g) * 0.008] };
+  }
+  return pose;
 }
 
 /** Poses a reaction may play over: the agent is up and not busy with a verb, a fall or a celebration. */
@@ -556,6 +612,32 @@ function withSocial(pose: Pose, look: RoleLook, s: Social, o: { time: number; ag
     off.hand = [Math.cos(a) * 0.08, 0.16 + Math.sin(a) * 0.1, 0.04];
     return { ...pose, off, tilt: still ? 0.08 : Math.sin(t * 9) * 0.12 };
   }
+  if (s.salute && live) {
+    // Got its order: snaps upright, hand to the brow, then lowers it as it turns to go.
+    const up = still || k < 0.65;
+    off.hand = up ? [0.03, 0.3, 0.1] : [0, 0.1 + (1 - k) * 0.4, 0.08];
+    off.head = [0, 0.01, 0];
+    return { ...pose, off, lean: pose.lean - 0.05 };
+  }
+  if (s.skill && live) {
+    // A skill kicks in: feet planted wide, hands up and forward, a small hop as it starts.
+    off.footL = [-0.05, 0, 0];
+    off.footR = [0.05, 0, 0];
+    off.hand = [0, 0.2, 0.13];
+    const hop = still ? 0 : Math.sin(Math.min(1, k * 3) * Math.PI) * 0.07;
+    return { ...pose, off, lift: pose.lift + hop, lean: pose.lean + 0.06 };
+  }
+  if (s.rally) {
+    // The crew lead waves the others on: an arm sweeping overhead, leaning toward the goal.
+    off.hand = [still ? 0 : Math.sin(t * 9) * 0.07, 0.32, 0.04];
+    return { ...pose, off, lean: pose.lean + 0.1 };
+  }
+  if (s.huddle) {
+    // Huddles with its crew: leans in, a hand to the middle, head down a little.
+    off.hand = [0, 0.1, 0.15];
+    off.head = [0, -0.012, 0.02];
+    return { ...pose, off, lean: pose.lean + 0.18 };
+  }
   if (s.scheme) {
     // Rubs its hands: the hand jitters side to side in front of it.
     off.hand = [still ? 0 : Math.sin(t * 18) * 0.025, 0.1, 0.1];
@@ -579,6 +661,12 @@ function withSocial(pose: Pose, look: RoleLook, s: Social, o: { time: number; ag
   if (s.shake && live) {
     off.hand = [0, 0.2, 0.06 + (still ? 0 : Math.sin(t * 22) * 0.03)];
     return { ...pose, off, lean: pose.lean + 0.06 };
+  }
+  if (s.talk && s.callout) {
+    // Calls out something on the board: points at it while it talks, the head bobbing on the beats.
+    off.hand = [0, 0.17, 0.17];
+    off.head = [0, still ? 0 : Math.max(0, Math.sin(t * 9)) * 0.012, 0.01];
+    return { ...pose, off };
   }
   if (s.talk) {
     // Talking with its hands, a little bob of the head on the beats.
@@ -608,6 +696,11 @@ function withSocial(pose: Pose, look: RoleLook, s: Social, o: { time: number; ag
     off.hand = [0, 0.14 + k2 * 0.08, 0.1];
     return { ...pose, off, lean: pose.lean - 0.12 - k2 * 0.16 };
   }
+  if (s.sweat) {
+    // A wave is coming in close by: glances at it over its shoulder, leaning back a little.
+    off.head = [0.03, 0, -0.01];
+    return { ...pose, off, lean: pose.lean - 0.06 };
+  }
   if (s.point) {
     // Points the way it is heading.
     off.hand = [0, 0.16, 0.16];
@@ -628,7 +721,7 @@ function withSocial(pose: Pose, look: RoleLook, s: Social, o: { time: number; ag
  * digger leans on its shovel, the builder taps a block, the scout and the others look around now
  * and then. Small and slow; reduced motion keeps the plain stance.
  */
-function idleHabit(pose: Pose, look: RoleLook, t: number, seed: number): Pose {
+function idleHabit(pose: Pose, look: RoleLook, t: number, seed: number, persona?: Persona): Pose {
   const cycle = (t + seed * 1.7) % 6;
   const glance = cycle > 4.2 ? Math.sin(((cycle - 4.2) / 1.8) * Math.PI) : 0;
   switch (look.verb) {
@@ -653,13 +746,39 @@ function idleHabit(pose: Pose, look: RoleLook, t: number, seed: number): Pose {
       pose.lift = Math.sin(t * 3 + seed) * 0.015;
   }
   if (glance) pose.off.head = [glance * 0.035, 0, 0];
+  return persona ? withPersona(pose, persona, t, seed) : pose;
+}
+
+/**
+ * Its character on top of the role's habit (the hands only where the role left them free): stoic
+ * folds its arms and holds still, fidget shifts its weight and glances about, calm breathes slowly.
+ */
+function withPersona(pose: Pose, persona: Persona, t: number, seed: number): Pose {
+  const handFree = !pose.off.hand;
+  switch (persona) {
+    case 'stoic':
+      if (handFree) pose.off.hand = [0, 0.13, 0.11];
+      pose.lift *= 0.3;
+      break;
+    case 'fidget': {
+      pose.tilt = Math.sin(t * 2.6 + seed) * 0.045;
+      const cycle = (t + seed * 1.3) % 2.4;
+      if (cycle > 1.8) pose.off.head = [Math.sin(((cycle - 1.8) / 0.6) * Math.PI) * 0.04 * (seed % 2 ? 1 : -1), 0, 0];
+      if (handFree) pose.off.hand = [0, 0.02 + Math.abs(Math.sin(t * 3.4 + seed)) * 0.03, 0.03];
+      break;
+    }
+    case 'calm':
+      pose.lift = Math.sin(t * 1.1 + seed) * 0.014;
+      pose.off.head = [pose.off.head?.[0] ?? 0, -0.008, 0.006];
+      break;
+  }
   return pose;
 }
 
 function basePose(
   kind: PoseKind,
   look: RoleLook,
-  o: { time: number; age: number; walk?: number; still?: boolean; seed?: number },
+  o: { time: number; age: number; walk?: number; still?: boolean; seed?: number; persona?: Persona },
 ): Pose {
   const pose: Pose = { kind, lift: 0, tilt: 0, lean: 0, off: {}, tipScale: 1, fx: 0 };
   const still = !!o.still;
@@ -747,7 +866,7 @@ function basePose(
       pose.lift = still ? 0 : Math.sin(t * 3 + seed) * 0.012;
       return pose;
     default:
-      return still ? pose : idleHabit(pose, look, t, seed);
+      return still ? pose : idleHabit(pose, look, t, seed, o.persona);
   }
 }
 

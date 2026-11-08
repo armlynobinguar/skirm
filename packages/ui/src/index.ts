@@ -59,6 +59,7 @@ export {
   lookTop,
   poseKind,
   poseAt,
+  personaOf,
   isoPolys,
   polyBounds,
   fillOf,
@@ -78,6 +79,7 @@ export {
   type PoseKind,
   type PoseInput,
   type Social,
+  type Persona,
   type IsoPoly,
   type Dress,
 } from './looks';
