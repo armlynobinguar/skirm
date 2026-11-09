@@ -5,7 +5,7 @@ import { ApiError } from '@/lib/api/errors';
 import { meFixture } from '@/test/fixtures';
 import { renderWithProviders } from '@/test/render';
 import { testRouter } from '@/test/router';
-import { MarketplaceScreen, mergeMine, v2ProofLine } from './MarketplaceScreen';
+import { MarketplaceScreen, forSaleFirst, mergeMine, v2ProofLine } from './MarketplaceScreen';
 import {
   ME_ID,
   SECRET_PROMPT,
@@ -259,5 +259,17 @@ describe('v2ProofLine', () => {
     expect(v2ProofLine({ rankedWinRate: 0.625, rankedMatches: 16, benchmarkScore: 0.71 })).toBe('Won 63% of 16 ranked · Benchmark 71%');
     expect(v2ProofLine({ rankedWinRate: null, rankedMatches: 0, benchmarkScore: 0 })).toBe('No ranked matches · Benchmark 0%');
     expect(v2ProofLine({ rankedWinRate: 0, rankedMatches: 3, benchmarkScore: null })).toBe('Won 0% of 3 ranked · Not benchmarked');
+  });
+});
+
+describe('forSaleFirst', () => {
+  it('puts skills on sale first and keeps each group in the API order', () => {
+    const cards = [
+      { id: 'a', priceYocto: null },
+      { id: 'b', priceYocto: '1' },
+      { id: 'c', priceYocto: null },
+      { id: 'd', priceYocto: '2' },
+    ];
+    expect(forSaleFirst(cards).map((c) => c.id)).toEqual(['b', 'd', 'a', 'c']);
   });
 });
