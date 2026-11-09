@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ButtonLink } from '@/components/ButtonLink';
+import { SignInButton } from '@/components/shell/RequireSession';
 import { QueryView } from '@/components/states/QueryView';
 import { Skeleton } from '@/components/states/Skeleton';
 import { useToast } from '@/components/toast/ToastProvider';
@@ -61,13 +62,29 @@ export function TournamentsScreen() {
                     ))}
                   </ul>
                 ) : (
-                  <p className={s.note}>No tournaments yet. Make the first one.</p>
+                  <p className={s.note}>
+                    {status === 'signedOut'
+                      ? 'No tournaments yet. Sign in to make the first one.'
+                      : 'No tournaments yet. Make the first one.'}
+                  </p>
                 )
               }
             </QueryView>
           </section>
         </div>
-        <aside className={s.colSide}>{status === 'signedIn' ? <CreateTournament /> : null}</aside>
+        <aside className={s.colSide}>
+          {status === 'signedIn' ? (
+            <CreateTournament />
+          ) : status === 'signedOut' ? (
+            <section className={s.card} aria-labelledby="t-new-signin" data-testid="t-signin">
+              <h2 className={s.h3} id="t-new-signin">
+                Make a tournament
+              </h2>
+              <p className={s.note}>Pick a bracket size and a prize pool, then share the link. Needs an account; no wallet needed.</p>
+              <SignInButton data-testid="t-signin-action">Sign in to create</SignInButton>
+            </section>
+          ) : null}
+        </aside>
       </div>
     </div>
   );
