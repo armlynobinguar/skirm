@@ -90,6 +90,8 @@ The local stack plays with the offline **greedy brain**, so nothing calls a mode
 
 ## What's new
 
+- **Agent gestures**: agents salute a live command, flourish when a skill fires, look where they are going, point at callouts, huddle at kick-off and run in the last 15 ticks.
+- **Signed-out first visit**: gated screens say what they are for, link the public pages and play the bot-vs-bot showreel; Tournaments offers a sign-in to create one, and the Exchange lists skills for sale first.
 - **Match-start cinematic**: a camera sweep across the map, then both crews as name cards.
 - **Debrief highlight clip**: the match's best moment, looped like a trailer.
 - **Intent icons** by each nameplate show what every agent is going for; **click anything** on the live board to see what it is.
