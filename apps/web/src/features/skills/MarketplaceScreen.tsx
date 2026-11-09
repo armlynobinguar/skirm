@@ -184,7 +184,7 @@ function ExchangeList({ sel, onSelect }: { sel: string | null; onSelect: (id: st
   });
 
   const needle = search.trim().toLowerCase();
-  const cards = (market.data ?? []).filter(
+  const cards = forSaleFirst(market.data ?? []).filter(
     (c) =>
       !needle ||
       c.skill.name.toLowerCase().includes(needle) ||
@@ -392,6 +392,14 @@ function fromRow(row: SkillRow, held: boolean, meId: string | undefined): CardMo
     mine,
     statusLine: mine || row.status === 'Starter' ? row.status : 'Owned',
   };
+}
+
+/**
+ * Skills on sale come first, in the order the API sorted them; skills listed without a price ("Not for
+ * sale") follow, so a visitor's first card is one they can buy. Stable: each group keeps its order.
+ */
+export function forSaleFirst<T extends { priceYocto: string | null }>(cards: readonly T[]): T[] {
+  return [...cards.filter((c) => c.priceYocto !== null), ...cards.filter((c) => c.priceYocto === null)];
 }
 
 /** "Won 63% of 16 ranked · Benchmark 71%" / "No ranked matches · Not benchmarked". */
