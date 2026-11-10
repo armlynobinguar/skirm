@@ -88,8 +88,8 @@ describe('S11 Skirmish hub', () => {
     expect(within(ladder).getByTestId('s11-ladder-8')).not.toHaveClass(/you/);
     expect(within(ladder).getByTestId('s11-ladder-more')).toHaveAttribute('href', '/leaderboards');
     const pool = screen.getByRole('region', { name: /Season 3 prize pool/ });
-    expect(within(pool).getByTestId('s11-pool')).toHaveTextContent('12.50 NEARlocal');
-    expect(within(pool).getByTestId('s11-pool-local')).toHaveAttribute('title', 'Kept offchain until the seasons contract is deployed');
+    expect(within(pool).getByTestId('s11-pool')).toHaveTextContent('12.50 NEARoffchain tally');
+    expect(within(pool).getByTestId('s11-pool-local')).toHaveAttribute('title', expect.stringContaining('until the season is recorded on the seasons contract on NEAR'));
     expect(pool).toHaveTextContent('1st30%2nd20%3rd15%4th–10th5% each');
     expect(pool).toHaveTextContent('Paid in NEAR to the top 10 when the season ends');
     expect(within(pool).getByTestId('s11-pool-ends')).toHaveTextContent(/^2d 0[23]h \d\dm$/);
@@ -107,6 +107,16 @@ describe('S11 Skirmish hub', () => {
     const pool = await screen.findByRole('region', { name: /Season 4 prize pool/ });
     expect(await within(pool).findByText('Paid in NEAR to the top 3 when the season ends')).toBeInTheDocument();
     expect(pool).toHaveTextContent('1st60%2nd30%3rd10%');
+    expect(within(pool).queryByTestId('s11-pool-local')).not.toBeInTheDocument();
+  });
+
+  it('says how an empty pool fills instead of showing 0.00 NEAR', async () => {
+    setup({ api: { currentSeason: async () => currentSeasonFixture({ season: seasonFixture({ number: 5, poolYocto: '0', poolSource: 'local' }) }) } });
+    await ready();
+    const pool = await screen.findByRole('region', { name: /Season 5 prize pool/ });
+    expect(await within(pool).findByTestId('s11-pool')).toHaveTextContent('No pool yet');
+    expect(within(pool).getByTestId('s11-pool-fills')).toHaveTextContent('30% of every skill-market fee taken this season goes into it.');
+    expect(pool).not.toHaveTextContent('0.00 NEAR');
     expect(within(pool).queryByTestId('s11-pool-local')).not.toBeInTheDocument();
   });
 
