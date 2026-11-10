@@ -1,14 +1,19 @@
 'use client';
 // /verify: anyone pastes a match id and checks it against the NEAR registry in their own browser
 // (no account needed). `?id=` prefills and runs it, so a check can be shared as a link. "Try a
-// sample match" fills and checks NEXT_PUBLIC_SAMPLE_MATCH_ID (a known ranked, recorded match) for
-// visitors without an id of their own; unset, it is hidden (no public api lists ended ranked matches).
+// recent match" lists the latest ranked matches recorded on NEAR (GET /v2/matches/recorded), so a
+// visitor without an id of their own has one to check; with none recorded yet it falls back to
+// NEXT_PUBLIC_SAMPLE_MATCH_ID, and says so plainly when there is neither.
 import { Button } from '@skirm/ui';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, type FormEvent } from 'react';
 import { Skeleton } from '@/components/states/Skeleton';
+import { mapById } from '@/features/arena/world';
+import type { V2RecordedMatch } from '@/lib/api/types';
 import { config } from '@/lib/config';
 import { routes } from '@/lib/routes';
+import { useApi } from '@/lib/services';
 import { VerifyPanel } from './VerifyPanel';
 import s from './verify.module.css';
 
@@ -37,14 +42,17 @@ function VerifyForm() {
   const current = useSearchParams().get('id')?.trim() || '';
   const [text, setText] = useState(current);
   const sample = config.sampleMatchId;
+  const api = useApi();
+  const recorded = useQuery({ queryKey: ['matches', 'v2-recorded'], queryFn: () => api.v2RecordedMatches(), retry: false, staleTime: 60_000 });
+  const recent = (recorded.data ?? []).slice(0, 3);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const id = matchIdFrom(text);
     if (id) router.replace(routes.verify(id));
   };
-  const trySample = () => {
-    setText(sample);
-    router.replace(routes.verify(sample));
+  const pick = (id: string) => {
+    setText(id);
+    router.replace(routes.verify(id));
   };
   return (
     <div className={`sk-panel ${s.page}`} data-testid="verify-screen">
@@ -61,16 +69,35 @@ function VerifyForm() {
           Check
         </Button>
       </form>
-      {sample ? (
+      {recent.length ? (
+        <div className={s.sample} data-testid="verify-recent">
+          <span>No match id to hand? Try a recent ranked match recorded on NEAR:</span>
+          {recent.map((m) => (
+            <Button key={m.id} size="sm" variant="secondary" onClick={() => pick(m.id)} disabled={current === m.id} data-testid={`verify-recent-${m.id}`}>
+              {recentLabel(m)}
+            </Button>
+          ))}
+        </div>
+      ) : sample ? (
         <p className={s.sample}>
           <span>No match id to hand?</span>
-          <Button size="sm" variant="secondary" onClick={trySample} disabled={current === sample} data-testid="verify-sample">
+          <Button size="sm" variant="secondary" onClick={() => pick(sample)} disabled={current === sample} data-testid="verify-sample">
             Try a sample match
           </Button>
           <span>a ranked match recorded on NEAR</span>
+        </p>
+      ) : recorded.isSuccess && !current ? (
+        <p className={s.sample} data-testid="verify-none">
+          No ranked match is recorded on NEAR yet. The first ranked results will be listed here to check.
         </p>
       ) : null}
       {current ? <VerifyPanel key={current} matchId={current} showPageLink={false} auto /> : null}
     </div>
   );
+}
+
+/** "ana 3–2 ben · Copper Hollow": who played, the score and the map. */
+function recentLabel(m: V2RecordedMatch): string {
+  const who = `${m.handles.A ?? '?'} ${m.score ? `${m.score.A}–${m.score.B}` : 'vs'} ${m.handles.B ?? '?'}`;
+  return `${who} · ${mapById(m.mapId)?.name ?? m.mapId}`;
 }

@@ -704,6 +704,16 @@ export interface V2LiveMatch {
   teams: Record<Side, { handle: string | null; size: number }>;
 }
 
+/** GET /v2/matches/recorded: an ended ranked match whose result is on the NEAR registry. */
+export interface V2RecordedMatch {
+  id: string;
+  mapId: string;
+  endedAt: string | null;
+  winner: 'A' | 'B' | 'draw' | null;
+  score: Record<Side, number> | null;
+  handles: Record<Side, string | null>;
+}
+
 // ---------- Seasons ----------
 
 export type SeasonStatus = 'open' | 'locked' | 'paid';

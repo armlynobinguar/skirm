@@ -79,6 +79,7 @@ const METHODS: (keyof ApiClient)[] = [
   'v2Match',
   'v2MatchLog',
   'v2LiveMatches',
+  'v2RecordedMatches',
   'createLobby',
   'myLobbies',
   'lobby',
