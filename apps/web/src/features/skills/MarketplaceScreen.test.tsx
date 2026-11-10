@@ -41,6 +41,17 @@ describe('S09 Marketplace', () => {
     expect(api.skills).not.toHaveBeenCalled();
   });
 
+  it("shows the server's first page at once, before its own fetch answers, then refreshes it", async () => {
+    let answer: (v: ReturnType<typeof marketCardFixture>[]) => void = () => {};
+    const pending = new Promise<ReturnType<typeof marketCardFixture>[]>((r) => (answer = r));
+    const { api } = renderWithProviders(<MarketplaceScreen initialCards={[marketCardFixture()]} />, { api: base({ market: () => pending }) });
+    // In the first render: no skeleton, no waiting on the bundle or the session.
+    expect(screen.getByTestId(`s09-card-${SKILL_ID}`)).toBeInTheDocument();
+    await waitFor(() => expect(api.market).toHaveBeenCalledWith({ sort: 'winrate' }));
+    answer([]);
+    await waitFor(() => expect(screen.queryByTestId(`s09-card-${SKILL_ID}`)).not.toBeInTheDocument());
+  });
+
   it('shows cards with price in NEAR (bigint), the ranked and benchmark proof line and the corner chip', async () => {
     const { api } = renderWithProviders(<MarketplaceScreen />, { handle: 'ada', api: base() });
     const card = await screen.findByTestId(`s09-card-${SKILL_ID}`);

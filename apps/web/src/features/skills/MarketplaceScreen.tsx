@@ -51,8 +51,9 @@ const TABS: { id: MarketTab; label: string }[] = [
 ];
 
 /** `skillId`: open the drawer on this skill (the /market/[skillId] deep link). */
-export function MarketplaceScreen({ skillId }: { skillId?: string } = {}) {
-  return <Marketplace initial={skillId ?? null} />;
+/** `initialCards`: the first page (default sort, no tag) the server already fetched, shown at once. */
+export function MarketplaceScreen({ skillId, initialCards }: { skillId?: string; initialCards?: MarketCard[] } = {}) {
+  return <Marketplace initial={skillId ?? null} initialCards={initialCards} />;
 }
 
 /** Keeps the address bar on the open skill without a navigation (Next syncs native history calls). */
@@ -65,7 +66,7 @@ function syncUrl(skillId: string | null) {
   }
 }
 
-function Marketplace({ initial }: { initial: string | null }) {
+function Marketplace({ initial, initialCards }: { initial: string | null; initialCards?: MarketCard[] }) {
   const [tab, setTab] = useState<MarketTab>('exchange');
   const [sel, setSel] = useState<string | null>(initial);
   const drawer = useRef<HTMLElement>(null);
@@ -145,7 +146,7 @@ function Marketplace({ initial }: { initial: string | null }) {
       <div className={x.mk} data-open={sel ? '' : undefined}>
         <div id="s09-panel" role="tabpanel" aria-labelledby={`s09-tab-${tab}`} className={x.list}>
           {tab === 'exchange' ? (
-            <ExchangeList sel={sel} onSelect={select} />
+            <ExchangeList sel={sel} onSelect={select} initialCards={initialCards} />
           ) : (
             <RequireSession>
               <MineList sel={sel} onSelect={select} />
@@ -166,7 +167,7 @@ function Marketplace({ initial }: { initial: string | null }) {
 
 // ---------- Exchange tab ----------
 
-function ExchangeList({ sel, onSelect }: { sel: string | null; onSelect: (id: string) => void }) {
+function ExchangeList({ sel, onSelect, initialCards }: { sel: string | null; onSelect: (id: string) => void; initialCards?: MarketCard[] }) {
   const api = useApi();
   const { status } = useSession();
   const me = useMe();
@@ -181,6 +182,8 @@ function ExchangeList({ sel, onSelect }: { sel: string | null; onSelect: (id: st
     // Public: signed out too, once the session is known (the cache is cleared on sign-in).
     enabled: status !== 'loading',
     placeholderData: keepPreviousData,
+    // The server's first page shows at once; stale from the start, so it is refetched once enabled.
+    ...(initialCards && !tag && sort === 'winrate' ? { initialData: initialCards, initialDataUpdatedAt: 0 } : {}),
   });
 
   const needle = search.trim().toLowerCase();
