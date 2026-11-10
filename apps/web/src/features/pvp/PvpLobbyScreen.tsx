@@ -629,7 +629,7 @@ function EarnRows({ d }: { d: EarnBack }) {
 
 type SeasonQuery = ReturnType<typeof useCurrentSeason>;
 
-/** The season's prize pool ("local" while offchain), its split and the time left. */
+/** The season's prize pool (how it fills while empty; "offchain tally" until it is on NEAR), its split and the time left. */
 function PoolPanel({ season }: { season: SeasonQuery }) {
   const d = season.data?.season;
   const now = useNow(1000, d?.status === 'open');
@@ -643,14 +643,28 @@ function PoolPanel({ season }: { season: SeasonQuery }) {
           const left = Date.parse(ssn.endsAt) - now;
           return (
             <>
-              <div className={h.poolN} data-testid="s11-pool">
-                <span className="sk-disp">{nearText(ssn.poolYocto)}</span>
-                {ssn.poolSource === 'local' ? (
-                  <span className={h.chip} title="Kept offchain until the seasons contract is deployed" data-testid="s11-pool-local">
-                    local
+              {sumYocto(ssn.poolYocto) === 0n && ssn.status === 'open' ? (
+                // An empty pool says how it fills, as on Leaderboards, instead of "0.00 NEAR".
+                <div className={h.poolEmpty} data-testid="s11-pool">
+                  <span className="sk-disp">No pool yet</span>
+                  <span className={h.note} data-testid="s11-pool-fills">
+                    {DEFAULTS.season.feeShareBps / 100}% of every skill-market fee taken this season goes into it.
                   </span>
-                ) : null}
-              </div>
+                </div>
+              ) : (
+                <div className={h.poolN} data-testid="s11-pool">
+                  <span className="sk-disp">{nearText(ssn.poolYocto)}</span>
+                  {ssn.poolSource === 'local' ? (
+                    <span
+                      className={h.chip}
+                      title="skirm's server keeps this tally until the season is recorded on the seasons contract on NEAR"
+                      data-testid="s11-pool-local"
+                    >
+                      offchain tally
+                    </span>
+                  ) : null}
+                </div>
+              )}
               <span className="sk-kick">Paid in NEAR to the top {ssn.splitBps.length} when the season ends</span>
               <dl className={h.split}>
                 {splitRows(ssn.splitBps).map(([a, b]) => (
