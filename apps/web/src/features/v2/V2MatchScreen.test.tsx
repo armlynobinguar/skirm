@@ -442,7 +442,7 @@ describe('v2 match screen: spectating and practice', () => {
   });
 
   it('marks a practice: vs Greedy bot and Free practice through found, lock-in and the debrief', async () => {
-    const { rt, user } = setup('mat_p');
+    const { rt } = setup('mat_p');
     act(() =>
       rt.emit({ type: 'v2_found', matchId: 'mat_p', team: 'A', mapId: 'copper-hollow', ranked: false, acceptMs: 10_000, difficulty: 'easy', practice: true, free: true, rivalHandle: 'Greedy bot' }),
     );
