@@ -29,7 +29,7 @@ import { Button, Icon, fmt } from '@skirm/ui';
 import Link from 'next/link';
 import { useState } from 'react';
 import { AgentPortrait } from '@/features/arena/AgentPortrait';
-import { roleTitle } from '@/features/arena/roles';
+import { type RoleClass, roleTitle } from '@/features/arena/roles';
 import { errorCopy, isApiError } from '@/lib/api/errors';
 import { useBuyCosmetic, useCosmetics, useMe } from '@/lib/api/queries';
 import { routes } from '@/lib/routes';
@@ -161,16 +161,18 @@ export interface LookEditorProps {
   agentId: string;
   name: string;
   unlocks: Unlock[];
+  /** The agent's role; unlocks are only a fallback for agents without one. */
+  role?: RoleClass;
   initial: AgentAppearance;
   saving: boolean;
   onSave: (look: AgentAppearance) => void;
   onCancel: () => void;
 }
 
-export function LookEditor({ agentId, name, unlocks, initial, saving, onSave, onCancel }: LookEditorProps) {
+export function LookEditor({ agentId, name, unlocks, role: agentRole, initial, saving, onSave, onCancel }: LookEditorProps) {
   const [look, setLook] = useState<AgentAppearance>(initial);
   const set = <K extends keyof AgentAppearance>(k: K, v: AgentAppearance[K]) => setLook((l) => ({ ...l, [k]: v }));
-  const role = roleTitle(unlocks);
+  const role = agentRole ?? roleTitle(unlocks);
   const changed = JSON.stringify(look) !== JSON.stringify(initial);
 
   const me = useMe();

@@ -32,7 +32,8 @@ export interface CommandDeckProps {
 }
 
 export function CommandDeck({ lead, agents, elo, hub }: CommandDeckProps) {
-  const role = lead ? roleTitle(lead.unlocks) : null;
+  // The agent's own role (what the crew screen, PvP and matches show); unlocks only as a fallback.
+  const role = lead ? (lead.role ?? roleTitle(lead.unlocks)) : null;
   const skill = lead?.skills[0]?.name;
   const rotation = MAPS[ROTATION_INDEX]!;
   const smallest = MAPS[0]!.A;
