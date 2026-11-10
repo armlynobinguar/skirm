@@ -11,6 +11,15 @@ const base = {
 };
 
 describe('S02 Command deck', () => {
+  it("shows the lead agent's own role, not one guessed from its unlocks", async () => {
+    const me = meFixture();
+    me.agents[0] = { ...me.agents[0]!, role: 'Runner', unlocks: ['builder'] };
+    renderWithProviders(<HomeScreen />, { handle: 'ada', path: '/play', api: { me: async () => me } });
+    const deck = await screen.findByTestId('s02-deck');
+    await waitFor(() => expect(deck).toHaveTextContent('Runner · crew lead'));
+    expect(deck).not.toHaveTextContent('Builder · crew lead');
+  });
+
   it('shows the lead agent with its role and skill, and the menu tiles', async () => {
     renderWithProviders(<HomeScreen />, { handle: 'ada', path: '/play', api: base });
     const deck = await screen.findByTestId('s02-deck');

@@ -92,3 +92,14 @@ describe('Look editor premium colours', () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ outfit: 1, skin: 2 }));
   });
 });
+
+describe('Look editor role', () => {
+  it("names the agent's own role over one guessed from its unlocks", async () => {
+    renderWithProviders(
+      <LookEditor agentId={AGENT} name="Rook" unlocks={['builder']} role="Runner" initial={defaultAppearance(AGENT)} saving={false} onSave={() => {}} onCancel={() => {}} />,
+      { handle: 'ada', api: { me: async () => meFixture(), cosmetics: async () => cosmeticsFixture({ owned: [] }) } },
+    );
+    expect(await screen.findByText(/· Runner/)).toBeInTheDocument();
+    expect(screen.queryByText(/· Builder/)).not.toBeInTheDocument();
+  });
+});

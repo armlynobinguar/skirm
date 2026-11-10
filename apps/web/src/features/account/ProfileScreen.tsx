@@ -247,6 +247,7 @@ function AgentsCard({ agents }: { agents: Agent[] }) {
             agentId={editing.id}
             name={editing.name}
             unlocks={editing.unlocks}
+            role={editing.role}
             initial={editing.appearance}
             saving={save.isPending}
             onSave={(appearance) => save.mutate({ id: editing.id, patch: { appearance } })}
