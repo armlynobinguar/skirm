@@ -148,7 +148,7 @@ function PoolText({ season }: { season: Season }) {
   if (sumYocto(season.poolYocto) === 0n) {
     return season.status === 'open' ? (
       <>
-        No prize pool yet: {feePct}% of every skill-market fee taken this season goes into it, split among the top{' '}{places}.
+        No prize pool yet: {feePct}% of every skill-market fee taken this season goes into it, split among the top&nbsp;{places}.
       </>
     ) : (
       <>This season ended with no prize pool.</>
