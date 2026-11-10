@@ -1,7 +1,9 @@
 'use client';
 // v2 match, found: the VS card. Accept or decline within 10 s; the rival stays hidden (practice
-// names the greedy bot at once, since there is nobody to hide).
+// names the greedy bot at once, since there is nobody to hide). Practice accepts by itself: the
+// player just pressed Start, and a missed 10 s click would only void the match.
 import { Button } from '@skirm/ui';
+import { useEffect, useRef } from 'react';
 import { TierBadge } from '@/components/TierBadge';
 import { mapById } from '@/features/arena/world';
 import { useRealtime } from '@/lib/services';
@@ -13,6 +15,12 @@ export function Accept({ view }: { view: V2MatchView }) {
   const rt = useRealtime();
   const map = mapById(view.mapId);
   const mine = view.accepted.includes(view.team);
+  const sent = useRef(false);
+  useEffect(() => {
+    if (!view.practice || mine || sent.current) return;
+    sent.current = true;
+    rt.send({ type: 'v2_accept', matchId: view.matchId });
+  }, [view.practice, view.matchId, mine, rt]);
   return (
     <div className={v.vs} role="dialog" aria-modal="true" aria-labelledby="v2-found" data-testid="v2-found">
       <p className={v.found}>
