@@ -51,6 +51,8 @@ describe('v2 match screen', () => {
 
     act(() => rt.emit({ type: 'v2_found', matchId: 'mat_v2', team: 'A', mapId: 'copper-hollow', ranked: false, acceptMs: 10_000 }));
     expect(screen.getByTestId('v2-found')).toHaveTextContent('Copper Hollow');
+    // Casual and ranked wait for the player's own Accept.
+    expect(rt.sent.some((m) => m.type === 'v2_accept')).toBe(false);
     await user.click(screen.getByTestId('v2-accept'));
     expect(rt.sent).toContainEqual({ type: 'v2_accept', matchId: 'mat_v2' });
 
@@ -451,7 +453,11 @@ describe('v2 match screen: spectating and practice', () => {
     expect(screen.getByTestId('v2-practice')).toHaveTextContent('vs Greedy bot');
     expect(screen.getByTestId('v2-free')).toHaveTextContent('Free practice');
     expect(found).toHaveTextContent('Greedy bot');
-    await user.click(screen.getByTestId('v2-accept'));
+    // Practice accepts by itself, once: a missed click would only void the match.
+    expect(rt.sent.filter((m) => m.type === 'v2_accept')).toEqual([{ type: 'v2_accept', matchId: 'mat_p' }]);
+    act(() => rt.emit({ type: 'v2_accepted', matchId: 'mat_p', team: 'A' }));
+    expect(found).toHaveTextContent('Accepted');
+    expect(rt.sent.filter((m) => m.type === 'v2_accept')).toHaveLength(1);
     act(() => rt.emit({ type: 'v2_lockin', matchId: 'mat_p', lockMs: 30_000, rival: { agents: 1 }, free: true }));
     expect(screen.getByTestId('v2-lockin')).toHaveTextContent('practice');
     expect(screen.getByTestId('v2-practice')).toHaveTextContent('vs Greedy bot');
