@@ -87,6 +87,7 @@ import type {
   TrialRequest,
   UnlinkNearResponse,
   V2LiveMatch,
+  V2RecordedMatch,
   V2MatchRecord,
   ReplayShare,
   SharedReplay,
@@ -231,6 +232,8 @@ export interface ApiClient {
   v2MatchLog(matchId: string): Promise<PublicMatchLog>;
   /** GET /v2/matches/live: v2 matches being played now, crews hidden. */
   v2LiveMatches(): Promise<V2LiveMatch[]>;
+  /** GET /v2/matches/recorded: the latest ranked matches recorded on NEAR (the /verify examples). */
+  v2RecordedMatches(): Promise<V2RecordedMatch[]>;
   /** GET /v2/matches/:id/highlights: highlight moments with caster lines (public, once ended). */
   v2Highlights(matchId: string): Promise<V2Highlights>;
   /** POST /v2/matches/:id/shares: a player's public link to the replay, optionally a clip. */
@@ -492,6 +495,7 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     v2Match: (id) => get(`/v2/matches/${enc(id)}`),
     v2MatchLog: (id) => get(`/v2/matches/${enc(id)}/log`),
     v2LiveMatches: () => get('/v2/matches/live'),
+    v2RecordedMatches: () => get('/v2/matches/recorded'),
     v2Highlights: (id) => get(`/v2/matches/${enc(id)}/highlights`),
     createReplayShare: (id, clip) => json('POST', `/v2/matches/${enc(id)}/shares`, { body: clip ? { clip } : {} }),
     replayShares: (id) => get(`/v2/matches/${enc(id)}/shares`),
