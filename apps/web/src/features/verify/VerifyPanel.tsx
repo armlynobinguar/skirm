@@ -1,7 +1,9 @@
 'use client';
 // "Verify on NEAR": a button that runs ./verify.ts in the browser and shows verified / mismatch /
 // not recorded onchain / NEAR unreachable, each check and nearblocks links. Used on the debrief, the
-// shared replay and the standalone /verify page.
+// shared replay and the standalone /verify page. Casual and practice matches are never written to
+// NEAR (`onchain={false}`): the panel then offers the browser check of the log only, without
+// promising a NEAR record.
 import { Button } from '@skirm/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -29,8 +31,21 @@ const SUMMARY: Record<VerifyStatus, string> = {
   unavailable: 'The log still checks out in your browser; only the onchain comparison is missing.',
 };
 
-/** The button and, once run, the report. `auto` runs it at once (the /verify page). Each click runs it afresh. */
-export function VerifyPanel({ matchId, showPageLink = true, auto = false }: { matchId: string; showPageLink?: boolean; auto?: boolean }) {
+/**
+ * The button and, once run, the report. `auto` runs it at once (the /verify page). Each click runs it
+ * afresh. `onchain={false}` (casual, practice): a log check, since only ranked results go to NEAR.
+ */
+export function VerifyPanel({
+  matchId,
+  showPageLink = true,
+  auto = false,
+  onchain = true,
+}: {
+  matchId: string;
+  showPageLink?: boolean;
+  auto?: boolean;
+  onchain?: boolean;
+}) {
   const api = useApi();
   const [round, setRound] = useState(auto ? 1 : 0);
   const run = useQuery({
@@ -43,15 +58,21 @@ export function VerifyPanel({ matchId, showPageLink = true, auto = false }: { ma
   });
   const pending = round > 0 && run.isFetching;
   return (
-    <section className={`sk-panel ${s.panel}`} aria-label="Verify on NEAR" data-testid="verify-panel">
-      <span className="sk-kick">
-        <b>Verify on NEAR</b> · recomputed in your browser, read straight from {config.near.contracts.registry}
-      </span>
+    <section className={`sk-panel ${s.panel}`} aria-label={onchain ? 'Verify on NEAR' : 'Check the match log'} data-testid="verify-panel">
+      {onchain ? (
+        <span className="sk-kick">
+          <b>Verify on NEAR</b> · recomputed in your browser, read straight from {config.near.contracts.registry}
+        </span>
+      ) : (
+        <span className="sk-kick" data-testid="verify-offchain">
+          <b>Check the match log</b> · recomputed in your browser · only ranked results are written to NEAR
+        </span>
+      )}
       <div className={s.actions}>
         <Button size="sm" variant="primary" onClick={() => setRound((n) => n + 1)} disabled={pending} data-testid="verify-run">
-          {pending ? 'Verifying…' : run.data ? 'Verify again' : 'Verify on NEAR'}
+          {pending ? (onchain ? 'Verifying…' : 'Checking…') : run.data ? (onchain ? 'Verify again' : 'Check again') : onchain ? 'Verify on NEAR' : 'Check the log'}
         </Button>
-        {showPageLink ? (
+        {showPageLink && onchain ? (
           <a className={s.link} href={routes.verify(matchId)}>
             Share this check
           </a>
