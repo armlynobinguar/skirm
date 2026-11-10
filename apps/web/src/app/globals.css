@@ -154,6 +154,7 @@ a.app-dock-tutorial:hover { color: var(--bone); }
 .app-signin-needed { max-width: 560px; }
 /* Signed out on a gated screen: the prompt, then the showreel (RequireSession.tsx). */
 .app-signin-gate { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.app-signin-gate > .app-signin-needed { align-self: center; width: 100%; }
 .app-signin-pitch { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; }
 .app-signin-public { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; font-size: 14px; }
 .app-signin-public a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
