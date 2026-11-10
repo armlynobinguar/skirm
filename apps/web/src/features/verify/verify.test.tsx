@@ -193,6 +193,21 @@ describe('VerifyPanel and /verify', () => {
     fetchSpy.mockRestore();
   });
 
+  it('a casual or practice match offers a log check, not a NEAR verification', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(rpc(() => viewResult(null)).fetch);
+    const api = createFakeApi({ v2Match: async () => match({ ranked: false, registry: { status: 'none' } }), v2MatchLog: async () => served() });
+    renderWithProviders(<VerifyPanel matchId="mat_v2" onchain={false} />, { api });
+    expect(screen.getByTestId('verify-panel')).toHaveAccessibleName('Check the match log');
+    expect(screen.getByTestId('verify-offchain')).toHaveTextContent('only ranked results are written to NEAR');
+    expect(screen.getByTestId('verify-run')).toHaveTextContent('Check the log');
+    expect(screen.queryByText('Share this check')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('verify-run'));
+    expect(await screen.findByTestId('verify-status')).toHaveTextContent('Not recorded onchain');
+    expect(screen.getByTestId('verify-run')).toHaveTextContent('Check again');
+    expect(screen.getByTestId('verify-check-chain')).toHaveAttribute('data-ok');
+    fetchSpy.mockRestore();
+  });
+
   it('the page takes a pasted match link and runs the check from ?id=', async () => {
     expect(matchIdFrom(' https://playskirm.xyz/matches/mat_01ABC/result ')).toBe('mat_01ABC');
     expect(matchIdFrom('https://playskirm.xyz/verify?id=mat_2')).toBe('mat_2');

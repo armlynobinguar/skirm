@@ -324,7 +324,7 @@ function Debrief({
       {data.status === 'ended' ? (
         <HighlightClip matchId={data.matchId} team={me} watch={watch} handles={data.handles} onReplay={onReplay} replayHref={replayHref} />
       ) : null}
-      {data.status === 'ended' ? <VerifyPanel matchId={data.matchId} /> : null}
+      {data.status === 'ended' ? <VerifyPanel matchId={data.matchId} onchain={data.ranked} /> : null}
       {data.status === 'ended' ? <ReplayPanel matchId={data.matchId} ticks={r.ticks} canShare={!watch} /> : null}
       {data.comms ? <Transcript lines={data.comms} team={me} watch={watch} /> : null}
       {!watch && data.status === 'ended' ? <Decisions matchId={data.matchId} /> : null}

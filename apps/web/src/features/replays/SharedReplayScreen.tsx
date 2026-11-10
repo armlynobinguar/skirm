@@ -83,7 +83,7 @@ export function SharedReplayScreen({ shareId }: { shareId: string }) {
           <HighlightList highlights={d.highlights} {...(view ? { onJump: watch } : {})} />
         </>
       ) : null}
-      {d.match.status === 'ended' ? <VerifyPanel matchId={d.match.id} /> : null}
+      {d.match.status === 'ended' ? <VerifyPanel matchId={d.match.id} onchain={d.match.ranked} /> : null}
     </section>
   );
 }
