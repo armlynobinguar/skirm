@@ -475,3 +475,37 @@ describe('seasons', () => {
     }
   });
 });
+
+describe('GET /v2/matches/recorded', () => {
+  it('lists ended ranked matches recorded on NEAR, latest first, without crews', async () => {
+    // Last in the file and on its own accounts: these ranked finishes add season standings.
+    const rae = await h.as('ecorae');
+    const rex = await h.as('ecorex');
+    const make = async (ranked: boolean) =>
+      h.repos.v2Matches.create({ mapId: 'copper-hollow', ranked, teamA: rae.accountId, teamB: rex.accountId, crews: { A: crew('agt_r1', 'HiddenOne', X), B: crew('agt_r2', 'HiddenTwo', Y) } });
+    const older = await make(true);
+    await h.repos.v2Matches.finish(older.id, { winner: 'A', reason: 'goal', decidedBy: 'goal', score: { A: 3, B: 1 }, ticks: 80 });
+    await h.repos.v2Matches.setRegistry(older.id, 'recorded', 'Tx1');
+    h.clock.now += 1000;
+    const newer = await make(true);
+    await h.repos.v2Matches.finish(newer.id, { winner: 'B', reason: 'goal', decidedBy: 'goal', score: { A: 2, B: 3 }, ticks: 90 });
+    await h.repos.v2Matches.setRegistry(newer.id, 'recorded', 'Tx2');
+    const pending = await make(true);
+    await h.repos.v2Matches.finish(pending.id, { winner: 'A', reason: 'goal', score: { A: 3, B: 0 }, ticks: 70 });
+    const casual = await make(false);
+    await h.repos.v2Matches.finish(casual.id, { winner: 'A', reason: 'goal', score: { A: 3, B: 0 }, ticks: 70 });
+
+    const res = await h.http().get('/v2/matches/recorded');
+    expect(res.status).toBe(200);
+    expect(res.body.map((m: { id: string }) => m.id)).toEqual([newer.id, older.id]);
+    expect(res.body[0]).toEqual({
+      id: newer.id,
+      mapId: 'copper-hollow',
+      endedAt: expect.any(String),
+      winner: 'B',
+      score: { A: 2, B: 3 },
+      handles: { A: 'ecorae', B: 'ecorex' },
+    });
+    expect(JSON.stringify(res.body)).not.toContain('Hidden');
+  });
+});

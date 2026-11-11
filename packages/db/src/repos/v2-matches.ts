@@ -143,6 +143,16 @@ export class V2MatchesRepo {
     return this.db.select().from(v2Matches).where(eq(v2Matches.status, 'live')).orderBy(by).limit(limit);
   }
 
+  /** Ended ranked matches whose result is recorded on the NEAR registry, latest first (the /verify examples). */
+  async listRecorded(limit = 5): Promise<V2MatchRow[]> {
+    return this.db
+      .select()
+      .from(v2Matches)
+      .where(and(eq(v2Matches.status, 'ended'), eq(v2Matches.ranked, true), eq(v2Matches.registryStatus, 'recorded')))
+      .orderBy(desc(v2Matches.endedAt))
+      .limit(limit);
+  }
+
   /** A player's latest matches, newest first. */
   async listForAccount(accountId: string, limit = 20): Promise<V2MatchRow[]> {
     return this.db

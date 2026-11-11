@@ -253,17 +253,34 @@ describe('/verify sample match', () => {
     config.sampleMatchId = original;
   });
 
-  it('is hidden when NEXT_PUBLIC_SAMPLE_MATCH_ID is unset', () => {
+  it('is hidden when NEXT_PUBLIC_SAMPLE_MATCH_ID is unset, and says no ranked match is recorded yet', async () => {
     config.sampleMatchId = '';
-    renderWithProviders(<VerifyScreen />, { api: createFakeApi(), path: '/verify' });
+    renderWithProviders(<VerifyScreen />, { api: createFakeApi({ v2RecordedMatches: async () => [] }), path: '/verify' });
+    expect(await screen.findByTestId('verify-none')).toHaveTextContent('No ranked match is recorded on NEAR yet.');
     expect(screen.queryByTestId('verify-sample')).not.toBeInTheDocument();
   });
 
   it('fills the input with the sample id and runs the check', async () => {
     config.sampleMatchId = 'mat_v2';
-    renderWithProviders(<VerifyScreen />, { api: createFakeApi(), path: '/verify' });
-    fireEvent.click(screen.getByTestId('verify-sample'));
+    renderWithProviders(<VerifyScreen />, { api: createFakeApi({ v2RecordedMatches: async () => [] }), path: '/verify' });
+    fireEvent.click(await screen.findByTestId('verify-sample'));
     expect(screen.getByTestId('verify-input')).toHaveValue('mat_v2');
     expect(testRouter.replace).toHaveBeenCalledWith('/verify?id=mat_v2');
+  });
+
+  it('offers the latest ranked matches recorded on NEAR, ahead of the sample', async () => {
+    config.sampleMatchId = 'mat_sample';
+    const recorded = [
+      { id: 'mat_r1', mapId: 'copper-hollow', endedAt: '2026-11-09T10:00:00.000Z', winner: 'A' as const, score: { A: 3, B: 2 }, handles: { A: 'ana', B: 'ben' } },
+      { id: 'mat_r2', mapId: 'saltmarsh-weir', endedAt: '2026-11-09T09:00:00.000Z', winner: 'B' as const, score: { A: 1, B: 3 }, handles: { A: 'kai', B: 'eve' } },
+    ];
+    renderWithProviders(<VerifyScreen />, { api: createFakeApi({ v2RecordedMatches: async () => recorded }), path: '/verify' });
+    const first = await screen.findByTestId('verify-recent-mat_r1');
+    expect(first).toHaveTextContent('ana 3–2 ben · Copper Hollow');
+    expect(screen.getByTestId('verify-recent-mat_r2')).toHaveTextContent('kai 1–3 eve · Saltmarsh Weir');
+    expect(screen.queryByTestId('verify-sample')).not.toBeInTheDocument();
+    fireEvent.click(first);
+    expect(screen.getByTestId('verify-input')).toHaveValue('mat_r1');
+    expect(testRouter.replace).toHaveBeenCalledWith('/verify?id=mat_r1');
   });
 });

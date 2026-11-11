@@ -76,6 +76,28 @@ export class PublicController {
   }
 
   /**
+   * The latest ranked matches recorded on the NEAR registry (up to 5): what /verify offers to check
+   * when a visitor has no match id. Handles and the score only, never the crews. Declared before
+   * `v2/matches/:id` so `recorded` is not read as a match id.
+   */
+  @Get('v2/matches/recorded')
+  async v2Recorded() {
+    const { repos } = this.deps;
+    const rows = await repos.v2Matches.listRecorded(5);
+    const ids = new Set(rows.flatMap((m) => [m.teamAAccountId, m.teamBAccountId]));
+    const accounts = await Promise.all([...ids].map((id) => repos.accounts.get(id)));
+    const handle = new Map(accounts.flatMap((a) => (a ? [[a.id, a.handle] as const] : [])));
+    return rows.map((m) => ({
+      id: m.id,
+      mapId: m.mapId,
+      endedAt: m.endedAt ? m.endedAt.toISOString() : null,
+      winner: m.winner,
+      score: m.scoreA != null && m.scoreB != null ? { A: m.scoreA, B: m.scoreB } : null,
+      handles: { A: handle.get(m.teamAAccountId) ?? null, B: handle.get(m.teamBAccountId) ?? null },
+    }));
+  }
+
+  /**
    * What was said in a v2 match: the lines realtime saw delivered, with who heard and overheard them.
    * Public once the match is over (409 `match_live` until then, so the rival's talk never leaks
    * mid-match). Page with `next` as the following `afterTick`.
