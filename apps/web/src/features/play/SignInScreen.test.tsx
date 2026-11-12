@@ -20,6 +20,7 @@ describe('S01 Sign in', () => {
     const legal = await screen.findByTestId('s01-legal');
     expect(within(legal).getByRole('link', { name: 'terms' })).toHaveAttribute('href', '/terms');
     expect(within(legal).getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', '/privacy');
+    expect(within(legal).getByRole('link', { name: 'docs' })).toHaveAttribute('href', '/docs');
   });
 
   it('follows ?next= after sign-in', async () => {

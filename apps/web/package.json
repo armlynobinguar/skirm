@@ -9,7 +9,8 @@
     "start": "next start -p 3000",
     "test": "vitest run",
     "typecheck": "next typegen && tsc --noEmit",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "docs:build": "node scripts/build-docs.mjs"
   },
   "dependencies": {
     "@hot-labs/near-connect": "^0.11.4",

@@ -46,6 +46,8 @@ export const routes = {
   /** Check a match against the NEAR registry in the browser (`?id=` prefills and runs it). Public. */
   verify: (matchId?: string) => `/verify${matchId ? `?id=${e(matchId)}` : ''}`,
   leaderboards: () => '/leaderboards', // S14
+  /** The docs site: the landing page, or one page by its slug (src/features/docs/content/<slug>.md). */
+  docs: (slug?: string) => (slug ? `/docs/${e(slug)}` : '/docs'),
   terms: () => '/terms',
   privacy: () => '/privacy',
   credits: () => '/account/credits', // S15
