@@ -60,7 +60,7 @@ export const routes = {
   tournament: (id: string) => `/tournaments/${e(id)}`, // a bracket
 } as const;
 
-export type NavGroup = 'play' | 'skills' | 'market' | 'pvp' | 'leaderboards' | 'account';
+export type NavGroup = 'play' | 'skills' | 'market' | 'pvp' | 'leaderboards' | 'docs' | 'account';
 
 /** Which header item a path belongs to (TopBar.dc.html `active`). */
 export function navGroupOf(pathname: string): NavGroup | null {
@@ -69,6 +69,7 @@ export function navGroupOf(pathname: string): NavGroup | null {
   if (/^\/(market|backing)(\/|$)/.test(pathname)) return 'market';
   if (/^\/(pvp|matches|lobbies|tournaments)(\/|$)/.test(pathname)) return 'pvp';
   if (/^\/leaderboards(\/|$)/.test(pathname)) return 'leaderboards';
+  if (/^\/docs(\/|$)/.test(pathname)) return 'docs';
   if (/^\/account(\/|$)/.test(pathname)) return 'account';
   return null;
 }
@@ -106,6 +107,7 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/matches\/[^/]+\/result\/?$/, key: 'match-result', title: 'Debrief', sub: '// replay hash on NEAR', back: routes.pvp() },
   { re: /^\/matches(\/|$)/, key: 'match', title: 'Live', sub: '// 2 s ticks', back: routes.pvp() },
   { re: /^\/leaderboards(\/|$)/, key: 'ladder', title: 'Leaderboards', sub: '// season', back: routes.home() },
+  { re: /^\/docs(\/[^/]+)?\/?$/, key: 'docs', title: 'Docs', sub: '// how skirm works', back: routes.home() },
   { re: /^\/terms\/?$/, key: 'terms', title: 'Terms', sub: '// the rules', back: routes.home() },
   { re: /^\/privacy\/?$/, key: 'privacy', title: 'Privacy', sub: '// your data', back: routes.home() },
   { re: /^\/market(\/|$)/, key: 'market', title: 'Exchange', sub: '// proof first', back: routes.home() },

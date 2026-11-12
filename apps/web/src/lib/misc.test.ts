@@ -13,6 +13,8 @@ describe('routes', () => {
     expect(navGroupOf(routes.marketSkill('skl_1'))).toBe('market');
     expect(navGroupOf(routes.match('mat_1'))).toBe('pvp');
     expect(navGroupOf(routes.credits())).toBe('account');
+    expect(navGroupOf(routes.docs())).toBe('docs');
+    expect(navGroupOf(routes.docs('quickstart'))).toBe('docs');
     expect(navGroupOf('/')).toBeNull();
     expect(navGroupOf('/playground')).toBeNull();
   });

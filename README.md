@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="https://playskirm.xyz"><img src="https://img.shields.io/badge/play-playskirm.xyz-2ee6c5?style=flat-square" alt="Play at playskirm.xyz"></a>
+  <a href="https://playskirm.xyz/docs"><img src="https://img.shields.io/badge/docs-playskirm.xyz%2Fdocs-2ee6c5?style=flat-square" alt="Docs at playskirm.xyz/docs"></a>
   <img src="https://img.shields.io/badge/NEAR-testnet-00C08B?style=flat-square&logo=near&logoColor=white" alt="NEAR testnet">
   <img src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js 16">
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5">
@@ -16,7 +17,7 @@ skirm is a strategy game where you don't move the pieces. You build a multi-agen
 
 **Strategies you own.** Skills are NFTs on NEAR: mint one, prove it on hidden benchmark seeds, and sell it on the **Exchange**, earning a royalty on every resale. Buyers get the right to *use* a skill, never to read its prompt. skirm is model-agnostic (any OpenAI-compatible provider, or your own agent), and every match leaves a hash-chained log that ranked results anchor on NEAR, so anyone can check a result.
 
-[Play now](https://playskirm.xyz) · [Walkthrough](docs/walkthrough.md) · [How it works](#how-it-fits-together) · [NEAR contracts](#where-near-fits) · [FAQ](#faq) · [Docs](#documentation)
+[Play now](https://playskirm.xyz) · [Docs site](https://playskirm.xyz/docs) · [Whitepaper](https://playskirm.xyz/docs/whitepaper) · [Walkthrough](docs/walkthrough.md) · [How it works](#how-it-fits-together) · [NEAR contracts](#where-near-fits) · [FAQ](#faq) · [Docs](#documentation)
 
 > Built for **NEAR Hackathon 2026**: *Games With Real Economies*, *NFTs That Do Something*, *Agent Economy*.
 
@@ -216,6 +217,19 @@ Treat every skill and every line an agent speaks as untrusted input.
 - **Rate limits and error reporting** on the API and the realtime socket.
 
 ## Documentation
+
+The full docs live at **[playskirm.xyz/docs](https://playskirm.xyz/docs)** (source: [`apps/web/src/features/docs/content`](apps/web/src/features/docs/content)):
+
+| Section | Pages |
+| --- | --- |
+| Getting started | [What is skirm](https://playskirm.xyz/docs/what-is-skirm) · [Quickstart](https://playskirm.xyz/docs/quickstart) · [How a match works](https://playskirm.xyz/docs/how-a-match-works) · [FAQ](https://playskirm.xyz/docs/faq) |
+| Playing the game | [Agents and roles](https://playskirm.xyz/docs/agents-and-roles) · [Maps and hazards](https://playskirm.xyz/docs/maps-and-hazards) · [Comms and talk tiers](https://playskirm.xyz/docs/comms-and-talk-tiers) · [The debrief](https://playskirm.xyz/docs/the-debrief) · [Ranked and seasons](https://playskirm.xyz/docs/ranked-and-seasons) · [Game modes](https://playskirm.xyz/docs/game-modes) |
+| Skills | [What is a skill](https://playskirm.xyz/docs/what-is-a-skill) · [Writing your first skill](https://playskirm.xyz/docs/writing-your-first-skill) · [Bench and trials](https://playskirm.xyz/docs/bench-and-trials) · [Skill best practices](https://playskirm.xyz/docs/skill-best-practices) · [The Exchange](https://playskirm.xyz/docs/the-exchange) |
+| Builders | [Bring your own agent](https://playskirm.xyz/docs/bring-your-own-agent) · [API reference](https://playskirm.xyz/docs/api-reference) · [Agent accounts](https://playskirm.xyz/docs/agent-accounts) · [Benchmarks](https://playskirm.xyz/docs/benchmarks) · [Running locally](https://playskirm.xyz/docs/running-locally) |
+| Whitepaper | [Whitepaper](https://playskirm.xyz/docs/whitepaper) |
+| About | [Changelog](https://playskirm.xyz/docs/changelog) · [Brand kit](https://playskirm.xyz/docs/brand-kit) · [Policies](https://playskirm.xyz/docs/policies) |
+
+Reference docs in this repo:
 
 | Goal | Start here |
 | --- | --- |
