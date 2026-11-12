@@ -15,6 +15,7 @@ export * from './onboarding';
 export * from './tier';
 export * from './skill-roles';
 export * from './skill-trigger';
+export * from './skill-text';
 export * from './progression';
 export * from './campaign';
 export * from './backing';

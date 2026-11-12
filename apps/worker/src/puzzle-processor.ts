@@ -12,7 +12,7 @@
 // events (no speech text). A solved run updates the player's best for the puzzle (PuzzlesRepo).
 import { playPuzzle, type V2AgentContext } from '@skirm/decision-engine/v2';
 import { holdFor, puzzleById, type AgentSpec } from '@skirm/engine/v2';
-import { skillFitsRole } from '@skirm/shared';
+import { skillFitsRole, skillTextForModel } from '@skirm/shared';
 import type { BenchmarkAttempt, BenchmarkDeps, BenchmarkOutcome } from './benchmark-processor';
 import { BENCH_EVENTS_MAX, benchEventLine, type BenchEvent } from './bench-processor';
 import { WorkerError, errorCode } from './deps';
@@ -106,7 +106,7 @@ export async function processPuzzleRun(
         if (!skillFitsRole(m?.roles, v.role)) continue;
         const sealed = await repos.skills.loadSealed(k.id, k.version);
         if (!sealed) continue;
-        skills.push((await vault.decryptSkill(sealed)).prompt);
+        skills.push(skillTextForModel(await vault.decryptSkill(sealed)));
         triggers.push(m?.trigger ?? null);
       }
       contexts[v.id] = { skills, skillTriggers: triggers, instructions: v.systemPrompt ?? null };

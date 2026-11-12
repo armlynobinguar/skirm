@@ -34,6 +34,7 @@ import {
 import type { BenchmarkAttempt, BenchmarkDeps, BenchmarkOutcome } from './benchmark-processor';
 import { WorkerError, errorCode } from './deps';
 import { settleRecorded } from './hold-sweep';
+import { skillTextForModel } from '@skirm/shared';
 
 /** The tested agent's id; the bot's are `bot-<n>`. */
 export const BENCH_AGENT_ID = 'bench-1';
@@ -176,7 +177,7 @@ export async function processBenchRun(
     const text = await deps.vault.decryptSkill(sealed);
     // As matches play it (realtime's roster, the benchmark): the prompt, only on ticks the
     // version's trigger holds.
-    const context = { skills: [text.prompt], skillTriggers: [version.trigger ?? null] };
+    const context = { skills: [skillTextForModel(text)], skillTriggers: [version.trigger ?? null] };
 
     if (!free) {
       const amount = holdFor([tested], false);
