@@ -320,7 +320,11 @@ export function SignInScreen() {
         </section>
         <p className="sk-muted s01-legal" data-testid="s01-legal">
           {NETWORK_LABEL}. By playing you accept the <Link href={routes.terms()}>terms</Link>; how your data is used is in the{' '}
-          <Link href={routes.privacy()}>privacy policy</Link>.
+          <Link href={routes.privacy()}>privacy policy</Link>. New here? Read the{' '}
+          <Link href={routes.docs()} data-testid="s01-docs">
+            docs
+          </Link>
+          .
         </p>
       </main>
     </div>
