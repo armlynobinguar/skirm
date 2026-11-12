@@ -28,7 +28,7 @@ import {
   type Role,
   type TalkTier,
 } from '@skirm/engine/v2';
-import { skillFitsRole } from '@skirm/shared';
+import { skillFitsRole, skillTextForModel } from '@skirm/shared';
 import type { BenchmarkAttempt, BenchmarkDeps, BenchmarkOutcome } from './benchmark-processor';
 import { WorkerError, errorCode } from './deps';
 import { settleRecorded } from './hold-sweep';
@@ -126,7 +126,7 @@ export async function processDailyAttempt(
         if (!(await repos.skills.owns(row.accountId, k.id, k.version))) continue;
         const sealed = await repos.skills.loadSealed(k.id, k.version);
         if (!sealed) continue;
-        skills.push((await deps.vault.decryptSkill(sealed)).prompt);
+        skills.push(skillTextForModel(await deps.vault.decryptSkill(sealed)));
         triggers.push(m.trigger ?? null);
       }
       contexts[c.agentId] = { skills, skillTriggers: triggers, instructions: agent?.systemPrompt ?? null };

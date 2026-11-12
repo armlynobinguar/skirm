@@ -29,6 +29,7 @@ import { WorkerError, errorCode, type WorkerDeps } from './deps';
 import { processBenchRun } from './bench-processor';
 import { processDailyAttempt } from './daily-processor';
 import { processPuzzleRun } from './puzzle-processor';
+import { skillTextForModel } from '@skirm/shared';
 
 export type BenchmarkDeps = Pick<
   WorkerDeps,
@@ -318,7 +319,7 @@ async function skillContext(
   const sealed = await deps.repos.skills.loadSealed(skillId, version);
   if (!sealed) return undefined;
   const v = await deps.repos.skills.get(skillId, version);
-  return { skills: [(await deps.vault.decryptSkill(sealed)).prompt], skillTriggers: [v?.trigger ?? null] };
+  return { skills: [skillTextForModel(await deps.vault.decryptSkill(sealed))], skillTriggers: [v?.trigger ?? null] };
 }
 
 /** One headless match: `crew` on team A with the model brain against the greedy bot. */

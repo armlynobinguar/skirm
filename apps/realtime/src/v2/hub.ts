@@ -51,7 +51,7 @@ import {
   type Team,
   type V2Frame,
 } from '@skirm/engine/v2';
-import { DEFAULTS, rankedRoleRefusal, skillFitsRole, type AgentCosmetics } from '@skirm/shared';
+import { DEFAULTS, rankedRoleRefusal, skillFitsRole, skillTextForModel, type AgentCosmetics } from '@skirm/shared';
 import { V2_MATCH_LAST_TTL_S, v2MatchChannel, v2MatchLastKey, type ExternalTurnStore, type V2CrewEntry, type V2EndReason, type V2ServerMessage, type Vault } from '@skirm/server';
 import type { Logger, RegistryQueue } from '../deps';
 import { Matchmaker, type Lane, type QueueEntry } from '../matchmaker';
@@ -737,7 +737,7 @@ export class V2Hub {
         }
         const sealed = await repos.skills.loadSealed(k.id, k.version);
         if (!sealed) continue;
-        prompts.push((await vault.decryptSkill(sealed)).prompt);
+        prompts.push(skillTextForModel(await vault.decryptSkill(sealed)));
         keys.push({ id: k.id, version: k.version });
         names.push(k.name);
       }

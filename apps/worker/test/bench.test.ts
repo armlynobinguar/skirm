@@ -101,6 +101,18 @@ describe('bench consumer', () => {
     expect(before.available - after.available).toBe(row.credits);
   });
 
+  it("hands the model the skill's reflexes after its prompt", async () => {
+    const brain = readingBrain();
+    ctx = await setup({ brain });
+    const { account, v } = await draft(ctx);
+    const sealed = await ctx.vault.encryptSkill('Wall off the flood first.', 'If water is next to you, place a block.');
+    const run = await ctx.repos.bench.create({ accountId: account.id, skillId: v.id, version: 1, mapId: 'copper-hollow', difficulty: 'easy', limit: 10, sealed });
+    expect((await processBenchmark(ctx.deps, { kind: 'bench', runId: run.id })).status).toBe('done');
+    expect([...brain.seen]).toEqual([
+      'Wall off the flood first.\n\nReflexes (check these every step):\nIf water is next to you, place a block.',
+    ]);
+  });
+
   it('a model run that cannot cover its hold ends insufficient_credits with nothing played', async () => {
     ctx = await setup({ brain: readingBrain() }, { ledger: { config: { freeAllowance: 0 } } });
     const { account, v } = await draft(ctx);
