@@ -159,7 +159,8 @@ describe('TopBar', () => {
     await user.click(menu);
     expect(menu).toHaveAttribute('aria-expanded', 'true');
     expect(nav).toHaveAttribute('data-open');
-    expect(within(nav).getAllByRole('link')).toHaveLength(5);
+    expect(within(nav).getAllByRole('link')).toHaveLength(6);
+    expect(within(nav).getByRole('link', { name: /Docs/ })).toHaveAttribute('href', '/docs');
     await user.keyboard('{Escape}');
     expect(menu).toHaveAttribute('aria-expanded', 'false');
   });
