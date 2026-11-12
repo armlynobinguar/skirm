@@ -5,6 +5,7 @@ import '@skirm/ui/styles.css';
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { preconnect } from 'react-dom';
 import { Providers } from '@/components/Providers';
 import { config } from '@/lib/config';
 
@@ -43,6 +44,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: '#05080d', width: 'device-width', initialScale: 1 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  // Every screen talks to the api: open the connection (DNS, TLS) while the bundle loads.
+  preconnect(config.apiUrl, { crossOrigin: 'anonymous' });
   return (
     <html lang="en">
       <body>
