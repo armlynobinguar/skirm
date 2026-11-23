@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/copy-relayer-sdk.mjs",
     "build": "next build",
+    "predev": "node scripts/copy-relayer-sdk.mjs",
     "dev": "next dev -p 3000",
     "start": "next start -p 3000",
     "test": "vitest run",

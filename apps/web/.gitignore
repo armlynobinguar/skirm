@@ -3,3 +3,9 @@ next-env.d.ts
 .next-*/
 /test-results/
 /playwright-report/
+
+# Zama relayer SDK bundle, copied by scripts/copy-relayer-sdk.mjs
+/public/zama/
+/public/tfhe_bg.wasm
+/public/kms_lib_bg.wasm
+/public/workerHelpers.js
