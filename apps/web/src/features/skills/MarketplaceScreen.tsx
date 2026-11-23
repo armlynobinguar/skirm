@@ -34,6 +34,7 @@ import { SkillArt, rarityOf, useTilt } from './parts';
 import { RoleTag } from './RoleTag';
 import { SkillDrawer } from './SkillDetailScreen';
 import { ZamaAuctionsSlot } from '@/features/zama/auctions/ZamaAuctionSlots';
+import { ZamaBenchmarkSeedsChip } from '@/features/zama/benchmarks/ZamaBenchmarkSlots';
 import s from './skills.module.css';
 import x from './exchange.module.css';
 
@@ -376,7 +377,7 @@ interface CardModel {
   /** My skills tab: show the status where the price goes. */
   statusLine?: SkillStatus | 'Owned';
   /** Exchange cards: the v2 proof (ranked win rate and benchmark score). */
-  v2?: Pick<MarketCard, 'rankedWinRate' | 'rankedMatches' | 'benchmarkScore'>;
+  v2?: Pick<MarketCard, 'rankedWinRate' | 'rankedMatches' | 'benchmarkScore' | 'benchmarkSeeds'>;
 }
 
 function fromMarket(c: MarketCard, meId: string | undefined): CardModel {
@@ -386,7 +387,7 @@ function fromMarket(c: MarketCard, meId: string | undefined): CardModel {
     priceYocto: c.priceYocto,
     owned: c.owned,
     mine: !!meId && c.creator.id === meId,
-    v2: { rankedWinRate: c.rankedWinRate, rankedMatches: c.rankedMatches, benchmarkScore: c.benchmarkScore },
+    v2: { rankedWinRate: c.rankedWinRate, rankedMatches: c.rankedMatches, benchmarkScore: c.benchmarkScore, benchmarkSeeds: c.benchmarkSeeds ?? null },
   };
 }
 
@@ -467,6 +468,8 @@ function Card({ card: c, selected, onSelect }: { card: CardModel; selected: bool
           <span className={x.proof} data-testid="s09-proof">
             {c.v2 ? v2ProofLine(c.v2) : ROW_PROOF}
           </span>
+          {/* Benchmark seeds drawn on chain (NEXT_PUBLIC_ZAMA_ENABLED); verify from the skill's detail. */}
+          <ZamaBenchmarkSeedsChip status={c.v2?.benchmarkSeeds} />
           <span className={x.ln}>
             <i style={{ width: `${p ?? 0}%` }} />
           </span>

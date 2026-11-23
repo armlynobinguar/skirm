@@ -5,7 +5,7 @@
 //
 // Game types (SkillPublic, Tag, …) come from @skirm/shared (type-only imports,
 // browser-safe).
-import type { ActionKind, AgentAppearance, AgentCosmetics, AgentProgression, CosmeticItem, EquipCosmetic, PlayerTier, RankedTierName, SkillPublic, SkillRole, SkillTrigger, Tag, TraitInfo, Unlock } from '@skirm/shared';
+import type { ActionKind, OnchainBenchmark, PlayedBenchmarkMatch, AgentAppearance, AgentCosmetics, AgentProgression, CosmeticItem, EquipCosmetic, PlayerTier, RankedTierName, SkillPublic, SkillRole, SkillTrigger, Tag, TraitInfo, Unlock } from '@skirm/shared';
 
 import type { Difficulty, V2Debrief, V2Frame } from '../realtime/protocol';
 
@@ -315,6 +315,8 @@ export interface MarketCard {
   rankedMatches: number;
   /** Benchmark score (0–1); null when not benchmarked, offline (needs a model key) or not finished. */
   benchmarkScore: number | null;
+  /** How far the benchmark's on-chain seed got (Zama BenchmarkSeeds); null or absent for keyed seeds. */
+  benchmarkSeeds?: OnchainBenchmark['status'] | null;
 }
 
 /** `winrate`: ranked win rate; `benchmark`: benchmark score. Null values sort last. */
@@ -387,6 +389,11 @@ export interface MarketBenchmark {
   /** 0–1; null unless done with a model brain. */
   score: number | null;
   needsModel: boolean;
+  /**
+   * The seed record when the seeds were drawn on chain (Zama BenchmarkSeeds), with each played match's
+   * (map, difficulty, hijack, log hash) to verify against the revealed seed; null or absent otherwise.
+   */
+  onchain?: (OnchainBenchmark & { played: PlayedBenchmarkMatch[] }) | null;
 }
 
 /** One trial match: the buyer's agent with the skill (crew A) against the bot crew. */

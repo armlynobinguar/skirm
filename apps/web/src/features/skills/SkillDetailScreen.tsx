@@ -43,6 +43,7 @@ import { isFinalRefusal, pendingStore } from '@/lib/wallet/pending';
 import { WalletError } from '@/lib/wallet/types';
 import { BackWriterPanel } from '@/features/backing/BackWriterPanel';
 import { ZamaSkillAuctionSlot } from '@/features/zama/auctions/ZamaAuctionSlots';
+import { ZamaBenchmarkSeedsSlot } from '@/features/zama/benchmarks/ZamaBenchmarkSlots';
 import { CancelListingButton } from './CancelListingButton';
 import { ConfirmTransactionModal } from './ConfirmTransactionModal';
 import { ConnectWalletModal } from './ConnectWalletModal';
@@ -242,7 +243,7 @@ function DrawerView({ d, me, onClose }: { d: MarketDetail; me: Me | undefined; o
         </Proof>
       ) : (
         <>
-          <BenchmarkProof b={d.benchmark} />
+          <BenchmarkProof b={d.benchmark} skillId={sk.id} version={version} promptSha256={hash} />
           <RankedProof ranked={d.ranked} />
           <CountersProof vs={d.counters.vs} />
           <GauntletProof b={d.benchmark} />
@@ -307,7 +308,7 @@ const wld = (r: Pick<RecordTally, 'wins' | 'losses' | 'draws'>) => `${r.wins}–
 const winPct = (r: Pick<RecordTally, 'wins' | 'matches'>) => (r.matches ? `${Math.round((r.wins / r.matches) * 100)}%` : '–');
 const ratePct = (x: number | null) => (x === null ? '–' : `${Math.round(x * 100)}%`);
 
-function BenchmarkProof({ b }: { b: MarketBenchmark | null }) {
+function BenchmarkProof({ b, skillId, version, promptSha256 }: { b: MarketBenchmark | null; skillId: string; version: number; promptSha256: string }) {
   let body: ReactNode;
   if (!b) body = <p>Runs when this version is minted, on seeds the seller never sees.</p>;
   else if (b.needsModel) body = <p data-testid="s10-benchmark-needs-model">{NEEDS_MODEL}. No score until it runs with one.</p>;
@@ -331,6 +332,8 @@ function BenchmarkProof({ b }: { b: MarketBenchmark | null }) {
   return (
     <Proof title="Benchmark at mint" sub={b?.brain ? `HIDDEN SEEDS · ${b.brain.toUpperCase()}` : 'HIDDEN SEEDS'} data-testid="s10-benchmark">
       {body}
+      {/* Seeds drawn on chain (NEXT_PUBLIC_ZAMA_ENABLED): the badge, its transactions and "Verify benchmark". */}
+      <ZamaBenchmarkSeedsSlot skillId={skillId} version={version} onchain={b?.onchain} promptSha256={promptSha256} score={b?.score ?? null} />
     </Proof>
   );
 }
