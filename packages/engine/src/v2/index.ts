@@ -21,3 +21,4 @@ export * from './daily';
 export * from './puzzles';
 export * from './tools';
 export * from './roles';
+export * from './drops';

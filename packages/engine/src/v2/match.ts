@@ -32,6 +32,7 @@ import { middleTiles, parseMapV2 } from './map';
 import { deliverTalk, TALK_TIERS, type HeardMessage, type SayInput, type TalkTier } from './talk';
 import { cooldownFor, digHitsFor, timerFor, visionOf } from './traits';
 import { isBridge, isSandbag, landTool, newGear, pickTool, runPumps, toolActions, useTool, type GearState, type ToolKind } from './tools';
+import { dropsOf, matchDrops, type DropPlacement, type DropSlot } from './drops';
 import { courierStride, decoyFor, kitOf, plantActions, plantDecoy, pruneDecoys, springDecoy, switchReach, tend, tendActions } from './roles';
 
 export const TICK_MS = 2000;
@@ -107,6 +108,15 @@ export interface MatchOptions {
   hold?: Partial<Record<Team, number>>;
   /** Bluffs each crew may tell this match (BLUFF_CAP when unset; the practice bot's from the difficulty). */
   lieCap?: Partial<Record<Team, number>>;
+  /**
+   * The match seed drawn on chain (Zama: SkirmMatch FHE randomness), a decimal uint64. Recorded on
+   * the state for the log header; seedDropValue derives a stand-in drop value from it.
+   */
+  seed?: string;
+  /** Every supply drop's tile (or random value) and tick, in map order, replacing the map's (drops.ts). */
+  dropSchedule?: readonly DropPlacement[];
+  /** The drop tiles stay sealed until placeSealedDrop places each one (drops.ts); ignored with dropSchedule. */
+  sealedDrops?: boolean;
 }
 
 export type Action =
@@ -291,6 +301,10 @@ export interface MatchState {
   gear?: GearState;
   /** Saboteur decoys by tile index, and the crew that planted each (roles.ts). Absent until one is planted. */
   decoys?: Record<number, Team>;
+  /** The on-chain match seed (MatchOptions.seed), absent when none. */
+  seed?: string;
+  /** This match's supply drops when they do not come from the map (dropSchedule / sealedDrops, drops.ts). */
+  drops?: DropSlot[];
 }
 
 const DIRS: Record<Dir, [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
@@ -381,6 +395,8 @@ export function createMatch(def: MapDefV2, crews: Record<Team, AgentSpec[]>, opt
     visible: { A: new Array(size).fill(false), B: new Array(size).fill(false) },
     result: null,
     gear: newGear(),
+    ...(opts.seed !== undefined ? { seed: checkSeed(opts.seed) } : {}),
+    ...(opts.dropSchedule || opts.sealedDrops ? { drops: matchDrops(map, opts.dropSchedule, !opts.dropSchedule && opts.sealedDrops) } : {}),
   };
   // Both crews know where every item starts (the prototype's known items): fog hides what happens
   // to them later, not where they were laid out.
@@ -417,8 +433,9 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
     for (const j of f.tiles) if (s.grid[j] === f.kind) s.grid[j] = null;
     return false;
   });
-  def.drops.forEach((d, k) => {
-    if (d.tick !== s.tick) return;
+  dropsOf(s).forEach((d, k) => {
+    // A sealed drop waits for its tile (placeSealedDrop), which lands it on its tick or the next one.
+    if (d.tick !== s.tick || d.sealed) return;
     const j = idx(s, d.at);
     const lands = s.grid[j] === null;
     if (lands) {
@@ -560,7 +577,7 @@ export function stepMatch(s: MatchState, input: TickInput): MatchEvent[] {
 function originOf(s: MatchState, j: number, team: Team, droppedBy: Team | undefined): ItemOrigin {
   if (droppedBy) return droppedBy === team ? 'recovered' : 'stolen';
   if (s.middle.includes(j)) return 'middle';
-  if (s.map.def.drops.some((d) => idx(s, d.at) === j)) return 'drop';
+  if (dropsOf(s).some((d) => !d.sealed && idx(s, d.at) === j)) return 'drop';
   return 'own';
 }
 
@@ -1002,6 +1019,12 @@ export function idx(s: MatchState, [x, y]: [number, number]): number {
 
 export function manhattan(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+/** A match seed is a decimal uint64 (the FHE.randEuint64 plaintext). */
+function checkSeed(seed: string): string {
+  if (!/^(0|[1-9][0-9]{0,19})$/.test(seed) || BigInt(seed) >= 2n ** 64n) throw new Error(`the match seed must be a decimal uint64, got ${seed}`);
+  return seed;
 }
 
 function clamp(n: number, lo: number, hi: number) {
