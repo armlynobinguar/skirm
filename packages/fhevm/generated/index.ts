@@ -1082,6 +1082,32 @@ export const SkirmMatchAbi = [
   {
     "inputs": [
       {
+        "internalType": "contract IERC7984",
+        "name": "credits_",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "operator_",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "treasury_",
+        "type": "address"
+      },
+      {
+        "internalType": "uint16",
+        "name": "feeBps_",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint8",
         "name": "side",
         "type": "uint8"
@@ -1134,6 +1160,17 @@ export const SkirmMatchAbi = [
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint16",
+        "name": "feeBps",
+        "type": "uint16"
+      }
+    ],
+    "name": "InvalidFee",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "InvalidKMSSignatures",
     "type": "error"
@@ -1151,6 +1188,11 @@ export const SkirmMatchAbi = [
   },
   {
     "inputs": [],
+    "name": "InvalidLogHash",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidPlayers",
     "type": "error"
   },
@@ -1163,6 +1205,17 @@ export const SkirmMatchAbi = [
       }
     ],
     "name": "InvalidSide",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "winner",
+        "type": "uint8"
+      }
+    ],
+    "name": "InvalidWinner",
     "type": "error"
   },
   {
@@ -1206,7 +1259,40 @@ export const SkirmMatchAbi = [
         "type": "address"
       }
     ],
+    "name": "NotOperator",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "caller",
+        "type": "address"
+      }
+    ],
     "name": "NotPlayer",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
     "type": "error"
   },
   {
@@ -1223,6 +1309,17 @@ export const SkirmMatchAbi = [
       }
     ],
     "name": "SenderNotAllowedToUseHandle",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "refundableAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "SettleStillOpen",
     "type": "error"
   },
   {
@@ -1250,6 +1347,11 @@ export const SkirmMatchAbi = [
   {
     "inputs": [],
     "name": "ZamaProtocolUnsupported",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroAddress",
     "type": "error"
   },
   {
@@ -1313,6 +1415,25 @@ export const SkirmMatchAbi = [
       }
     ],
     "name": "DropRevealed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "treasury",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint16",
+        "name": "feeBps",
+        "type": "uint16"
+      }
+    ],
+    "name": "FeeSet",
     "type": "event"
   },
   {
@@ -1444,6 +1565,82 @@ export const SkirmMatchAbi = [
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "winner",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "logHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "MatchSettled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "operator",
+        "type": "address"
+      }
+    ],
+    "name": "OperatorSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferStarted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "bytes32[]",
         "name": "handlesList",
@@ -1529,6 +1726,93 @@ export const SkirmMatchAbi = [
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint8",
+        "name": "side",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "ok",
+        "type": "bool"
+      }
+    ],
+    "name": "StakeChecked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint8",
+        "name": "side",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "stakeHandle",
+        "type": "bytes32"
+      }
+    ],
+    "name": "StakeLocked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint8",
+        "name": "side",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "amountHandle",
+        "type": "bytes32"
+      }
+    ],
+    "name": "StakePaid",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "DROP_INTERVAL",
     "outputs": [
@@ -1549,6 +1833,19 @@ export const SkirmMatchAbi = [
         "internalType": "uint8",
         "name": "",
         "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_FEE_BPS",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "",
+        "type": "uint16"
       }
     ],
     "stateMutability": "view",
@@ -1595,6 +1892,19 @@ export const SkirmMatchAbi = [
   },
   {
     "inputs": [],
+    "name": "SETTLE_TIMEOUT",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "SLOTS",
     "outputs": [
       {
@@ -1617,6 +1927,13 @@ export const SkirmMatchAbi = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "acceptOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1653,11 +1970,29 @@ export const SkirmMatchAbi = [
         "internalType": "uint64",
         "name": "lockWindow",
         "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "minStake",
+        "type": "uint64"
       }
     ],
     "name": "createMatch",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "credits",
+    "outputs": [
+      {
+        "internalType": "contract IERC7984",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1679,6 +2014,68 @@ export const SkirmMatchAbi = [
         "internalType": "uint64",
         "name": "",
         "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "escrow",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "minStake",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint16",
+        "name": "matchFeeBps",
+        "type": "uint16"
+      },
+      {
+        "internalType": "bytes32[2]",
+        "name": "staked",
+        "type": "bytes32[2]"
+      },
+      {
+        "internalType": "bytes32[2]",
+        "name": "stakeOk",
+        "type": "bytes32[2]"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "matched",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32[2]",
+        "name": "paid",
+        "type": "bytes32[2]"
+      },
+      {
+        "internalType": "bool[2]",
+        "name": "stakeOkClear",
+        "type": "bool[2]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "feeBps",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "",
+        "type": "uint16"
       }
     ],
     "stateMutability": "view",
@@ -1795,6 +2192,45 @@ export const SkirmMatchAbi = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "operator",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "pendingOwner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "bytes32",
@@ -1841,6 +2277,26 @@ export const SkirmMatchAbi = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "refundUnsettled",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1961,6 +2417,96 @@ export const SkirmMatchAbi = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "treasury_",
+        "type": "address"
+      },
+      {
+        "internalType": "uint16",
+        "name": "feeBps_",
+        "type": "uint16"
+      }
+    ],
+    "name": "setFee",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "operator_",
+        "type": "address"
+      }
+    ],
+    "name": "setOperator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint8",
+        "name": "winnerSeat",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "logHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "settle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "settlement",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "logHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "uint8",
+            "name": "winner",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint64",
+            "name": "settledAt",
+            "type": "uint64"
+          }
+        ],
+        "internalType": "struct SkirmMatch.Settlement",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "matchId",
         "type": "bytes32"
@@ -1986,6 +2532,11 @@ export const SkirmMatchAbi = [
         "type": "bytes32[3]"
       },
       {
+        "internalType": "externalEuint64",
+        "name": "stake",
+        "type": "bytes32"
+      },
+      {
         "internalType": "bytes",
         "name": "inputProof",
         "type": "bytes"
@@ -1994,6 +2545,32 @@ export const SkirmMatchAbi = [
     "name": "submitLoadout",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "treasury",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ] as const;

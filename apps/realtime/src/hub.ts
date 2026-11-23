@@ -93,6 +93,7 @@ export class RealtimeHub {
       ...(deps.externalPost ? { externalPost: deps.externalPost } : {}),
       ...(deps.v2Models ? { models: deps.v2Models } : {}),
       ...(deps.sealedMatches ? { sealed: deps.sealedMatches } : {}),
+      ...(deps.matchSettler ? { settler: deps.matchSettler } : {}),
       log: this.log,
     });
     this.scheduleSweep(0);

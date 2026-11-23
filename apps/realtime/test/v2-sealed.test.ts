@@ -4,7 +4,7 @@
 // the skills that play) whatever the client sends alongside.
 import { mapV2, parseMapV2, sealedDropTile, verifyLog, type MatchLog } from '@skirm/engine/v2';
 import { encodeLoadout, type SealedPick } from '@skirm/shared';
-import type { ChainRandomness, SealedMatchReader, SealedMatchState } from '@skirm/server';
+import type { ChainRandomness, MatchSettler, SealedMatchReader, SealedMatchState } from '@skirm/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { RealtimeHub } from '../src/hub';
 import { FakeSocket, makeDeps, type TestDeps } from './helpers';
@@ -166,5 +166,56 @@ describe('v2 sealed loadouts', () => {
     expect(log.ticks.length).toBeGreaterThanOrEqual(copper.drops[0]!.tick);
     expect(placed).toEqual([{ slot: 0, value: VALUE, at: sealedDropTile(parseMapV2(copper), VALUE), tick: copper.drops[0]!.tick }]);
     expect(reader.drops).toBeGreaterThanOrEqual(1);
+  });
+  it('settles a sealed match on chain once it ends, anchoring the log head hash', async () => {
+    const reader = fakeReader();
+    const settled: { matchId: string; winner: 'A' | 'B' | null; logHash: string }[] = [];
+    let done!: () => void;
+    const landed = new Promise<void>((r) => (done = r));
+    const settler: MatchSettler = {
+      async settle(matchId, winner, logHash) {
+        settled.push({ matchId, winner, logHash });
+        done();
+        return { status: 'settled', txHash: '0xabc' };
+      },
+    };
+    const deps = await makeDeps({ v2Timing: FAST_V2, sealedMatches: reader, matchSettler: settler });
+    const { ana, ben, matchId } = await matched(deps);
+    await ana.send({ type: 'v2_seal', matchId, address: ANA_EVM });
+    await ben.send({ type: 'v2_seal', matchId, address: BEN_EVM });
+    reader.state = {
+      status: 'revealed',
+      players: [ANA_EVM, BEN_EVM],
+      locked: [true, true],
+      revealed: [encodeLoadout([{ agentId: ana.agents[0]!.id, tier: 'standard' }], ana.agents), encodeLoadout([{ agentId: ben.agents[0]!.id, tier: 'standard' }], ben.agents)],
+    };
+    await ana.send({ type: 'v2_lock_in', matchId, tiers: [], sealed: true });
+    await ben.send({ type: 'v2_lock_in', matchId, tiers: [], sealed: true });
+    const end = await ana.inbox.next('v2_end', () => true, 30_000);
+    await landed;
+
+    const row = (await deps.repos.v2Matches.get(matchId))!;
+    expect(settled).toHaveLength(1);
+    expect(settled[0]!.matchId).toBe(matchId);
+    expect(settled[0]!.logHash).toBe(row.logHash);
+    expect(settled[0]!.logHash).toBe(end.logHash);
+    const winner = end.result?.winner;
+    expect(settled[0]!.winner).toBe(winner === 'A' || winner === 'B' ? winner : null);
+  });
+
+  it('does not settle a match that was not sealed', async () => {
+    const calls: string[] = [];
+    const settler: MatchSettler = {
+      async settle(matchId) {
+        calls.push(matchId);
+        return { status: 'settled', txHash: '0x1' };
+      },
+    };
+    const deps = await makeDeps({ v2Timing: FAST_V2, sealedMatches: fakeReader(), matchSettler: settler });
+    const { ana, ben, matchId } = await matched(deps);
+    await ana.send({ type: 'v2_lock_in', matchId, tiers: ['standard'] });
+    await ben.send({ type: 'v2_lock_in', matchId, tiers: ['standard'] });
+    await ana.inbox.next('v2_end', () => true, 30_000);
+    expect(calls).toEqual([]);
   });
 });

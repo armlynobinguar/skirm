@@ -34,11 +34,12 @@ describe("SkirmMatch", function () {
   async function seal(player: HardhatEthersSigner, side: number, l: Loadout, matchId = id) {
     const input = fhevm.createEncryptedInput(gameAddress, player.address);
     for (const v of [...l.agents, ...l.skills, ...l.tiers]) input.add8(v);
+    input.add64(0);
     const enc = await input.encrypt();
     const h = enc.handles;
     return game
       .connect(player)
-      .submitLoadout(matchId, side, [h[0]!, h[1]!, h[2]!], [h[3]!, h[4]!, h[5]!], [h[6]!, h[7]!, h[8]!], enc.inputProof);
+      .submitLoadout(matchId, side, [h[0]!, h[1]!, h[2]!], [h[3]!, h[4]!, h[5]!], [h[6]!, h[7]!, h[8]!], h[9]!, enc.inputProof);
   }
 
   async function decryptAs(player: HardhatEthersSigner, handle: string): Promise<bigint> {
@@ -62,14 +63,16 @@ describe("SkirmMatch", function () {
       console.warn("SkirmMatch tests need the FHEVM mock (hardhat network)");
       this.skip();
     }
+    // Unstaked matches (minStake 0) never touch the token; the stake escrow has its own suite.
+    const credits = await (await ethers.getContractFactory("ConfidentialSkirmCredits")).deploy(alice.address, 0n, 0n);
     const factory = await ethers.getContractFactory("SkirmMatch");
-    game = await factory.deploy();
+    game = await factory.deploy(await credits.getAddress(), eve.address, ethers.ZeroAddress, 0);
     gameAddress = await game.getAddress();
   });
 
   describe("createMatch", function () {
     it("records both players, the deadline and the open status", async function () {
-      const tx = await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW);
+      const tx = await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW, 0n);
       const deadline = BigInt(await time.latest()) + LOCK_WINDOW;
       await expect(tx).to.emit(game, "MatchCreated").withArgs(id, alice.address, bob.address, deadline);
 
@@ -82,21 +85,21 @@ describe("SkirmMatch", function () {
     });
 
     it("rejects a duplicate id, a bad window and fixed seats the creator is not in", async function () {
-      await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW);
-      await expect(game.connect(bob).createMatch(id, alice.address, bob.address, LOCK_WINDOW))
+      await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW, 0n);
+      await expect(game.connect(bob).createMatch(id, alice.address, bob.address, LOCK_WINDOW, 0n))
         .to.be.revertedWithCustomError(game, "MatchExists")
         .withArgs(id);
 
       const other = matchKey("other");
-      await expect(game.connect(eve).createMatch(other, alice.address, bob.address, LOCK_WINDOW)).to.be.revertedWithCustomError(
+      await expect(game.connect(eve).createMatch(other, alice.address, bob.address, LOCK_WINDOW, 0n)).to.be.revertedWithCustomError(
         game,
         "InvalidPlayers",
       );
-      await expect(game.connect(alice).createMatch(other, alice.address, alice.address, LOCK_WINDOW)).to.be.revertedWithCustomError(
+      await expect(game.connect(alice).createMatch(other, alice.address, alice.address, LOCK_WINDOW, 0n)).to.be.revertedWithCustomError(
         game,
         "InvalidPlayers",
       );
-      await expect(game.connect(alice).createMatch(other, alice.address, bob.address, 10n))
+      await expect(game.connect(alice).createMatch(other, alice.address, bob.address, 10n, 0n))
         .to.be.revertedWithCustomError(game, "InvalidLockWindow")
         .withArgs(10n);
     });
@@ -104,7 +107,7 @@ describe("SkirmMatch", function () {
 
   describe("submitLoadout", function () {
     beforeEach(async function () {
-      await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW);
+      await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW, 0n);
     });
 
     it("stores encrypted handles and marks the side locked", async function () {
@@ -150,10 +153,11 @@ describe("SkirmMatch", function () {
     it("reverts an encrypted input made for another sender", async function () {
       const input = fhevm.createEncryptedInput(gameAddress, eve.address);
       for (let i = 0; i < 9; i++) input.add8(1);
+      input.add64(0);
       const enc = await input.encrypt();
       const h = enc.handles;
       await expect(
-        game.connect(alice).submitLoadout(id, 0, [h[0]!, h[1]!, h[2]!], [h[3]!, h[4]!, h[5]!], [h[6]!, h[7]!, h[8]!], enc.inputProof),
+        game.connect(alice).submitLoadout(id, 0, [h[0]!, h[1]!, h[2]!], [h[3]!, h[4]!, h[5]!], [h[6]!, h[7]!, h[8]!], h[9]!, enc.inputProof),
       ).to.be.reverted;
     });
 
@@ -171,7 +175,7 @@ describe("SkirmMatch", function () {
 
   describe("open seats", function () {
     it("gives each open seat to its first submitter, never both to one account", async function () {
-      await game.connect(eve).createMatch(id, ethers.ZeroAddress, ethers.ZeroAddress, LOCK_WINDOW);
+      await game.connect(eve).createMatch(id, ethers.ZeroAddress, ethers.ZeroAddress, LOCK_WINDOW, 0n);
       await seal(alice, 0, LOADOUT_A);
       await expect(seal(alice, 1, LOADOUT_B)).to.be.revertedWithCustomError(game, "NotPlayer");
       await seal(bob, 1, LOADOUT_B);
@@ -181,7 +185,7 @@ describe("SkirmMatch", function () {
 
   describe("reveal", function () {
     beforeEach(async function () {
-      await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW);
+      await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW, 0n);
     });
 
     it("reverts before both sides locked", async function () {
@@ -200,7 +204,7 @@ describe("SkirmMatch", function () {
       expect((await game.getMatch(id)).status).to.eq(Status.Revealing);
 
       const handles = await game.revealHandles(id);
-      expect(handles.length).to.eq(19);
+      expect(handles.length).to.eq(21);
       const res = await fhevm.publicDecrypt([...handles]);
       const tx = game.connect(eve).finalizeReveal(id, res.abiEncodedClearValues, res.decryptionProof);
       await expect(tx).to.emit(game, "LoadoutRevealed").withArgs(id, 0, LOADOUT_A.agents, LOADOUT_A.skills, LOADOUT_A.tiers);
@@ -226,7 +230,7 @@ describe("SkirmMatch", function () {
       await (await game.reveal(id)).wait();
       const handles = await game.revealHandles(id);
       const res = await fhevm.publicDecrypt([...handles]);
-      const forged = ethers.AbiCoder.defaultAbiCoder().encode(["uint256[19]"], [Array.from({ length: 19 }, () => 1n)]);
+      const forged = ethers.AbiCoder.defaultAbiCoder().encode(["uint256[21]"], [Array.from({ length: 21 }, () => 1n)]);
       await expect(game.finalizeReveal(id, forged, res.decryptionProof)).to.be.reverted;
       expect((await game.getMatch(id)).status).to.eq(Status.Revealing);
     });
@@ -241,7 +245,7 @@ describe("SkirmMatch", function () {
 
   describe("forfeit", function () {
     beforeEach(async function () {
-      await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW);
+      await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW, 0n);
     });
 
     it("reverts while the lock is still open", async function () {
@@ -277,7 +281,7 @@ describe("SkirmMatch", function () {
     const DROP_INTERVAL = 60n;
 
     beforeEach(async function () {
-      await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW);
+      await game.connect(alice).createMatch(id, alice.address, bob.address, LOCK_WINDOW, 0n);
     });
 
     /** Both seal, reveal and finalize; resolves to the finalize receipt. */
@@ -331,7 +335,7 @@ describe("SkirmMatch", function () {
       expect(handles[18]).to.eq(r.seedHandle);
 
       const res = await fhevm.publicDecrypt([...handles]);
-      const clear = ethers.AbiCoder.defaultAbiCoder().decode(["uint256[19]"], res.abiEncodedClearValues)[0] as bigint[];
+      const clear = ethers.AbiCoder.defaultAbiCoder().decode(["uint256[21]"], res.abiEncodedClearValues)[0] as bigint[];
       const tx = await game.finalizeReveal(id, res.abiEncodedClearValues, res.decryptionProof);
       const startedAt = BigInt(await time.latest());
       await expect(tx).to.emit(game, "SeedRevealed").withArgs(id, clear[18], startedAt);
@@ -352,9 +356,9 @@ describe("SkirmMatch", function () {
       const handles = await game.revealHandles(id);
       const res = await fhevm.publicDecrypt([...handles]);
       const coder = ethers.AbiCoder.defaultAbiCoder();
-      const clear = [...(coder.decode(["uint256[19]"], res.abiEncodedClearValues)[0] as bigint[])];
+      const clear = [...(coder.decode(["uint256[21]"], res.abiEncodedClearValues)[0] as bigint[])];
       clear[18] = (clear[18]! + 1n) % 2n ** 64n;
-      await expect(game.finalizeReveal(id, coder.encode(["uint256[19]"], [clear]), res.decryptionProof)).to.be.reverted;
+      await expect(game.finalizeReveal(id, coder.encode(["uint256[21]"], [clear]), res.decryptionProof)).to.be.reverted;
       expect((await game.randomness(id)).seed).to.eq(0n);
     });
 
@@ -414,7 +418,7 @@ describe("SkirmMatch", function () {
 
     it("draws a different seed for every match", async function () {
       const other = matchKey("second-match");
-      await game.connect(alice).createMatch(other, alice.address, bob.address, LOCK_WINDOW);
+      await game.connect(alice).createMatch(other, alice.address, bob.address, LOCK_WINDOW, 0n);
       await startMatch();
       await startMatch(other);
       const a = await game.randomness(id);

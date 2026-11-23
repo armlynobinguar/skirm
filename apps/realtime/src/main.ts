@@ -10,6 +10,7 @@ import {
   RedisExternalTurnStore,
   createQueue,
   createRedis,
+  createMatchSettler,
   createSealedMatchReader,
   createVault,
   enqueueRegistry,
@@ -68,6 +69,9 @@ async function bootstrap(): Promise<void> {
     externalTurns: new RedisExternalTurnStore(redis),
     // Sealed loadouts on Sepolia (ZAMA_ENABLED, SEPOLIA_RPC_URL, ZAMA_MATCH_ADDRESS): null when off.
     sealedMatches: createSealedMatchReader(zamaServerConfig(process.env)),
+    // Sealed results settle on chain from the operator key (ZAMA_OPERATOR_PRIVATE_KEY): null when off
+    // or when no key is set (that case logs a warning, never the key).
+    matchSettler: createMatchSettler(process.env, log),
     log,
   };
 

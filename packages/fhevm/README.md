@@ -8,7 +8,7 @@ OpenZeppelin's [confidential contracts](https://github.com/OpenZeppelin/openzepp
 | Contract | What it is |
 | --- | --- |
 | `ConfidentialSkirmCredits` (cSKIRM) | ERC-7984 confidential token for stakes and rewards. Balances and transfer amounts are FHE ciphertexts. Owner + approved minters (game contracts) can mint; a public faucet gives testers a fixed amount once per cooldown. |
-| `SkirmMatch` | Sealed PvP loadouts: each player commits its crew, skills and talk tiers as encrypted inputs; nobody can read them until both have locked, then both are revealed together with a KMS-verified public decryption. Lock deadline + forfeit. |
+| `SkirmMatch` | Sealed PvP loadouts: each player commits its crew, skills and talk tiers as encrypted inputs; nobody can read them until both have locked, then both are revealed together with a KMS-verified public decryption. Lock deadline + forfeit. FHE randomness (seed, supply drops). Confidential cSKIRM stake escrow, settled by the game server with the match log hash anchored on chain. |
 
 ## Setup
 
@@ -45,17 +45,20 @@ much they talk) without seeing the rival's. Off chain that rests on trusting the
 transparent chain a commit is readable the moment it lands, so the second player could counter the
 first. With FHEVM the picks are ciphertexts until both are locked, and the reveal is verifiable.
 
-**Lifecycle** (`Status`): `None → Open → Locked → Revealing → Revealed`, or `Open → Forfeited | Cancelled`.
+**Lifecycle** (`Status`): `None → Open → Locked → Revealing → Revealed → Settled`, or `Open → Forfeited | Cancelled`
+at the lock deadline, or `Locked | Revealing | Revealed → Cancelled` when nobody settles in time.
 
 | Call | Who | What |
 | --- | --- | --- |
-| `createMatch(id, playerA, playerB, lockWindow)` | a player (or anyone, with both seats open) | `id = keccak256(utf8(offchainMatchId))`. A seat left as `address(0)` goes to the first account that seals it (never both seats to one account). `lockWindow` 1 min to 1 day. |
-| `submitLoadout(id, side, agents[3], skills[3], tiers[3], proof)` | that side's player | Nine `externalEuint8` under one input proof. ACL: only the contract and the submitting player. One submission per side, before the deadline. |
-| `reveal(id)` | anyone, once both locked | `FHE.makePubliclyDecryptable` on the 18 loadout handles and the match seed; emits `RevealRequested(id, handles)`. |
+| `createMatch(id, playerA, playerB, lockWindow, minStake)` | a player (or anyone, with both seats open) | `id = keccak256(utf8(offchainMatchId))`. A seat left as `address(0)` goes to the first account that seals it (never both seats to one account). `lockWindow` 1 min to 1 day. `minStake`: public minimum cSKIRM stake per side (0: unstaked). |
+| `submitLoadout(id, side, agents[3], skills[3], tiers[3], stake, proof)` | that side's player | Nine `externalEuint8` and one `externalEuint64` stake under one input proof. ACL: only the contract and the submitting player. One submission per side, before the deadline. A staked match pulls the stake into escrow (see below). |
+| `reveal(id)` | anyone, once both locked | `FHE.makePubliclyDecryptable` on the 18 loadout handles, the match seed and both "stake ok" flags; emits `RevealRequested(id, handles)`. |
 | `finalizeReveal(id, abiEncodedClearValues, decryptionProof)` | anyone | Fetch both from the relayer (`publicDecrypt(revealHandles(id))`); `FHE.checkSignatures` verifies the KMS proof, then the plaintexts are stored (`revealedLoadout`, `randomness`) and emitted (`LoadoutRevealed`, `SeedRevealed`). |
 | `revealDrop(id, slot)` | anyone, once the drop is due | Opens supply drop `slot` for public decryption, in slot order, no earlier than `dropDueAt(id, slot)`; emits `DropRevealRequested`. |
 | `finalizeDrop(id, slot, abiEncodedClearValue, decryptionProof)` | anyone | Checks the KMS proof for that one handle, stores the value (`randomness`) and emits `DropRevealed`. |
-| `forfeit(id)` | anyone, after the deadline while `Open` | One side locked: it wins (`MatchForfeited`, `winner`). Neither: `MatchCancelled`. |
+| `forfeit(id)` | anyone, after the deadline while `Open` | One side locked: it wins (`MatchForfeited`, `winner`) and gets its stake back. Neither: `MatchCancelled`. |
+| `settle(id, winnerSeat, logHash)` | the `operator` (game server), once, while `Revealed` | Anchors the log head hash, records the result (0, 1 or `NO_SIDE` = draw) and pays the escrow out (`MatchSettled`, `StakePaid`). |
+| `refundUnsettled(id)` | anyone, `SETTLE_TIMEOUT` (1 day) after the lock deadline | A locked match nobody settled is cancelled and both stakes go back. |
 
 Public decryption uses the current FHEVM flow (`makePubliclyDecryptable` + off-chain relayer
 decryption + on-chain `checkSignatures`), not the old oracle callback.
@@ -75,12 +78,11 @@ tells the rival someone is sealing), creates the match if needed, encrypts and s
 rival, then team A reveals and finalizes (team B steps in if it does not land). The web then sends
 `v2_lock_in { sealed: true }`; realtime (`ZAMA_ENABLED=1`, `SEPOLIA_RPC_URL`, optional
 `ZAMA_MATCH_ADDRESS`) reads `revealedLoadout` through `@skirm/server` `EthersSealedMatchReader`,
-checks the seat is the address the player declared, and plays exactly that crew. The server only
-reads the chain and holds no key.
+checks the seat is the address the player declared, and plays exactly that crew. Reading needs no
+key; settling the result (below) uses the operator key.
 
-**Hook points** for later contracts: `_onCreated`, `_onSealed`, `_onBothLocked` (the randomness
-below is already drawn when it runs), `_onRevealed` and `_onForfeited` (a cSKIRM stake escrow can
-take stakes on seal and pay out on result or forfeit). They are empty internal virtual functions here.
+**Hook points**: `_onCreated`, `_onSealed`, `_onBothLocked` (the randomness below is already drawn
+when it runs), `_onRevealed` and `_onForfeited`. The stake escrow below is implemented in them.
 
 **Known limits.** Match ids are predictable, so an attacker who knows one could open it first with
 fixed seats only if they are one of those seats; with open seats, the off-chain address check makes a
@@ -134,6 +136,65 @@ stored value came through `FHE.checkSignatures`, and anyone can re-run `publicDe
 for the same plaintexts. The debrief shows every draw with its Etherscan transaction and can publish
 the draws the map did not use, so all of a match's randomness ends up public.
 
+## SkirmMatch: confidential cSKIRM stakes and payouts
+
+**Confidentiality goal.** A player can put cSKIRM on a sealed match without the rival, spectators or
+the game server learning how much: the stake, the escrow and every payout stay ciphertexts that
+only their owner can decrypt. On a transparent chain a stake is a public transfer, so the rival
+sees how confident (or how rich) you are before the match starts; here they see a handle.
+
+**Why in SkirmMatch, not a separate contract.** The stake rides the seal: one input proof covers
+the loadout and the stake, one operator approval (to SkirmMatch) lets it pull the stake, and the
+"stake ok" flags join the loadout reveal batch, so one `publicDecrypt` and one `checkSignatures`
+open everything. A separate `SkirmStakes` would need a second approval or ACL hand-offs
+(`allowTransient` across contracts) for every amount, and a second reveal round for the flags.
+
+**Stake on seal.** The player first calls `cSKIRM.setOperator(SkirmMatch, until)` (ERC-7984 has no
+allowance; the web asks once and sets 30 days). `submitLoadout` then runs
+`confidentialTransferFrom(player, SkirmMatch, stake)`. ERC-7984 does not revert on a short balance:
+it moves 0. So the escrow stores the amount actually transferred (the returned handle) and derives
+`stakeOk = transferred >= minStake` as an `ebool`. Nothing about the amount is public; the seal
+succeeds either way, so even "this player was short" stays hidden until the reveal.
+
+**Matched pot.** Once both are sealed, `matched = FHE.min(FHE.select(ok0, staked0, 0), FHE.select(ok1, staked1, 0))`:
+each side risks the smaller valid stake, and a side whose stake is not ok does not count as locked in
+the escrow (the pot is 0). At `reveal` the two flags open with the loadouts (handles 20 and 21 of
+`revealHandles`); `finalizeReveal` checks and stores them (`StakeChecked`, `escrow(id).stakeOkClear`).
+That is the only thing anyone learns about a stake: yes or no.
+
+**Settlement.** The game server (`operator`, set at deploy, changeable by the owner) posts
+`settle(id, winnerSeat, logHash)` after the match. It stores the head of the match's hash-chained
+log (`settlement(id)`: the on-chain anchor the verifier checks) and pays out by confidential transfer:
+
+| Result | Winner | Loser / other side | Treasury |
+| --- | --- | --- | --- |
+| Win | its stake + `matched` − fee | its stake − `matched` (the unmatched excess) | fee = `feeBps` of `2 × matched` |
+| Draw (`NO_SIDE`) | its stake back | its stake back | — |
+| A stake not ok | `matched` is 0: both stakes back | | — |
+| Lock forfeit (one side sealed) | the locked side takes the pot: its own stake | — | — |
+| Cancelled (`refundUnsettled`) | both stakes back | | — |
+
+The fee is computed as `(pot / 10000) × bps + (pot % 10000) × bps / 10000` so it cannot overflow 64
+bits; `feeBps` is fixed per match at creation (max `MAX_FEE_BPS` = 10%). Each payout handle
+(`escrow(id).paid`) only decrypts for its recipient (and the contract); `matched` only for the
+contract. `settle` reverts for anyone but the operator (`NotOperator`) and on a second call
+(`WrongStatus(Settled)`). Draws, forfeits and cancels also go through `_pay`, so every amount that
+leaves the escrow is a confidential transfer.
+
+**Game flow.** On the lock-in the web shows "Stake (🔒 encrypted)" (default and minimum
+`NEXT_PUBLIC_ZAMA_MIN_STAKE`, 10 cSKIRM; 0 makes sealed matches unstaked), approves SkirmMatch as
+operator once, and encrypts the stake with the loadout. Realtime (`ZAMA_ENABLED`, plus
+`ZAMA_OPERATOR_PRIVATE_KEY` for the operator account) settles each sealed match when it ends, in the
+background (a void or unstored result settles as a draw). Without the key it logs a warning and
+does not settle; players can still `refundUnsettled` after the timeout. The debrief shows the public
+flags, a "Settled on Sepolia" link, and "Payout: 🔒 Reveal", which user-decrypts the player's own
+stake and payout.
+
+**Known limits.** A player who stakes 0 still gets the rival's loadout revealed (the flags open with
+the loadouts), but risks nothing and can win nothing; the game itself is played and recorded
+normally. The operator is trusted to post the true winner; the anchored log hash makes a false
+result detectable (PR 5 verifies it), not impossible.
+
 ## Deploy to Sepolia
 
 ```bash
@@ -144,11 +205,17 @@ This deploys `ConfidentialSkirmCredits` and `SkirmMatch` (or only the ones in `D
 e.g. `DEPLOY_CONTRACTS=SkirmMatch` next to an already deployed token), records them in
 `deployments/sepolia.json` (address, tx, block, constructor args; merged with what is already
 there) and regenerates `generated/index.ts`. Commit both files so the web and realtime pick up the
-addresses. To verify:
+addresses.
+
+SkirmMatch's constructor is `(credits, operator, treasury, feeBps)`: `CREDITS_ADDRESS` (default: the
+cSKIRM deployed in the same run or recorded in `deployments/sepolia.json`), `MATCH_OPERATOR` (default
+the deployer; give the game server that account's key as `ZAMA_OPERATOR_PRIVATE_KEY`), `TREASURY`
+(default none) and `FEE_BPS` (default 0). The stake escrow changes SkirmMatch's ABI, so a SkirmMatch
+deployed before it must be redeployed (`DEPLOY_CONTRACTS=SkirmMatch` keeps the token). To verify:
 
 ```bash
 npx hardhat verify --network sepolia <creditsAddress> <owner> <faucetAmount> <faucetCooldown>
-npx hardhat verify --network sepolia <matchAddress>
+npx hardhat verify --network sepolia <matchAddress> <creditsAddress> <operator> <treasury> <feeBps>
 ```
 
 ## Address + ABI export

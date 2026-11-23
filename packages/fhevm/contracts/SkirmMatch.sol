@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import {FHE, euint8, euint16, euint64, externalEuint8} from "@fhevm/solidity/lib/FHE.sol";
+import {FHE, ebool, euint8, euint16, euint64, externalEuint8, externalEuint64} from "@fhevm/solidity/lib/FHE.sol";
 import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
+import {IERC7984} from "@openzeppelin/confidential-contracts/interfaces/IERC7984.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 /// @title skirm sealed loadouts
 /// @author skirm
@@ -34,10 +37,21 @@ import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 ///      `finalizeDrop` with the KMS proof). The game server maps a drop value to a legal tile
 ///      (packages/engine v2 `sealedDropTile`) and lands the drop once its value is public.
 ///
-///      Extension points: the internal `_on*` hooks are empty here. A later contract layers a
-///      cSKIRM stake escrow (taken on seal, paid out on result or forfeit) on top of them without
-///      changing this flow.
-contract SkirmMatch is ZamaEthereumConfig {
+///      Confidential stakes: a match created with a nonzero `minStake` is staked. Each player
+///      stakes an encrypted cSKIRM amount with its seal (same input proof), pulled through ERC-7984
+///      `confidentialTransferFrom` (the player first makes this contract an operator with
+///      `setOperator` on cSKIRM). ERC-7984 moves 0 instead of reverting when the balance is short,
+///      so the escrow works on the amount actually transferred and derives an encrypted
+///      "stake ok" flag (`transferred >= minStake`). The flags open with the loadouts at `reveal`
+///      (handles 20 and 21): everyone learns "stake ok yes/no", never the amount. A side whose
+///      flag is false does not count as locked in the escrow: the matched pot is
+///      `min(select(ok0, stake0, 0), select(ok1, stake1, 0))`, so it can win nothing and both
+///      stakes go back at settlement. The game server (the `operator` role) settles the result with
+///      `settle`, which anchors the final log hash on chain and pays the matched pot to the winner
+///      (minus the treasury fee), each side's unmatched excess back to it, or both stakes back on a
+///      draw. Every payout is a confidential transfer: only its recipient can decrypt the amount.
+///      The escrow lives in the `_on*` hooks below.
+contract SkirmMatch is ZamaEthereumConfig, Ownable2Step {
     /// @notice Crew slots per side (the map crew limit never exceeds 3).
     uint8 public constant SLOTS = 3;
 
@@ -60,8 +74,16 @@ contract SkirmMatch is ZamaEthereumConfig {
     ///      (the server lands it on the first tick after it reads the value), never the other way round.
     uint64 public constant DROP_INTERVAL = 60 seconds;
 
+    /// @notice Highest treasury fee, in basis points of the matched pot (10%).
+    uint16 public constant MAX_FEE_BPS = 1_000;
+
+    /// @notice A locked match nobody settled is refundable by anyone this long after its lock deadline.
+    uint64 public constant SETTLE_TIMEOUT = 1 days;
+
     /// @notice Lifecycle of a match.
-    /// @dev None → Open → Locked → Revealing → Revealed, or Open → Forfeited / Cancelled after the deadline.
+    /// @dev None → Open → Locked → Revealing → Revealed → Settled, or Open → Forfeited / Cancelled
+    ///      after the lock deadline, or Locked / Revealing / Revealed → Cancelled once SETTLE_TIMEOUT
+    ///      passed without a settlement (`refundUnsettled`).
     enum Status {
         None,
         Open,
@@ -69,7 +91,8 @@ contract SkirmMatch is ZamaEthereumConfig {
         Revealing,
         Revealed,
         Forfeited,
-        Cancelled
+        Cancelled,
+        Settled
     }
 
     /// @notice Public match header.
@@ -124,6 +147,50 @@ contract SkirmMatch is ZamaEthereumConfig {
 
     mapping(bytes32 matchId => Randomness) private _random;
 
+    /// @notice A match's cSKIRM escrow. Amounts are FHE handles; only the side's player (and this
+    ///         contract) can decrypt its own stake, payout and flag.
+    /// @param minStake Public minimum stake in base units (0: the match is unstaked, nothing moves).
+    /// @param feeBps Treasury fee on the matched pot, fixed when the match was created.
+    /// @param staked Amount each side actually transferred in (ERC-7984 moves 0 on a short balance).
+    /// @param stakeOk Encrypted `staked >= minStake` per side; public from `reveal` on.
+    /// @param matched The pot each side puts at risk: min of both sides' valid stakes (0 if any is not ok).
+    /// @param paid Amount paid back to each side at settlement, forfeit or refund.
+    /// @param stakeOkClear The verified flags (after `finalizeReveal`).
+    struct Escrow {
+        uint64 minStake;
+        uint16 feeBps;
+        euint64[2] staked;
+        ebool[2] stakeOk;
+        euint64 matched;
+        euint64[2] paid;
+        bool[2] stakeOkClear;
+    }
+
+    /// @notice A settled match: the result the operator posted and the anchored log hash.
+    /// @param logHash Head of the match's hash-chained log (the verification anchor).
+    /// @param winner 0 or 1, or NO_SIDE for a draw.
+    /// @param settledAt Timestamp of the settlement (0 before).
+    struct Settlement {
+        bytes32 logHash;
+        uint8 winner;
+        uint64 settledAt;
+    }
+
+    mapping(bytes32 matchId => Escrow) private _escrow;
+    mapping(bytes32 matchId => Settlement) private _settlement;
+
+    /// @notice The cSKIRM (ERC-7984) token stakes are paid in.
+    IERC7984 public immutable credits;
+
+    /// @notice The game server's signer: the only account that can `settle`.
+    address public operator;
+
+    /// @notice Receives the fee on settled pots (address(0) or a zero fee: no fee).
+    address public treasury;
+
+    /// @notice Fee in basis points of the matched pot for matches created from now on.
+    uint16 public feeBps;
+
     /// @notice A match was created.
     event MatchCreated(bytes32 indexed matchId, address playerA, address playerB, uint64 lockDeadline);
 
@@ -154,8 +221,53 @@ contract SkirmMatch is ZamaEthereumConfig {
     /// @notice The lock deadline passed with exactly one side sealed: that side wins by forfeit.
     event MatchForfeited(bytes32 indexed matchId, uint8 winner);
 
-    /// @notice The lock deadline passed with no side sealed.
+    /// @notice The lock deadline passed with no side sealed, or a locked match was never settled.
     event MatchCancelled(bytes32 indexed matchId);
+
+    /// @notice A side's stake went into escrow. `stakeHandle` is the transferred amount, encrypted.
+    event StakeLocked(bytes32 indexed matchId, uint8 indexed side, address indexed player, bytes32 stakeHandle);
+
+    /// @notice A side's verified "stake ok" flag (only yes/no: the amount stays encrypted).
+    event StakeChecked(bytes32 indexed matchId, uint8 indexed side, bool ok);
+
+    /// @notice A side was paid out of escrow. `amountHandle` only decrypts for `player`.
+    event StakePaid(bytes32 indexed matchId, uint8 indexed side, address indexed player, bytes32 amountHandle);
+
+    /// @notice The operator settled the match and anchored its final log hash.
+    event MatchSettled(bytes32 indexed matchId, uint8 winner, bytes32 logHash);
+
+    event OperatorSet(address indexed operator);
+    event FeeSet(address indexed treasury, uint16 feeBps);
+
+    /// @param credits_ The cSKIRM token stakes are paid in.
+    /// @param operator_ The game server's signer (settles results).
+    /// @param treasury_ Fee recipient (address(0) for none).
+    /// @param feeBps_ Fee on the matched pot, at most MAX_FEE_BPS.
+    constructor(IERC7984 credits_, address operator_, address treasury_, uint16 feeBps_) Ownable(msg.sender) {
+        if (address(credits_) == address(0) || operator_ == address(0)) revert ZeroAddress();
+        if (feeBps_ > MAX_FEE_BPS) revert InvalidFee(feeBps_);
+        credits = credits_;
+        operator = operator_;
+        treasury = treasury_;
+        feeBps = feeBps_;
+        emit OperatorSet(operator_);
+        emit FeeSet(treasury_, feeBps_);
+    }
+
+    /// @notice Changes the settlement operator.
+    function setOperator(address operator_) external onlyOwner {
+        if (operator_ == address(0)) revert ZeroAddress();
+        operator = operator_;
+        emit OperatorSet(operator_);
+    }
+
+    /// @notice Changes the fee recipient and the fee for matches created from now on.
+    function setFee(address treasury_, uint16 feeBps_) external onlyOwner {
+        if (feeBps_ > MAX_FEE_BPS) revert InvalidFee(feeBps_);
+        treasury = treasury_;
+        feeBps = feeBps_;
+        emit FeeSet(treasury_, feeBps_);
+    }
 
     error MatchExists(bytes32 matchId);
     error UnknownMatch(bytes32 matchId);
@@ -170,6 +282,12 @@ contract SkirmMatch is ZamaEthereumConfig {
     error InvalidDrop(uint8 slot);
     error DropOutOfOrder(uint8 slot, uint8 next);
     error DropNotDue(uint8 slot, uint64 dueAt);
+    error NotOperator(address caller);
+    error InvalidWinner(uint8 winner);
+    error InvalidLogHash();
+    error InvalidFee(uint16 feeBps);
+    error ZeroAddress();
+    error SettleStillOpen(uint64 refundableAt);
 
     /// @notice Creates a match. A seat left as address(0) goes to the first account that seals it.
     /// @dev When a seat is fixed, the creator must be one of the fixed players, so nobody can bind
@@ -180,7 +298,8 @@ contract SkirmMatch is ZamaEthereumConfig {
     /// @param playerA Side 0 (team A), or address(0) for an open seat.
     /// @param playerB Side 1 (team B), or address(0) for an open seat.
     /// @param lockWindow Seconds from now until the lock deadline.
-    function createMatch(bytes32 matchId, address playerA, address playerB, uint64 lockWindow) external {
+    /// @param minStake Public minimum cSKIRM stake per side in base units (0: unstaked match).
+    function createMatch(bytes32 matchId, address playerA, address playerB, uint64 lockWindow, uint64 minStake) external {
         MatchInfo storage m = _matches[matchId];
         if (m.status != Status.None) revert MatchExists(matchId);
         if (playerA != address(0) && playerA == playerB) revert InvalidPlayers();
@@ -195,17 +314,21 @@ contract SkirmMatch is ZamaEthereumConfig {
         m.status = Status.Open;
         m.winner = NO_SIDE;
         emit MatchCreated(matchId, playerA, playerB, deadline);
-        _onCreated(matchId);
+        _onCreated(matchId, minStake);
     }
 
     /// @notice Seals the caller's loadout for `side`. One submission per side, before the deadline.
-    /// @dev All nine values share one input proof (created for this contract and the caller).
-    ///      Only the caller and this contract get ACL access to the handles.
+    /// @dev All ten values share one input proof (created for this contract and the caller).
+    ///      Only the caller and this contract get ACL access to the handles. On a staked match the
+    ///      caller must have made this contract a cSKIRM operator (`setOperator`); the stake is
+    ///      pulled even when it is short (the transfer then moves 0), and only the encrypted flag
+    ///      records whether it met `minStake`, so the call never reveals the amount.
     /// @param matchId The match.
     /// @param side 0 for team A, 1 for team B.
     /// @param agents Encrypted roster index per slot (0 = empty).
     /// @param skills Encrypted equipped-skill bitmask per slot.
     /// @param tiers Encrypted talk tier per slot.
+    /// @param stake Encrypted cSKIRM stake (ignored on an unstaked match).
     /// @param inputProof Proof for the encrypted inputs.
     function submitLoadout(
         bytes32 matchId,
@@ -213,6 +336,7 @@ contract SkirmMatch is ZamaEthereumConfig {
         externalEuint8[3] calldata agents,
         externalEuint8[3] calldata skills,
         externalEuint8[3] calldata tiers,
+        externalEuint64 stake,
         bytes calldata inputProof
     ) external {
         MatchInfo storage m = _requireMatch(matchId);
@@ -237,7 +361,7 @@ contract SkirmMatch is ZamaEthereumConfig {
         }
         m.locked[side] = true;
         emit LoadoutSealed(matchId, side, msg.sender);
-        _onSealed(matchId, side);
+        _onSealed(matchId, side, stake, inputProof);
 
         if (m.locked[1 - side]) {
             m.status = Status.Locked;
@@ -247,8 +371,8 @@ contract SkirmMatch is ZamaEthereumConfig {
         }
     }
 
-    /// @notice Opens both loadouts and the match seed for public decryption. Anyone can call it once
-    ///         both sides sealed.
+    /// @notice Opens both loadouts, the match seed and both "stake ok" flags for public decryption.
+    ///         Anyone can call it once both sides sealed.
     /// @param matchId The match.
     function reveal(bytes32 matchId) external {
         MatchInfo storage m = _requireMatch(matchId);
@@ -260,6 +384,9 @@ contract SkirmMatch is ZamaEthereumConfig {
             FHE.makePubliclyDecryptable(euint8.wrap(handles[i]));
         }
         FHE.makePubliclyDecryptable(_random[matchId].seed);
+        Escrow storage e = _escrow[matchId];
+        FHE.makePubliclyDecryptable(e.stakeOk[0]);
+        FHE.makePubliclyDecryptable(e.stakeOk[1]);
         emit RevealRequested(matchId, handles);
     }
 
@@ -273,8 +400,8 @@ contract SkirmMatch is ZamaEthereumConfig {
         if (m.status != Status.Revealing) revert WrongStatus(m.status);
         FHE.checkSignatures(revealHandles(matchId), abiEncodedClearValues, decryptionProof);
 
-        // 19 static words (18 loadout values, then the seed): the same layout as uint256[19].
-        uint256[19] memory clear = abi.decode(abiEncodedClearValues, (uint256[19]));
+        // 21 static words (18 loadout values, the seed, both stake flags): the layout of uint256[21].
+        uint256[21] memory clear = abi.decode(abiEncodedClearValues, (uint256[21]));
         m.status = Status.Revealed;
         for (uint8 side = 0; side < 2; side++) {
             RevealedLoadout storage r = _revealed[matchId][side];
@@ -290,7 +417,7 @@ contract SkirmMatch is ZamaEthereumConfig {
         rnd.clearSeed = uint64(clear[2 * VALUES_PER_SIDE]);
         rnd.startedAt = uint64(block.timestamp);
         emit SeedRevealed(matchId, rnd.clearSeed, rnd.startedAt);
-        _onRevealed(matchId);
+        _onRevealed(matchId, clear[2 * VALUES_PER_SIDE + 1] != 0, clear[2 * VALUES_PER_SIDE + 2] != 0);
     }
 
     /// @notice Opens supply drop `slot` for public decryption. Anyone can call it once the drop is
@@ -350,6 +477,77 @@ contract SkirmMatch is ZamaEthereumConfig {
         _onForfeited(matchId);
     }
 
+    /// @notice Posts a revealed match's result: anchors the final log hash on chain and pays out
+    ///         the escrow. Only the operator (the game server) can call it, once.
+    /// @dev Staked match, win: the winner gets its stake plus the matched pot from the loser, minus
+    ///      the fee (`feeBps` of both matched stakes) which goes to the treasury; the loser gets its
+    ///      unmatched excess back. Draw: both stakes go back. A side whose stake was not ok makes the
+    ///      matched pot 0, so either result refunds both. Every amount stays encrypted.
+    /// @param matchId The match.
+    /// @param winnerSeat 0 or 1, or NO_SIDE for a draw.
+    /// @param logHash Head of the match's hash-chained log (nonzero).
+    function settle(bytes32 matchId, uint8 winnerSeat, bytes32 logHash) external {
+        if (msg.sender != operator) revert NotOperator(msg.sender);
+        MatchInfo storage m = _requireMatch(matchId);
+        if (m.status != Status.Revealed) revert WrongStatus(m.status);
+        if (winnerSeat > 1 && winnerSeat != NO_SIDE) revert InvalidWinner(winnerSeat);
+        if (logHash == bytes32(0)) revert InvalidLogHash();
+
+        m.status = Status.Settled;
+        m.winner = winnerSeat;
+        _settlement[matchId] = Settlement({logHash: logHash, winner: winnerSeat, settledAt: uint64(block.timestamp)});
+        emit MatchSettled(matchId, winnerSeat, logHash);
+        _payOut(matchId, winnerSeat);
+    }
+
+    /// @notice Refunds both stakes of a locked match nobody settled within SETTLE_TIMEOUT after its
+    ///         lock deadline (the server went away, or the reveal never finished). Anyone can call it.
+    /// @param matchId The match.
+    function refundUnsettled(bytes32 matchId) external {
+        MatchInfo storage m = _requireMatch(matchId);
+        if (m.status != Status.Locked && m.status != Status.Revealing && m.status != Status.Revealed) revert WrongStatus(m.status);
+        uint64 refundableAt = m.lockDeadline + SETTLE_TIMEOUT;
+        if (block.timestamp <= refundableAt) revert SettleStillOpen(refundableAt);
+        m.status = Status.Cancelled;
+        emit MatchCancelled(matchId);
+        _payOut(matchId, NO_SIDE);
+    }
+
+    /// @notice A match's escrow: public terms, encrypted handles and the verified flags.
+    /// @return minStake Minimum stake per side (0: unstaked).
+    /// @return matchFeeBps Fee on the matched pot.
+    /// @return staked Each side's transferred stake (handles; the side's player can decrypt its own).
+    /// @return stakeOk Each side's encrypted flag (public from `reveal` on).
+    /// @return matched The matched pot per side (handle; only this contract holds access).
+    /// @return paid Each side's payout (handles; zero until paid).
+    /// @return stakeOkClear The verified flags (false before `finalizeReveal`).
+    function escrow(bytes32 matchId)
+        external
+        view
+        returns (
+            uint64 minStake,
+            uint16 matchFeeBps,
+            bytes32[2] memory staked,
+            bytes32[2] memory stakeOk,
+            bytes32 matched,
+            bytes32[2] memory paid,
+            bool[2] memory stakeOkClear
+        )
+    {
+        Escrow storage e = _escrow[matchId];
+        for (uint256 i = 0; i < 2; i++) {
+            staked[i] = euint64.unwrap(e.staked[i]);
+            stakeOk[i] = ebool.unwrap(e.stakeOk[i]);
+            paid[i] = euint64.unwrap(e.paid[i]);
+        }
+        return (e.minStake, e.feeBps, staked, stakeOk, euint64.unwrap(e.matched), paid, e.stakeOkClear);
+    }
+
+    /// @notice The posted result and anchored log hash (all zero before `settle`).
+    function settlement(bytes32 matchId) external view returns (Settlement memory) {
+        return _settlement[matchId];
+    }
+
     /// @notice The public match header (status None for an unknown id).
     function getMatch(bytes32 matchId) external view returns (MatchInfo memory) {
         return _matches[matchId];
@@ -407,9 +605,11 @@ contract SkirmMatch is ZamaEthereumConfig {
     }
 
     /// @notice Every handle `reveal` opens, in the order `finalizeReveal` expects the clear values:
-    ///         side 0 then side 1, each agents[0..2], skills[0..2], tiers[0..2]; then the match seed.
+    ///         side 0 then side 1, each agents[0..2], skills[0..2], tiers[0..2]; then the match seed;
+    ///         then side 0's and side 1's "stake ok" flag.
     function revealHandles(bytes32 matchId) public view returns (bytes32[] memory handles) {
-        handles = new bytes32[](2 * uint256(VALUES_PER_SIDE) + 1);
+        uint256 n = 2 * uint256(VALUES_PER_SIDE);
+        handles = new bytes32[](n + 3);
         for (uint8 side = 0; side < 2; side++) {
             SealedLoadout storage l = _sealed[matchId][side];
             uint256 base = uint256(side) * VALUES_PER_SIDE;
@@ -419,7 +619,10 @@ contract SkirmMatch is ZamaEthereumConfig {
                 handles[base + 2 * SLOTS + i] = euint8.unwrap(l.tiers[i]);
             }
         }
-        handles[2 * uint256(VALUES_PER_SIDE)] = euint64.unwrap(_random[matchId].seed);
+        handles[n] = euint64.unwrap(_random[matchId].seed);
+        Escrow storage e = _escrow[matchId];
+        handles[n + 1] = ebool.unwrap(e.stakeOk[0]);
+        handles[n + 2] = ebool.unwrap(e.stakeOk[1]);
     }
 
     // ---------------------------------------------------------------- internals and hooks
@@ -456,18 +659,102 @@ contract SkirmMatch is ZamaEthereumConfig {
         return rnd.startedAt + uint64(slot + 1) * DROP_INTERVAL;
     }
 
-    /// @dev Hook: a match was created (stake escrow can record the stake terms here).
-    function _onCreated(bytes32 matchId) internal virtual {}
+    /// @dev Splits `pot` into the treasury fee: `pot * bps / 10_000`, computed as
+    ///      `(pot / 10_000) * bps + (pot % 10_000) * bps / 10_000` so it cannot overflow 64 bits.
+    function _fee(euint64 pot, uint16 bps) private returns (euint64) {
+        euint64 whole = FHE.mul(FHE.div(pot, 10_000), uint64(bps));
+        euint64 part = FHE.div(FHE.mul(FHE.rem(pot, 10_000), uint64(bps)), 10_000);
+        return FHE.add(whole, part);
+    }
 
-    /// @dev Hook: `side` sealed its loadout (stake escrow can pull the side's stake here).
-    function _onSealed(bytes32 matchId, uint8 side) internal virtual {}
+    /// @dev Confidential transfer of `amount` out of escrow to `side`'s player, recorded as its payout.
+    function _pay(bytes32 matchId, uint8 side, euint64 amount) private {
+        address to = _matches[matchId].players[side];
+        FHE.allowTransient(amount, address(credits));
+        euint64 sent = credits.confidentialTransfer(to, amount);
+        _escrow[matchId].paid[side] = sent;
+        emit StakePaid(matchId, side, to, euint64.unwrap(sent));
+    }
+
+    /// @dev Pays a locked match out: `winner` takes the matched pot (minus the fee), NO_SIDE refunds both.
+    function _payOut(bytes32 matchId, uint8 winner) private {
+        Escrow storage e = _escrow[matchId];
+        if (e.minStake == 0) return;
+        if (winner == NO_SIDE) {
+            _pay(matchId, 0, e.staked[0]);
+            _pay(matchId, 1, e.staked[1]);
+            return;
+        }
+        uint8 loser = 1 - winner;
+        euint64 winnings = e.matched;
+        address to = treasury;
+        if (e.feeBps != 0 && to != address(0)) {
+            euint64 fee = _fee(FHE.add(e.matched, e.matched), e.feeBps);
+            winnings = FHE.sub(winnings, fee);
+            FHE.allowTransient(fee, address(credits));
+            credits.confidentialTransfer(to, fee);
+        }
+        _pay(matchId, winner, FHE.add(e.staked[winner], winnings));
+        _pay(matchId, loser, FHE.sub(e.staked[loser], e.matched));
+    }
+
+    /// @dev Hook: a match was created. Records the stake terms.
+    function _onCreated(bytes32 matchId, uint64 minStake) internal virtual {
+        Escrow storage e = _escrow[matchId];
+        e.minStake = minStake;
+        e.feeBps = feeBps;
+    }
+
+    /// @dev Hook: `side` sealed its loadout. Pulls its stake into escrow and derives the encrypted
+    ///      "stake ok" flag from the amount actually transferred. Unstaked match: nothing moves and
+    ///      the flag is `stake >= 0` (always true; computed rather than a trivial constant so each
+    ///      side's flag is a distinct handle for the batch public decryption).
+    function _onSealed(bytes32 matchId, uint8 side, externalEuint64 stake, bytes calldata inputProof) internal virtual {
+        Escrow storage e = _escrow[matchId];
+        euint64 amount = FHE.fromExternal(stake, inputProof);
+        ebool ok;
+        if (e.minStake == 0) {
+            ok = FHE.ge(amount, 0);
+        } else {
+            FHE.allowTransient(amount, address(credits));
+            // Reverts only without operator approval (public anyway); a short balance moves 0.
+            euint64 transferred = credits.confidentialTransferFrom(msg.sender, address(this), amount);
+            FHE.allowThis(transferred);
+            FHE.allow(transferred, msg.sender);
+            e.staked[side] = transferred;
+            ok = FHE.ge(transferred, e.minStake);
+            emit StakeLocked(matchId, side, msg.sender, euint64.unwrap(transferred));
+        }
+        FHE.allowThis(ok);
+        FHE.allow(ok, msg.sender);
+        e.stakeOk[side] = ok;
+    }
 
     /// @dev Hook: both sides sealed; the FHE seed and drop values are already drawn (`randomness`).
-    function _onBothLocked(bytes32 matchId) internal virtual {}
+    ///      Matches the pot: a side whose stake is not ok counts as 0, so the pot is 0.
+    function _onBothLocked(bytes32 matchId) internal virtual {
+        Escrow storage e = _escrow[matchId];
+        if (e.minStake == 0) return;
+        euint64 zero = FHE.asEuint64(0);
+        euint64 valid0 = FHE.select(e.stakeOk[0], e.staked[0], zero);
+        euint64 valid1 = FHE.select(e.stakeOk[1], e.staked[1], zero);
+        e.matched = FHE.min(valid0, valid1);
+        FHE.allowThis(e.matched);
+    }
 
-    /// @dev Hook: plaintext loadouts are stored.
-    function _onRevealed(bytes32 matchId) internal virtual {}
+    /// @dev Hook: plaintext loadouts are stored, with the verified "stake ok" flags.
+    function _onRevealed(bytes32 matchId, bool ok0, bool ok1) internal virtual {
+        Escrow storage e = _escrow[matchId];
+        e.stakeOkClear = [ok0, ok1];
+        emit StakeChecked(matchId, 0, ok0);
+        emit StakeChecked(matchId, 1, ok1);
+    }
 
-    /// @dev Hook: the match was forfeited or cancelled (stake escrow pays out or refunds here).
-    function _onForfeited(bytes32 matchId) internal virtual {}
+    /// @dev Hook: the match was forfeited or cancelled at the lock deadline. The side that sealed
+    ///      takes the pot, which only holds its own stake: it gets it back.
+    function _onForfeited(bytes32 matchId) internal virtual {
+        MatchInfo storage m = _matches[matchId];
+        if (_escrow[matchId].minStake == 0 || m.status != Status.Forfeited) return;
+        _pay(matchId, m.winner, _escrow[matchId].staked[m.winner]);
+    }
 }
