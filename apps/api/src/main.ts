@@ -10,6 +10,7 @@ import {
   QUEUE_BENCHMARKS,
   RedisCostStore,
   RpcBackingTxReader,
+  createAuctionReader,
   createNearAdapters,
   createQueue,
   createRedis,
@@ -52,6 +53,7 @@ async function main(): Promise<void> {
   // Writer backing on NEAR (contracts/backing) once its account is set; credits in dev otherwise.
   const backingContract = process.env.BACKING_CONTRACT?.trim() || undefined;
 
+  const auctions = createAuctionReader(process.env);
   const deps: ApiDeps = {
     config: {
       ...config,
@@ -94,6 +96,8 @@ async function main(): Promise<void> {
           },
         }
       : {}),
+    // Sealed skill auctions on Sepolia: only with ZAMA_ENABLED and SkillAuction deployed.
+    ...(auctions ? { auctions } : {}),
     benchmarkQueue,
     costs: new RedisDailyCosts(readRedis),
     // Bring your own agent: pull turns realtime publishes, shared through Redis.

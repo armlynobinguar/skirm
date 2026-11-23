@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { auctionPayout, auctionStatus, skillRefPreimage, vickreyOutcome } from '../src/sealed-auction';
+import { auctionPayout, auctionStatus, evmLinkMessage, skillRefPreimage, vickreyOutcome } from '../src/sealed-auction';
 
 describe('sealed auctions', () => {
   it('names the contract statuses', () => {
@@ -33,5 +33,11 @@ describe('sealed auctions', () => {
   it('splits the price into the fee and the seller share', () => {
     expect(auctionPayout(1_000_000n, 250)).toEqual({ fee: 25_000n, seller: 975_000n });
     expect(auctionPayout(1_000_000n, 250, false)).toEqual({ fee: 0n, seller: 1_000_000n });
+  });
+
+  it('binds the EVM link message to the account and a lower-cased address', () => {
+    expect(evmLinkMessage('acc_1', '0xABCDEF0000000000000000000000000000000001')).toBe(
+      'skirm: link EVM address 0xabcdef0000000000000000000000000000000001 to account acc_1',
+    );
   });
 });

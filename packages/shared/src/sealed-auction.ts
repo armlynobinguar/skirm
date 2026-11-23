@@ -61,3 +61,12 @@ export function auctionPayout(price: bigint, feeBps: number, hasTreasury = true)
   const fee = hasTreasury ? (price * BigInt(feeBps)) / 10_000n : 0n;
   return { fee, seller: price - fee };
 }
+
+/**
+ * The message a player signs (EIP-191 personal_sign) to link an EVM address to its skirm account:
+ * sealed auctions name their winner by address, and the Exchange grants the license to the account
+ * linked to it. Bound to the account id, so a signature cannot link the address anywhere else.
+ */
+export function evmLinkMessage(accountId: string, address: string): string {
+  return `skirm: link EVM address ${address.toLowerCase()} to account ${accountId}`;
+}
