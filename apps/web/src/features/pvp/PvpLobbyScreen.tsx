@@ -38,6 +38,7 @@ import type { V2EndReason } from '@/lib/realtime/protocol';
 import { useRealtimeMessage, useRealtimeStatus } from '@/lib/realtime/hooks';
 import { routes } from '@/lib/routes';
 import { useApi, useRealtime } from '@/lib/services';
+import { zamaConfig } from '@/lib/zama/config';
 import s from './pvp.module.css';
 import h from './hub.module.css';
 import { boardSizeRange, creditsAsNear, fmtCountdown, fmtMinSec, nearFixed, nearText, splitRows, splitShare, sumYocto, useNow } from './pvpUtil';
@@ -543,6 +544,11 @@ function Lobby() {
           <ButtonLink href={routes.verify()} size="sm" data-testid="s11-more-verify">
             Verify a match on NEAR
           </ButtonLink>
+          {zamaConfig.enabled ? (
+            <ButtonLink href={routes.fog()} size="sm" data-testid="s11-more-fog">
+              Fog Skirm · on chain
+            </ButtonLink>
+          ) : null}
         </div>
         <p className={h.note}>
           When a rival is found you have 10 s to accept, then 30 s to lock in talk tiers.
