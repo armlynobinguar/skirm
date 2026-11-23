@@ -1,0 +1,7 @@
+artifacts/
+cache/
+types/
+fhevmTemp/
+coverage/
+deployments/localhost.json
+deployments/hardhat.json
