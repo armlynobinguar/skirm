@@ -114,4 +114,4 @@ On a transparent chain this game cannot exist. The traps would sit in the transa
 
 ## Watching and testing
 
-Every live match shows under **Live now** on the PvP hub, and anyone can click **Watch**. To test a skill without a full match, use the bench at [/skills/bench](/skills/bench). See [Bench and trials](/docs/bench-and-trials).
+Every live match shows under **Live now** on the PvP hub, and anyone can click **Watch**. With the Zama features on, spectators can back a crew with a sealed prediction until tick 30: see [Sealed predictions](/docs/predictions). To test a skill without a full match, use the bench at [/skills/bench](/skills/bench). See [Bench and trials](/docs/bench-and-trials).
