@@ -1091,6 +1091,49 @@ export const SkirmMatchAbi = [
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "slot",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint64",
+        "name": "dueAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "DropNotDue",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "slot",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "next",
+        "type": "uint8"
+      }
+    ],
+    "name": "DropOutOfOrder",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "slot",
+        "type": "uint8"
+      }
+    ],
+    "name": "InvalidDrop",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "InvalidKMSSignatures",
     "type": "error"
@@ -1220,6 +1263,56 @@ export const SkirmMatchAbi = [
       }
     ],
     "name": "BothLocked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint8",
+        "name": "slot",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "handle",
+        "type": "bytes32"
+      }
+    ],
+    "name": "DropRevealRequested",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint8",
+        "name": "slot",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint16",
+        "name": "value",
+        "type": "uint16"
+      }
+    ],
+    "name": "DropRevealed",
     "type": "event"
   },
   {
@@ -1377,6 +1470,31 @@ export const SkirmMatchAbi = [
       },
       {
         "indexed": false,
+        "internalType": "bytes32",
+        "name": "seedHandle",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32[3]",
+        "name": "dropHandles",
+        "type": "bytes32[3]"
+      }
+    ],
+    "name": "RandomnessDrawn",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
         "internalType": "bytes32[]",
         "name": "handles",
         "type": "bytes32[]"
@@ -1384,6 +1502,57 @@ export const SkirmMatchAbi = [
     ],
     "name": "RevealRequested",
     "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "seed",
+        "type": "uint64"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "startedAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "SeedRevealed",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "DROP_INTERVAL",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DROP_SLOTS",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [],
@@ -1499,6 +1668,58 @@ export const SkirmMatchAbi = [
         "type": "bytes32"
       },
       {
+        "internalType": "uint8",
+        "name": "slot",
+        "type": "uint8"
+      }
+    ],
+    "name": "dropDueAt",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint8",
+        "name": "slot",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes",
+        "name": "abiEncodedClearValue",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
+        "name": "decryptionProof",
+        "type": "bytes"
+      }
+    ],
+    "name": "finalizeDrop",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
         "internalType": "bytes",
         "name": "abiEncodedClearValues",
         "type": "bytes"
@@ -1581,7 +1802,74 @@ export const SkirmMatchAbi = [
         "type": "bytes32"
       }
     ],
+    "name": "randomness",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "seedHandle",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32[3]",
+        "name": "dropHandles",
+        "type": "bytes32[3]"
+      },
+      {
+        "internalType": "uint64",
+        "name": "seed",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint16[3]",
+        "name": "drops",
+        "type": "uint16[3]"
+      },
+      {
+        "internalType": "uint64",
+        "name": "startedAt",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint8",
+        "name": "dropsRequested",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "dropsRevealed",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      }
+    ],
     "name": "reveal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint8",
+        "name": "slot",
+        "type": "uint8"
+      }
+    ],
+    "name": "revealDrop",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

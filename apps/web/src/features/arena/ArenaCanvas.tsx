@@ -183,7 +183,8 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
           light: inMatch ? softFog(layer, lm.arena, dt, still) : null,
           agFade: rivalFade(layer, lm.arena, dt, still),
           lanes: inMatch && reveal > 0.7 ? proto.laneSetOf(A) : null,
-          drops: inMatch && reveal > 0.7 ? A.drops.filter((d) => (lm.arena.tick ?? 0) < d[2]) : null,
+          // Sealed drops (Zama): where they land is unknown until they do, so no marker ahead of time.
+          drops: inMatch && reveal > 0.7 && !lm.arena.sealedDrops ? A.drops.filter((d) => (lm.arena.tick ?? 0) < d[2]) : null,
         };
         // Following an agent (or third person): ease the board so the agent sits at the camera's focus.
         const f = inMatch && L.view.focus && L.view.mode !== 'overview' ? cur.agents.find((a) => a.id === L.view.focus) : null;

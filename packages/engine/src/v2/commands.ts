@@ -4,6 +4,7 @@
 // the hash-chained match log with that tick (LogTick.commands), into the targeted agents' prompts for
 // DEFAULTS.commands.activeTicks ticks, and into the crew's own frames and debrief. The rival never
 // sees it (not in its frames, the watch view or the public transcript).
+import { dropsOf } from './drops';
 import type { Team } from './map';
 import type { MatchState } from './match';
 
@@ -83,8 +84,8 @@ export function commandLabel(c: Pick<CrewCommand, 'preset' | 'text'>): string {
 export function dropTargets(s: MatchState): [number, number][] {
   const { w } = s.map;
   const at = (j: number): [number, number] => [j % w, (j / w) | 0];
-  const landed = s.map.def.drops
-    .filter((d) => d.tick <= s.tick && s.grid[d.at[1] * w + d.at[0]] === 'item')
+  const landed = dropsOf(s)
+    .filter((d) => !d.sealed && d.tick <= s.tick && s.grid[d.at[1] * w + d.at[0]] === 'item')
     .map((d) => d.at);
   if (landed.length) return landed.map(([x, y]) => [x, y]);
   return s.middle.filter((j) => s.grid[j] === 'item').map(at);

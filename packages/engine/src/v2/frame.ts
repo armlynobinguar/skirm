@@ -139,6 +139,12 @@ export interface V2Frame {
   placed?: { at: [number, number]; kind: ToolKind; ticksLeft?: number }[];
   /** Saboteur decoys (roles.ts): all of them in the watch view, the viewing crew's own in its frames. Absent: none. */
   decoys?: { at: [number, number]; team: Team }[];
+  /**
+   * The supply drop tiles are not the map's (drawn from randomness, drops.ts): nothing should show
+   * the map's drop tiles ahead of time; each one is known when it lands (the supply_drop event).
+   * Absent: the map's drops.
+   */
+  sealedDrops?: true;
 }
 
 /** What the server knows beside the match state: each agent's current plan. */
@@ -237,6 +243,7 @@ export function frameFor(s: MatchState, view: FrameView, events: MatchEvent[], e
     ...(gear.ground.length ? { tools: gear.ground } : {}),
     ...(gear.placed.length ? { placed: gear.placed } : {}),
     ...(decoys.length ? { decoys } : {}),
+    ...(s.drops ? { sealedDrops: true as const } : {}),
   };
 }
 

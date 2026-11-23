@@ -177,7 +177,19 @@ export type V2ServerMessage =
   | { type: 'v2_locked'; matchId: string; team: Team }
   /** Sealed loadouts: `team` is sealing its crew on chain (sent to both; what it picked stays hidden). */
   | { type: 'v2_sealing'; matchId: string; team: Team }
-  | { type: 'v2_start'; matchId: string; team: Team; rival: { handle: string }; tickMs: number; holdTicks: Record<Team, number> }
+  /**
+   * `zama` (sealed matches, ZAMA_ENABLED): the match plays on the seed SkirmMatch drew with FHE
+   * randomness, and its supply drop tiles stay sealed on chain until each one is revealed.
+   */
+  | {
+      type: 'v2_start';
+      matchId: string;
+      team: Team;
+      rival: { handle: string };
+      tickMs: number;
+      holdTicks: Record<Team, number>;
+      zama?: { seed: string; sealedDrops: true };
+    }
   | { type: 'v2_frame'; matchId: string; frame: V2Frame }
   | { type: 'v2_end'; matchId: string; result: MatchResult | null; reason: V2EndReason; logHash: string | null; debrief?: V2Debrief }
   /** Answer to v2_replay: a player's own crew view (the whole board for anyone else), ascending tick. */

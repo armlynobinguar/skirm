@@ -23,6 +23,8 @@ export interface LiveArena {
   team?: Team;
   /** Match tick, for supply drops still to come. */
   tick?: number;
+  /** The drop tiles are sealed (on-chain randomness): the map's upcoming drop markers do not apply. */
+  sealedDrops?: true;
   /** Speech bubbles over agents for this frame's talk, by agent id. */
   barks?: Record<string, LiveBark> | null;
   /** Hybrid control: the agent its player steers (ringed when the camera follows no one). */
@@ -146,6 +148,7 @@ export function composeV2Arena(frame: V2Frame, prev?: LiveArena | null): LiveAre
     barks: barksOf(frame),
     ...(controlled ? { controlled } : {}),
     ...(cosmetics ? { cosmetics } : {}),
+    ...(frame.sealedDrops ? { sealedDrops: true as const } : {}),
   };
 }
 

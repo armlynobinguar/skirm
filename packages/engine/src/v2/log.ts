@@ -28,6 +28,19 @@ export interface LogHeader {
   /** The level played (replaying needs it). Absent means Normal: a Normal log leaves it out. */
   difficulty?: Difficulty;
   models: { planner: string; actor: string; speech: string };
+  /** The match seed drawn on chain (Zama SkirmMatch), a decimal uint64. Absent when none, so older logs hash the same. */
+  seed?: string;
+  /** The supply drop tiles were sealed on chain and placed as each was revealed (LogTick.drops). Absent: the map's. */
+  sealedDrops?: true;
+}
+
+/** A sealed supply drop placed on a tick: its slot, the revealed random value and the tile it maps to. */
+export interface LogDrop {
+  slot: number;
+  value: number;
+  at: [number, number];
+  /** The chain value never arrived in time: the value came from the seed (seedDropValue). */
+  fromSeed?: true;
 }
 
 export interface LogTick {
@@ -38,6 +51,8 @@ export interface LogTick {
   commands?: CrewCommand[];
   /** Hybrid control: the agents whose action this tick came from their player (absent when none). */
   controlled?: string[];
+  /** Sealed supply drops placed before this tick (placeSealedDrop), absent when none. */
+  drops?: LogDrop[];
 }
 
 export interface MatchLog {

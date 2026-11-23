@@ -67,6 +67,7 @@ import type { MatchTimelineInput, V2MatchMessageInput } from '@skirm/db';
 import type { V2Debrief, V2DraftBan, V2DraftSkill, V2EndReason, V2ServerMessage } from '@skirm/server';
 import type { Logger } from '../deps';
 import type { Scheduler } from '../timing';
+import { ChainDrops, type ChainRandomSource } from './chain-drops';
 import { DebriefTally, buildDebrief } from './debrief';
 import { DecisionTimeline } from './timeline';
 
@@ -286,6 +287,8 @@ export class V2Match {
   private lockBy = 0;
   /** Sealed loadouts: the EVM address each sealing crew declared (v2_seal). */
   private readonly sealers = new Map<Team, string>();
+  /** Sealed matches: the on-chain seed and sealed drop values the match plays on (useChainRandomness). */
+  private chain: ChainRandomSource | null = null;
   /** Draft mode: every ban step so far, the crew whose turn it is and when its step runs out. */
   private readonly bans: V2DraftBan[] = [];
   private draftTurn: Team | null = null;
@@ -522,6 +525,7 @@ export class V2Match {
       difficulty: this.difficulty,
       ...(this.setup.hold ? { hold: this.setup.hold } : {}),
       ...(this.setup.lieCap ? { lieCap: this.setup.lieCap } : {}),
+      ...(this.chain ? { seed: this.chain.seed, sealedDrops: true } : {}),
     });
   }
 
@@ -774,6 +778,21 @@ export class V2Match {
     return true;
   }
 
+  /**
+   * Sealed matches: play on the seed SkirmMatch drew with FHE randomness, with every supply drop tile
+   * sealed until its value is revealed on chain (chain-drops.ts). Only before the match goes live.
+   */
+  useChainRandomness(source: ChainRandomSource): boolean {
+    if (this.phase !== 'lockin') return false;
+    this.chain = source;
+    return true;
+  }
+
+  /** The on-chain seed this match plays on, if it is a sealed match. */
+  get chainSeed(): string | null {
+    return this.chain?.seed ?? null;
+  }
+
   /** The EVM address `team` declared with seal, if it is sealing. */
   sealedBy(team: Team): string | undefined {
     return this.sealers.get(team);
@@ -852,12 +871,23 @@ export class V2Match {
       ranked: setup.ranked,
       ...(this.difficulty !== RANKED_DIFFICULTY ? { difficulty: this.difficulty } : {}),
       models: { planner: model, actor: model, speech: model },
+      // The log commits to the chain seed; each sealed drop's revealed value goes in with its tick.
+      ...(this.chain ? { seed: this.chain.seed, sealedDrops: true as const } : {}),
     });
+    const chainDrops = this.chain ? new ChainDrops(this.chain, () => this.deps.scheduler.now(), this.deps.log, `v2 match ${this.matchId}`) : null;
 
     await Promise.all(TEAMS.map((t) => this.replan(t)));
     this.phase = 'live';
     for (const t of TEAMS)
-      this.deps.send(t, { type: 'v2_start', matchId: this.matchId, team: t, rival: { handle: setup.sides[t === 'A' ? 'B' : 'A'].handle }, tickMs: timing.tickMs, holdTicks: { ...s.holdTicks } });
+      this.deps.send(t, {
+        type: 'v2_start',
+        matchId: this.matchId,
+        team: t,
+        rival: { handle: setup.sides[t === 'A' ? 'B' : 'A'].handle },
+        tickMs: timing.tickMs,
+        holdTicks: { ...s.holdTicks },
+        ...(this.chain ? { zama: { seed: this.chain.seed, sealedDrops: true as const } } : {}),
+      });
     this.publish([]);
 
     const sched = this.deps.scheduler;
@@ -886,8 +916,16 @@ export class V2Match {
         this.count(a.team, d);
         this.timeline?.turn(a, d);
       });
+      const drops = chainDrops?.place(s, s.tick + 1) ?? [];
       const ev = stepMatch(s, { actions, says });
-      appendTick(log, { tick: s.tick, actions, says, ...(commands.length ? { commands } : {}), ...(steered.length ? { controlled: steered } : {}) });
+      appendTick(log, {
+        tick: s.tick,
+        actions,
+        says,
+        ...(commands.length ? { commands } : {}),
+        ...(steered.length ? { controlled: steered } : {}),
+        ...(drops.length ? { drops } : {}),
+      });
       // A steered agent that is out goes back to nobody: there is nothing left to steer.
       for (const t of TEAMS) if (this.controlled[t] && s.agents.find((a) => a.id === this.controlled[t])?.out) this.setControl(t, null);
       this.tally.add(ev);

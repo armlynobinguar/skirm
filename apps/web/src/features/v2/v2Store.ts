@@ -131,6 +131,8 @@ export interface V2MatchView {
   draft: V2DraftView | null;
   /** Sealed loadouts (Zama): crews sealing their lock-in on chain (v2_sealing). Absent: none. */
   sealing?: Team[];
+  /** Zama: the match plays on the on-chain FHE seed with sealed supply drops (v2_start `zama`). Absent: no. */
+  zama?: { seed: string };
 }
 
 /** Most comms lines kept per match. */
@@ -205,7 +207,15 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
     case 'v2_sealing':
       return prev.sealing?.includes(m.team) ? prev : { ...prev, sealing: [...(prev.sealing ?? []), m.team] };
     case 'v2_start':
-      return { ...prev, phase: 'live', team: m.team, rivalHandle: m.rival.handle, tickMs: m.tickMs, holdTicks: m.holdTicks };
+      return {
+        ...prev,
+        phase: 'live',
+        team: m.team,
+        rivalHandle: m.rival.handle,
+        tickMs: m.tickMs,
+        holdTicks: m.holdTicks,
+        ...(m.zama ? { zama: { seed: m.zama.seed } } : {}),
+      };
     case 'v2_frame': {
       // Only a player of the match gets its crew frames: this tab plays it, whatever it spectated.
       if (prev.watch && m.frame.view !== 'watch') return frameView(m.matchId, m.frame, now);
