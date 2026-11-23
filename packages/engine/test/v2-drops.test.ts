@@ -7,6 +7,7 @@ import {
   createMatch,
   dropCandidates,
   dropsOf,
+  frameFor,
   mapV2,
   parseMapV2,
   placeSealedDrop,
@@ -133,6 +134,11 @@ describe('sealed drops', () => {
     const tick = copper.drops[0]!.tick;
     expect(drops(run(s, tick - 1))).toEqual([]);
     expect(drops(run(s, 1))).toHaveLength(1);
+  });
+
+  it('flags the frames, so nothing shows the map drop tiles ahead of time', () => {
+    expect(frameFor(createMatch(copper, crews(), { sealedDrops: true }), 'A', []).sealedDrops).toBe(true);
+    expect(frameFor(createMatch(copper, crews()), 'A', []).sealedDrops).toBeUndefined();
   });
 
   it('refuses to place a drop in a match without sealed drops', () => {
