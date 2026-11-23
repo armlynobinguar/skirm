@@ -61,6 +61,21 @@ export async function encryptU8(instance: Instance, contract: string, user: stri
   return { handle: toHex(handles[0]!), inputProof: toHex(inputProof) };
 }
 
+export interface EncryptedInputs {
+  /** One `externalEuintN` argument per value, in order. */
+  handles: Hex[];
+  /** The `bytes inputProof` shared by all of them. */
+  inputProof: Hex;
+}
+
+/** Encrypts several uint8 values under one proof for `contract`, to be submitted by `user`. */
+export async function encryptU8s(instance: Instance, contract: string, user: string, values: readonly (number | bigint)[]): Promise<EncryptedInputs> {
+  const input = instance.createEncryptedInput(contract, user);
+  values.forEach((v, i) => input.add8(checkUint(v, MAX_U8, `encryptU8s[${i}]`)));
+  const { handles, inputProof } = await input.encrypt();
+  return { handles: handles.map((h) => toHex(h)), inputProof: toHex(inputProof) };
+}
+
 /** What the decrypt request needs from a wallet signer (an ethers JsonRpcSigner fits). */
 export interface TypedDataSigner {
   getAddress(): Promise<string>;

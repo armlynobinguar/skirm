@@ -14,8 +14,10 @@
     "@google-cloud/kms": "^6.3.0",
     "@skirm/db": "*",
     "@skirm/engine": "*",
+    "@skirm/fhevm": "*",
     "@skirm/shared": "*",
     "bullmq": "^6.4.2",
+    "ethers": "^6.17.0",
     "ioredis": "^5.4.2",
     "jose": "^5.9.6",
     "zod": "^4.6.6"

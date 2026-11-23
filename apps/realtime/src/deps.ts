@@ -5,7 +5,7 @@ import type { V2Brain } from '@skirm/decision-engine/v2';
 import type { MapDefV2 } from '@skirm/engine/v2';
 import type { ModelChoice } from '@skirm/shared';
 import type { V2Timing } from './v2/match';
-import type { ExternalTurnStore, RegistryJobData, ServerConfig, Vault } from '@skirm/server';
+import type { ExternalTurnStore, RegistryJobData, SealedMatchReader, ServerConfig, Vault } from '@skirm/server';
 import type { WebhookPost } from './v2/external';
 import type { PubSub } from './pubsub';
 import type { QueueTiming, Scheduler } from './timing';
@@ -52,6 +52,8 @@ export interface RealtimeDeps {
   v2Timing?: Partial<V2Timing>;
   /** Bring your own agent: the pull relay shared with the api (Redis in production). */
   externalTurns?: ExternalTurnStore;
+  /** Sealed loadouts (ZAMA_ENABLED): the SkirmMatch reader on Sepolia (absent: the feature is off). */
+  sealedMatches?: SealedMatchReader | null;
   /** Tests only: the external agents' webhook transport (default: the SSRF-safe POST). */
   externalPost?: WebhookPost;
   /** v2 map pool (default: MAPS_V2). */

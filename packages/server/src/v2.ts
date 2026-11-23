@@ -125,8 +125,16 @@ export type V2ClientMessage =
    * `tiers` is per queued agent (slot order). `crew`, when sent, replaces the queued crew (swap,
    * remove, or add up to `crewLimit`) and its tiers win over `tiers`. `playbookId` picks one of the
    * player's crew playbooks for this match (null: none); absent keeps the one selected over REST.
+   * `sealed` (ZAMA_ENABLED): the crew is the loadout this player sealed on SkirmMatch (Sepolia), read
+   * back from the chain once both are revealed; `crew` and `tiers` are then ignored.
    */
-  | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[]; playbookId?: string | null }
+  | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[]; playbookId?: string | null; sealed?: true }
+  /**
+   * Sealed loadouts (ZAMA_ENABLED), during lock-in: this player seals its crew on SkirmMatch from
+   * the EVM `address`. The lock-in window grows to fit the Sepolia round trips and both crews get
+   * v2_sealing; the crew lands with v2_lock_in `sealed` once the reveal is finalized.
+   */
+  | { type: 'v2_seal'; matchId: string; address: string }
   /** Every stored frame of an ended match (answered with v2_frames), for replay at another speed. */
   | { type: 'v2_replay'; matchId: string }
   /**
@@ -167,6 +175,8 @@ export type V2ServerMessage =
   /** `free`: as on v2_found, this crew is not held for the match. */
   | { type: 'v2_lockin'; matchId: string; lockMs: number; rival: { agents: number }; crewLimit?: number; headStartTicks?: Record<Team, number>; free?: true }
   | { type: 'v2_locked'; matchId: string; team: Team }
+  /** Sealed loadouts: `team` is sealing its crew on chain (sent to both; what it picked stays hidden). */
+  | { type: 'v2_sealing'; matchId: string; team: Team }
   | { type: 'v2_start'; matchId: string; team: Team; rival: { handle: string }; tickMs: number; holdTicks: Record<Team, number> }
   | { type: 'v2_frame'; matchId: string; frame: V2Frame }
   | { type: 'v2_end'; matchId: string; result: MatchResult | null; reason: V2EndReason; logHash: string | null; debrief?: V2Debrief }

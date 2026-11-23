@@ -1,0 +1,16 @@
+/* Sealed loadout panel on the PvP lock-in (NEXT_PUBLIC_ZAMA_ENABLED). Tokens only. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.note { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.sides { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
+.sides li { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 13px; line-height: 18px; }
+.who { font-weight: 700; }
+.sealed { font: 600 12px/18px var(--font-mono); }
+.pending { font: 600 12px/18px var(--font-mono); color: var(--ink-muted); }
+.error { margin: 0; font-size: 13px; line-height: 18px; color: var(--critical); }
+.mono { font-family: var(--font-mono); font-weight: 600; }

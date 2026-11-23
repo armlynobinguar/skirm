@@ -70,6 +70,7 @@ export type ParseResult =
 
 /** Agent, match and map ids: server ids (`agt_…`, `mat_…`) or anything id-shaped, ≤ 64 chars. */
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const EVM_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 function parseV2Crew(v: unknown): V2CrewEntry[] | string {
   if (!Array.isArray(v) || v.length < 1 || v.length > 3) return 'crew must have 1 to 3 agents';
   const out: V2CrewEntry[] = [];
@@ -92,6 +93,7 @@ const TYPES = [
   'v2_accept',
   'v2_decline',
   'v2_lock_in',
+  'v2_seal',
   'v2_watch',
   'v2_unwatch',
   'v2_replay',
@@ -242,7 +244,7 @@ export function parseClientMessage(raw: unknown): ParseResult {
       return { ok: true, msg: { type: 'v2_steer', matchId: v.matchId, input } };
     }
     case 'v2_lock_in': {
-      if (extraKeys(v, ['type', 'matchId', 'tiers', 'crew', 'playbookId'])) return bad('v2_lock_in takes {matchId, tiers, crew?, playbookId?}');
+      if (extraKeys(v, ['type', 'matchId', 'tiers', 'crew', 'playbookId', 'sealed'])) return bad('v2_lock_in takes {matchId, tiers, crew?, playbookId?, sealed?}');
       if (typeof v.matchId !== 'string' || !ID_RE.test(v.matchId)) return bad('v2_lock_in.matchId must be an id');
       if (!Array.isArray(v.tiers) || v.tiers.length > 3 || !v.tiers.every((t) => TIERS.includes(t as never)))
         return bad('v2_lock_in.tiers must list at most 3 talk tiers');
@@ -256,7 +258,17 @@ export function parseClientMessage(raw: unknown): ParseResult {
         if (v.playbookId !== null && (typeof v.playbookId !== 'string' || !ID_RE.test(v.playbookId))) return bad('v2_lock_in.playbookId must be a playbook id, or null for none');
         msg.playbookId = v.playbookId;
       }
+      if (v.sealed !== undefined) {
+        if (v.sealed !== true) return bad('v2_lock_in.sealed must be true when sent');
+        msg.sealed = true;
+      }
       return { ok: true, msg };
+    }
+    case 'v2_seal': {
+      if (extraKeys(v, ['type', 'matchId', 'address'])) return bad('v2_seal takes {matchId, address}');
+      if (typeof v.matchId !== 'string' || !ID_RE.test(v.matchId)) return bad('v2_seal.matchId must be an id');
+      if (typeof v.address !== 'string' || !EVM_ADDRESS_RE.test(v.address)) return bad('v2_seal.address must be a 0x EVM address');
+      return { ok: true, msg: { type: 'v2_seal', matchId: v.matchId, address: v.address.toLowerCase() } };
     }
     case 'v2_lobby_ready': {
       if (extraKeys(v, ['type', 'lobbyId', 'crew'])) return bad('v2_lobby_ready takes {lobbyId, crew}');

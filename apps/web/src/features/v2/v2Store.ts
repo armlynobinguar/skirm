@@ -129,6 +129,8 @@ export interface V2MatchView {
   commandAck: { tick: number; left: number } | null;
   /** Draft mode (v2_found `draft`): the ban phase; null outside draft mode. */
   draft: V2DraftView | null;
+  /** Sealed loadouts (Zama): crews sealing their lock-in on chain (v2_sealing). Absent: none. */
+  sealing?: Team[];
 }
 
 /** Most comms lines kept per match. */
@@ -200,6 +202,8 @@ export function reduceV2(prev: V2MatchView | undefined, m: WsServerMessage, now:
       };
     case 'v2_locked':
       return prev.locked.includes(m.team) ? prev : { ...prev, locked: [...prev.locked, m.team] };
+    case 'v2_sealing':
+      return prev.sealing?.includes(m.team) ? prev : { ...prev, sealing: [...(prev.sealing ?? []), m.team] };
     case 'v2_start':
       return { ...prev, phase: 'live', team: m.team, rivalHandle: m.rival.handle, tickMs: m.tickMs, holdTicks: m.holdTicks };
     case 'v2_frame': {
