@@ -1,7 +1,9 @@
 // Sealed loadouts (Zama FHEVM on Sepolia): the game server's read side of packages/fhevm
 // SkirmMatch.sol. Both players seal an encrypted loadout on chain; once the reveal is finalized the
 // contract holds the verified plaintexts, and this module reads them back and turns them into the
-// crew that plays. The server holds no key and sends no transaction: it only reads.
+// crew that plays. It also reads the match's FHE randomness: the seed (public from the reveal on)
+// and each supply drop value once its own reveal is finalized. The server holds no key and sends no
+// transaction: it only reads.
 //
 // Gated by ZAMA_ENABLED. Env: SEPOLIA_RPC_URL, and optionally ZAMA_MATCH_ADDRESS (default: the
 // SkirmMatch address in packages/fhevm/deployments/sepolia.json, via @skirm/fhevm/generated).
@@ -21,11 +23,36 @@ export interface SealedMatchState {
   locked: [boolean, boolean];
   /** The verified plaintexts per side, once status is `revealed`; else null. */
   revealed: [EncodedLoadout, EncodedLoadout] | null;
+  /** The on-chain randomness, once status is `revealed` (absent or null before). */
+  randomness?: ChainRandomness | null;
+}
+
+/** SkirmMatch.randomness: the FHE seed and drop values, as far as they are revealed. */
+export interface ChainRandomness {
+  /** The verified match seed, a decimal uint64 (null before finalizeReveal). */
+  seed: string | null;
+  /** Unix seconds finalizeReveal landed (0 before): the drop clock starts here. */
+  startedAt: number;
+  /** Each drop slot's verified value, null until its finalizeDrop. */
+  drops: (number | null)[];
 }
 
 /** Reads a match from SkirmMatch (mocked in tests). */
 export interface SealedMatchReader {
   read(matchId: string): Promise<SealedMatchState>;
+  /** The randomness alone (cheaper than read while drops come due). Absent: read().randomness. */
+  randomness?(matchId: string): Promise<ChainRandomness>;
+}
+
+/** Drop `slot`'s revealed value, or null while it is still sealed. */
+export function chainDropValue(rnd: ChainRandomness | null | undefined, slot: number): number | null {
+  return rnd?.drops[slot] ?? null;
+}
+
+/** The randomness through a reader (its own randomness() when it has one). */
+export async function readRandomness(reader: SealedMatchReader, matchId: string): Promise<ChainRandomness | null> {
+  if (reader.randomness) return reader.randomness(matchId);
+  return (await reader.read(matchId)).randomness ?? null;
 }
 
 export interface ZamaServerConfig {
@@ -86,8 +113,30 @@ export class EthersSealedMatchReader implements SealedMatchReader {
       players: [String(m.players[0]).toLowerCase(), String(m.players[1]).toLowerCase()],
       locked: [!!m.locked[0], !!m.locked[1]],
       revealed,
+      randomness: status === 'revealed' ? await this.randomness(matchId) : null,
     };
   }
+
+  async randomness(matchId: string): Promise<ChainRandomness> {
+    const r = (await this.contract.getFunction('randomness')(sealedMatchKey(matchId))) as {
+      seed: bigint;
+      drops: bigint[];
+      startedAt: bigint;
+      dropsRevealed: bigint;
+    };
+    return parseRandomness(r);
+  }
+}
+
+/** SkirmMatch.randomness's return values as ChainRandomness (exported for tests). */
+export function parseRandomness(r: { seed: bigint; drops: readonly bigint[]; startedAt: bigint; dropsRevealed: bigint }): ChainRandomness {
+  const started = r.startedAt > 0n;
+  const revealed = Number(r.dropsRevealed);
+  return {
+    seed: started ? r.seed.toString() : null,
+    startedAt: Number(r.startedAt),
+    drops: r.drops.map((v, i) => (i < revealed ? Number(v) : null)),
+  };
 }
 
 /** The reader when the feature is on and SkirmMatch is deployed, else null. */

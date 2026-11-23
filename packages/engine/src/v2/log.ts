@@ -39,6 +39,8 @@ export interface LogDrop {
   slot: number;
   value: number;
   at: [number, number];
+  /** The chain value never arrived in time: the value came from the seed (seedDropValue). */
+  fromSeed?: true;
 }
 
 export interface LogTick {

@@ -2,7 +2,10 @@ import { encodeLoadout, type SealedRosterAgent } from '@skirm/shared';
 import { describe, expect, it } from 'vitest';
 import {
   SealedMatchError,
+  chainDropValue,
   createSealedMatchReader,
+  parseRandomness,
+  readRandomness,
   revealedCrew,
   sealedMatchKey,
   zamaServerConfig,
@@ -76,5 +79,27 @@ describe('revealedCrew', () => {
     s.revealed![1] = { agents: [9, 0, 0], skills: [0, 0, 0], tiers: [1, 0, 0] };
     expect(() => revealedCrew(s, 'B', BOB, roster)).toThrow(SealedMatchError);
     expect(() => revealedCrew(s, 'B', BOB, roster)).toThrow(expect.objectContaining({ code: 'invalid_loadout' }));
+  });
+});
+
+describe('chain randomness', () => {
+  it('reads the seed once the reveal landed and each drop once its own reveal did', () => {
+    const before = parseRandomness({ seed: 0n, drops: [0n, 0n, 0n], startedAt: 0n, dropsRevealed: 0n });
+    expect(before).toEqual({ seed: null, startedAt: 0, drops: [null, null, null] });
+
+    const r = parseRandomness({ seed: 18446744073709551615n, drops: [513n, 0n, 0n], startedAt: 1_800_000_000n, dropsRevealed: 1n });
+    expect(r).toEqual({ seed: '18446744073709551615', startedAt: 1_800_000_000, drops: [513, null, null] });
+    expect(chainDropValue(r, 0)).toBe(513);
+    expect(chainDropValue(r, 1)).toBeNull();
+    expect(chainDropValue(null, 0)).toBeNull();
+  });
+
+  it('reads the randomness through the reader method, or the full read when it has none', async () => {
+    const rnd = { seed: '7', startedAt: 1, drops: [1, null, null] };
+    const readOnly = { read: async () => ({ ...revealed(), randomness: rnd }) };
+    expect(await readRandomness(readOnly, 'm')).toEqual(rnd);
+    const both = { read: async () => revealed(), randomness: async () => ({ ...rnd, seed: '8' }) };
+    expect((await readRandomness(both, 'm'))?.seed).toBe('8');
+    expect(await readRandomness({ read: async () => revealed() }, 'm')).toBeNull();
   });
 });

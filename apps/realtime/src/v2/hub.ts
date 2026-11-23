@@ -55,6 +55,8 @@ import { DEFAULTS, rankedRoleRefusal, skillFitsRole, skillTextForModel, type Age
 import {
   SealedMatchError,
   V2_MATCH_LAST_TTL_S,
+  chainDropValue,
+  readRandomness,
   revealedCrew,
   v2MatchChannel,
   v2MatchLastKey,
@@ -515,6 +517,13 @@ export class V2Hub {
     const roster = await this.deps.repos.agents.listByOwner(accountId);
     try {
       const picks = revealedCrew(state, team, address, roster);
+      // The seed drawn on chain once both sealed, the same for both crews: the match plays on it,
+      // with each supply drop tile read back as its value is revealed.
+      const seed = state.randomness?.seed;
+      if (seed && match.chainSeed === null) {
+        match.useChainRandomness({ seed, dropValue: async (slot) => chainDropValue(await readRandomness(reader, match.matchId), slot) });
+        this.deps.log.info(`v2 match ${match.matchId}: plays on the on-chain seed with sealed supply drops`);
+      }
       return {
         crew: picks.map((p) => ({ agentId: p.agentId, tier: p.tier })),
         skills: new Map(picks.map((p) => [p.agentId, new Set(p.skillIds)])),

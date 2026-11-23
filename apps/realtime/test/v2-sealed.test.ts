@@ -2,8 +2,9 @@
 // grows the lock-in window and tells both crews, a sealed v2_lock_in waits for the finalized reveal,
 // refuses a seat held by another address, and plays exactly the revealed crew (agents, tiers and
 // the skills that play) whatever the client sends alongside.
+import { mapV2, parseMapV2, sealedDropTile, verifyLog, type MatchLog } from '@skirm/engine/v2';
 import { encodeLoadout, type SealedPick } from '@skirm/shared';
-import type { SealedMatchReader, SealedMatchState } from '@skirm/server';
+import type { ChainRandomness, SealedMatchReader, SealedMatchState } from '@skirm/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { RealtimeHub } from '../src/hub';
 import { FakeSocket, makeDeps, type TestDeps } from './helpers';
@@ -127,5 +128,43 @@ describe('v2 sealed loadouts', () => {
     };
     await ana.send({ type: 'v2_lock_in', matchId, tiers: [], sealed: true });
     expect(await ana.inbox.next('error')).toMatchObject({ code: 'wrong_player' });
+  });
+  it('plays on the chain seed and lands the supply drop on the tile its revealed value maps to', async () => {
+    const SEED = '9876543210123456789';
+    const VALUE = 777;
+    const rnd: ChainRandomness = { seed: SEED, startedAt: 1_800_000_000, drops: [null, null, null] };
+    const reader = Object.assign(fakeReader(), {
+      drops: 0,
+      async randomness() {
+        this.drops++;
+        // Revealed on chain only once the server starts asking (the drop came due).
+        rnd.drops[0] = VALUE;
+        return rnd;
+      },
+    });
+    const deps = await makeDeps({ v2Timing: FAST_V2, sealedMatches: reader });
+    const { ana, ben, matchId } = await matched(deps);
+    await ana.send({ type: 'v2_seal', matchId, address: ANA_EVM });
+    await ben.send({ type: 'v2_seal', matchId, address: BEN_EVM });
+    reader.state = {
+      status: 'revealed',
+      players: [ANA_EVM, BEN_EVM],
+      locked: [true, true],
+      revealed: [encodeLoadout([{ agentId: ana.agents[0]!.id, tier: 'standard' }], ana.agents), encodeLoadout([{ agentId: ben.agents[0]!.id, tier: 'standard' }], ben.agents)],
+      randomness: { ...rnd, drops: [null, null, null] },
+    };
+    await ana.send({ type: 'v2_lock_in', matchId, tiers: [], sealed: true });
+    await ben.send({ type: 'v2_lock_in', matchId, tiers: [], sealed: true });
+    expect((await ana.inbox.next('v2_start')).zama).toEqual({ seed: SEED, sealedDrops: true });
+    await ana.inbox.next('v2_end', () => true, 30_000);
+
+    const log = (await deps.repos.v2Matches.get(matchId))!.log as MatchLog;
+    expect(log.header).toMatchObject({ seed: SEED, sealedDrops: true });
+    expect(verifyLog(log)).toBeNull();
+    const placed = log.ticks.flatMap((t) => (t.drops ?? []).map((d) => ({ ...d, tick: t.tick })));
+    const copper = mapV2('copper-hollow')!;
+    expect(log.ticks.length).toBeGreaterThanOrEqual(copper.drops[0]!.tick);
+    expect(placed).toEqual([{ slot: 0, value: VALUE, at: sealedDropTile(parseMapV2(copper), VALUE), tick: copper.drops[0]!.tick }]);
+    expect(reader.drops).toBeGreaterThanOrEqual(1);
   });
 });
