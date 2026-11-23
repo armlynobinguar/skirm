@@ -8,11 +8,17 @@ export type ContractName = "ConfidentialSkirmCredits" | "SkirmMatch";
 export interface FhevmNetwork {
   chainId: number;
   contracts: Record<ContractName, `0x${string}` | null>;
+  /** Block each contract was deployed in (null when unknown): where event scans can start. */
+  deployBlocks?: Record<ContractName, number | null>;
 }
 
 export const sepolia: FhevmNetwork = {
   "chainId": 11155111,
   "contracts": {
+    "ConfidentialSkirmCredits": null,
+    "SkirmMatch": null
+  },
+  "deployBlocks": {
     "ConfidentialSkirmCredits": null,
     "SkirmMatch": null
   }
