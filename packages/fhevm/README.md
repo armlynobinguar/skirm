@@ -193,7 +193,34 @@ stake and payout.
 **Known limits.** A player who stakes 0 still gets the rival's loadout revealed (the flags open with
 the loadouts), but risks nothing and can win nothing; the game itself is played and recorded
 normally. The operator is trusted to post the true winner; the anchored log hash makes a false
-result detectable (PR 5 verifies it), not impossible.
+result detectable (see "Verify a sealed round" below), not impossible.
+
+## Verify a sealed round (anyone, in the browser)
+
+`/verify?id=<matchId>` (apps/web `src/features/verify`, behind `NEXT_PUBLIC_ZAMA_ENABLED`) checks a
+sealed round against SkirmMatch with no wallet: a read-only ethers `JsonRpcProvider` on
+`NEXT_PUBLIC_SEPOLIA_RPC_URL` (default publicnode). The debrief of a sealed match links to it
+("Verify this round"). The comparison is pure and unit-tested (`sealed.ts`), and the chain read is
+separate (`sealedChain.ts`):
+
+| Check | Compares |
+| --- | --- |
+| Commitments came first | both `LoadoutSealed` events come before `RandomnessDrawn` (block, log index) |
+| Seed is genuine | `SeedRevealed` (only emitted after `FHE.checkSignatures` in `finalizeReveal`) and `randomness().seed` equal the log header `seed` |
+| Drops are genuine | each logged drop `value` equals `randomness().drops[slot]` (or `seedDropValue(seed, slot)` when `fromSeed`), and its tile equals `sealedDropTile(map, value)` |
+| Loadouts played as sealed | `revealedLoadout` per side against the header crews: crew size, talk tiers (casual), distinct roster indices whose order agrees with the agent ids; with a roster, a full `decodeLoadout` |
+| Result anchored | `settlement().logHash` equals the recomputed hash-chain head; `winner` equals the log result's seat (draw `NO_SIDE`) |
+| Replay | the logged actions and drops replayed through `@skirm/engine` reach the logged result |
+| Never revealed 🔒 | stake and payout handles (`escrow()`, `StakePaid`) stay encrypted; only the public "stake ok" flags are shown |
+
+Every event takes `matchId` as its first indexed argument, so one `eth_getLogs` filter (address and
+topic1) returns a match's events. The page walks back from the latest block in 10k-block windows
+until it finds `MatchCreated`, and stops at the deploy block: `deployBlocks` in
+`generated/index.ts` (from `deployments/sepolia.json`) or `NEXT_PUBLIC_ZAMA_MATCH_FROM_BLOCK`.
+Without either, it goes about 6 weeks back. The roster that maps indices to agent ids is private,
+so a live check covers what the revealed plaintexts alone prove. `?id=fixture-sealed-round` (and
+`~wrong-seed`, `~wrong-drop`, `~wrong-crew`, `~wrong-log-hash`, `~edited-log`) shows the checks on a
+labelled fixture: a real engine match with the SkirmMatch record it would leave behind.
 
 ## Deploy to Sepolia
 

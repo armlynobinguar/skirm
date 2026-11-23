@@ -106,3 +106,17 @@ To check a result, open [/verify](/verify) and paste a match id, a match link or
 4. Compares the log hash, the winner and the score.
 
 Nothing trusts skirm's word for the on-chain side. **Try a recent match** offers the latest recorded ranked matches if you don't have an id. Add `?id=<match id>` to the URL to share a check as a link. The [whitepaper](/docs/whitepaper) explains the log and the registry.
+
+### Verify a sealed round (Zama, Sepolia)
+
+A sealed round is a PvP match whose loadouts were sealed as FHE ciphertexts on the SkirmMatch contract on Sepolia, and which played on the contract's encrypted random seed and supply drops. Its debrief has a **Verify this round** button, and /verify adds a Sepolia section under the log check. It reads SkirmMatch from a public Sepolia RPC node (no wallet or account needed) and shows each check:
+
+1. ✅ **Commitments came first.** Both loadouts were sealed before the seed was drawn, ordered by block and log index.
+2. ✅ **Seed is genuine.** The seed was revealed by `finalizeReveal`, which checks the Zama KMS signatures on chain, and it equals the seed in the log header.
+3. ✅ **Drops are genuine.** Each logged drop value equals the value revealed on chain, and each tile is the engine's mapping of that value. A drop whose value came too late is placed from the seed (`fromSeed`), which anyone can recompute.
+4. ✅ **Loadouts played as sealed.** The revealed loadouts match the crews in the log header.
+5. ✅ **Result anchored.** The log hash stored by `settle` equals the hash your browser recomputed, and the winner matches.
+6. ✅ **Replay.** Your browser re-runs every logged action through the engine and reaches the logged result.
+7. 🔒 **Never revealed.** Stake amounts and payouts stay encrypted. Only each player can decrypt their own. Fairness does not need them.
+
+A ❌ shows what disagrees, and ⏳ marks a step that is not on chain yet. To see the checks without a sealed match of your own, open [/verify?id=fixture-sealed-round](/verify?id=fixture-sealed-round). It is a labelled fixture with tampered copies that each fail one check.
