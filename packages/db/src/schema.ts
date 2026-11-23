@@ -16,6 +16,7 @@ import {
   pgTable,
   primaryKey,
   real,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -96,6 +97,12 @@ export const accounts = pgTable(
      * (POST /zama/evm-link). Sealed skill auctions identify their winner by it.
      */
     evmAddress: text('evm_address'),
+    /**
+     * Private MMR (PrivateLadder on Sepolia): the player's last public tier index (0 Bronze .. 5
+     * Master), cached after the server revealed it with the KMS proof; null while not on the ladder.
+     * The exact rating is encrypted on chain and never stored here.
+     */
+    ladderTier: smallint('ladder_tier'),
     /** Platform-owned account (creator of the starter skill); never signs in. */
     system: boolean('system').notNull().default(false),
     /** v2: Elo is per player (ranked v2 matches only). */
