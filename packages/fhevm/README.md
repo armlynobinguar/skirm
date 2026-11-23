@@ -11,6 +11,7 @@ OpenZeppelin's [confidential contracts](https://github.com/OpenZeppelin/openzepp
 | `SkirmMatch` | Sealed PvP loadouts: each player commits its crew, skills and talk tiers as encrypted inputs; nobody can read them until both have locked, then both are revealed together with a KMS-verified public decryption. Lock deadline + forfeit. FHE randomness (seed, supply drops). Confidential cSKIRM stake escrow, settled by the game server with the match log hash anchored on chain. |
 | `FogSkirm` | Fog Skirm, a short two-player mode played fully on chain: scouts, traps, moves and a hidden seed vial stay ciphertexts; each round is resolved under FHE and only aggregate outcomes go public. See below. |
 | `SkillAuction` | Sealed-bid (second-price) auctions of skill versions on the Exchange, paid in cSKIRM: bids are escrowed ciphertexts, the top two are tracked under FHE, only the winner and the clearing price are ever decrypted, and losing bids are refunded confidentially. See below. |
+| `BenchmarkSeeds` | Hidden benchmark seeds for minted skill versions: the operator commits a version's prompt hash, which draws an encrypted seed only the operator can read; the results hash is posted before the seed opens, and the seed is revealed with a KMS proof (or forced open by anyone after a deadline). See below. |
 
 ## Setup
 
@@ -407,16 +408,92 @@ api refuses both). With NEAR ops on, the skill token itself still sits with the 
 auction moves the Exchange's ownership record; moving the NEAR token is left to a follow-up. An
 auction nobody finalizes stays in `Closing` (anyone can finalize; the seller has the incentive).
 
+## BenchmarkSeeds: hidden benchmark seeds drawn on chain
+
+Every minted skill version plays a hidden gauntlet of 6 matches; the seed decides each match's map
+and difficulty. Before this contract the picks came from an HMAC with a private server key, so
+writers had to trust the operator not to leak the key or grind it for a friend. Now the seed is
+drawn with FHE randomness after the prompt is committed, stays encrypted while the benchmark runs,
+and is revealed with a proof afterwards. The worker drives it (`apps/worker/src/benchmark-seeds.ts`,
+`packages/server/src/zama/benchmark-seeds.ts`); the Exchange shows the badge and "Verify benchmark"
+(apps/web `src/features/zama/benchmarks`).
+
+**Flow.**
+
+1. *Commit* (operator only): `commit(skillRef, promptHash)`, with `skillRef = keccak256("skirm-skill:<skillId>:<version>")`
+   (`skillRefPreimage`, the same reference SkillAuction uses) and the version's prompt sha256. The
+   same transaction draws one `euint64` seed (`FHE.randEuint64`) and gives the operator ACL on it. A
+   version commits once: a re-commit reverts, so the seed can't be redrawn.
+2. *Draw*: the worker user-decrypts the seed with the relayer SDK's node build and maps it to the
+   six picks (`benchmarkSeedPicks` in `packages/shared/src/benchmark-seeds.ts`): value `i` is bits
+   `[10i, 10i+10)` (`splitSeed` on chain gives the same numbers), its map is
+   `PRACTICE_MAPS[(v >> 1) % n]` and its difficulty `v & 1` (easy, normal).
+3. *Publish* (operator only): `publish(skillRef, resultsHash, scoreBps)` with `resultsHash =
+   keccak256(logHead1 ‖ … ‖ logHead6)` in play order. Only then does the seed become publicly
+   decryptable, so the results are fixed before anyone else can see the seed.
+4. *Finalize* (anyone): `finalize(skillRef, cleartext, proof)` checks the KMS proof
+   (`FHE.checkSignatures`) and stores the seed; `seedsOf` returns the six values.
+5. *Forced reveal* (anyone): `forceReveal(skillRef)` once `revealDeadline` (the reveal window,
+   fixed at commit) has passed without a publish. The seed opens with no results: a visible
+   missed benchmark.
+
+Events: `Committed`, `Published`, `ForcedReveal`, `Revealed`, `OperatorSet`, `RevealWindowSet`.
+
+**Why commit is operator-only.** Skill references are public, so if anyone could commit, a griefer
+could commit a version first with a wrong prompt hash, and the real benchmark could never commit (a
+version commits once).
+
+**Trust trade-off.** The operator is on the seed's ACL because it has to know the picks to play the
+matches, so it can learn the seed before the run. It still can't *choose* the seed (the
+coprocessor draws it after the prompt hash is fixed), can't redraw it, and can't change the results
+after the seed is public. Nobody else, the writer included, can read the seed until the publish.
+That is strictly better than the keyed hash, where the key could leak or be ground for a friend
+and nothing could be checked afterwards.
+
+**What stays hidden, from whom.**
+
+| Value | Who can decrypt it |
+| --- | --- |
+| The seed, from commit to publish | The operator only (and this contract) |
+| The seed, after publish or a forced reveal | Everyone, stored on chain after `finalize` |
+| Prompt hash, results hash, score | Everyone (public, bound before the seed opens) |
+
+**One euint64 or six euint32.** The six picks need 10 bits each, so one 64-bit draw covers them. The
+suite measures both draws with the same ACL work (`contracts/test/SeedDrawProbe.sol`, test only):
+
+| Draw | Gas | HCU | HCU depth |
+| --- | ---: | ---: | ---: |
+| 6 × `randEuint32` | 535,086 | 144,000 | 24,000 |
+| 1 × `randEuint64` | 123,898 | 24,000 | 24,000 |
+
+One draw is about 4.3× cheaper in gas and 6× in HCU. It is also one handle to user-decrypt and one to
+prove at the reveal. Off-chain the split is a shift and a mask.
+
+**Gas and HCU** (FHEVM mock, `npx hardhat test test/BenchmarkSeeds.ts` prints them):
+
+| Call | Gas | HCU | HCU depth |
+| --- | ---: | ---: | ---: |
+| `commit` (draws the seed) | 191,021 | 24,000 | 24,000 |
+| `publish` (opens the seed) | 94,011 | 0 | 0 |
+| `forceReveal` | 68,825 | 0 | 0 |
+| `finalize` (checks the KMS proof) | 116,445 | 0 | 0 |
+
+**Known limits.** The map index is `(v >> 1) % n` over 9 bits, so with a map count that doesn't
+divide 512 the first `512 mod n` maps are each drawn with probability higher by 1/512. The
+picks use the current `PRACTICE_MAPS` list; changing that list changes how old seeds map, so
+"Verify benchmark" is only meaningful against the list the benchmark ran with.
+
 ## Deploy to Sepolia
 
 ```bash
 npm run deploy:sepolia -w @skirm/fhevm
 ```
 
-This deploys `ConfidentialSkirmCredits`, `SkirmMatch`, `FogSkirm` and `SkillAuction` (or only the
-ones in `DEPLOY_CONTRACTS`, e.g. `DEPLOY_CONTRACTS=SkirmMatch` next to an already deployed token,
-`DEPLOY_CONTRACTS=FogSkirm` to add Fog Skirm, which takes no constructor arguments, or
-`DEPLOY_CONTRACTS=SkillAuction` to add the sealed skill auctions), records them in
+This deploys `ConfidentialSkirmCredits`, `SkirmMatch`, `FogSkirm`, `SkillAuction` and
+`BenchmarkSeeds` (or only the ones in `DEPLOY_CONTRACTS`, e.g. `DEPLOY_CONTRACTS=SkirmMatch` next to
+an already deployed token, `DEPLOY_CONTRACTS=FogSkirm` to add Fog Skirm, which takes no constructor
+arguments, `DEPLOY_CONTRACTS=SkillAuction` to add the sealed skill auctions, or
+`DEPLOY_CONTRACTS=BenchmarkSeeds` to add the on-chain benchmark seeds), records them in
 `deployments/sepolia.json` (address, tx, block, constructor args; merged with what is already
 there) and regenerates `generated/index.ts`. Commit both files so the web and realtime pick up the
 addresses.
@@ -431,13 +508,20 @@ SkillAuction's constructor is `(credits, treasury, feeBps)`: the same `CREDITS_A
 `TREASURY`, and `AUCTION_FEE_BPS` (fee on the clearing price, at most 1000; default `FEE_BPS`, else
 0). The server reads it with `ZAMA_ENABLED=1` (api: `/zama/auctions`; worker: the grant poller,
 `ZAMA_AUCTION_POLL_MS`); `ZAMA_AUCTION_ADDRESS` / `NEXT_PUBLIC_ZAMA_AUCTION_ADDRESS` override the
-address. To verify:
+address.
+
+BenchmarkSeeds' constructor is `(operator, revealWindow)`: `BENCHMARK_OPERATOR` (default
+`MATCH_OPERATOR`, else the deployer; the worker signs with that account's key as
+`ZAMA_OPERATOR_PRIVATE_KEY`) and `BENCHMARK_REVEAL_WINDOW_SECONDS` (600..2,592,000; default 86,400).
+The worker uses it with `ZAMA_ENABLED=1` and the key set, else it keeps the keyed-hash seeds;
+`ZAMA_BENCHMARK_ADDRESS` / `NEXT_PUBLIC_ZAMA_BENCHMARK_ADDRESS` override the address. To verify:
 
 ```bash
 npx hardhat verify --network sepolia <creditsAddress> <owner> <faucetAmount> <faucetCooldown>
 npx hardhat verify --network sepolia <matchAddress> <creditsAddress> <operator> <treasury> <feeBps>
 npx hardhat verify --network sepolia <fogAddress>
 npx hardhat verify --network sepolia <auctionAddress> <creditsAddress> <treasury> <feeBps>
+npx hardhat verify --network sepolia <benchmarkSeedsAddress> <operator> <revealWindow>
 ```
 
 ## Address + ABI export
