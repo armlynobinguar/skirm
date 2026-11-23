@@ -20,3 +20,4 @@ export * from './progression';
 export * from './campaign';
 export * from './backing';
 export * from './models';
+export * from './sealed-loadout';
