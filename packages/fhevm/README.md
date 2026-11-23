@@ -51,8 +51,10 @@ first. With FHEVM the picks are ciphertexts until both are locked, and the revea
 | --- | --- | --- |
 | `createMatch(id, playerA, playerB, lockWindow)` | a player (or anyone, with both seats open) | `id = keccak256(utf8(offchainMatchId))`. A seat left as `address(0)` goes to the first account that seals it (never both seats to one account). `lockWindow` 1 min to 1 day. |
 | `submitLoadout(id, side, agents[3], skills[3], tiers[3], proof)` | that side's player | Nine `externalEuint8` under one input proof. ACL: only the contract and the submitting player. One submission per side, before the deadline. |
-| `reveal(id)` | anyone, once both locked | `FHE.makePubliclyDecryptable` on all 18 handles; emits `RevealRequested(id, handles)`. |
-| `finalizeReveal(id, abiEncodedClearValues, decryptionProof)` | anyone | Fetch both from the relayer (`publicDecrypt(revealHandles(id))`); `FHE.checkSignatures` verifies the KMS proof, then the plaintexts are stored (`revealedLoadout`) and emitted (`LoadoutRevealed`). |
+| `reveal(id)` | anyone, once both locked | `FHE.makePubliclyDecryptable` on the 18 loadout handles and the match seed; emits `RevealRequested(id, handles)`. |
+| `finalizeReveal(id, abiEncodedClearValues, decryptionProof)` | anyone | Fetch both from the relayer (`publicDecrypt(revealHandles(id))`); `FHE.checkSignatures` verifies the KMS proof, then the plaintexts are stored (`revealedLoadout`, `randomness`) and emitted (`LoadoutRevealed`, `SeedRevealed`). |
+| `revealDrop(id, slot)` | anyone, once the drop is due | Opens supply drop `slot` for public decryption, in slot order, no earlier than `dropDueAt(id, slot)`; emits `DropRevealRequested`. |
+| `finalizeDrop(id, slot, abiEncodedClearValue, decryptionProof)` | anyone | Checks the KMS proof for that one handle, stores the value (`randomness`) and emits `DropRevealed`. |
 | `forfeit(id)` | anyone, after the deadline while `Open` | One side locked: it wins (`MatchForfeited`, `winner`). Neither: `MatchCancelled`. |
 
 Public decryption uses the current FHEVM flow (`makePubliclyDecryptable` + off-chain relayer
@@ -76,15 +78,61 @@ rival, then team A reveals and finalizes (team B steps in if it does not land). 
 checks the seat is the address the player declared, and plays exactly that crew. The server only
 reads the chain and holds no key.
 
-**Hook points** for later contracts: `_onCreated`, `_onSealed`, `_onBothLocked` (an FHE random seed
-can be drawn here, before anything is revealed), `_onRevealed` and `_onForfeited` (a cSKIRM stake
-escrow can take stakes on seal and pay out on result or forfeit). They are empty internal virtual
-functions here.
+**Hook points** for later contracts: `_onCreated`, `_onSealed`, `_onBothLocked` (the randomness
+below is already drawn when it runs), `_onRevealed` and `_onForfeited` (a cSKIRM stake escrow can
+take stakes on seal and pay out on result or forfeit). They are empty internal virtual functions here.
 
 **Known limits.** Match ids are predictable, so an attacker who knows one could open it first with
 fixed seats only if they are one of those seats; with open seats, the off-chain address check makes a
 squatted seat fail the sealed lock (the player then locks in normally). Off chain, a side that never
 locks plays its queued crew as before; the on-chain forfeit settles the commitment only.
+
+## SkirmMatch: on-chain randomness (match seed and supply drops)
+
+**Fairness goal.** Neither player nor the game server can pick or grind a match's seed, nobody can
+know where a supply drop lands before it appears, and afterwards anyone can check every value.
+
+**Draw.** The transaction that seals the second loadout also draws the randomness
+(`_drawRandomness`, before `_onBothLocked`):
+
+- the match seed, `FHE.randEuint64()`;
+- one value per supply drop slot, `FHE.randEuint16()` × `DROP_SLOTS` (3; maps have at most 3 drops).
+
+Both commitments are already in, so no player can choose a loadout against the seed, and the
+coprocessor's randomness cannot be re-rolled by retrying a transaction someone controls. Only the
+contract holds ACL access: the players, the game server and the deployer cannot decrypt any of it
+(tested: user decryption and public decryption both fail until the reveal). `RandomnessDrawn` logs
+the handles.
+
+**Seed reveal.** The seed is the 19th handle of `revealHandles` and opens with the loadouts:
+`reveal` makes it publicly decryptable and `finalizeReveal` checks it under the same KMS proof, then
+stores it with the start time (`randomness(id).seed`, `startedAt`; `SeedRevealed`). Public decryption
+was chosen over granting the server operator ACL: everyone learns the seed at the same moment the
+match starts, the server needs no key or ACL of its own, and the value is verifiable by anyone.
+
+**Drop reveals.** Each drop value opens on its own, in slot order, and never early:
+`revealDrop(id, slot)` reverts with `DropNotDue` before `startedAt + (slot + 1) × DROP_INTERVAL`
+(60 s) and with `DropOutOfOrder` until the previous slot is finalized; `finalizeDrop` checks the KMS
+proof for that handle. The official maps land drops 70–140 s into a match, so a value is public at most
+a few seconds before its drop lands. Anyone can send both transactions (the players' tabs do, team A
+first and team B as fallback); a forged value reverts.
+
+**Game server.** Realtime (`ZAMA_ENABLED`) reads `randomness` with the sealed loadouts and starts the
+match on the seed (`createMatch` `seed` + `sealedDrops`, packages/engine v2 `drops.ts`). A sealed drop
+cannot land until it is placed: a few ticks before each drop's tick the server reads the chain, and
+once the value is stored it places the drop on `sealedDropTile(map, value)` = the map's candidate
+tiles (open floor on the centre column, equally far from both crews, top to bottom) at index
+`value mod count`. A late reveal delays the drop to the first tick after it is read; if nothing is
+revealed within 20 ticks the seed stands in (`seedDropValue`, flagged `fromSeed` in the log), so a
+match never stalls. Frames carry `sealedDrops`, so the web hides the map's drop markers.
+
+**Verification.** The match log header commits to the seed (`seed`, `sealedDrops`) and each tick to
+the drops placed on it (`drops: [{ slot, value, at }]`), so the log hash anchors them. To check a
+match: read `randomness(keccak256(matchId))` (or the `SeedRevealed` / `DropRevealed` events), compare
+the seed and each value with the log, recompute `sealedDropTile` for each value, and replay. Each
+stored value came through `FHE.checkSignatures`, and anyone can re-run `publicDecrypt` on the handles
+for the same plaintexts. The debrief shows every draw with its Etherscan transaction and can publish
+the draws the map did not use, so all of a match's randomness ends up public.
 
 ## Deploy to Sepolia
 
