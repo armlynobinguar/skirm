@@ -52,7 +52,19 @@ import {
   type V2Frame,
 } from '@skirm/engine/v2';
 import { DEFAULTS, rankedRoleRefusal, skillFitsRole, skillTextForModel, type AgentCosmetics } from '@skirm/shared';
-import { V2_MATCH_LAST_TTL_S, v2MatchChannel, v2MatchLastKey, type ExternalTurnStore, type V2CrewEntry, type V2EndReason, type V2ServerMessage, type Vault } from '@skirm/server';
+import {
+  SealedMatchError,
+  V2_MATCH_LAST_TTL_S,
+  revealedCrew,
+  v2MatchChannel,
+  v2MatchLastKey,
+  type ExternalTurnStore,
+  type SealedMatchReader,
+  type V2CrewEntry,
+  type V2EndReason,
+  type V2ServerMessage,
+  type Vault,
+} from '@skirm/server';
 import type { Logger, RegistryQueue } from '../deps';
 import { Matchmaker, type Lane, type QueueEntry } from '../matchmaker';
 import type { WsServerMessage } from '../protocol';
@@ -139,6 +151,8 @@ export interface V2HubDeps {
   externalPost?: WebhookPost;
   /** The models a crew entry may pick (config llmModels), the default first. Absent: DEFAULT_LLM_MODEL alone. */
   models?: readonly ModelChoice[];
+  /** Sealed loadouts (ZAMA_ENABLED): reads SkirmMatch on Sepolia. Absent: v2_seal and sealed locks are refused. */
+  sealed?: SealedMatchReader | null;
   log: Logger;
 }
 
@@ -159,6 +173,9 @@ export class V2HubError extends Error {
       | 'draft_casual'
       | 'mission_locked'
       | 'insufficient_credits'
+      | 'zama_off'
+      | 'not_sealing'
+      | SealedMatchError['code']
       | V2BanError
       | V2CommandError
       | V2ControlError,
@@ -472,11 +489,64 @@ export class V2Hub {
   }
 
   /**
-   * Locks a crew in. `crew` swaps, removes or adds agents (up to the map's crew limit) and its tiers
-   * win over `tiers`; the new roster is loaded (skills decrypted) before the lock lands.
+   * Sealed loadouts: the player seals its crew on SkirmMatch from EVM `address` (V2Match.seal grows
+   * the lock-in window). Not against the practice bot, which cannot seal.
    */
-  async lockIn(accountId: string, matchId: string, tiers: V2CrewEntry['tier'][], crew?: V2CrewEntry[], playbookId?: string | null): Promise<void> {
+  seal(accountId: string, matchId: string, address: string): void {
+    if (!this.deps.sealed) throw new V2HubError('zama_off', 'sealed loadouts are not enabled on this server');
     const { match, team } = this.mine(accountId, matchId);
+    if (match.setup.practice) throw new V2HubError('invalid_crew', 'practice has no rival to seal against');
+    if (!match.seal(team, address)) throw new V2HubError('not_in_lockin', 'lock-in is over');
+    this.deps.log.info(`v2 match ${matchId} ${team}: sealing its loadout on chain`);
+  }
+
+  /**
+   * The crew `team` sealed on chain, read back once the reveal is finalized: the authoritative
+   * picks (agents, tiers and the skills that play), decoded against the player's own roster.
+   */
+  private async sealedCrew(accountId: string, match: V2Match, team: Team): Promise<{ crew: V2CrewEntry[]; skills: Map<string, Set<string>> }> {
+    const reader = this.deps.sealed;
+    if (!reader) throw new V2HubError('zama_off', 'sealed loadouts are not enabled on this server');
+    const address = match.sealedBy(team);
+    if (!address) throw new V2HubError('not_sealing', 'send v2_seal before a sealed lock-in');
+    const state = await reader.read(match.matchId).catch((err: unknown) => {
+      throw new V2HubError('unavailable', `could not read the sealed loadouts: ${(err as Error).message}`);
+    });
+    const roster = await this.deps.repos.agents.listByOwner(accountId);
+    try {
+      const picks = revealedCrew(state, team, address, roster);
+      return {
+        crew: picks.map((p) => ({ agentId: p.agentId, tier: p.tier })),
+        skills: new Map(picks.map((p) => [p.agentId, new Set(p.skillIds)])),
+      };
+    } catch (err) {
+      if (err instanceof SealedMatchError) throw new V2HubError(err.code, err.message);
+      throw err;
+    }
+  }
+
+  /**
+   * Locks a crew in. `crew` swaps, removes or adds agents (up to the map's crew limit) and its tiers
+   * win over `tiers`; the new roster is loaded (skills decrypted) before the lock lands. `sealed`:
+   * the crew is the one this player sealed on chain (sealedCrew), whatever `crew` and `tiers` say.
+   */
+  async lockIn(
+    accountId: string,
+    matchId: string,
+    tiers: V2CrewEntry['tier'][],
+    crew?: V2CrewEntry[],
+    playbookId?: string | null,
+    sealed?: boolean,
+  ): Promise<void> {
+    const { match, team } = this.mine(accountId, matchId);
+    let onlySkills: Map<string, Set<string>> | undefined;
+    if (sealed) {
+      if (match.phase !== 'lockin') throw new V2HubError('not_in_lockin', 'lock-in is over; the crew you queued with plays');
+      const picked = await this.sealedCrew(accountId, match, team);
+      crew = picked.crew;
+      tiers = crew.map((c) => c.tier);
+      onlySkills = picked.skills;
+    }
     // The crew playbook for this match: absent keeps the one selected when the match was made, null plays none.
     const playbook = playbookId === undefined ? undefined : playbookId === null ? null : await this.playbook(accountId, playbookId);
     if (playbook === undefined && playbookId) throw new V2HubError('not_found', 'playbook not found');
@@ -491,9 +561,9 @@ export class V2Hub {
     await this.ownCrew(accountId, crew, matchId);
     if (match.setup.ranked) await this.noExternal(accountId, crew);
     if (match.setup.ranked) await this.rankedRoles(crew);
-    const roster = await this.roster(accountId, crew, { matchId, ranked: match.setup.ranked });
+    const roster = await this.roster(accountId, crew, { matchId, ranked: match.setup.ranked }, onlySkills);
     if (!match.lockIn(team, tiers, roster, playbook)) throw missed();
-    this.deps.log.info(`v2 match ${matchId} ${team}: crew changed at lock-in (${roster.crew.length} agents)`);
+    this.deps.log.info(`v2 match ${matchId} ${team}: ${sealed ? 'sealed crew revealed' : 'crew changed'} at lock-in (${roster.crew.length} agents)`);
   }
 
   /**
@@ -700,7 +770,8 @@ export class V2Hub {
    * the renter, who never reads another player's strategy. The free starter skill every account gets
    * is not bought (see runsBoughtSkill).
    */
-  private async roster(accountId: string, entries: V2CrewEntry[], match: RosterMatch): Promise<V2Roster> {
+  /** `onlySkills`: per agent id, the equipped skills that play (a sealed loadout); absent: all of them. */
+  private async roster(accountId: string, entries: V2CrewEntry[], match: RosterMatch, onlySkills?: ReadonlyMap<string, ReadonlySet<string>>): Promise<V2Roster> {
     const { repos, vault, log } = this.deps;
     const crew: AgentSpec[] = [];
     const skills: string[][] = [];
@@ -726,7 +797,9 @@ export class V2Hub {
       const holder = ownerId;
       // Role slots: the API refuses a skill for another role, so one here is stale; it sits out.
       const roles = new Map((v.skills.length ? await repos.skills.getMany(v.skills) : []).map((m) => [`${m.id}:${m.version}`, m.roles]));
+      const only = onlySkills?.get(v.id);
       for (const k of v.skills) {
+        if (only && !only.has(k.id)) continue;
         if (!(await repos.skills.owns(holder, k.id, k.version))) {
           log.warn(`v2: agent ${v.id} plays without skill ${k.id} v${k.version}: its player does not own it`);
           continue;

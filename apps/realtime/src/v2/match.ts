@@ -77,6 +77,11 @@ export interface V2Timing {
   /** Draft mode: the time each ban step lasts. */
   draftStepMs: number;
   lockMs: number;
+  /**
+   * Sealed loadouts: the lock-in window once a crew starts sealing on chain (v2_seal), from that
+   * moment. Sepolia needs a few blocks for create, seal, reveal and finalize.
+   */
+  sealedLockMs: number;
   tickMs: number;
   actionMs: number;
   planMs: number;
@@ -88,6 +93,7 @@ export const DEFAULT_V2_TIMING: V2Timing = {
   acceptMs: 10_000,
   draftStepMs: DEFAULTS.draft.stepMs,
   lockMs: 30_000,
+  sealedLockMs: 240_000,
   tickMs: TICK_MS,
   actionMs: V2_ACTION_DEADLINE_MS,
   planMs: V2_PLANNER_DEADLINE_MS,
@@ -278,6 +284,8 @@ export class V2Match {
   /** What each crew had held, kept for the debrief. */
   private heldFor: Partial<Record<Team, number>> = {};
   private lockBy = 0;
+  /** Sealed loadouts: the EVM address each sealing crew declared (v2_seal). */
+  private readonly sealers = new Map<Team, string>();
   /** Draft mode: every ban step so far, the crew whose turn it is and when its step runs out. */
   private readonly bans: V2DraftBan[] = [];
   private draftTurn: Team | null = null;
@@ -737,6 +745,40 @@ export class V2Match {
     for (const t of TEAMS) this.deps.send(t, msg);
   }
 
+  /** Waits for both locks or the lock-in deadline, which a crew that starts sealing (seal) moves out. */
+  private async waitForLock(): Promise<void> {
+    const s = this.deps.scheduler;
+    while (this.locked.size < 2 && !this.stopReason) {
+      const by = this.lockBy;
+      const left = by - s.now();
+      if (left <= 0) return;
+      await this.waitFor(() => this.locked.size === 2 || this.lockBy !== by, left);
+      if (this.lockBy === by) return;
+    }
+  }
+
+  /**
+   * Sealed loadouts: `team` seals its crew on chain from EVM `address`. The lock-in window becomes
+   * timing.sealedLockMs from now (never shorter), both crews get v2_sealing and the new time.
+   * Returns false when the crew can no longer lock in.
+   */
+  seal(team: Team, address: string): boolean {
+    if (this.phase !== 'lockin' || this.locked.has(team)) return false;
+    const first = !this.sealers.has(team);
+    this.sealers.set(team, address.toLowerCase());
+    if (!first) return true;
+    this.lockBy = Math.max(this.lockBy, this.deps.scheduler.now() + this.timing.sealedLockMs);
+    this.toAll({ type: 'v2_sealing', matchId: this.matchId, team });
+    for (const t of TEAMS) this.deps.send(t, this.lockinMessage(t));
+    this.poke?.();
+    return true;
+  }
+
+  /** The EVM address `team` declared with seal, if it is sealing. */
+  sealedBy(team: Team): string | undefined {
+    return this.sealers.get(team);
+  }
+
   /** Resolves once `done()` holds (re-checked on every poke) or after `ms`. */
   private waitFor(done: () => boolean, ms: number): Promise<void> {
     const s = this.deps.scheduler;
@@ -770,7 +812,7 @@ export class V2Match {
     this.phase = 'lockin';
     this.lockBy = this.deps.scheduler.now() + timing.lockMs;
     for (const t of TEAMS) this.deps.send(t, this.lockinMessage(t));
-    await this.waitFor(() => this.locked.size === 2, timing.lockMs);
+    await this.waitForLock();
     if (this.stopReason) return this.voidMatch('aborted');
     const crews = {} as Record<Team, AgentSpec[]>;
     for (const t of TEAMS) {

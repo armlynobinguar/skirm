@@ -161,6 +161,16 @@ describe('parseClientMessage', () => {
     expect(err({ type: 'v2_command', preset: 'regroup' })).toBe('bad_message');
   });
 
+  it('checks the sealed loadout messages: v2_seal with an EVM address, v2_lock_in sealed true', () => {
+    const address = '0x00000000000000000000000000000000000000AA';
+    expect(ok({ type: 'v2_seal', matchId: 'mat_1', address })).toEqual({ type: 'v2_seal', matchId: 'mat_1', address: address.toLowerCase() });
+    expect(err({ type: 'v2_seal', matchId: 'mat_1', address: '0x1234' })).toBe('bad_message');
+    expect(err({ type: 'v2_seal', matchId: 'mat_1' })).toBe('bad_message');
+    expect(err({ type: 'v2_seal', matchId: 'mat_1', address, side: 0 })).toBe('bad_message');
+    expect(ok({ type: 'v2_lock_in', matchId: 'mat_1', tiers: [], sealed: true })).toEqual({ type: 'v2_lock_in', matchId: 'mat_1', tiers: [], sealed: true });
+    expect(err({ type: 'v2_lock_in', matchId: 'mat_1', tiers: [], sealed: false })).toBe('bad_message');
+  });
+
   it('checks v2_control: an own agent id or null to hand it back', () => {
     expect(ok({ type: 'v2_control', matchId: 'mat_1', agentId: 'agt_1' })).toEqual({ type: 'v2_control', matchId: 'mat_1', agentId: 'agt_1' });
     expect(ok({ type: 'v2_control', matchId: 'mat_1', agentId: null })).toEqual({ type: 'v2_control', matchId: 'mat_1', agentId: null });

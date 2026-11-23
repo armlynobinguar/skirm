@@ -10,11 +10,13 @@ import {
   RedisExternalTurnStore,
   createQueue,
   createRedis,
+  createSealedMatchReader,
   createVault,
   enqueueRegistry,
   installCrashReporting,
   loadConfig,
   reportError,
+  zamaServerConfig,
 } from '@skirm/server';
 import { RealtimeModule } from './app.module';
 import { consoleLogger, type RealtimeDeps } from './deps';
@@ -64,6 +66,8 @@ async function bootstrap(): Promise<void> {
     v2Timing: { tickMs: v2TickMs },
     // Bring your own agent: pull turns go through Redis, so any api instance serves them.
     externalTurns: new RedisExternalTurnStore(redis),
+    // Sealed loadouts on Sepolia (ZAMA_ENABLED, SEPOLIA_RPC_URL, ZAMA_MATCH_ADDRESS): null when off.
+    sealedMatches: createSealedMatchReader(zamaServerConfig(process.env)),
     log,
   };
 
