@@ -15,7 +15,7 @@ export interface ZamaConfig {
   /** Block explorer for tx links. */
   explorerUrl: string;
   /** Contract addresses: env override, else packages/fhevm/deployments/sepolia.json (via generated/). */
-  contracts: { credits: HexAddress | null; match: HexAddress | null; fog: HexAddress | null };
+  contracts: { credits: HexAddress | null; match: HexAddress | null; fog: HexAddress | null; auction: HexAddress | null };
 }
 
 const flag = (v: string | undefined) => v === '1' || v === 'true';
@@ -36,5 +36,6 @@ export const zamaConfig: ZamaConfig = {
       parseAddress(process.env.NEXT_PUBLIC_ZAMA_CREDITS_ADDRESS) ?? sepolia.contracts.ConfidentialSkirmCredits,
     match: parseAddress(process.env.NEXT_PUBLIC_ZAMA_MATCH_ADDRESS) ?? sepolia.contracts.SkirmMatch,
     fog: parseAddress(process.env.NEXT_PUBLIC_ZAMA_FOG_ADDRESS) ?? sepolia.contracts.FogSkirm,
+    auction: parseAddress(process.env.NEXT_PUBLIC_ZAMA_AUCTION_ADDRESS) ?? sepolia.contracts.SkillAuction,
   },
 };

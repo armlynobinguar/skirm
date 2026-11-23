@@ -42,6 +42,7 @@ import { useNearSigner } from '@/lib/wallet/hooks';
 import { isFinalRefusal, pendingStore } from '@/lib/wallet/pending';
 import { WalletError } from '@/lib/wallet/types';
 import { BackWriterPanel } from '@/features/backing/BackWriterPanel';
+import { ZamaSkillAuctionSlot } from '@/features/zama/auctions/ZamaAuctionSlots';
 import { CancelListingButton } from './CancelListingButton';
 import { ConfirmTransactionModal } from './ConfirmTransactionModal';
 import { ConnectWalletModal } from './ConnectWalletModal';
@@ -744,6 +745,11 @@ function Actions({ d, me, ownListing, creator }: { d: MarketDetail; me: Me | und
             {ownListing ? 'Change price' : 'List for resale'}
           </Button>
         </div>
+      ) : null}
+
+      {/* Sealed-bid auction in cSKIRM (NEXT_PUBLIC_ZAMA_ENABLED): bid box, outcome, or the holder's start form. */}
+      {sk.status !== 'Draft' && !sk.accountBound ? (
+        <ZamaSkillAuctionSlot skillId={sk.id} version={sk.version} canStart={canList && !ownListing} accountId={me?.account.id ?? null} />
       ) : null}
 
       <ConnectWalletModal
