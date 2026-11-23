@@ -13,7 +13,7 @@ const VALUES = [2, 1, 0, 3, 1, 0, 1, 2, 0];
 
 /** An in-memory SkirmMatch: `rival` scripts what the other client does on each read. */
 function fakeChain(init: Partial<ChainMatch> = {}) {
-  const m: ChainMatch = { status: 'none', players: [ZERO, ZERO], locked: [false, false], lockDeadline: 0, ...init };
+  const m: ChainMatch = { status: 'none', players: [ZERO, ZERO], locked: [false, false], lockDeadline: 0, minStake: 0n, ...init };
   const calls: string[] = [];
   let reads = 0;
   const hooks: { onRead?: (m: ChainMatch, n: number) => void } = {};
@@ -22,10 +22,11 @@ function fakeChain(init: Partial<ChainMatch> = {}) {
       hooks.onRead?.(m, ++reads);
       return { ...m, players: [...m.players] as [string, string], locked: [...m.locked] as [boolean, boolean] };
     }),
-    create: vi.fn(async () => {
-      calls.push('create');
+    create: vi.fn(async (_key, _window, minStake) => {
+      calls.push(`create:${minStake}`);
       if (m.status !== 'none') throw new Error('MatchExists');
       m.status = 'open';
+      m.minStake = minStake;
     }),
     submit: vi.fn(async (_key, side, enc) => {
       calls.push(`submit:${side}:${enc.handles.length}`);
@@ -50,11 +51,14 @@ function fakeChain(init: Partial<ChainMatch> = {}) {
 
 function fakeInstance() {
   const added: bigint[] = [];
+  const added64: bigint[] = [];
   return {
     added,
+    added64,
     createEncryptedInput: vi.fn(() => {
       const input = {
         add8: (v: bigint) => (added.push(v), input),
+        add64: (v: bigint) => (added64.push(v), added.push(v), input),
         encrypt: async () => ({ handles: added.map((_, i) => new Uint8Array(32).fill(i + 1)), inputProof: new Uint8Array([0xab]) }),
       };
       return input;
@@ -104,12 +108,14 @@ describe('sealLoadout', () => {
     };
     const inst = fakeInstance();
     const steps: string[] = [];
-    const out = await sealLoadout({ ...base(chain.api, inst), onStep: (s) => steps.push(s) });
+    const out = await sealLoadout({ ...base(chain.api, inst), minStake: 0n, onStep: (s) => steps.push(s) });
 
     expect(out.status).toBe('revealed');
-    expect(inst.added).toEqual(VALUES.map(BigInt));
+    // Nine loadout bytes, then the (unused) stake as a uint64, under one proof.
+    expect(inst.added).toEqual([...VALUES.map(BigInt), 0n]);
+    expect(inst.added64).toEqual([0n]);
     expect(inst.createEncryptedInput).toHaveBeenCalledWith('0x0000000000000000000000000000000000000001', ME);
-    expect(chain.calls).toEqual(['create', 'submit:0:9', 'reveal', 'finalize:0xc1ea:0x9f00']);
+    expect(chain.calls).toEqual(['create:0', 'submit:0:10', 'reveal', 'finalize:0xc1ea:0x9f00']);
     expect(steps).toEqual(['create', 'encrypt', 'submit', 'waiting', 'reveal', 'finalize', 'revealed']);
   });
 
@@ -117,7 +123,7 @@ describe('sealLoadout', () => {
     const chain = fakeChain({ status: 'open', players: [RIVAL, ZERO], locked: [true, false] });
     const inst = fakeInstance();
     await sealLoadout(base(chain.api, inst, 'B'));
-    expect(chain.calls[0]).toBe('submit:1:9');
+    expect(chain.calls[0]).toBe('submit:1:10');
     expect(chain.m.status).toBe('revealed');
   });
 
@@ -145,6 +151,42 @@ describe('sealLoadout', () => {
       if (n === 3) ctl.abort();
     };
     await expect(sealLoadout({ ...base(waiting.api, fakeInstance()), signal: ctl.signal })).rejects.toMatchObject({ code: 'aborted' });
+  });
+
+  it('creates a staked match, approves the operator once, then seals the encrypted stake with the loadout', async () => {
+    const chain = fakeChain();
+    chain.hooks.onRead = (m, n) => {
+      if (n === 3) {
+        m.players[1] = RIVAL;
+        m.locked[1] = true;
+        m.status = 'locked';
+      }
+    };
+    const inst = fakeInstance();
+    const order: string[] = [];
+    const approveStake = vi.fn(async () => void order.push('approve'));
+    chain.api.submit = vi.fn(async (_k, side, enc) => {
+      order.push(`submit:${enc.handles.length}`);
+      chain.m.players[side] = ME.toLowerCase();
+      chain.m.locked[side] = true;
+    });
+    const steps: string[] = [];
+    await sealLoadout({ ...base(chain.api, inst), minStake: 10_000_000n, stake: 25_000_000n, approveStake, onStep: (s) => steps.push(s) });
+    expect(chain.calls[0]).toBe('create:10000000');
+    expect(order).toEqual(['approve', 'submit:10']);
+    expect(inst.added64).toEqual([25_000_000n]);
+    expect(steps.slice(0, 4)).toEqual(['create', 'approve', 'encrypt', 'submit']);
+  });
+
+  it('skips the approval on an unstaked match and returns once the match is already settled', async () => {
+    const chain = fakeChain({ status: 'open', players: [ZERO, RIVAL], locked: [false, true], minStake: 0n });
+    chain.hooks.onRead = (m, n) => {
+      if (n === 2) m.status = 'settled';
+    };
+    const approveStake = vi.fn(async () => undefined);
+    const out = await sealLoadout({ ...base(chain.api, fakeInstance()), approveStake });
+    expect(approveStake).not.toHaveBeenCalled();
+    expect(out.status).toBe('settled');
   });
 
   it('retries a finalize the relayer is not ready for', async () => {

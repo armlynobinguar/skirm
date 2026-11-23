@@ -1,0 +1,12 @@
+/* Stake escrow card in the debrief (NEXT_PUBLIC_ZAMA_ENABLED). Tokens only. */
+
+.card { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.rows { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.rows li { display: flex; justify-content: space-between; gap: var(--space-2); font: 400 12px/16px var(--font-mono); }
+.ok { color: var(--you); font-weight: 600; }
+.bad { color: var(--amber); font-weight: 600; }
+.mono { font-family: var(--font-mono); font-weight: 600; }
+.muted { margin: 0; color: var(--ink-muted); font: 400 12px/16px var(--font-mono); }
+.link { font: 600 12px/16px var(--font-mono); white-space: nowrap; }
+.payout { margin: 0; font: 600 13px/18px var(--font-mono); }
+.error { margin: 0; font-size: 13px; line-height: 18px; color: var(--critical); }
