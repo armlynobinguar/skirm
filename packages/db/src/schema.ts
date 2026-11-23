@@ -91,6 +91,11 @@ export const accounts = pgTable(
     handle: text('handle').notNull(),
     privyDid: text('privy_did'),
     nearAccountId: text('near_account_id'),
+    /**
+     * Linked EVM address (Zama/Sepolia features), lower-case 0x hex, proven with a signed message
+     * (POST /zama/evm-link). Sealed skill auctions identify their winner by it.
+     */
+    evmAddress: text('evm_address'),
     /** Platform-owned account (creator of the starter skill); never signs in. */
     system: boolean('system').notNull().default(false),
     /** v2: Elo is per player (ranked v2 matches only). */
@@ -113,6 +118,10 @@ export const accounts = pgTable(
     uniqueIndex('accounts_near_uq')
       .on(t.nearAccountId)
       .where(sql`${t.nearAccountId} is not null`),
+    /** One player per EVM address. */
+    uniqueIndex('accounts_evm_uq')
+      .on(t.evmAddress)
+      .where(sql`${t.evmAddress} is not null`),
   ],
 );
 
@@ -334,11 +343,59 @@ export const sales = pgTable(
     buyerId: text('buyer_id')
       .notNull()
       .references(() => accounts.id),
+    /** The price in base units of `currency` (yoctoNEAR for 'near', cSKIRM base units for 'cskirm'). */
     priceYocto: numeric('price_yocto', { precision: 40, scale: 0 }).notNull(),
+    /** 'near': a NEAR market purchase; 'cskirm': a sealed auction won on Sepolia (SkillAuction). */
+    currency: text('currency').notNull().default('near'),
     txHash: text('tx_hash').notNull(),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex('sales_tx_uq').on(t.txHash), index('sales_skill_idx').on(t.skillId)],
+  (t) => [
+    uniqueIndex('sales_tx_uq').on(t.txHash),
+    index('sales_skill_idx').on(t.skillId),
+    check('sales_currency_ck', sql`${t.currency} in ('near', 'cskirm')`),
+  ],
+);
+
+/**
+ * A sealed-bid auction of a skill version on SkillAuction (Zama FHEVM, Sepolia), registered by its
+ * seller after creating it on chain. The bids never leave the chain; this row maps the on-chain
+ * auction to the version it sells. The worker polls open auctions past their end and, once the
+ * chain says `won`, grants the winner the version through MarketRepo.recordSale (`sale_id`).
+ * Status: open → won (winner known but not granted yet, e.g. its EVM address is not linked) →
+ * granted, or open → failed.
+ */
+export const skillAuctions = pgTable(
+  'skill_auctions',
+  {
+    /** `auc_` + ULID. */
+    id: text('id').primaryKey(),
+    /** SkillAuction contract address (lower-case) and the auction id on it. */
+    contractAddress: text('contract_address').notNull(),
+    chainAuctionId: numeric('chain_auction_id', { precision: 78, scale: 0 }).notNull(),
+    skillId: text('skill_id').notNull(),
+    version: integer('version').notNull(),
+    sellerId: text('seller_id')
+      .notNull()
+      .references(() => accounts.id),
+    /** keccak256 of skillRefPreimage(skillId, version), as stored on chain. */
+    skillRef: text('skill_ref').notNull(),
+    endsAt: ts('ends_at').notNull(),
+    status: text('status').notNull().default('open'),
+    winnerAddress: text('winner_address'),
+    buyerId: text('buyer_id').references(() => accounts.id),
+    /** Clearing price in cSKIRM base units, once won. */
+    price: numeric('price', { precision: 40, scale: 0 }),
+    saleId: text('sale_id').references(() => sales.id),
+    createdAt: createdAt(),
+    settledAt: ts('settled_at'),
+  },
+  (t) => [
+    uniqueIndex('skill_auctions_chain_uq').on(t.contractAddress, t.chainAuctionId),
+    index('skill_auctions_status_idx').on(t.status, t.endsAt),
+    index('skill_auctions_skill_idx').on(t.skillId, t.version),
+    check('skill_auctions_status_ck', sql`${t.status} in ('open', 'won', 'granted', 'failed')`),
+  ],
 );
 
 // ---------- Agent rentals ----------

@@ -431,5 +431,24 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE UNIQUE INDEX \"agent_accounts_near_uq\" ON \"agent_accounts\" USING btree (\"near_account_id\");",
       "\nCREATE INDEX \"agent_accounts_owner_idx\" ON \"agent_accounts\" USING btree (\"owner_id\");"
     ]
+  },
+  {
+    "tag": "0025_sealed_auctions",
+    "folderMillis": 1795424634818,
+    "bps": true,
+    "hash": "0628e58f5f574c1b57b97cb54a193694666ef97c7582c2c314dabbfde85d0e10",
+    "sql": [
+      "CREATE TABLE \"skill_auctions\" (\n\t\"id\" text PRIMARY KEY NOT NULL,\n\t\"contract_address\" text NOT NULL,\n\t\"chain_auction_id\" numeric(78, 0) NOT NULL,\n\t\"skill_id\" text NOT NULL,\n\t\"version\" integer NOT NULL,\n\t\"seller_id\" text NOT NULL,\n\t\"skill_ref\" text NOT NULL,\n\t\"ends_at\" timestamp with time zone NOT NULL,\n\t\"status\" text DEFAULT 'open' NOT NULL,\n\t\"winner_address\" text,\n\t\"buyer_id\" text,\n\t\"price\" numeric(40, 0),\n\t\"sale_id\" text,\n\t\"created_at\" timestamp with time zone DEFAULT now() NOT NULL,\n\t\"settled_at\" timestamp with time zone,\n\tCONSTRAINT \"skill_auctions_status_ck\" CHECK (\"skill_auctions\".\"status\" in ('open', 'won', 'granted', 'failed'))\n);\n",
+      "\nALTER TABLE \"accounts\" ADD COLUMN \"evm_address\" text;",
+      "\nALTER TABLE \"sales\" ADD COLUMN \"currency\" text DEFAULT 'near' NOT NULL;",
+      "\nALTER TABLE \"skill_auctions\" ADD CONSTRAINT \"skill_auctions_seller_id_accounts_id_fk\" FOREIGN KEY (\"seller_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"skill_auctions\" ADD CONSTRAINT \"skill_auctions_buyer_id_accounts_id_fk\" FOREIGN KEY (\"buyer_id\") REFERENCES \"public\".\"accounts\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nALTER TABLE \"skill_auctions\" ADD CONSTRAINT \"skill_auctions_sale_id_sales_id_fk\" FOREIGN KEY (\"sale_id\") REFERENCES \"public\".\"sales\"(\"id\") ON DELETE no action ON UPDATE no action;",
+      "\nCREATE UNIQUE INDEX \"skill_auctions_chain_uq\" ON \"skill_auctions\" USING btree (\"contract_address\",\"chain_auction_id\");",
+      "\nCREATE INDEX \"skill_auctions_status_idx\" ON \"skill_auctions\" USING btree (\"status\",\"ends_at\");",
+      "\nCREATE INDEX \"skill_auctions_skill_idx\" ON \"skill_auctions\" USING btree (\"skill_id\",\"version\");",
+      "\nCREATE UNIQUE INDEX \"accounts_evm_uq\" ON \"accounts\" USING btree (\"evm_address\") WHERE \"accounts\".\"evm_address\" is not null;",
+      "\nALTER TABLE \"sales\" ADD CONSTRAINT \"sales_currency_ck\" CHECK (\"sales\".\"currency\" in ('near', 'cskirm'));"
+    ]
   }
 ];

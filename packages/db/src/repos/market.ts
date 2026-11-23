@@ -165,6 +165,10 @@ export class MarketRepo {
     buyerId: string;
     txHash: string;
     priceYocto?: string;
+    /** 'cskirm' for a sealed auction won on Sepolia (`priceYocto` then holds cSKIRM base units). */
+    currency?: 'near' | 'cskirm';
+    /** The seller when no listing is closed by this sale (an auction sells without a listing). */
+    sellerId?: string;
   }): Promise<{ sale: SaleRow; duplicate: boolean }> {
     const existing = await this.saleByTx(input.txHash);
     if (existing) return { sale: existing, duplicate: true };
@@ -240,9 +244,10 @@ export class MarketRepo {
             version: input.version,
             tokenId: ver.tokenId,
             listingId: listing?.id ?? null,
-            sellerId: listing?.sellerId ?? null,
+            sellerId: listing?.sellerId ?? input.sellerId ?? null,
             buyerId: input.buyerId,
             priceYocto: price,
+            currency: input.currency ?? 'near',
             txHash: input.txHash,
           })
           .returning();
@@ -261,7 +266,8 @@ export class MarketRepo {
   /**
    * Creator royalties earned per skill: the Formulas §6 royalty share (splitSale, floor per sale at
    * the sold version's royalty_bps) summed over resales. A primary sale (seller = creator) pays no
-   * royalty, and a sale with no recorded seller is not counted. Skills with no royalty are absent.
+   * royalty, and a sale with no recorded seller is not counted. NEAR sales only (an auction's cSKIRM
+   * price is paid out on Sepolia by SkillAuction itself). Skills with no royalty are absent.
    */
   async royaltiesByCreator(creatorId: string): Promise<Map<string, bigint>> {
     const rows = await this.db
@@ -281,6 +287,7 @@ export class MarketRepo {
           eq(skills.creatorId, creatorId),
           isNotNull(sales.sellerId),
           ne(sales.sellerId, creatorId),
+          eq(sales.currency, 'near'),
         ),
       );
     const out = new Map<string, bigint>();
@@ -297,6 +304,7 @@ export class MarketRepo {
   /**
    * What the account took home as a seller, summed over its recorded sales: the Formulas §6 seller
    * share (splitSale at the sold version's royalty_bps; no royalty when the seller is the creator).
+   * NEAR sales only.
    */
   async salesNetBySeller(sellerId: string): Promise<bigint> {
     const rows = await this.db
@@ -311,7 +319,7 @@ export class MarketRepo {
         and(eq(skillVersions.skillId, sales.skillId), eq(skillVersions.version, sales.version)),
       )
       .innerJoin(skills, eq(skills.id, sales.skillId))
-      .where(eq(sales.sellerId, sellerId));
+      .where(and(eq(sales.sellerId, sellerId), eq(sales.currency, 'near')));
     let net = 0n;
     for (const r of rows)
       net += splitSale(BigInt(r.priceYocto), {

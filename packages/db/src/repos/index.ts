@@ -2,6 +2,7 @@ import type { Executor } from '../client';
 import { AccountsRepo } from './accounts';
 import { AgentAccountsRepo } from './agent-accounts';
 import { AgentsRepo } from './agents';
+import { AuctionsRepo } from './auctions';
 import { BackingRepo } from './backing';
 import { BenchRepo } from './bench';
 import { DailyRepo } from './daily';
@@ -86,6 +87,8 @@ export interface Repos {
   relay: RelayRepo;
   /** Agents' own custodial NEAR accounts, their spend caps and payments. */
   agentAccounts: AgentAccountsRepo;
+  /** Sealed-bid skill auctions on SkillAuction (Sepolia): the on-chain id to skill version map. */
+  auctions: AuctionsRepo;
   /** Runs `fn` with repositories bound to one transaction. */
   transaction<T>(fn: (repos: Repos) => Promise<T>): Promise<T>;
 }
@@ -134,6 +137,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
     backing: new BackingRepo(db),
     relay: new RelayRepo(db),
     agentAccounts: new AgentAccountsRepo(db),
+    auctions: new AuctionsRepo(db),
     transaction: (fn) => tx(db, (t) => fn(createRepos(t, opts))),
   };
 }
@@ -141,6 +145,7 @@ export function createRepos(db: Executor, opts: ReposOptions = {}): Repos {
 export * from './accounts';
 export * from './agent-accounts';
 export * from './agents';
+export * from './auctions';
 export * from './backing';
 export * from './bench';
 export * from './daily';
