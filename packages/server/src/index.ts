@@ -13,3 +13,4 @@ export * from './external-http';
 export * from './zama/sealed-match';
 export * from './zama/settlement';
 export * from './zama/auctions';
+export * from './zama/benchmark-seeds';

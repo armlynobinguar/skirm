@@ -61,7 +61,8 @@ export class ContractMatchSettler implements MatchSettler {
   }
 }
 
-const PRIVATE_KEY_RE = /^(0x)?[0-9a-fA-F]{64}$/;
+/** A 32-byte hex private key, 0x optional (ZAMA_OPERATOR_PRIVATE_KEY). */
+export const OPERATOR_KEY_RE = /^(0x)?[0-9a-fA-F]{64}$/;
 
 interface SettlerLog {
   warn(msg: string): void;
@@ -82,7 +83,7 @@ export function createMatchSettler(
     log.warn('zama: ZAMA_OPERATOR_PRIVATE_KEY is not set, sealed matches will not be settled on chain');
     return null;
   }
-  if (!PRIVATE_KEY_RE.test(key)) {
+  if (!OPERATOR_KEY_RE.test(key)) {
     log.warn('zama: ZAMA_OPERATOR_PRIVATE_KEY is not a 32-byte hex key, sealed matches will not be settled on chain');
     return null;
   }

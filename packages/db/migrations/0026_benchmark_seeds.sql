@@ -1,0 +1,1 @@
+ALTER TABLE "skill_benchmarks" ADD COLUMN "onchain" jsonb;

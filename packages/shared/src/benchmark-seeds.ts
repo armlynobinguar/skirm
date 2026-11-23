@@ -148,3 +148,27 @@ export function verifyBenchmark(input: {
   checks.push({ name: 'score', ok: scoreOk, detail: `${(chain.scoreBps / 100).toFixed(2)}% posted on chain` });
   return { ok: checks.every((c) => c.ok), checks };
 }
+
+/**
+ * What the server keeps about a benchmark whose seed was drawn on chain (skill_benchmarks.onchain):
+ * where to find it and how far the reveal got. The chain stays the source of truth; the web reads it
+ * back to verify.
+ */
+export interface OnchainBenchmark {
+  /** BenchmarkSeeds address (lower-case). */
+  contract: string;
+  /** keccak256(skillRefPreimage(skillId, version)). */
+  skillRef: string;
+  /** The prompt hash bound at commit (0x + the version's prompt sha256). */
+  promptHash: string;
+  /** committed: seed drawn and sealed; published: results posted, seed public; revealed: seed verified on chain. */
+  status: 'committed' | 'published' | 'revealed';
+  /** keccak256 of the played log hashes, once posted. */
+  resultsHash: string | null;
+  scoreBps: number | null;
+  /** The revealed seed (decimal), once finalized. */
+  seed: string | null;
+  commitTx: string | null;
+  publishTx: string | null;
+  finalizeTx: string | null;
+}

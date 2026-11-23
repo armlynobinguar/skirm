@@ -183,6 +183,13 @@
       "when": 1795424634818,
       "tag": "0025_sealed_auctions",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795427411935,
+      "tag": "0026_benchmark_seeds",
+      "breakpoints": true
     }
   ]
 }
