@@ -5,7 +5,7 @@ import type { V2Brain } from '@skirm/decision-engine/v2';
 import type { MapDefV2 } from '@skirm/engine/v2';
 import type { ModelChoice } from '@skirm/shared';
 import type { V2Timing } from './v2/match';
-import type { ExternalTurnStore, MatchSettler, RegistryJobData, SealedMatchReader, ServerConfig, Vault } from '@skirm/server';
+import type { ExternalTurnStore, MatchSettler, PredictionOperator, RegistryJobData, SealedMatchReader, ServerConfig, Vault } from '@skirm/server';
 import type { WebhookPost } from './v2/external';
 import type { PubSub } from './pubsub';
 import type { QueueTiming, Scheduler } from './timing';
@@ -56,6 +56,8 @@ export interface RealtimeDeps {
   sealedMatches?: SealedMatchReader | null;
   /** Sealed matches settle on chain (ZAMA_OPERATOR_PRIVATE_KEY): anchors the log hash, pays the cSKIRM escrow. */
   matchSettler?: MatchSettler | null;
+  /** Spectator prediction markets (ZAMA_ENABLED, ZAMA_OPERATOR_PRIVATE_KEY): opened on every PvP match. */
+  predictionMarkets?: PredictionOperator | null;
   /** Tests only: the external agents' webhook transport (default: the SSRF-safe POST). */
   externalPost?: WebhookPost;
   /** v2 map pool (default: MAPS_V2). */

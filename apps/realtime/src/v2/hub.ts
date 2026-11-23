@@ -63,6 +63,7 @@ import {
   v2MatchLastKey,
   type ExternalTurnStore,
   type MatchSettler,
+  type PredictionOperator,
   type SealedMatchReader,
   type V2CrewEntry,
   type V2EndReason,
@@ -77,6 +78,7 @@ import { sleep, type QueueTiming, type Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
 import { ExternalBrain, isExternalBrain, type WebhookPost } from './external';
 import { DEFAULT_V2_TIMING, TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2ControlError, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Playbook, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
+import { MatchMarkets } from './predictions';
 import type { V2FrameStore } from './replay';
 
 export interface V2Search {
@@ -159,6 +161,8 @@ export interface V2HubDeps {
   sealed?: SealedMatchReader | null;
   /** Sealed matches settle on chain once they end (operator key set). Absent: they are not settled. */
   settler?: MatchSettler | null;
+  /** Spectator prediction markets (ZAMA_ENABLED, operator key set): opened on every PvP match. Absent: none. */
+  predictions?: PredictionOperator | null;
   log: Logger;
 }
 
@@ -214,8 +218,13 @@ export class V2Hub {
   /** Agents of pairs being set up (paired, no live v2_matches row yet), so no other crew can take them meanwhile. */
   private readonly startingAgents = new Set<string>();
   private closing = false;
+  /** Spectator prediction markets on PvP matches (null when off). */
+  private readonly markets: MatchMarkets | null;
 
   constructor(private readonly deps: V2HubDeps) {
+    this.markets = deps.predictions
+      ? new MatchMarkets(deps.predictions, deps.log, { tickMs: { ...DEFAULT_V2_TIMING, ...deps.timing }.tickMs, now: () => deps.scheduler.now() })
+      : null;
     this.matchmaker = new Matchmaker<V2Search>(deps.queueTiming, deps.scheduler, {
       status: (e, searchingMs, range) => this.deps.send(e.key, { type: 'queue_status', searchingMs, eloRange: range }),
       pair: (a, b) => this.track(this.start(a, b)),
@@ -908,6 +917,8 @@ export class V2Hub {
   /** A V2Match wired to this hub: its credits on the ledger, its watchers, and finish(). */
   private newMatch(setup: V2Setup, brains: Record<Team, V2Brain>, send: V2MatchDeps['send']): V2Match {
     const { repos, log } = this.deps;
+    // Spectators can watch any PvP match: each gets a prediction market (practice has no rival to back).
+    const markets = setup.practice ? null : this.markets;
     const match: V2Match = new V2Match(setup, {
       brains,
       scheduler: this.deps.scheduler,
@@ -917,6 +928,7 @@ export class V2Hub {
       watch: (msg) => {
         for (const fn of this.watchers.get(setup.matchId) ?? []) fn(msg);
         this.relay(setup.matchId, msg);
+        if (msg.type === 'v2_frame') markets?.tick(setup.matchId, msg.frame.tick);
       },
       finish: (end) => this.finish(end, match),
       heartbeat: () => repos.v2Matches.heartbeat(setup.matchId, new Date(this.deps.scheduler.now())),
@@ -1091,7 +1103,8 @@ export class V2Hub {
     // A result is announced only once it is stored: a row that could not be written (or that was
     // voided meanwhile) would show a win the sweep then voids, so v2_end goes out void instead.
     const stored = !!end.result && row?.status === 'ended';
-    this.settleSealed(end, match, stored);
+    const settled = this.settleSealed(end, match, stored);
+    this.resolveMarket(end, stored, settled);
     if (end.result && !stored) {
       log.error(`v2 match ${end.matchId}: result not stored (${row ? `row is ${row.status}` : 'record failed'}), ending it void`);
       this.campaignMatches.delete(end.matchId);
@@ -1147,7 +1160,7 @@ export class V2Hub {
    * to anchor, and without an operator key nothing is sent: the players can still take their stakes
    * back with refundUnsettled once the timeout passes.
    */
-  private settleSealed(end: V2MatchEnd, match: V2Match, stored: boolean): void {
+  private settleSealed(end: V2MatchEnd, match: V2Match, stored: boolean): Promise<void> | undefined {
     if (!match.sealedBy('A') || !match.sealedBy('B')) return;
     const { log } = this.deps;
     const settler = this.deps.settler;
@@ -1160,15 +1173,26 @@ export class V2Hub {
       return;
     }
     const winner = stored && end.result && end.result.winner !== 'draw' ? end.result.winner : null;
-    this.track(
-      settler.settle(end.matchId, winner, logHash(end.log)).then(
-        (out) =>
-          out.status === 'settled'
-            ? log.info(`v2 match ${end.matchId}: settled on chain (${winner ?? 'draw'}) in ${out.txHash}`)
-            : log.warn(`v2 match ${end.matchId}: not settled on chain: ${out.reason}`),
-        (err: unknown) => log.error(`v2 match ${end.matchId}: on-chain settlement failed: ${(err as Error).message}`),
-      ),
+    const settling = settler.settle(end.matchId, winner, logHash(end.log)).then(
+      (out) =>
+        out.status === 'settled'
+          ? log.info(`v2 match ${end.matchId}: settled on chain (${winner ?? 'draw'}) in ${out.txHash}`)
+          : log.warn(`v2 match ${end.matchId}: not settled on chain: ${out.reason}`),
+      (err: unknown) => log.error(`v2 match ${end.matchId}: on-chain settlement failed: ${(err as Error).message}`),
     );
+    this.track(settling);
+    return settling;
+  }
+
+  /**
+   * The match's prediction market resolves in the background once the match is over (after the
+   * sealed settlement, which the contract reads the winner from). A void or unstored result resolves
+   * as a draw: every prediction is refunded.
+   */
+  private resolveMarket(end: V2MatchEnd, stored: boolean, settled: Promise<void> | undefined): void {
+    if (!this.markets) return;
+    const winner = stored && end.result && end.result.winner !== 'draw' ? end.result.winner : null;
+    this.track(this.markets.end(end.matchId, winner, settled));
   }
 
   /** A campaign match's result for its player; a cleared chapter grants its rewards (logged, never fatal). */

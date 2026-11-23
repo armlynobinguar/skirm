@@ -11,6 +11,7 @@ import {
   createQueue,
   createRedis,
   createMatchSettler,
+  createPredictionOperator,
   createSealedMatchReader,
   createVault,
   enqueueRegistry,
@@ -72,6 +73,9 @@ async function bootstrap(): Promise<void> {
     // Sealed results settle on chain from the operator key (ZAMA_OPERATOR_PRIVATE_KEY): null when off
     // or when no key is set (that case logs a warning, never the key).
     matchSettler: createMatchSettler(process.env, log),
+    // Spectator prediction markets on PvP matches (ZAMA_ENABLED, MatchPredictions deployed, the same
+    // operator key): null when off.
+    predictionMarkets: createPredictionOperator(process.env, log),
     log,
   };
 
