@@ -24,7 +24,8 @@ export function FogArena() {
   const deployed = zamaConfig.contracts.fog !== null;
 
   useEffect(() => {
-    void restoreEvmWallet().then(setConn, () => undefined);
+    // An already-connected wallet on another chain still goes through Connect (which switches it).
+    void restoreEvmWallet().then((c) => setConn(c && c.chainId === zamaConfig.chainId ? c : null), () => undefined);
   }, []);
 
   const deps = useMemo<FogDeps | null>(() => {
