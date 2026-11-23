@@ -37,6 +37,7 @@ import {
   MAPS_V2,
   isCommunityMapId,
   isDifficulty,
+  logHash,
   RANKED_DIFFICULTY,
   botCrew,
   practiceRival,
@@ -61,6 +62,7 @@ import {
   v2MatchChannel,
   v2MatchLastKey,
   type ExternalTurnStore,
+  type MatchSettler,
   type SealedMatchReader,
   type V2CrewEntry,
   type V2EndReason,
@@ -155,6 +157,8 @@ export interface V2HubDeps {
   models?: readonly ModelChoice[];
   /** Sealed loadouts (ZAMA_ENABLED): reads SkirmMatch on Sepolia. Absent: v2_seal and sealed locks are refused. */
   sealed?: SealedMatchReader | null;
+  /** Sealed matches settle on chain once they end (operator key set). Absent: they are not settled. */
+  settler?: MatchSettler | null;
   log: Logger;
 }
 
@@ -1086,7 +1090,9 @@ export class V2Hub {
     const row = await this.recordRetrying(end, match);
     // A result is announced only once it is stored: a row that could not be written (or that was
     // voided meanwhile) would show a win the sweep then voids, so v2_end goes out void instead.
-    if (end.result && row?.status !== 'ended') {
+    const stored = !!end.result && row?.status === 'ended';
+    this.settleSealed(end, match, stored);
+    if (end.result && !stored) {
       log.error(`v2 match ${end.matchId}: result not stored (${row ? `row is ${row.status}` : 'record failed'}), ending it void`);
       this.campaignMatches.delete(end.matchId);
       await this.recordExternal(end.matchId, match);
@@ -1132,6 +1138,37 @@ export class V2Hub {
     }
     await this.recordExternal(end.matchId, match);
     return out;
+  }
+
+  /**
+   * A sealed match (both crews sealed on SkirmMatch) settles on chain in the background, so v2_end
+   * never waits on Sepolia: the operator posts the winner (a void or unstored result settles as a
+   * draw, which refunds both stakes) and anchors the log's head hash. Without a log there is nothing
+   * to anchor, and without an operator key nothing is sent: the players can still take their stakes
+   * back with refundUnsettled once the timeout passes.
+   */
+  private settleSealed(end: V2MatchEnd, match: V2Match, stored: boolean): void {
+    if (!match.sealedBy('A') || !match.sealedBy('B')) return;
+    const { log } = this.deps;
+    const settler = this.deps.settler;
+    if (!settler) {
+      log.warn(`v2 match ${end.matchId}: sealed match not settled on chain (no ZAMA_OPERATOR_PRIVATE_KEY)`);
+      return;
+    }
+    if (!end.log) {
+      log.warn(`v2 match ${end.matchId}: sealed match has no log to anchor, not settled on chain`);
+      return;
+    }
+    const winner = stored && end.result && end.result.winner !== 'draw' ? end.result.winner : null;
+    this.track(
+      settler.settle(end.matchId, winner, logHash(end.log)).then(
+        (out) =>
+          out.status === 'settled'
+            ? log.info(`v2 match ${end.matchId}: settled on chain (${winner ?? 'draw'}) in ${out.txHash}`)
+            : log.warn(`v2 match ${end.matchId}: not settled on chain: ${out.reason}`),
+        (err: unknown) => log.error(`v2 match ${end.matchId}: on-chain settlement failed: ${(err as Error).message}`),
+      ),
+    );
   }
 
   /** A campaign match's result for its player; a cleared chapter grants its rewards (logged, never fatal). */

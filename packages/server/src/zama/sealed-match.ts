@@ -11,7 +11,7 @@ import { SkirmMatchAbi, sepolia } from '@skirm/fhevm/generated';
 import { SealedLoadoutError, decodeLoadout, type DecodedPick, type EncodedLoadout, type SealedRosterAgent } from '@skirm/shared';
 import { Contract, JsonRpcProvider, id as keccakUtf8 } from 'ethers';
 
-export const SEALED_MATCH_STATUSES = ['none', 'open', 'locked', 'revealing', 'revealed', 'forfeited', 'cancelled'] as const;
+export const SEALED_MATCH_STATUSES = ['none', 'open', 'locked', 'revealing', 'revealed', 'forfeited', 'cancelled', 'settled'] as const;
 /** SkirmMatch.Status, by name. */
 export type SealedMatchStatus = (typeof SEALED_MATCH_STATUSES)[number];
 
