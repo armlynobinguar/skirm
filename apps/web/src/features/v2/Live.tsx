@@ -42,6 +42,7 @@ import { calloutOf, difficultyOf, type Callout, type FeedFilter } from './hud/mo
 import { Banner, CalloutBar, CountIn } from './hud/parts';
 import { ThirdPerson } from './hud/ThirdPerson';
 import { Inspect } from './hud/Inspect';
+import { ZamaRandomnessSlot } from '@/features/zama/randomness/ZamaRandomnessSlot';
 import type { V2CommsLine, V2MatchView } from './v2Store';
 
 const ChaseCam = dynamic(() => import('@/features/arena/chase3d/ChaseCam'), { ssr: false });
@@ -377,6 +378,9 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
         <AgentCards team={team} mapId={view.mapId} tick={tick} cards={rivalCards} unseen={unseen} pressed={tpv ?? focus} onPick={onPick} onWatch={enterTpv} className={c.cardsB} />
       </div>
       {intro ? null : <GearLegend frame={frame} />}
+      {!intro && view.zama ? (
+        <ZamaRandomnessSlot matchId={view.matchId} mapId={view.mapId} team={watch || replay ? null : team} mode="live" seed={view.zama.seed} />
+      ) : null}
       <Inspect frame={frame} tickMs={view.tickMs} enabled={!intro && !tpv && !control.controlled} onWatch={enterTpv} />
       {watched ? (
         <ThirdPerson

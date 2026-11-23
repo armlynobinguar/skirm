@@ -63,7 +63,8 @@ export function inspectTile(frame: V2Frame, x: number, y: number, tickMs: number
   if (tool) extra.push(`A ${tool.kind} lies here: an agent can pick it up and use it.`);
   const placed = frame.placed?.find((t) => t.at[0] === x && t.at[1] === y);
   if (placed) extra.push(`A placed ${placed.kind}.`);
-  const drop = def?.drops.find((d) => d.at[0] === x && d.at[1] === y && d.tick > frame.tick);
+  // Sealed drops (Zama): the map's drop tiles do not apply, and the real ones are secret until they land.
+  const drop = frame.sealedDrops ? undefined : def?.drops.find((d) => d.at[0] === x && d.at[1] === y && d.tick > frame.tick);
   if (drop) extra.push(`A supply drop lands here in ${secs(drop.tick - frame.tick, tickMs)}.`);
   const ice = def?.ice?.some(([ix, iy]) => ix === x && iy === y);
   const hazard = (key: 'water' | 'fire' | 'lava', what: string): Inspected => {

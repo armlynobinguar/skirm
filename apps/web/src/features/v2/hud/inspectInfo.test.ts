@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { mapV2 } from '@skirm/engine/v2';
 import { v2FrameFixture } from '@/test/fixtures';
 import { inspectTile } from './inspectInfo';
 
@@ -40,5 +41,14 @@ describe('inspecting the board', () => {
     const water = inspectTile({ ...frame, rows, agents: [] }, 2, 1, 2000)!;
     expect(water.kind).toBe('Hazard');
     expect(water.tone).toBe('hazard');
+  });
+
+  it('never points at the map drop tile when the drops are sealed on chain', () => {
+    const all = v2FrameFixture({}, 'watch');
+    const drop = mapV2(all.mapId)?.drops[0];
+    if (!drop) return;
+    const at = (f: typeof all) => inspectTile({ ...f, agents: [], tick: 0 }, drop.at[0], drop.at[1], 2000)?.lines.join(' ') ?? '';
+    expect(at(all)).toContain('A supply drop lands here');
+    expect(at({ ...all, sealedDrops: true })).not.toContain('supply drop');
   });
 });
