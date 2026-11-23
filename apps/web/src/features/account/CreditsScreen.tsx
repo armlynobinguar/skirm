@@ -31,6 +31,7 @@ import { isFinalRefusal, pendingStore } from '@/lib/wallet/pending';
 import { WalletError } from '@/lib/wallet/types';
 import { ConfirmTransactionModal } from '@/features/skills/ConfirmTransactionModal';
 import { ConnectWalletModal } from '@/features/skills/ConnectWalletModal';
+import { ZamaCreditsSlot } from '@/features/zama/credits/ZamaCreditsSlot';
 import s from './account.module.css';
 import {
   checkNearAmount,
@@ -251,6 +252,8 @@ function CreditsBody() {
           loading={me.isPending}
           onConnect={() => setWalletOpen('connect')}
         />
+
+        <ZamaCreditsSlot />
       </div>
 
       <Ledger query={credits} pending={depositing} rate={rate} />
