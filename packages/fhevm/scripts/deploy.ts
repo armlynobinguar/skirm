@@ -9,6 +9,12 @@
  * `SkirmMatch` to add it next to an already deployed token), CREDITS_OWNER (defaults to the
  * deployer), FAUCET_AMOUNT (base units, 6 decimals; default 1,000 cSKIRM), FAUCET_COOLDOWN_SECONDS
  * (default 86400).
+ *
+ * SkirmMatch escrows cSKIRM stakes, so it takes: the cSKIRM address (CREDITS_ADDRESS, else the one
+ * deployed in this run or recorded in deployments/<network>.json), MATCH_OPERATOR (the game server
+ * signer that settles results; default the deployer; the server holds its key as
+ * ZAMA_OPERATOR_PRIVATE_KEY), TREASURY (fee recipient; default none) and FEE_BPS (fee on the matched
+ * pot in basis points, at most 1000; default 0).
  */
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { ethers, network } from "hardhat";
@@ -21,8 +27,18 @@ const DEFAULT_FAUCET_COOLDOWN = 24n * 60n * 60n;
 
 type ContractName = (typeof EXPORTED_CONTRACTS)[number];
 
-/** Constructor arguments per contract. */
-function constructorArgs(name: ContractName, deployer: HardhatEthersSigner): unknown[] {
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+
+/** An address from env `name`, else `fallback`; throws on a malformed value. */
+function envAddress(name: string, fallback: string): string {
+  const v = process.env[name]?.trim();
+  if (!v) return fallback;
+  if (!ADDRESS_RE.test(v)) throw new Error(`${name}: "${v}" is not an address`);
+  return v;
+}
+
+/** Constructor arguments per contract (`contracts`: what is deployed so far on this network). */
+function constructorArgs(name: ContractName, deployer: HardhatEthersSigner, contracts: Record<string, DeploymentRecord>): unknown[] {
   switch (name) {
     case "ConfidentialSkirmCredits":
       return [
@@ -30,8 +46,13 @@ function constructorArgs(name: ContractName, deployer: HardhatEthersSigner): unk
         BigInt(process.env.FAUCET_AMOUNT ?? DEFAULT_FAUCET_AMOUNT),
         BigInt(process.env.FAUCET_COOLDOWN_SECONDS ?? DEFAULT_FAUCET_COOLDOWN),
       ];
-    case "SkirmMatch":
-      return [];
+    case "SkirmMatch": {
+      const credits = envAddress("CREDITS_ADDRESS", contracts.ConfidentialSkirmCredits?.address ?? "");
+      if (!credits) throw new Error("SkirmMatch needs cSKIRM: deploy ConfidentialSkirmCredits first or set CREDITS_ADDRESS");
+      const feeBps = Number(process.env.FEE_BPS ?? 0);
+      if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 1000) throw new Error(`FEE_BPS: ${process.env.FEE_BPS} is not 0..1000`);
+      return [credits, envAddress("MATCH_OPERATOR", deployer.address), envAddress("TREASURY", ethers.ZeroAddress), feeBps];
+    }
   }
 }
 
@@ -45,8 +66,8 @@ function selected(): ContractName[] {
   return names as ContractName[];
 }
 
-async function deployOne(name: ContractName, deployer: HardhatEthersSigner): Promise<DeploymentRecord> {
-  const args = constructorArgs(name, deployer);
+async function deployOne(name: ContractName, deployer: HardhatEthersSigner, contracts: Record<string, DeploymentRecord>): Promise<DeploymentRecord> {
+  const args = constructorArgs(name, deployer, contracts);
   const factory = await ethers.getContractFactory(name, deployer);
   const contract = await factory.deploy(...args);
   const tx = contract.deploymentTransaction();
@@ -74,7 +95,7 @@ async function main(): Promise<void> {
   const previous = readDeployments(network.name);
   const contracts: Record<string, DeploymentRecord> = previous?.chainId === chainId ? { ...previous.contracts } : {};
   for (const name of names) {
-    contracts[name] = await deployOne(name, deployer);
+    contracts[name] = await deployOne(name, deployer, contracts);
     // Written after each contract, so a later failure keeps the ones already deployed.
     const deployments: NetworkDeployments = { network: network.name, chainId, contracts };
     writeDeployments(deployments);
