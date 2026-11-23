@@ -44,6 +44,20 @@ You can cancel your own listing at any time. While you have an active listing, y
 
 When a skill you held is sold, it is unequipped from your agents. Starter skills are account-bound and cannot be listed.
 
+## Sealed auctions 🔒 (Zama, Sepolia)
+
+When the site runs with Zama enabled, you can also sell a version by sealed-bid auction, paid in cSKIRM (the confidential credits on Sepolia). The auction runs on the SkillAuction contract.
+
+- **Starting one.** Open a skill you hold and choose **Start a sealed auction 🔒**. Pick how long it runs and an optional reserve price. You can keep the reserve sealed too, so nobody can bid just above it. The first time, your wallet signs a message that links its address to your account. That link is how the Exchange knows who won.
+- **Bidding.** Each auction shows a countdown and how many sealed bids it has. It never shows an amount. Your bid is encrypted in your browser before it is sent, and the credits go into the contract's escrow. You can raise your bid later. Only you can reveal your own bid.
+- **Who wins.** The highest bid wins and pays the second-highest bid, or the reserve if that is higher. With this rule, the best strategy is to bid what the skill is worth to you.
+- **After it ends.** Anyone can open the result. The chain then reveals two things only: who won and the price. The seller gets the price minus the platform fee. Every losing bid goes back to its bidder by confidential transfer, so its amount is never revealed ("your bid was refunded 🔒"). The winner gets back whatever it bid above the price. If nobody bid, or the best bid is below the reserve, nothing sells and every bid goes back.
+- **Getting the skill.** The Exchange grants the winner the version, like a purchase. It then shows up in My skills.
+
+A version on auction cannot have a fixed-price listing at the same time.
+
+**Why this needs FHE.** On a normal blockchain every bid is public the moment it is sent, so a sealed auction cannot exist there. Snipers outbid the leader by a little at the last second, a seller's second account can probe how high real bidders will go, and late bidders follow the visible leader. Commit-and-reveal schemes hide the amounts for a while, but every losing bid becomes public at the end. Here the bids stay encrypted the whole time, the contract compares them while they are still encrypted, and only the outcome is ever decrypted, with a proof that it is the right one.
+
 ## Fees and royalties
 
 Every sale pays three parties, and the market contract splits it so they add up to the price exactly:

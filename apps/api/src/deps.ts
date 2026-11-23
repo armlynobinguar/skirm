@@ -9,6 +9,7 @@ import type { RateLimitStore, RateLimits } from './rate-limit';
 import type { RelayDeps } from './relay';
 import type {
   AgentAccountsChain,
+  AuctionReader,
   BackingTxReader,
   BadgeMinter,
   BenchmarkJobData,
@@ -111,6 +112,11 @@ export interface ApiDeps {
    * free quota. Absent (RELAYER_* unset): the relay routes are off and nothing else changes.
    */
   relay?: RelayDeps;
+  /**
+   * Sealed skill auctions on Sepolia (ZAMA_ENABLED, SkillAuction deployed): reads auctions a seller
+   * registers. Absent: the /zama/auctions routes answer 404 (the EVM address link still works).
+   */
+  auctions?: AuctionReader;
   /** Benchmarks queued at mint and buyers' trials (the worker plays them). */
   benchmarkQueue: BenchmarkQueue;
   /** Daily model spend for GET /ops/stats (absent: the route reports it as unavailable). */

@@ -281,6 +281,35 @@ export class AccountsRepo {
     }
   }
 
+  /**
+   * Links an EVM address (the api checks the signed proof first). Stored lower-case; an address
+   * already linked to another account is refused. Linking again replaces the account's address.
+   */
+  async linkEvmAddress(
+    id: string,
+    address: string,
+  ): Promise<{ ok: true } | { ok: false; error: 'taken' | 'invalid' }> {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return { ok: false, error: 'invalid' };
+    try {
+      await tx(this.db, (t) =>
+        t.update(accounts).set({ evmAddress: address.toLowerCase() }).where(eq(accounts.id, id)),
+      );
+      return { ok: true };
+    } catch (err) {
+      if (isUniqueViolation(err)) return { ok: false, error: 'taken' };
+      throw err;
+    }
+  }
+
+  /** The live account an EVM address is linked to (any case). */
+  async byEvmAddress(address: string): Promise<AccountRow | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.evmAddress, address.toLowerCase()), isNull(accounts.deletedAt)));
+    return row;
+  }
+
   /** Clears the linked NEAR account (DELETE /me/near; the api checks what forbids it first). */
   async unlinkNearAccount(id: string): Promise<AccountRow | undefined> {
     const [row] = await this.db

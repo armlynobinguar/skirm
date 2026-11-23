@@ -260,6 +260,9 @@ export class MarketController {
       }
       version = mine[0].version;
     }
+    // A version on sealed auction (SkillAuction) is sold there: no fixed-price listing beside it.
+    if (await this.deps.repos.auctions.openFor(sid, version))
+      throw new ApiError(409, 'auction_open', 'this version is on sealed auction');
     // Outside dev mode the listing must be onchain: its nft_approve tx is read through RPC.
     if (this.deps.config.AUTH_MODE !== 'dev') {
       if (!b.txHash)

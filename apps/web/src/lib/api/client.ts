@@ -8,6 +8,7 @@ import { authHeaders } from '../auth/credentials';
 import type { MatchDecisions } from './decisions';
 import type { PublicMatchLog } from './matchLogTypes';
 import { ApiError, errorFromBody } from './errors';
+import type { EvmLink, SealedAuctionCard, SealedAuctionList } from './zamaTypes';
 import type { Campaign, CampaignStart } from './campaignTypes';
 import type {
   BackingConfig,
@@ -170,6 +171,15 @@ export interface ApiClient {
   startTrial(skillId: string, body: TrialRequest): Promise<StartTrialResponse>;
   /** GET /market/:id/trials: the caller's trials of the skill, newest first. */
   trials(skillId: string, version?: number): Promise<Trial[]>;
+
+  /** GET /zama/evm-link: the caller's linked EVM address (sealed auctions name winners by it). */
+  evmLink(): Promise<EvmLink>;
+  /** PUT /zama/evm-link: links `address`, proven by a personal_sign of evmLinkMessage (@skirm/shared). */
+  linkEvm(body: { address: string; signature: string }): Promise<EvmLink>;
+  /** GET /zama/auctions: registered sealed auctions, open first (404 `auctions_disabled` when off). */
+  sealedAuctions(skillId?: string): Promise<SealedAuctionList>;
+  /** POST /zama/auctions: registers the caller's on-chain SkillAuction auction of a version it holds. */
+  registerSealedAuction(body: { skillId: string; version: number; auctionId: string }): Promise<SealedAuctionCard>;
 
   /** GET /bench: the test bench's cost here and the caller's runs left this hour. */
   benchInfo(): Promise<BenchInfo>;
@@ -460,6 +470,10 @@ export function createApiClient(opts: ApiClientOptions): ApiClient {
     cancelListing: (id, version) => json('DELETE', `/market/${enc(id)}/listing`, { query: { version } }),
     startTrial: (id, body) => json('POST', `/market/${enc(id)}/trial`, { body }),
     trials: (id, version) => get(`/market/${enc(id)}/trials`, { version }),
+    evmLink: () => get('/zama/evm-link'),
+    linkEvm: (body) => json('PUT', '/zama/evm-link', { body }),
+    sealedAuctions: (skillId) => get('/zama/auctions', { skillId }),
+    registerSealedAuction: (body) => json('POST', '/zama/auctions', { body }),
 
     benchInfo: () => get('/bench'),
     startBenchRun: (body) => json('POST', '/bench/runs', { body }),

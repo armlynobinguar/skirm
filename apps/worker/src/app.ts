@@ -9,6 +9,7 @@ import {
   QUEUE_SEASONS,
   QUEUE_TOURNAMENTS,
   RedisCostStore,
+  createAuctionReader,
   createNearAdapters,
   createQueue,
   createRedis,
@@ -21,6 +22,7 @@ import {
   scheduleTournamentTick,
   type ServerConfig,
 } from '@skirm/server';
+import { auctionPollMs, startAuctionPoller } from './auction-processor';
 import { benchSecretWarning, processBenchmark } from './benchmark-processor';
 import {
   errorCode,
@@ -198,6 +200,9 @@ export async function startWorkerApp(
   await scheduleSeasonTick(seasonQueue);
   await scheduleRankedDecay(rankedQueue);
   await scheduleTournamentTick(tournamentQueue);
+  // Sealed skill auctions (ZAMA_ENABLED, SkillAuction deployed): grant each won auction's buyer.
+  const auctionReader = createAuctionReader(env);
+  const stopAuctions = auctionReader ? startAuctionPoller(deps, auctionReader, auctionPollMs(env)) : null;
   if (brain.kind === 'greedy')
     logger.warn(
       'benchmarks and trials need a model key (LLM_API_KEY): they end needs_model',
@@ -208,6 +213,7 @@ export async function startWorkerApp(
     registry: near.registry.kind,
     seasons: near.seasons.kind,
     eloDecay: decay,
+    sealedAuctions: auctionReader ? auctionReader.address : 'off',
   });
 
   // Official starter skills for the market (idempotent, advisory-locked across workers). In the
@@ -230,6 +236,7 @@ export async function startWorkerApp(
     deps,
     async close(graceMs = 30_000) {
       await seeding;
+      await stopAuctions?.();
       const graceful = Promise.all(workers.map((w) => w.close()));
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timedOut = await Promise.race([

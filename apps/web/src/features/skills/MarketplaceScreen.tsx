@@ -33,6 +33,7 @@ import { TAGS, near } from './lib';
 import { SkillArt, rarityOf, useTilt } from './parts';
 import { RoleTag } from './RoleTag';
 import { SkillDrawer } from './SkillDetailScreen';
+import { ZamaAuctionsSlot } from '@/features/zama/auctions/ZamaAuctionSlots';
 import s from './skills.module.css';
 import x from './exchange.module.css';
 
@@ -146,7 +147,11 @@ function Marketplace({ initial, initialCards }: { initial: string | null; initia
       <div className={x.mk} data-open={sel ? '' : undefined}>
         <div id="s09-panel" role="tabpanel" aria-labelledby={`s09-tab-${tab}`} className={x.list}>
           {tab === 'exchange' ? (
-            <ExchangeList sel={sel} onSelect={select} initialCards={initialCards} />
+            <>
+              {/* Sealed-bid auctions in cSKIRM (NEXT_PUBLIC_ZAMA_ENABLED; nothing when off or none). */}
+              <ZamaAuctionsSlot />
+              <ExchangeList sel={sel} onSelect={select} initialCards={initialCards} />
+            </>
           ) : (
             <RequireSession>
               <MineList sel={sel} onSelect={select} />

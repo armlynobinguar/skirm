@@ -10,6 +10,7 @@ OpenZeppelin's [confidential contracts](https://github.com/OpenZeppelin/openzepp
 | `ConfidentialSkirmCredits` (cSKIRM) | ERC-7984 confidential token for stakes and rewards. Balances and transfer amounts are FHE ciphertexts. Owner + approved minters (game contracts) can mint; a public faucet gives testers a fixed amount once per cooldown. |
 | `SkirmMatch` | Sealed PvP loadouts: each player commits its crew, skills and talk tiers as encrypted inputs; nobody can read them until both have locked, then both are revealed together with a KMS-verified public decryption. Lock deadline + forfeit. FHE randomness (seed, supply drops). Confidential cSKIRM stake escrow, settled by the game server with the match log hash anchored on chain. |
 | `FogSkirm` | Fog Skirm, a short two-player mode played fully on chain: scouts, traps, moves and a hidden seed vial stay ciphertexts; each round is resolved under FHE and only aggregate outcomes go public. See below. |
+| `SkillAuction` | Sealed-bid (second-price) auctions of skill versions on the Exchange, paid in cSKIRM: bids are escrowed ciphertexts, the top two are tracked under FHE, only the winner and the clearing price are ever decrypted, and losing bids are refunded confidentially. See below. |
 
 ## Setup
 
@@ -315,15 +316,107 @@ live in SkirmMatch.
 send `finalizeRound`, so it only needs the relayer. Ping history is kept in the player's browser
 (the chain keeps the latest pings only). A spectator sees only the public outcomes until the end.
 
+## SkillAuction: sealed-bid skill auctions in cSKIRM
+
+Sellers auction a skill version on the Exchange and bidders submit encrypted bids, paid in cSKIRM.
+Nobody, the seller included, can read a bid while the auction runs or after it ends; when it closes
+only two numbers become public: who won and the clearing price. Play it from the Exchange (apps/web
+`src/features/zama/auctions`, behind `NEXT_PUBLIC_ZAMA_ENABLED`): a "Sealed auctions 🔒" row on the
+Exchange tab, and a bid box or "Start a sealed auction 🔒" in a skill's detail.
+
+**Flow.**
+
+1. *Create*: `createAuction(skillRef, endTime, reserve)` with a public reserve, or
+   `createAuctionSealedReserve(skillRef, endTime, encReserve, proof)` with an encrypted one.
+   `skillRef = keccak256("skirm-skill:<skillId>:<version>")` (`skillRefPreimage` in
+   `packages/shared/src/sealed-auction.ts`) ties the auction to one off-chain skill version without
+   putting its name or text on chain. The seller then registers it with the api (`POST /zama/auctions`),
+   which checks the seller's linked EVM address, the skill reference and that it holds the version.
+2. *Bid*: `bid(auctionId, encAmount, proof)`, after making SkillAuction a cSKIRM operator once. The
+   contract pulls the amount with `confidentialTransferFrom` and adds what *actually arrived* to the
+   bidder's sealed total: ERC-7984 moves 0 on a short balance instead of reverting, so an unfunded
+   bid counts as 0 and nobody learns that it was unfunded. One sealed total per address; a second
+   `bid` raises it. The public sees "N sealed bids" (a count); the bidder can user-decrypt its own.
+3. *Close* (anyone, after `endTime`): with no bids the auction fails at once. Otherwise it computes
+   `met = first >= reserve` and opens exactly two handles for public decryption,
+   `met ? winnerIndex : 0` and `met ? price : 0`.
+4. *Finalize* (anyone): `finalize(auctionId, clear, proof)` checks the KMS proof with
+   `FHE.checkSignatures`, records the winner and price, pays the seller `price - fee` and the
+   treasury the fee, and emits `Won(auctionId, skillRef, winner, seller, price)` (or `Failed`).
+5. *Refund* (anyone, paid to the bidder): `refund(auctionId, bidder)` sends a loser its whole escrow
+   and the winner `total - price`, both as ciphertexts. Pulled per bidder so `finalize` stays O(1)
+   under the per-transaction HCU limit.
+
+**Pricing: Vickrey (second price).** The highest total wins and pays `max(second, reserve)`. Ties go to
+the earlier bidder at the tied value. Truthful bidding is the dominant strategy, which fits a market
+where nobody can see the others anyway. The contract tracks the top two totals and the winner index
+under FHE in O(1) per bid (no loop over bidders). With `t` the bidder's new total and `i` its index:
+`beats = t > first`, `first' = max(first, t)`, `firstIdx' = beats ? i : firstIdx`, and
+`second' = (firstIdx == i) ? second : (beats ? first : max(second, t))`. `vickreyOutcome` in
+`packages/shared/src/sealed-auction.ts` is the same rule on plaintexts, and the tests compare them.
+
+**What stays hidden, from whom.**
+
+| Value | Who can decrypt it |
+| --- | --- |
+| A bidder's total (every bid and raise) | That bidder only, before and after the close |
+| The running highest and second-highest totals, the leader | Nobody (only the contract's ACL) |
+| An encrypted reserve | The seller only; public only if it ends up being the price |
+| How many addresses bid | Everyone (`bidders`) |
+| Winner and clearing price | Everyone, after `finalize` (KMS-verified) |
+| A losing bid's amount, its refund | That bidder only, forever |
+
+In a second-price auction the clearing price is the runner-up's bid (or the reserve): that one
+number is the price by design, but the runner-up's identity is never revealed.
+
+**Why sealed bids need FHE.** On a transparent chain every bid is in the calldata and in storage the
+moment it lands, so the auction degenerates: snipers outbid the leader by 1 in the last block, a
+seller's shill account probes how high real bidders go, and late bidders herd behind the visible
+leader. Commit-reveal hides amounts but leaks everything at reveal time (every losing bid becomes
+public), lets a losing bidder refuse to reveal, and needs escrow sized without knowing the bid. Here
+the escrow itself is a ciphertext, the ranking is computed on ciphertexts, and only the outcome is
+ever decrypted, with a proof.
+
+**Off chain.** The worker (`apps/worker/src/auction-processor.ts`, `grantWonAuctions` in
+`packages/server/src/zama/auctions.ts`) polls auctions past their end and, once the chain says won,
+grants the version to the account linked to the winning address through the Exchange's own sale
+path (`MarketRepo.recordSale`, currency `cskirm`, keyed by the auction so a retry never sells twice).
+A winner without a linked address is granted as soon as it links one (`PUT /zama/evm-link`, a
+personal_sign of `evmLinkMessage(accountId, address)`).
+
+**Gas and HCU** (FHEVM mock, `npx hardhat test test/SkillAuction.ts` prints them; HCU limits per tx
+on the coprocessor: 20,000,000 total, 5,000,000 sequential depth):
+
+| Call | Gas | HCU | HCU depth |
+| --- | ---: | ---: | ---: |
+| `createAuction` (public reserve) | 319,227 | 128 | 32 |
+| `createAuctionSealedReserve` | 418,436 | 96 | 32 |
+| `bid`, first from an address | 698,650 | 1,284,096 | 480,000 |
+| `bid`, a raise | 673,975 | 1,556,064 | 697,000 |
+| `close` | 276,580 | 480,064 | 273,000 |
+| `close` with no bids | 30,911 | 0 | 0 |
+| `finalize` (sells, pays seller and treasury) | 750,775 | 1,172,192 | 586,032 |
+| `finalize` (no sale) | 99,277 | 0 | 0 |
+| `refund` | 414,671 | 719,032 | 502,000 |
+
+Every call is under 8% of the per-transaction HCU budget and 14% of the depth budget, and the cost
+of a bid does not grow with the number of bidders.
+
+**Known limits.** One open auction per skill version, and no fixed-price NEAR listing beside it (the
+api refuses both). With NEAR ops on, the skill token itself still sits with the seller on NEAR: the
+auction moves the Exchange's ownership record; moving the NEAR token is left to a follow-up. An
+auction nobody finalizes stays in `Closing` (anyone can finalize; the seller has the incentive).
+
 ## Deploy to Sepolia
 
 ```bash
 npm run deploy:sepolia -w @skirm/fhevm
 ```
 
-This deploys `ConfidentialSkirmCredits`, `SkirmMatch` and `FogSkirm` (or only the ones in
-`DEPLOY_CONTRACTS`, e.g. `DEPLOY_CONTRACTS=SkirmMatch` next to an already deployed token, or
-`DEPLOY_CONTRACTS=FogSkirm` to add Fog Skirm, which takes no constructor arguments), records them in
+This deploys `ConfidentialSkirmCredits`, `SkirmMatch`, `FogSkirm` and `SkillAuction` (or only the
+ones in `DEPLOY_CONTRACTS`, e.g. `DEPLOY_CONTRACTS=SkirmMatch` next to an already deployed token,
+`DEPLOY_CONTRACTS=FogSkirm` to add Fog Skirm, which takes no constructor arguments, or
+`DEPLOY_CONTRACTS=SkillAuction` to add the sealed skill auctions), records them in
 `deployments/sepolia.json` (address, tx, block, constructor args; merged with what is already
 there) and regenerates `generated/index.ts`. Commit both files so the web and realtime pick up the
 addresses.
@@ -332,12 +425,19 @@ SkirmMatch's constructor is `(credits, operator, treasury, feeBps)`: `CREDITS_AD
 cSKIRM deployed in the same run or recorded in `deployments/sepolia.json`), `MATCH_OPERATOR` (default
 the deployer; give the game server that account's key as `ZAMA_OPERATOR_PRIVATE_KEY`), `TREASURY`
 (default none) and `FEE_BPS` (default 0). The stake escrow changes SkirmMatch's ABI, so a SkirmMatch
-deployed before it must be redeployed (`DEPLOY_CONTRACTS=SkirmMatch` keeps the token). To verify:
+deployed before it must be redeployed (`DEPLOY_CONTRACTS=SkirmMatch` keeps the token).
+
+SkillAuction's constructor is `(credits, treasury, feeBps)`: the same `CREDITS_ADDRESS` and
+`TREASURY`, and `AUCTION_FEE_BPS` (fee on the clearing price, at most 1000; default `FEE_BPS`, else
+0). The server reads it with `ZAMA_ENABLED=1` (api: `/zama/auctions`; worker: the grant poller,
+`ZAMA_AUCTION_POLL_MS`); `ZAMA_AUCTION_ADDRESS` / `NEXT_PUBLIC_ZAMA_AUCTION_ADDRESS` override the
+address. To verify:
 
 ```bash
 npx hardhat verify --network sepolia <creditsAddress> <owner> <faucetAmount> <faucetCooldown>
 npx hardhat verify --network sepolia <matchAddress> <creditsAddress> <operator> <treasury> <feeBps>
 npx hardhat verify --network sepolia <fogAddress>
+npx hardhat verify --network sepolia <auctionAddress> <creditsAddress> <treasury> <feeBps>
 ```
 
 ## Address + ABI export

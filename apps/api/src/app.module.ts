@@ -30,6 +30,7 @@ import { RankedController } from './controllers/ranked.controller';
 import { RelayController } from './controllers/relay.controller';
 import { SeasonsController } from './controllers/seasons.controller';
 import { SkillsController } from './controllers/skills.controller';
+import { ZamaController } from './controllers/zama.controller';
 import { DEPS, type ApiDeps } from './deps';
 import { ApiExceptionFilter } from './errors';
 import { DEFAULT_RATE_LIMITS, RateLimitGuard } from './rate-limit';
@@ -66,6 +67,7 @@ export class AppModule {
         CommunityMapsController,
         BackingController,
         RelayController,
+        ZamaController,
       ],
       providers: [
         { provide: DEPS, useValue: deps },
