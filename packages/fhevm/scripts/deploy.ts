@@ -6,11 +6,11 @@
  *
  * Env: SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY (required on Sepolia), and optionally
  * DEPLOY_CONTRACTS (comma list, default every contract:
- * ConfidentialSkirmCredits,SkirmMatch,FogSkirm,SkillAuction,BenchmarkSeeds,MatchPredictions; e.g.
+ * ConfidentialSkirmCredits,SkirmMatch,FogSkirm,SkillAuction,BenchmarkSeeds,MatchPredictions,PrivateLadder; e.g.
  * `SkirmMatch` to add it next to an already deployed token, `FogSkirm` to add the Fog Skirm mode,
  * which takes no constructor arguments, `SkillAuction` to add the sealed-bid skill auctions,
- * `BenchmarkSeeds` to add the on-chain benchmark seeds, or `MatchPredictions` to add confidential
- * spectator predictions), CREDITS_OWNER (defaults to the
+ * `BenchmarkSeeds` to add the on-chain benchmark seeds, `MatchPredictions` to add confidential
+ * spectator predictions, or `PrivateLadder` to add the encrypted rating ladder), CREDITS_OWNER (defaults to the
  * deployer), FAUCET_AMOUNT (base units, 6 decimals; default 1,000 cSKIRM), FAUCET_COOLDOWN_SECONDS
  * (default 86400).
  *
@@ -33,6 +33,11 @@
  * the operator's result), PREDICTIONS_OPERATOR (opens, closes and resolves markets; default
  * MATCH_OPERATOR, else the deployer), TREASURY and PREDICTIONS_FEE_BPS (fee on the winnings, at most
  * 1000; default FEE_BPS, else 0).
+ *
+ * PrivateLadder takes SkirmMatch (as above: sealed matches are reported from its settlement),
+ * LADDER_OPERATOR (reports off-chain ranked matches and asks isCloseMatch; default MATCH_OPERATOR,
+ * else the deployer) and LADDER_MATCH_WINDOW (the rating gap isCloseMatch calls close, 25..1000;
+ * default 200).
  */
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { ethers, network } from "hardhat";
@@ -99,6 +104,16 @@ function constructorArgs(name: ContractName, deployer: HardhatEthersSigner, cont
         envAddress("PREDICTIONS_OPERATOR", envAddress("MATCH_OPERATOR", deployer.address)),
         envAddress("TREASURY", ethers.ZeroAddress),
         feeBps,
+      ];
+    }
+    case "PrivateLadder": {
+      const raw = process.env.LADDER_MATCH_WINDOW || 200;
+      const window = Number(raw);
+      if (!Number.isInteger(window) || window < 25 || window > 1000) throw new Error(`LADDER_MATCH_WINDOW: ${raw} is not 25..1000`);
+      return [
+        envAddress("SKIRM_MATCH_ADDRESS", contracts.SkirmMatch?.address ?? ethers.ZeroAddress),
+        envAddress("LADDER_OPERATOR", envAddress("MATCH_OPERATOR", deployer.address)),
+        window,
       ];
     }
   }
