@@ -5,9 +5,10 @@
  *   npm run deploy:sepolia -w @skirm/fhevm
  *
  * Env: SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY (required on Sepolia), and optionally
- * DEPLOY_CONTRACTS (comma list, default every contract: ConfidentialSkirmCredits,SkirmMatch,FogSkirm;
- * e.g. `SkirmMatch` to add it next to an already deployed token, or `FogSkirm` to add the Fog Skirm
- * mode, which takes no constructor arguments), CREDITS_OWNER (defaults to the
+ * DEPLOY_CONTRACTS (comma list, default every contract:
+ * ConfidentialSkirmCredits,SkirmMatch,FogSkirm,SkillAuction; e.g. `SkirmMatch` to add it next to an
+ * already deployed token, `FogSkirm` to add the Fog Skirm mode, which takes no constructor arguments,
+ * or `SkillAuction` to add the sealed-bid skill auctions), CREDITS_OWNER (defaults to the
  * deployer), FAUCET_AMOUNT (base units, 6 decimals; default 1,000 cSKIRM), FAUCET_COOLDOWN_SECONDS
  * (default 86400).
  *
@@ -16,6 +17,9 @@
  * signer that settles results; default the deployer; the server holds its key as
  * ZAMA_OPERATOR_PRIVATE_KEY), TREASURY (fee recipient; default none) and FEE_BPS (fee on the matched
  * pot in basis points, at most 1000; default 0).
+ *
+ * SkillAuction escrows cSKIRM bids, so it takes the same cSKIRM address, TREASURY and
+ * AUCTION_FEE_BPS (fee on the clearing price, at most 1000; default FEE_BPS, else 0).
  */
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { ethers, network } from "hardhat";
@@ -56,6 +60,14 @@ function constructorArgs(name: ContractName, deployer: HardhatEthersSigner, cont
     }
     case "FogSkirm":
       return [];
+    case "SkillAuction": {
+      const credits = envAddress("CREDITS_ADDRESS", contracts.ConfidentialSkirmCredits?.address ?? "");
+      if (!credits) throw new Error("SkillAuction needs cSKIRM: deploy ConfidentialSkirmCredits first or set CREDITS_ADDRESS");
+      const raw = process.env.AUCTION_FEE_BPS ?? process.env.FEE_BPS ?? 0;
+      const feeBps = Number(raw);
+      if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 1000) throw new Error(`AUCTION_FEE_BPS: ${raw} is not 0..1000`);
+      return [credits, envAddress("TREASURY", ethers.ZeroAddress), feeBps];
+    }
   }
 }
 
