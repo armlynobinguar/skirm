@@ -9,6 +9,7 @@ OpenZeppelin's [confidential contracts](https://github.com/OpenZeppelin/openzepp
 | --- | --- |
 | `ConfidentialSkirmCredits` (cSKIRM) | ERC-7984 confidential token for stakes and rewards. Balances and transfer amounts are FHE ciphertexts. Owner + approved minters (game contracts) can mint; a public faucet gives testers a fixed amount once per cooldown. |
 | `SkirmMatch` | Sealed PvP loadouts: each player commits its crew, skills and talk tiers as encrypted inputs; nobody can read them until both have locked, then both are revealed together with a KMS-verified public decryption. Lock deadline + forfeit. FHE randomness (seed, supply drops). Confidential cSKIRM stake escrow, settled by the game server with the match log hash anchored on chain. |
+| `FogSkirm` | Fog Skirm, a short two-player mode played fully on chain: scouts, traps, moves and a hidden seed vial stay ciphertexts; each round is resolved under FHE and only aggregate outcomes go public. See below. |
 
 ## Setup
 
@@ -222,14 +223,107 @@ so a live check covers what the revealed plaintexts alone prove. `?id=fixture-se
 `~wrong-seed`, `~wrong-drop`, `~wrong-crew`, `~wrong-log-hash`, `~edited-log`) shows the checks on a
 labelled fixture: a real engine match with the SkirmMatch record it would leave behind.
 
+## FogSkirm: Fog Skirm, a fully on-chain hidden-information mode
+
+A small game that only works with FHE. Two scouts on a 5×5 marsh; a seed vial is hidden somewhere
+in the middle row. Find it, carry it back to your home row, and avoid the two flood switches your
+rival planted on your side of the board where you cannot see them. Ten rounds, simultaneous moves,
+every move a transaction. Play it at `/fog` (apps/web `src/features/zama/fog`, behind
+`NEXT_PUBLIC_ZAMA_ENABLED`, linked from the PvP hub).
+
+**How to play.**
+
+1. *Create* (`createGame(opponent, moveWindow, trap0, trap1, proof)`): plant your two flood switches
+   (encrypted tile indices, one input proof), pick the move clock and optionally invite one address
+   (else the seat is open). Share the game id.
+2. *Join* (`joinGame(id, trap0, trap1, proof)`): the rival plants theirs. This transaction draws the
+   vial (`FHE.randEuint8() mod 5` on row 2) after both trap sets are committed, places both scouts on
+   their home rows and starts round 1.
+3. *Each round* both players `submitMove(id, direction, proof)`: an encrypted 0 stay, 1 north,
+   2 east, 3 south, 4 west. In the UI you click a glowing tile next to your scout. The second move
+   resolves the round under FHE in the same transaction.
+4. *Publish the outcome*: either client public-decrypts the three outcome handles through the relayer
+   and sends `finalizeRound(id, clear, proof)`; `FHE.checkSignatures` rejects forged values.
+5. The game ends when a carrier reaches its home row (winner), after round 10 (draw), or by
+   `claimTimeout` once the move deadline passes: the only player who moved wins, nobody moved is a
+   draw. `cancelGame` calls off a game nobody joined.
+
+**Rules** (resolved for both scouts at once, in this order; `packages/shared/src/fog-skirm.ts` is the
+same logic in TypeScript):
+
+| Step | Under FHE |
+| --- | --- |
+| Move | `FHE.select` on each direction and board edge: off the board or an unknown code means you stay. Positions are kept as encrypted row, column and tile. |
+| Trap | Your tile equals a live rival trap (`FHE.eq`): you are sent home, that trap is spent (set to 255) and a carried vial drops back to its tile. |
+| Tag | Both scouts on one tile knock the vial loose. |
+| Pickup | Alone on the vial tile while nobody carries it. Both arriving together: nobody gets it. |
+| Delivery | The carrier on its home row wins. |
+| Sense | Each player gets two pings: distance band to the vial and to the rival scout (Manhattan distance; 0 = on or next to you, 1 = 2–3 steps, 2 = 4+). |
+
+Traps are planted on the rival's half: side 0 on tiles 10–19 (rows 2–3), side 1 on tiles 5–14
+(rows 1–2). The contract cannot reject an out-of-band trap without revealing it, so it turns it into
+an inert 255 under FHE (the planter can see that when it decrypts its own traps).
+
+**What stays hidden, from whom.**
+
+| Value | Who can decrypt it during the game |
+| --- | --- |
+| Your traps (as planted and live) | You |
+| Your scout's tile, whether you carry the vial, whether you were just hit | You |
+| Your vial ping | You |
+| The rival ping (symmetric) | Both players |
+| Every move, both scouts' rows and columns, the vial | Nobody (only the contract's ACL) |
+| Per round: "a trap went off", "the vial is carried", winner | Everyone, after `finalizeRound` (KMS-verified) |
+
+When the game ends, `_end` makes every planted trap, the vial column, both final tiles and every
+move of every finalized round publicly decryptable (`revealHandles`, `GameRevealRequested`).
+`finalizeGameReveal` checks them against the KMS proof and stores them (`replay`, `GameRevealed`).
+**Verify this game** on the game-over screen replays that history with the shared rules and checks
+that every round's public outcome, the final positions and the winner match the chain.
+
+**Why a transparent chain breaks it.** Without FHE the traps would be in `createGame`'s calldata and
+in storage, so the rival reads them on a block explorer before moving; every position and move
+would be public, so there is no fog; and a vial drawn from public randomness is visible the moment it
+is drawn. Commit-reveal does not fix it either: resolving a round needs comparisons between hidden
+values every round (is my scout on your trap, on the vial, on your tile?), so someone would have to
+reveal to resolve, or trust a referee. Here the contract computes on ciphertexts, nobody knows the
+full board, and the public outcome comes with a proof.
+
+**Gas and HCU** (FHEVM mock, `npx hardhat test test/FogSkirm.ts` prints them; HCU limits per tx on
+the coprocessor: 20,000,000 total, 5,000,000 sequential depth):
+
+| Call | Gas | HCU | HCU depth |
+| --- | ---: | ---: | ---: |
+| `createGame` | 533,855 | 380,032 | 138,000 |
+| `joinGame` (draws the vial, first pings) | 1,771,699 | 3,721,640 | 931,000 |
+| `submitMove`, first of the round | 219,553 | 0 | 0 |
+| `submitMove`, second (resolves the round) | 2,853,642 | 6,955,652 | 1,006,000 |
+| `finalizeRound` | 142,180 | 0 | 0 |
+| `finalizeRound` that ends the game (opens up to 27 handles) | 991,939 | 0 | 0 |
+| `finalizeGameReveal` | 463,186 to 480,953 | 0 | 0 |
+
+The resolving move is the heaviest transaction: about 35% of the per-transaction HCU budget and 20%
+of the depth budget, and about 2.9 M gas, well under Sepolia's block gas limit. A full 10-round game
+is about 35 M gas across both players.
+
+**No stake.** Fog Skirm is unstaked for now: an escrow would add an operator approval and a payout
+path to every game, and the point of the mode is the hidden-information mechanic. cSKIRM stakes
+live in SkirmMatch.
+
+**Known limits.** The vial column is `randEuint8 mod 5`, so column 0 is drawn with probability
+52/256 and the others 51/256. A round that is resolved but not finalized has no timeout: anyone can
+send `finalizeRound`, so it only needs the relayer. Ping history is kept in the player's browser
+(the chain keeps the latest pings only). A spectator sees only the public outcomes until the end.
+
 ## Deploy to Sepolia
 
 ```bash
 npm run deploy:sepolia -w @skirm/fhevm
 ```
 
-This deploys `ConfidentialSkirmCredits` and `SkirmMatch` (or only the ones in `DEPLOY_CONTRACTS`,
-e.g. `DEPLOY_CONTRACTS=SkirmMatch` next to an already deployed token), records them in
+This deploys `ConfidentialSkirmCredits`, `SkirmMatch` and `FogSkirm` (or only the ones in
+`DEPLOY_CONTRACTS`, e.g. `DEPLOY_CONTRACTS=SkirmMatch` next to an already deployed token, or
+`DEPLOY_CONTRACTS=FogSkirm` to add Fog Skirm, which takes no constructor arguments), records them in
 `deployments/sepolia.json` (address, tx, block, constructor args; merged with what is already
 there) and regenerates `generated/index.ts`. Commit both files so the web and realtime pick up the
 addresses.
@@ -243,6 +337,7 @@ deployed before it must be redeployed (`DEPLOY_CONTRACTS=SkirmMatch` keeps the t
 ```bash
 npx hardhat verify --network sepolia <creditsAddress> <owner> <faucetAmount> <faucetCooldown>
 npx hardhat verify --network sepolia <matchAddress> <creditsAddress> <operator> <treasury> <feeBps>
+npx hardhat verify --network sepolia <fogAddress>
 ```
 
 ## Address + ABI export
@@ -261,6 +356,6 @@ npm run export -w @skirm/fhevm
 ```
 
 The web reads the addresses from there, unless `NEXT_PUBLIC_ZAMA_CREDITS_ADDRESS` /
-`NEXT_PUBLIC_ZAMA_MATCH_ADDRESS` override them (realtime: `ZAMA_MATCH_ADDRESS`), and
+`NEXT_PUBLIC_ZAMA_MATCH_ADDRESS` / `NEXT_PUBLIC_ZAMA_FOG_ADDRESS` override them (realtime: `ZAMA_MATCH_ADDRESS`), and
 shows the cSKIRM card on /account/credits only when `NEXT_PUBLIC_ZAMA_ENABLED=1`
 (client code: `apps/web/src/lib/zama`, UI: `apps/web/src/features/zama`).
