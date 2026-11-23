@@ -168,6 +168,8 @@ export interface OnchainBenchmark {
   scoreBps: number | null;
   /** The revealed seed (decimal), once finalized. */
   seed: string | null;
+  /** True when the seed was forced open after the deadline (no results were posted). */
+  forced?: boolean;
   commitTx: string | null;
   publishTx: string | null;
   finalizeTx: string | null;

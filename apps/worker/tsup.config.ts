@@ -15,7 +15,9 @@ export default defineConfig({
   noExternal: [/^@skirm\//, /^drizzle-orm/],
   // Google Cloud SDKs (the KMS vault in @skirm/server) load protos and JSON from
   // their package dirs, so they stay external and resolve from the root node_modules at runtime.
-  external: [/^@google-cloud\//],
+  // The Zama relayer SDK's node build loads its WASM (TFHE, KMS) from its package dir the same way, and
+  // is imported lazily only when benchmark seeds are on chain.
+  external: [/^@google-cloud\//, /^@zama-fhe\//],
   // CommonJS deps bundled into ESM (pg via drizzle, bullmq, ioredis) call require(); give them one.
   banner: {
     js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);",

@@ -4,6 +4,7 @@ import type { Repos } from '@skirm/db';
 import type { V2Brain } from '@skirm/decision-engine/v2';
 import type {
   BenchmarkJobData,
+  BenchmarkSeeder,
   RegistryJobData,
   Registry,
   SeasonsChain,
@@ -44,6 +45,11 @@ export interface WorkerDeps {
   benchmarkQueue: BenchmarkQueue;
   /** HMAC key for the hidden benchmark picks (BENCH_SECRET; default 'skirm-bench'). */
   benchSecret?: string;
+  /**
+   * BenchmarkSeeds as the operator (ZAMA_ENABLED, deployed, ZAMA_OPERATOR_PRIVATE_KEY): benchmark seeds
+   * drawn on chain. Absent or null: the keyed-hash seeds from benchSecret.
+   */
+  benchmarkSeeder?: BenchmarkSeeder | null;
   clock: Clock;
   logger: Logger;
 }

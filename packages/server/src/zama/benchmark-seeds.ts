@@ -14,8 +14,8 @@
 // sepolia.json, via @skirm/fhevm/generated), ZAMA_RELAYER_URL (default: the SDK's Sepolia relayer).
 // The key is never logged.
 import { BenchmarkSeedsAbi, sepolia } from '@skirm/fhevm/generated';
-import { benchmarkSeedStatus, type BenchmarkSeedStatus } from '@skirm/shared';
-import { Contract, JsonRpcProvider, Wallet } from 'ethers';
+import { benchmarkSeedStatus, resultsHashPreimage, type BenchmarkSeedStatus } from '@skirm/shared';
+import { Contract, JsonRpcProvider, Wallet, keccak256 } from 'ethers';
 import { OPERATOR_KEY_RE } from './settlement';
 import { zamaServerConfig, type ZamaServerConfig } from './sealed-match';
 
@@ -62,6 +62,11 @@ export function parseChainBenchmark(
     resultsHash: String(b.resultsHash).toLowerCase(),
     seed: status === 'revealed' ? BigInt(b.seed).toString() : null,
   };
+}
+
+/** keccak256 of the match log heads in play order: the resultsHash the operator posts. */
+export function benchmarkResultsHash(logHashes: readonly string[]): string {
+  return keccak256(resultsHashPreimage(logHashes));
 }
 
 /** A prompt sha256 (hex, 0x optional) as the bytes32 commit takes; throws on anything else. */
