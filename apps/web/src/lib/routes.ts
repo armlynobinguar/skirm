@@ -45,6 +45,8 @@ export const routes = {
   replay: (shareId: string) => `/replays/${e(shareId)}`,
   /** Check a match against the NEAR registry in the browser (`?id=` prefills and runs it). Public. */
   verify: (matchId?: string) => `/verify${matchId ? `?id=${e(matchId)}` : ''}`,
+  /** Fog Skirm (Zama, Sepolia): the lobby, or one game by its on-chain id (`?game=`). */
+  fog: (gameId?: string) => `/fog${gameId ? `?game=${e(gameId)}` : ''}`,
   leaderboards: () => '/leaderboards', // S14
   /** The docs site: the landing page, or one page by its slug (src/features/docs/content/<slug>.md). */
   docs: (slug?: string) => (slug ? `/docs/${e(slug)}` : '/docs'),
@@ -67,7 +69,7 @@ export function navGroupOf(pathname: string): NavGroup | null {
   if (/^\/(play|maps|agents|tutorial|daily|campaign|puzzles)(\/|$)/.test(pathname)) return 'play';
   if (/^\/skills(\/|$)/.test(pathname)) return 'skills';
   if (/^\/(market|backing)(\/|$)/.test(pathname)) return 'market';
-  if (/^\/(pvp|matches|lobbies|tournaments)(\/|$)/.test(pathname)) return 'pvp';
+  if (/^\/(pvp|matches|lobbies|tournaments|fog)(\/|$)/.test(pathname)) return 'pvp';
   if (/^\/leaderboards(\/|$)/.test(pathname)) return 'leaderboards';
   if (/^\/docs(\/|$)/.test(pathname)) return 'docs';
   if (/^\/account(\/|$)/.test(pathname)) return 'account';
@@ -103,6 +105,7 @@ const SCREENS: { re: RegExp; key: string; title: string; sub: string; back: stri
   { re: /^\/tournaments\/?$/, key: 'tournaments', title: 'Tournaments', sub: '// brackets', back: routes.pvp() },
   { re: /^\/tournaments\//, key: 'tournament', title: 'Bracket', sub: '// single elimination', back: routes.tournaments() },
   { re: /^\/replays\/[^/]+\/?$/, key: 'replay', title: 'Replay', sub: '// shared', back: routes.pvp() },
+  { re: /^\/fog\/?$/, key: 'fog', title: 'Fog Skirm', sub: '// hidden on chain', back: routes.pvp() },
   { re: /^\/verify\/?$/, key: 'verify', title: 'Verify', sub: '// match vs NEAR', back: routes.pvp() },
   { re: /^\/matches\/[^/]+\/result\/?$/, key: 'match-result', title: 'Debrief', sub: '// replay hash on NEAR', back: routes.pvp() },
   { re: /^\/matches(\/|$)/, key: 'match', title: 'Live', sub: '// 2 s ticks', back: routes.pvp() },

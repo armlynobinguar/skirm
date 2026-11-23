@@ -18,6 +18,7 @@ skirm has modes for learning, for solo challenges and for playing other people. 
 | Private lobby | [/lobbies](/lobbies) | A friend | No |
 | Tournament | [/tournaments](/tournaments) | A bracket of players | No |
 | Ranked | [/pvp](/pvp) | A player | Yes |
+| Fog Skirm (Zama, Sepolia) | [/fog](/fog) | A player, fully on chain | No |
 
 ## Against the bot
 
@@ -97,6 +98,19 @@ Single-elimination brackets of 4, 8 or 16 players at [/tournaments](/tournaments
 ### Ranked
 
 The competitive ladder from the PvP hub. Normal difficulty, Standard talk, the default model and the original six roles. Results change your Elo, earn season points and are recorded on-chain on testnet. See [Ranked and seasons](/docs/ranked-and-seasons).
+
+### Fog Skirm (Zama, Sepolia)
+
+A short duel played entirely on the FogSkirm contract on Sepolia, where FHE keeps the hidden information hidden. It is on when the site runs with Zama enabled, and the PvP hub links to it.
+
+- **The board.** A 5×5 marsh with your home row at the bottom and the rival's at the top. A seed vial is hidden somewhere in the middle row. The contract draws it with on-chain FHE randomness after both players have planted their traps, and nobody can decrypt it.
+- **Setup.** Plant two flood switches on the rival's side of the board when you create or join a game. They are encrypted in your browser. Only you ever see them.
+- **Rounds.** Up to 10. Both players move at the same time: click a tile next to your scout and the move is encrypted and sent. A move off the board means you stay. When both moves are in, the contract resolves the round on ciphertexts. If you land on a rival flood switch, you are washed home and drop the vial. Two scouts on one tile knock the vial loose. A scout alone on the vial tile picks it up. Carry it to your home row to win.
+- **The fog.** After each round only you can decrypt your scout and two sense pings: how far the vial is and how far the rival is (🟢 next to you, 🟡 2-3 steps, ⚪ 4 or more). Only three facts go public, each checked against a decryption proof: a trap went off, the vial is carried, and who won.
+- **Timeouts.** If your rival does not move before the clock runs out, claim the win.
+- **Verify this game.** When it ends, every trap, the vial and every move become public. The game-over screen replays the whole game with the same rules and checks it against the chain.
+
+On a transparent chain this game cannot exist. The traps would sit in the transaction data for the rival to read, and every position would be public.
 
 ## Watching and testing
 

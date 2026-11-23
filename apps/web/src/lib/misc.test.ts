@@ -12,6 +12,7 @@ describe('routes', () => {
     expect(navGroupOf(routes.editSkill('skl_1'))).toBe('skills');
     expect(navGroupOf(routes.marketSkill('skl_1'))).toBe('market');
     expect(navGroupOf(routes.match('mat_1'))).toBe('pvp');
+    expect(navGroupOf(routes.fog())).toBe('pvp');
     expect(navGroupOf(routes.credits())).toBe('account');
     expect(navGroupOf(routes.docs())).toBe('docs');
     expect(navGroupOf(routes.docs('quickstart'))).toBe('docs');
@@ -33,6 +34,9 @@ describe('routes', () => {
     expect(routes.crew('copper-hollow', 'hard')).toBe('/maps/copper-hollow/crew?d=hard');
     expect(routes.match('mat_1')).toBe('/matches/mat_1');
     expect(routes.matchResult('mat_1')).toBe('/matches/mat_1/result');
+    expect(routes.fog()).toBe('/fog');
+    expect(routes.fog('7')).toBe('/fog?game=7');
+    expect(screenOf(routes.fog())).toMatchObject({ key: 'fog', title: 'Fog Skirm', back: '/pvp' });
     expect(screenOf('/')).toBeNull();
   });
 });
