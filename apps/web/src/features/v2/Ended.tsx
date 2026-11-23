@@ -26,6 +26,7 @@ import { useApi } from '@/lib/services';
 import { HighlightClip } from '../replays/HighlightClip';
 import { ReplayPanel } from '../replays/ReplayPanel';
 import { VerifyPanel } from '../verify/VerifyPanel';
+import { ZamaVerifyRoundSlot } from '../verify/ZamaVerifySlot';
 import { ZamaRandomnessSlot } from '../zama/randomness/ZamaRandomnessSlot';
 import { ZamaStakeSlot } from '../zama/stakes/ZamaStakeSlot';
 import { PracticeBadge, other } from './common';
@@ -327,6 +328,7 @@ function Debrief({
         <HighlightClip matchId={data.matchId} team={me} watch={watch} handles={data.handles} onReplay={onReplay} replayHref={replayHref} />
       ) : null}
       {data.status === 'ended' ? <VerifyPanel matchId={data.matchId} onchain={data.ranked} /> : null}
+      {data.status === 'ended' ? <ZamaVerifyRoundSlot matchId={data.matchId} /> : null}
       {data.status === 'ended' ? <ZamaRandomnessSlot matchId={data.matchId} mapId={data.mapId} team={watch ? null : me} mode="debrief" /> : null}
       {/* Sealed stakes: a void match settles too (a refund), so this is not limited to ended ones. */}
       <ZamaStakeSlot matchId={data.matchId} team={watch ? null : me} />
