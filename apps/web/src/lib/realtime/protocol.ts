@@ -110,7 +110,9 @@ export type V2ClientMessage =
   | { type: 'v2_accept'; matchId: string }
   | { type: 'v2_decline'; matchId: string }
   /** `tiers` is per queued agent; `crew`, when sent, replaces the queued crew (up to `crewLimit`) and its tiers win. */
-  | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[]; playbookId?: string | null }
+  | { type: 'v2_lock_in'; matchId: string; tiers: TalkTier[]; crew?: V2CrewEntry[]; playbookId?: string | null; sealed?: true }
+  /** Sealed loadouts (Zama): this player seals its crew on SkirmMatch from the EVM `address`. */
+  | { type: 'v2_seal'; matchId: string; address: string }
   /** Every stored frame of an ended match (answered with v2_frames), for replay at another speed. */
   | { type: 'v2_replay'; matchId: string }
   /** Readies a crew in a private lobby; the match starts once both players have. v2_cancel_queue steps back. */
@@ -147,6 +149,8 @@ export type V2ServerMessage =
   /** `crewLimit`: most agents this map takes; `headStartTicks`: each crew's hold with the crews as they stand. */
   | ({ type: 'v2_lockin'; matchId: string; lockMs: number; rival: { agents: number }; crewLimit?: number; headStartTicks?: Record<Team, number> } & V2PracticeFlags)
   | { type: 'v2_locked'; matchId: string; team: Team }
+  /** Sealed loadouts: `team` is sealing its crew on chain (its picks stay hidden). */
+  | { type: 'v2_sealing'; matchId: string; team: Team }
   | { type: 'v2_start'; matchId: string; team: Team; rival: { handle: string }; tickMs: number; holdTicks: Record<Team, number> }
   | { type: 'v2_frame'; matchId: string; frame: V2Frame }
   | { type: 'v2_end'; matchId: string; result: MatchResult | null; reason: V2EndReason; logHash: string | null; debrief?: V2Debrief }

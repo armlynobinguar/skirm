@@ -23,6 +23,7 @@ import { useToast } from '@/components/toast/ToastProvider';
 import { qk, useMe } from '@/lib/api/queries';
 import type { OutgoingMessage } from '@/lib/realtime/client';
 import { useApi, useRealtime } from '@/lib/services';
+import { ZamaSealSlot } from '@/features/zama/sealed/ZamaSealSlot';
 import { PracticeBadge, other } from './common';
 import type { V2MatchView } from './v2Store';
 
@@ -48,9 +49,12 @@ export function LockIn({ view }: { view: V2MatchView }) {
   const [crew, setCrew] = useState<string[]>(() => queued.map((a) => a.agentId));
   const [tiers, setTiers] = useState<Record<string, TalkTier>>(() => Object.fromEntries(queued.map((a) => [a.agentId, a.tier])));
   const [sent, setSent] = useState(false);
+  /** Sealing on Sepolia (NEXT_PUBLIC_ZAMA_ENABLED): the crew is frozen and the sealed panel locks it in. */
+  const [sealing, setSealing] = useState(false);
   const playbooks = usePlaybooks(!!me.data);
   const [playbook, setPlaybook] = useState<string | null | undefined>(undefined);
   const locked = view.locked.includes(view.team) || sent;
+  const frozen = locked || sealing;
   const nameOf = (id: string) => byId.get(id)?.name ?? queued.find((a) => a.agentId === id)?.name ?? 'Agent';
   const tierOf = (id: string): TalkTier => (view.ranked ? 'standard' : (tiers[id] ?? 'standard'));
   /** The model an agent was queued with, when not the default (ranked plays the default). */
@@ -129,7 +133,7 @@ export function LockIn({ view }: { view: V2MatchView }) {
         <div className={c.squad}>
           {Array.from({ length: Math.max(limit, crew.length) }, (_, i) => {
             const id = crew[i];
-            if (!id) return <EmptySlot key={`empty-${i}`} index={i} onAdd={focusRoster} disabled={locked || !agents.length} />;
+            if (!id) return <EmptySlot key={`empty-${i}`} index={i} onAdd={focusRoster} disabled={frozen || !agents.length} />;
             const a = byId.get(id);
             return (
               <CrewCard
@@ -139,7 +143,7 @@ export function LockIn({ view }: { view: V2MatchView }) {
                 map={map}
                 tier={tierOf(id)}
                 ranked={view.ranked}
-                disabled={locked}
+                disabled={frozen}
                 skillMine={mine(a?.skills[0]?.id)}
                 onTier={(t) => setTiers((p) => ({ ...p, [id]: t }))}
                 onRemove={agents.length ? () => remove(id) : undefined}
@@ -149,7 +153,7 @@ export function LockIn({ view }: { view: V2MatchView }) {
             );
           })}
         </div>
-        {agents.length ? <RosterStrip agents={agents} picked={crew} onToggle={toggle} disabled={locked} testPrefix="v2" /> : null}
+        {agents.length ? <RosterStrip agents={agents} picked={crew} onToggle={toggle} disabled={frozen} testPrefix="v2" /> : null}
       </div>
 
       <aside className={c.side}>
@@ -159,7 +163,14 @@ export function LockIn({ view }: { view: V2MatchView }) {
             <GoalBox map={map} di={diffIndex(difficulty)} lock={view.ranked} />
           </div>
         ) : null}
-        <PlaybookPicker value={playbook} onChange={setPlaybook} disabled={locked} />
+        <PlaybookPicker value={playbook} onChange={setPlaybook} disabled={frozen} />
+        <ZamaSealSlot
+          view={view}
+          picks={crew.map((id) => ({ agentId: id, tier: tierOf(id) }))}
+          roster={agents}
+          playbookPick={() => playbookChange(playbooks.data, playbook)}
+          onSealing={setSealing}
+        />
         <CreditEstimate ticks={ticks} rates={rates} hold={hold}>
           <span className={c.formula} data-testid="v2-hold">
             {view.free
@@ -178,6 +189,8 @@ export function LockIn({ view }: { view: V2MatchView }) {
             <span className="sk-kick">
               Locked · {rivalLocked ? 'starting…' : 'waiting for the rival'}
             </span>
+          ) : sealing ? (
+            <span className="sk-kick">🔒 Sealing on Sepolia · the crew locks in once both are revealed</span>
           ) : (
             <Button variant="primary" size="lg" block onClick={lock} disabled={!crew.length && !!agents.length} data-testid="v2-lock">
               Lock in ▸
