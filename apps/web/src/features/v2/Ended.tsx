@@ -28,6 +28,7 @@ import { ReplayPanel } from '../replays/ReplayPanel';
 import { VerifyPanel } from '../verify/VerifyPanel';
 import { ZamaVerifyRoundSlot } from '../verify/ZamaVerifySlot';
 import { ZamaRandomnessSlot } from '../zama/randomness/ZamaRandomnessSlot';
+import { ZamaPredictionClaimSlot } from '../zama/predictions/ZamaPredictionSlots';
 import { ZamaStakeSlot } from '../zama/stakes/ZamaStakeSlot';
 import { PracticeBadge, other } from './common';
 import { BanList } from './Draft';
@@ -332,6 +333,8 @@ function Debrief({
       {data.status === 'ended' ? <ZamaRandomnessSlot matchId={data.matchId} mapId={data.mapId} team={watch ? null : me} mode="debrief" /> : null}
       {/* Sealed stakes: a void match settles too (a refund), so this is not limited to ended ones. */}
       <ZamaStakeSlot matchId={data.matchId} team={watch ? null : me} />
+      {/* Spectator predictions: a wallet that predicted claims its sealed payout (a void match refunds). */}
+      <ZamaPredictionClaimSlot matchId={data.matchId} names={{ A: nameOf('A'), B: nameOf('B') }} />
       {data.status === 'ended' ? <ReplayPanel matchId={data.matchId} ticks={r.ticks} canShare={!watch} /> : null}
       {data.comms ? <Transcript lines={data.comms} team={me} watch={watch} /> : null}
       {!watch && data.status === 'ended' ? <Decisions matchId={data.matchId} /> : null}
