@@ -132,6 +132,7 @@ describe('market proof', () => {
       manipulationRate: 2 / 3,
       score: expect.closeTo(0.6, 5),
       needsModel: false,
+      onchain: null,
     });
     expect(x.ranked).toEqual({
       matches: 1,
@@ -158,6 +159,43 @@ describe('market proof', () => {
     expect(z.benchmark).toMatchObject({ status: 'queued', score: null, needsModel: false });
     expect(z.ranked).toEqual({ matches: 0, wins: 0, losses: 0, draws: 0, perMap: [] });
     expect(z.counters).toEqual({ vs: [] });
+  });
+
+  it('a benchmark with seeds drawn on chain shows the seed record and the played picks and log hashes', async () => {
+    const logged = GAUNTLET.map((r, i) => ({ ...r, logHash: String(i).repeat(64) }));
+    const onchain = {
+      contract: '0x00000000000000000000000000000000000000bb',
+      skillRef: `0x${'1'.repeat(64)}`,
+      promptHash: `0x${'2'.repeat(64)}`,
+      status: 'revealed' as const,
+      resultsHash: `0x${'3'.repeat(64)}`,
+      scoreBps: 6000,
+      seed: '12345',
+      commitTx: '0xc0',
+      publishTx: '0xp0',
+      finalizeTx: '0xf0',
+    };
+    await h.repos.proof.finishBenchmark(Z, 1, {
+      brain: 'model',
+      matches: 6,
+      wins: 4,
+      losses: 2,
+      draws: 0,
+      deliveries: 30,
+      leaks: 0,
+      manipulations: 0,
+      score: 0.6,
+      results: logged,
+      onchain,
+    });
+    const z = (await buyer.get(`/market/${Z}`)).body;
+    expect(z.benchmark.onchain).toEqual({
+      ...onchain,
+      played: logged.map(({ mapId, difficulty, hijack, logHash }) => ({ mapId, difficulty, hijack, logHash })),
+    });
+    const cards = (await buyer.get('/market')).body as { skill: { id: string }; benchmarkSeeds: string | null }[];
+    expect(cards.find((c) => c.skill.id === Z)?.benchmarkSeeds).toBe('revealed');
+    expect(cards.find((c) => c.skill.id === X)?.benchmarkSeeds).toBeNull();
   });
 });
 
