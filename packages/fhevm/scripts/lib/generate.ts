@@ -23,6 +23,8 @@ export async function writeGeneratedModule(): Promise<string> {
     "export interface FhevmNetwork {",
     "  chainId: number;",
     "  contracts: Record<ContractName, `0x${string}` | null>;",
+    "  /** Block each contract was deployed in (null when unknown): where event scans can start. */",
+    "  deployBlocks?: Record<ContractName, number | null>;",
     "}",
     "",
   ];
@@ -32,9 +34,12 @@ export async function writeGeneratedModule(): Promise<string> {
     const contracts = Object.fromEntries(
       EXPORTED_CONTRACTS.map((name) => [name, deployed?.contracts[name]?.address ?? null]),
     );
+    const deployBlocks = Object.fromEntries(
+      EXPORTED_CONTRACTS.map((name) => [name, deployed?.contracts[name]?.blockNumber ?? null]),
+    );
     const chainId = deployed?.chainId ?? (network === "sepolia" ? 11155111 : 0);
     lines.push(
-      `export const ${network}: FhevmNetwork = ${JSON.stringify({ chainId, contracts }, null, 2)};`,
+      `export const ${network}: FhevmNetwork = ${JSON.stringify({ chainId, contracts, deployBlocks }, null, 2)};`,
       "",
     );
   }

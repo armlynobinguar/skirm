@@ -3,7 +3,9 @@
 // (no account needed). `?id=` prefills and runs it, so a check can be shared as a link. "Try a
 // recent match" lists the latest ranked matches recorded on NEAR (GET /v2/matches/recorded), so a
 // visitor without an id of their own has one to check; with none recorded yet it falls back to
-// NEXT_PUBLIC_SAMPLE_MATCH_ID, and says so plainly when there is neither.
+// NEXT_PUBLIC_SAMPLE_MATCH_ID, and says so plainly when there is neither. With Zama on, a sealed
+// round also gets the Sepolia check (ZamaVerifySlot), and `?id=fixture-sealed-round` shows that
+// check on a labelled fixture (no NEAR panel: the api has no such match).
 import { Button } from '@skirm/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -14,8 +16,11 @@ import type { V2RecordedMatch } from '@/lib/api/types';
 import { config } from '@/lib/config';
 import { routes } from '@/lib/routes';
 import { useApi } from '@/lib/services';
+import { zamaConfig } from '@/lib/zama/config';
+import { fixtureVariant, SEALED_FIXTURE_ID } from './sealedFixture';
 import { VerifyPanel } from './VerifyPanel';
 import s from './verify.module.css';
+import { ZamaVerifySlot } from './ZamaVerifySlot';
 
 /** A pasted id, a match URL (`/matches/<id>…`) or a verify link; the id alone, trimmed. */
 export function matchIdFrom(input: string): string {
@@ -91,7 +96,16 @@ function VerifyForm() {
           No ranked match is recorded on NEAR yet. The first ranked results will be listed here to check.
         </p>
       ) : null}
-      {current ? <VerifyPanel key={current} matchId={current} showPageLink={false} auto /> : null}
+      {zamaConfig.enabled && !current ? (
+        <p className={s.sample} data-testid="verify-sealed-fixture">
+          <span>Sealed rounds (Zama, Sepolia) get a second check of seed, drops, crews and log hash.</span>
+          <Button size="sm" variant="secondary" onClick={() => pick(SEALED_FIXTURE_ID)}>
+            See it on a fixture
+          </Button>
+        </p>
+      ) : null}
+      {current && !(zamaConfig.enabled && fixtureVariant(current)) ? <VerifyPanel key={current} matchId={current} showPageLink={false} auto /> : null}
+      {current ? <ZamaVerifySlot key={`sealed-${current}`} matchId={current} /> : null}
     </div>
   );
 }

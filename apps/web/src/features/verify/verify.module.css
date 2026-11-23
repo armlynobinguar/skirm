@@ -44,3 +44,18 @@
 .form input { padding: 8px 10px; color: var(--text); background: rgba(9, 15, 23, .8); border: 1px solid var(--line); font: 400 13px/18px var(--font-mono); }
 .intro { margin: 0; color: var(--text); }
 .sample { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font: 400 12px/16px var(--font-mono); color: var(--muted); }
+
+/* Verify a sealed round on Sepolia (SealedVerify.tsx). */
+.fixture { margin: 0; padding: 8px 12px; border: 1px dashed var(--amber); color: var(--text); font: 400 13px/18px var(--font-body, inherit); }
+.fixture b { color: var(--amber); text-transform: uppercase; }
+.sample a[aria-current] { color: var(--text); font-weight: 700; }
+.sealedChecks { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.sealedChecks > li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; }
+.sealedMark { font-size: 18px; line-height: 22px; }
+.sealedDetail { margin: 2px 0 4px; color: var(--text); }
+.sealedChecks details { font: 400 12px/16px var(--font-mono); color: var(--muted); }
+.sealedChecks summary { cursor: pointer; }
+.sealedWhy { margin: 4px 0 0; color: var(--text); font: 400 13px/18px var(--font-body, inherit); }
+.sealedLines { display: grid; gap: 2px; margin: 6px 0 0; padding: 0; list-style: none; }
+.sealedLines code { overflow-wrap: anywhere; font: 400 12px/16px var(--font-mono); color: var(--muted); }
+.sealedChecks > li[data-state='fail'] b { color: var(--rival); }
