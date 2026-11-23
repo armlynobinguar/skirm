@@ -18,7 +18,7 @@ export interface NetworkDeployments {
 }
 
 /** Contracts whose ABI is exported to the web, in the order they appear in the generated module. */
-export const EXPORTED_CONTRACTS = ["ConfidentialSkirmCredits", "SkirmMatch", "FogSkirm", "SkillAuction"] as const;
+export const EXPORTED_CONTRACTS = ["ConfidentialSkirmCredits", "SkirmMatch", "FogSkirm", "SkillAuction", "BenchmarkSeeds"] as const;
 
 /** Networks whose deployment file feeds the generated module. */
 export const EXPORTED_NETWORKS = ["sepolia"] as const;
