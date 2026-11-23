@@ -5,8 +5,9 @@
  *   npm run deploy:sepolia -w @skirm/fhevm
  *
  * Env: SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY (required on Sepolia), and optionally
- * DEPLOY_CONTRACTS (comma list, default every contract: ConfidentialSkirmCredits,SkirmMatch; e.g.
- * `SkirmMatch` to add it next to an already deployed token), CREDITS_OWNER (defaults to the
+ * DEPLOY_CONTRACTS (comma list, default every contract: ConfidentialSkirmCredits,SkirmMatch,FogSkirm;
+ * e.g. `SkirmMatch` to add it next to an already deployed token, or `FogSkirm` to add the Fog Skirm
+ * mode, which takes no constructor arguments), CREDITS_OWNER (defaults to the
  * deployer), FAUCET_AMOUNT (base units, 6 decimals; default 1,000 cSKIRM), FAUCET_COOLDOWN_SECONDS
  * (default 86400).
  *
@@ -53,6 +54,8 @@ function constructorArgs(name: ContractName, deployer: HardhatEthersSigner, cont
       if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 1000) throw new Error(`FEE_BPS: ${process.env.FEE_BPS} is not 0..1000`);
       return [credits, envAddress("MATCH_OPERATOR", deployer.address), envAddress("TREASURY", ethers.ZeroAddress), feeBps];
     }
+    case "FogSkirm":
+      return [];
   }
 }
 
