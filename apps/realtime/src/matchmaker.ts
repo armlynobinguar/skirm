@@ -23,6 +23,8 @@ export interface MatchmakerHooks<T> {
   pair(a: QueueEntry<T>, b: QueueEntry<T>): void;
   /** Whether two pools may pair; default: only equal pools. */
   pools?(a: string | undefined, b: string | undefined): boolean;
+  /** An extra veto on a pair that fits on Elo (default: none). */
+  allowPair?(a: QueueEntry<T>, b: QueueEntry<T>): boolean;
 }
 
 const samePool = (a?: string, b?: string) => a === b;
@@ -69,6 +71,15 @@ export class Matchmaker<T> {
     return e;
   }
 
+  /**
+   * Puts a search that was paired and then sent back into the queue with its original enqueuedAt, so
+   * its Elo range keeps widening from where it was. Does not pair at once (the next pass does).
+   */
+  restore(entry: QueueEntry<T>): void {
+    if (this.entries.has(entry.key)) throw new Error(`already queued: ${entry.key}`);
+    this.entries.set(entry.key, entry);
+  }
+
   remove(key: string): QueueEntry<T> | undefined {
     const e = this.entries.get(key);
     if (e) this.entries.delete(key);
@@ -96,6 +107,7 @@ export class Matchmaker<T> {
         if (c === e || taken.has(c.key) || c.lane !== e.lane || !(this.hooks.pools ?? samePool)(c.pool, e.pool)) continue;
         const gap = Math.abs(c.rating - e.rating);
         if (gap > Math.min(re, this.rangeOf(c, now))) continue;
+        if (this.hooks.allowPair && !this.hooks.allowPair(e, c)) continue;
         if (gap < bestGap) {
           best = c;
           bestGap = gap;
