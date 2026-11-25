@@ -30,6 +30,7 @@ import {
   type RevealedPrediction,
 } from './predictions';
 import s from './predictions.module.css';
+import { SealBadge, WhoCanSee } from '@/features/zama/privacy/WhoCanSee';
 
 export interface PredictPanelProps {
   matchId: string;
@@ -146,11 +147,14 @@ export function PredictPanel({ matchId, tick, names, api: injected, contract: fi
   return (
     <div className={`sk-panel ${s.live}`} data-testid="zama-predict-panel">
       <div className={s.head}>
-        <span className={s.title}>Predict 🔒</span>
+        <span className={s.title}>
+          Predict <SealBadge state="sealed">sealed</SealBadge>
+        </span>
         <span className={s.muted} data-testid="zama-predict-count">
           {sealedPredictionsLabel(market.predictors)}
         </span>
       </div>
+      <WhoCanSee topic="predictions" />
 
       {phase === 'open' ? (
         <>

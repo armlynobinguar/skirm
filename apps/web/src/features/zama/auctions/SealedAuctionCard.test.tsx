@@ -1,4 +1,4 @@
-// The "Sealed auction 🔒" card with the chain, wallet and relayer faked: countdown and a bid count
+// The "🔒 Sealed auction" card with the chain, wallet and relayer faked: countdown and a bid count
 // (never an amount), a bid that is encrypted before it is sent, the caller's own bid revealed on
 // demand, then the winner and price, and the loser's confidential refund.
 import { render, screen, waitFor } from '@testing-library/react';
@@ -92,7 +92,7 @@ describe('SealedAuctionCard', () => {
     render(<SealedAuctionCard card={card} contract={CONTRACT} api={api} address={ME} />);
     expect(await screen.findByTestId('zama-auction-bids')).toHaveTextContent('3 sealed bids');
     expect(screen.getByTestId('zama-auction-countdown')).toHaveTextContent(/⏱ (59m|1h 00m)/);
-    expect(screen.getByTestId('zama-auction-card')).toHaveTextContent('reserve sealed 🔒');
+    expect(screen.getByTestId('zama-auction-card')).toHaveTextContent('🔒 reserve sealed');
 
     await userEvent.type(screen.getByTestId('zama-auction-amount'), '12.5');
     await userEvent.click(screen.getByTestId('zama-auction-bid'));

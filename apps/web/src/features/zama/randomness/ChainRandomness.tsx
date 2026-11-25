@@ -30,6 +30,7 @@ import {
   type RevealTxs,
 } from './randomness';
 import s from './randomness.module.css';
+import { SealBadge, WhoCanSee } from '@/features/zama/privacy/WhoCanSee';
 
 export interface ChainRandomnessProps {
   matchId: string;
@@ -203,7 +204,7 @@ export function ChainRandomness({ matchId, mapId, team, mode, seed: announced, a
                     ) : null}
                   </>
                 ) : (
-                  <span className={s.muted}>🔒 {k === firstSealed ? (unused ? 'next draw' : 'next drop') : unused ? 'draw' : 'drop'}: encrypted</span>
+                  <SealBadge state="sealed">{k === firstSealed ? (unused ? 'next draw' : 'next drop') : unused ? 'draw' : 'drop'}: encrypted</SealBadge>
                 )}
               </li>
             );
@@ -212,6 +213,7 @@ export function ChainRandomness({ matchId, mapId, team, mode, seed: announced, a
       ) : (
         <p className={s.muted}>This map has no supply drops.</p>
       )}
+      <WhoCanSee topic="randomness" />
       {step ? <p className={s.muted}>{step}</p> : null}
       {error ? (
         <p className={s.error} role="alert">

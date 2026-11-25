@@ -16,6 +16,7 @@ import { explorerUrl, readOnlyRunner } from '@/features/zama/randomness/randomne
 import { matchAddress, sealedMatchKey, sideOf } from '@/features/zama/sealed/sealed';
 import { revealPayout, stakesApi, type ChainEscrow, type ChainSettlement, type Payout, type StakesApi } from './stakes';
 import s from './stakes.module.css';
+import { SealBadge, WhoCanSee } from '@/features/zama/privacy/WhoCanSee';
 
 export interface StakePayoutProps {
   matchId: string;
@@ -110,7 +111,9 @@ export function StakePayout({ matchId, team, api: injected }: StakePayoutProps) 
               return (
                 <li key={t} data-testid={`zama-stake-ok-${t}`}>
                   <span>{team === t ? 'You' : team ? 'Rival' : `Team ${t}`}</span>
-                  <span className={ok ? s.ok : s.bad}>{ok ? '🔒 stake counted' : '🔒 stake did not count'}</span>
+                  <span className={ok ? s.ok : s.bad}>
+                    <SealBadge state="sealed">{ok ? 'stake counted' : 'stake did not count'}</SealBadge>
+                  </span>
                 </li>
               );
             })}
@@ -147,6 +150,7 @@ export function StakePayout({ matchId, team, api: injected }: StakePayoutProps) 
           </>
         )
       ) : null}
+      <WhoCanSee topic="stakes" />
       {error ? (
         <p className={s.error} role="alert">
           {error}
