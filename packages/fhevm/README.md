@@ -12,6 +12,7 @@ OpenZeppelin's [confidential contracts](https://github.com/OpenZeppelin/openzepp
 | `FogSkirm` | Fog Skirm, a short two-player mode played fully on chain: scouts, traps, moves and a hidden seed vial stay ciphertexts; each round is resolved under FHE and only aggregate outcomes go public. See below. |
 | `SkillAuction` | Sealed-bid (second-price) auctions of skill versions on the Exchange, paid in cSKIRM: bids are escrowed ciphertexts, the top two are tracked under FHE, only the winner and the clearing price are ever decrypted, and losing bids are refunded confidentially. See below. |
 | `BenchmarkSeeds` | Hidden benchmark seeds for minted skill versions: the operator commits a version's prompt hash, which draws an encrypted seed only the operator can read; the results hash is posted before the seed opens, and the seed is revealed with a KMS proof (or forced open by anyone after a deadline). See below. |
+| `MatchPredictions` | Confidential spectator predictions on live matches in cSKIRM: the side and the stake are ciphertexts, the pool split stays hidden until the close at tick 30, only the two totals are opened (with a KMS proof) and each winner's pro-rata payout is computed and paid under FHE. A sealed match's winner is read from SkirmMatch. See below. |
 
 ## Setup
 
@@ -483,17 +484,103 @@ divide 512 the first `512 mod n` maps are each drawn with probability higher by 
 picks use the current `PRACTICE_MAPS` list; changing that list changes how old seeds map, so
 "Verify benchmark" is only meaningful against the list the benchmark ran with.
 
+## MatchPredictions: confidential spectator predictions
+
+Spectators back team A or team B on a live match, staked in cSKIRM. On a transparent chain a
+prediction market leaks as it fills: late bettors herd behind the visible pool, everyone follows the
+whale, mempool watchers front-run each bet's side and size, and in skirm the players themselves
+could read the crowd's sentiment mid-match. Here the side (an `ebool`, true = team B) and the
+amount (`euint64`) are encrypted in the spectator's browser, under one input proof, so while betting
+is open nobody sees how the pool splits. Only two numbers are ever opened, the total per side, and
+only after the close. The realtime server drives it (`apps/realtime/src/v2/predictions.ts`,
+`packages/server/src/zama/predictions.ts`); the web has the live "Predict 🔒" panel and the
+debrief's "Claim 🔒" (apps/web `src/features/zama/predictions`).
+
+**Flow.**
+
+1. *Open* (operator): `openMarket(matchKey, closesAt)` on a PvP match's first frame, with
+   `matchKey = keccak256(utf8(matchId))` (the SkirmMatch key). `closesAt` is the close tick's
+   expected time plus slack: a backstop only.
+2. *Predict*: `predict(matchKey, encBacksB, encAmount, proof)`, one per address. The amount is
+   capped at `MAX_STAKE` under FHE (`FHE.min`) and pulled with `confidentialTransferFrom` (the
+   spectator first makes this contract a cSKIRM operator). ERC-7984 moves 0 on a short balance, so
+   only what arrived counts: an unfunded prediction silently stakes 0. Both totals move on every
+   prediction (`totalA += select(backsB, 0, stake)`, `totalB += select(backsB, stake, 0)`), so the
+   transaction doesn't reveal the side. The predictor gets ACL on its side and stake. The two
+   players of a sealed match (SkirmMatch knows their addresses) can't predict on it.
+3. *Close*: the operator at tick 30 (`PREDICTION_CLOSE_TICK`, before late-game information exists),
+   or anyone after `closesAt`. Both totals become publicly decryptable; an empty market is void.
+4. *Reveal* (anyone): `revealTotals(matchKey, clear, proof)` checks the KMS proof
+   (`FHE.checkSignatures`) and stores the totals: the odds are public.
+5. *Resolve*: `resolve(matchKey, winnerSide)`. If SkirmMatch knows the match (a sealed match) the
+   winner is read from `SkirmMatch.settlement` and the argument is ignored. The `settle` call that
+   pays the players' own stakes and anchors the log hash then also decides the market, so anyone can
+   resolve it and the operator can't post a different result. A forfeited or cancelled sealed match
+   voids the market, and an unsettled one reverts `MatchNotSettled`. Any other match has no on-chain
+   record, so the operator's value is taken (operator only). Its log stays verifiable off-chain. A
+   draw (`NO_SIDE`) or a winning side nobody backed voids the market. `voidStale` (anyone) voids a
+   market nobody resolved within `RESOLVE_TIMEOUT` (1 day) of `closesAt`.
+6. *Claim*: `claim(matchKey)` pays the stake back on a void market. Otherwise it pays
+   `select(backedWinner, stake + winnings − fee, 0)`, with `winnings = stake × losing / winning`
+   and `fee = winnings × feeBps / 10000` (sent to the treasury, also under `select`). A loser's
+   payout is an encrypted 0, the same shape on chain as a win.
+
+Events: `MarketOpened`, `Predicted`, `MarketClosed`, `TotalsRevealed`, `MarketResolved`,
+`MarketVoided`, `Claimed`, `OperatorSet`, `FeeSet`.
+
+**Division and overflow.** FHE division only takes a plaintext divisor, which is why the totals are
+public before anyone claims. Then `FHE.div(FHE.mul(stake, losing), winning)` runs on the encrypted
+stake with plaintext totals. Stakes are capped at `MAX_STAKE` (100,000 cSKIRM = 1e11 base units)
+and markets at `MAX_PREDICTORS` (10,000), so a total is at most 1e15 and never wraps a `euint64`.
+`stake × losing` can still reach 1e26 > 2^64, so that one product is widened to `euint128`. The
+quotient is at most `losing`, so it fits back in `euint64`. `winnings × feeBps` stays under 2^64.
+Rounding is down, so the payouts never exceed the pool (the dust stays in the contract).
+
+**What stays hidden, from whom.**
+
+| Value | Who can decrypt it |
+| --- | --- |
+| A predictor's side and stake | That predictor only (and this contract), forever |
+| The running totals, while open | Nobody but this contract |
+| The totals, after close | Everyone (KMS proof, stored by `revealTotals`) |
+| A claimant's payout (0 for a loser) | That claimant only |
+| Predictor count, who predicted, who claimed | Everyone (public by design: transaction senders) |
+
+**Gas and HCU** (FHEVM mock, worst case in the suite; `npx hardhat test test/MatchPredictions.ts`
+prints them):
+
+| Call | Gas | HCU | HCU depth |
+| --- | ---: | ---: | ---: |
+| `openMarket` | 157,010 | 64 | 32 |
+| `predict` (cap, transfer, two selects + adds) | 716,024 | 1,170,096 | 574,000 |
+| `close` (operator, opens both totals) | 103,205 | 0 | 0 |
+| `revealTotals` (checks the KMS proof) | 97,930 | 0 | 0 |
+| `resolve` (operator's result) | 49,270 | 0 | 0 |
+| `resolve` (winner read from SkirmMatch) | 52,673 | 0 | 0 |
+| `resolve` (draw → void) | 48,674 | 0 | 0 |
+| `claim` (resolved: 128-bit mul/div, fee, two transfers) | 839,074 | 4,607,194 | 3,642,064 |
+| `claim` (void refund) | 379,744 | 586,032 | 369,000 |
+
+The resolved `claim` is the heaviest call: the 128-bit scalar multiply and divide dominate its HCU,
+and it stays under the per-transaction limits (20M global HCU, 5M depth).
+
+**Known limits.** Spectators see the count of predictions, and who predicted from the transaction
+senders. Payouts round down, and the dust stays in the contract. The close tick is enforced by the
+operator (and by the UI). On chain only `closesAt` is enforced, which is why it is set tight around
+the close tick.
+
 ## Deploy to Sepolia
 
 ```bash
 npm run deploy:sepolia -w @skirm/fhevm
 ```
 
-This deploys `ConfidentialSkirmCredits`, `SkirmMatch`, `FogSkirm`, `SkillAuction` and
-`BenchmarkSeeds` (or only the ones in `DEPLOY_CONTRACTS`, e.g. `DEPLOY_CONTRACTS=SkirmMatch` next to
+This deploys `ConfidentialSkirmCredits`, `SkirmMatch`, `FogSkirm`, `SkillAuction`,
+`BenchmarkSeeds` and `MatchPredictions` (or only the ones in `DEPLOY_CONTRACTS`, e.g. `DEPLOY_CONTRACTS=SkirmMatch` next to
 an already deployed token, `DEPLOY_CONTRACTS=FogSkirm` to add Fog Skirm, which takes no constructor
 arguments, `DEPLOY_CONTRACTS=SkillAuction` to add the sealed skill auctions, or
-`DEPLOY_CONTRACTS=BenchmarkSeeds` to add the on-chain benchmark seeds), records them in
+`DEPLOY_CONTRACTS=BenchmarkSeeds` to add the on-chain benchmark seeds, or
+`DEPLOY_CONTRACTS=MatchPredictions` to add spectator predictions), records them in
 `deployments/sepolia.json` (address, tx, block, constructor args; merged with what is already
 there) and regenerates `generated/index.ts`. Commit both files so the web and realtime pick up the
 addresses.
@@ -514,7 +601,16 @@ BenchmarkSeeds' constructor is `(operator, revealWindow)`: `BENCHMARK_OPERATOR` 
 `MATCH_OPERATOR`, else the deployer; the worker signs with that account's key as
 `ZAMA_OPERATOR_PRIVATE_KEY`) and `BENCHMARK_REVEAL_WINDOW_SECONDS` (600..2,592,000; default 86,400).
 The worker uses it with `ZAMA_ENABLED=1` and the key set, else it keeps the keyed-hash seeds;
-`ZAMA_BENCHMARK_ADDRESS` / `NEXT_PUBLIC_ZAMA_BENCHMARK_ADDRESS` override the address. To verify:
+`ZAMA_BENCHMARK_ADDRESS` / `NEXT_PUBLIC_ZAMA_BENCHMARK_ADDRESS` override the address.
+
+MatchPredictions' constructor is `(credits, skirmMatch, operator, treasury, feeBps)`: the same
+`CREDITS_ADDRESS`, the SkirmMatch deployed in the run or recorded (else `SKIRM_MATCH_ADDRESS`, else
+none: every market then takes the operator's result), `PREDICTIONS_OPERATOR` (default
+`MATCH_OPERATOR`, else the deployer; realtime signs with that account's key as
+`ZAMA_OPERATOR_PRIVATE_KEY`), `TREASURY` and `PREDICTIONS_FEE_BPS` (fee on the winnings, at most
+1000; default `FEE_BPS`, else 0). Deploy it after SkirmMatch so it reads the right one. Realtime uses
+it with `ZAMA_ENABLED=1` and the key set; `ZAMA_PREDICTIONS_ADDRESS` /
+`NEXT_PUBLIC_ZAMA_PREDICTIONS_ADDRESS` override the address. To verify:
 
 ```bash
 npx hardhat verify --network sepolia <creditsAddress> <owner> <faucetAmount> <faucetCooldown>
@@ -522,6 +618,7 @@ npx hardhat verify --network sepolia <matchAddress> <creditsAddress> <operator> 
 npx hardhat verify --network sepolia <fogAddress>
 npx hardhat verify --network sepolia <auctionAddress> <creditsAddress> <treasury> <feeBps>
 npx hardhat verify --network sepolia <benchmarkSeedsAddress> <operator> <revealWindow>
+npx hardhat verify --network sepolia <predictionsAddress> <creditsAddress> <matchAddress> <operator> <treasury> <feeBps>
 ```
 
 ## Address + ABI export

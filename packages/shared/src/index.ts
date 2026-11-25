@@ -24,3 +24,4 @@ export * from './sealed-loadout';
 export * from './fog-skirm';
 export * from './sealed-auction';
 export * from './benchmark-seeds';
+export * from './match-predictions';

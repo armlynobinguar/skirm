@@ -1,0 +1,20 @@
+/* Spectator predictions (NEXT_PUBLIC_ZAMA_ENABLED): live over the HUD, and in the debrief. Tokens only. */
+
+.live { position: absolute; top: 96px; right: 16px; z-index: 4; width: 260px; max-width: calc(100vw - 32px); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
+.card { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+.title { font: 700 13px/18px var(--font-mono); color: var(--you); }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.side, .sideOn { min-height: 32px; padding: 0 8px; background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); font: 600 12px/16px var(--font-mono); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sideOn { border-color: var(--you); color: var(--you); }
+.row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); }
+.pool { margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.pool > div { display: flex; justify-content: space-between; gap: var(--space-2); font: 400 12px/16px var(--font-mono); }
+.pool dt, .pool dd { margin: 0; }
+.winner { font-weight: 700; color: var(--you); }
+.muted { margin: 0; color: var(--ink-muted); font: 400 12px/16px var(--font-mono); }
+.result { margin: 0; font: 600 13px/18px var(--font-mono); }
+.good { color: var(--you); }
+.error { margin: 0; font-size: 13px; line-height: 18px; color: var(--critical); }
+.link { font: 600 12px/16px var(--font-mono); }
+@media (max-width: 720px) { .live { top: auto; bottom: 240px; right: 16px; } }

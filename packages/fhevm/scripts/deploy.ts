@@ -6,10 +6,11 @@
  *
  * Env: SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY (required on Sepolia), and optionally
  * DEPLOY_CONTRACTS (comma list, default every contract:
- * ConfidentialSkirmCredits,SkirmMatch,FogSkirm,SkillAuction,BenchmarkSeeds; e.g. `SkirmMatch` to add
- * it next to an already deployed token, `FogSkirm` to add the Fog Skirm mode, which takes no
- * constructor arguments, `SkillAuction` to add the sealed-bid skill auctions, or `BenchmarkSeeds` to
- * add the on-chain benchmark seeds), CREDITS_OWNER (defaults to the
+ * ConfidentialSkirmCredits,SkirmMatch,FogSkirm,SkillAuction,BenchmarkSeeds,MatchPredictions; e.g.
+ * `SkirmMatch` to add it next to an already deployed token, `FogSkirm` to add the Fog Skirm mode,
+ * which takes no constructor arguments, `SkillAuction` to add the sealed-bid skill auctions,
+ * `BenchmarkSeeds` to add the on-chain benchmark seeds, or `MatchPredictions` to add confidential
+ * spectator predictions), CREDITS_OWNER (defaults to the
  * deployer), FAUCET_AMOUNT (base units, 6 decimals; default 1,000 cSKIRM), FAUCET_COOLDOWN_SECONDS
  * (default 86400).
  *
@@ -26,6 +27,12 @@
  * default MATCH_OPERATOR, else the deployer; the worker holds its key as ZAMA_OPERATOR_PRIVATE_KEY)
  * and BENCHMARK_REVEAL_WINDOW_SECONDS (how long the operator has to publish before anyone may force
  * the reveal, 600..2592000; default 86400).
+ *
+ * MatchPredictions escrows cSKIRM predictions, so it takes the same cSKIRM address, SkirmMatch (the
+ * one deployed in this run or recorded, else SKIRM_MATCH_ADDRESS, else none: every market then takes
+ * the operator's result), PREDICTIONS_OPERATOR (opens, closes and resolves markets; default
+ * MATCH_OPERATOR, else the deployer), TREASURY and PREDICTIONS_FEE_BPS (fee on the winnings, at most
+ * 1000; default FEE_BPS, else 0).
  */
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { ethers, network } from "hardhat";
@@ -79,6 +86,20 @@ function constructorArgs(name: ContractName, deployer: HardhatEthersSigner, cont
       const window = Number(raw);
       if (!Number.isInteger(window) || window < 600 || window > 30 * 86_400) throw new Error(`BENCHMARK_REVEAL_WINDOW_SECONDS: ${raw} is not 600..2592000`);
       return [envAddress("BENCHMARK_OPERATOR", envAddress("MATCH_OPERATOR", deployer.address)), window];
+    }
+    case "MatchPredictions": {
+      const credits = envAddress("CREDITS_ADDRESS", contracts.ConfidentialSkirmCredits?.address ?? "");
+      if (!credits) throw new Error("MatchPredictions needs cSKIRM: deploy ConfidentialSkirmCredits first or set CREDITS_ADDRESS");
+      const raw = process.env.PREDICTIONS_FEE_BPS || process.env.FEE_BPS || 0;
+      const feeBps = Number(raw);
+      if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 1000) throw new Error(`PREDICTIONS_FEE_BPS: ${raw} is not 0..1000`);
+      return [
+        credits,
+        envAddress("SKIRM_MATCH_ADDRESS", contracts.SkirmMatch?.address ?? ethers.ZeroAddress),
+        envAddress("PREDICTIONS_OPERATOR", envAddress("MATCH_OPERATOR", deployer.address)),
+        envAddress("TREASURY", ethers.ZeroAddress),
+        feeBps,
+      ];
     }
   }
 }

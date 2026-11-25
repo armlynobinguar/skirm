@@ -94,6 +94,7 @@ export class RealtimeHub {
       ...(deps.v2Models ? { models: deps.v2Models } : {}),
       ...(deps.sealedMatches ? { sealed: deps.sealedMatches } : {}),
       ...(deps.matchSettler ? { settler: deps.matchSettler } : {}),
+      ...(deps.predictionMarkets ? { predictions: deps.predictionMarkets } : {}),
       log: this.log,
     });
     this.scheduleSweep(0);
