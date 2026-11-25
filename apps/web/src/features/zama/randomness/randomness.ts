@@ -13,6 +13,7 @@ import { Contract, JsonRpcProvider, type ContractRunner } from 'ethers';
 import { zamaConfig } from '@/lib/zama/config';
 import { isZeroHandle, publicDecrypt, type Hex } from '@/lib/zama/fhe';
 import type { Team } from '@/lib/realtime/protocol';
+import { trackTx } from '@/lib/zama/steps';
 
 /** Drop values SkirmMatch draws per match (DROP_SLOTS). */
 export const DROP_SLOTS = 3;
@@ -61,8 +62,7 @@ export function readOnlyRunner(): JsonRpcProvider {
 export function randomnessApi(runner: ContractRunner, address: string): RandomnessApi {
   const c = new Contract(address, SkirmMatchAbi, runner);
   const send = async (fn: string, ...args: unknown[]) => {
-    const tx = (await c.getFunction(fn)(...args)) as Tx;
-    await tx.wait();
+    await trackTx(() => c.getFunction(fn)(...args) as Promise<Tx>);
   };
   return {
     async read(key) {

@@ -1,9 +1,10 @@
 // Signed-in screen frame: the persistent arena canvas, the background music, skip link, the HUD top bar (with the account
-// badge), main column, the screen wipe, the design notes aside and the global keys (N, Escape). Used by
+// badge), main column, the screen wipe, the design notes aside, the global keys (N, Escape) and a confidential action's progress. Used by
 // src/app/(shell)/layout.tsx, so every route under (shell) gets it; S01 (src/app/page.tsx) does not.
 // Next keeps this layout mounted across (shell) navigations, so the arena never unmounts.
 import type { ReactNode } from 'react';
 import { ArenaCanvas } from '@/features/arena/ArenaCanvas';
+import { ZamaProgressSlot } from '@/features/zama/progress/ZamaProgressSlot';
 import { GlobalKeys } from './GlobalKeys';
 import { MusicPlayer } from './MusicPlayer';
 import { NotesAside } from './NotesAside';
@@ -25,6 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <NotesAside />
       <GlobalKeys />
       <MusicPlayer />
+      <ZamaProgressSlot />
     </div>
   );
 }

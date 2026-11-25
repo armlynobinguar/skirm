@@ -9,6 +9,7 @@
 import { ConfidentialSkirmCreditsAbi, SkirmMatchAbi } from '@skirm/fhevm/generated';
 import { Contract, type ContractRunner } from 'ethers';
 import { isZeroHandle, userDecrypt, type Hex, type TypedDataSigner } from '@/lib/zama/fhe';
+import { trackTx } from '@/lib/zama/steps';
 
 /** cSKIRM has 6 decimals (the ERC-7984 default). */
 export const CSKIRM_UNIT = 1_000_000n;
@@ -111,8 +112,7 @@ type Tx = { wait: () => Promise<unknown> };
 export async function approveOperator(signer: ContractRunner, credits: string, holder: string, spender: string, nowSec = Math.floor(Date.now() / 1000)): Promise<boolean> {
   const c = new Contract(credits, ConfidentialSkirmCreditsAbi, signer);
   if ((await c.getFunction('isOperator')(holder, spender)) as boolean) return false;
-  const tx = (await c.getFunction('setOperator')(spender, nowSec + OPERATOR_APPROVAL_DAYS * 86_400)) as Tx;
-  await tx.wait();
+  await trackTx(() => c.getFunction('setOperator')(spender, nowSec + OPERATOR_APPROVAL_DAYS * 86_400) as Promise<Tx>);
   return true;
 }
 

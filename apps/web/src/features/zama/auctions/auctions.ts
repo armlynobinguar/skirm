@@ -14,6 +14,7 @@ import { Contract, ZeroAddress, id as keccakUtf8, type ContractRunner } from 'et
 import { zamaConfig, type HexAddress } from '@/lib/zama/config';
 import { isZeroHandle, publicDecrypt, userDecryptUint, type EncryptedInput, type Hex, type TypedDataSigner } from '@/lib/zama/fhe';
 import { ZamaWalletError } from '@/lib/zama/wallet';
+import { trackTx } from '@/lib/zama/steps';
 
 /** Durations the seller can pick (seconds; the contract takes 1 minute to 30 days). */
 export const AUCTION_DURATIONS = [
@@ -107,8 +108,7 @@ export function parseAuction(a: {
 export function auctionApi(runner: ContractRunner, address: string = auctionAddress()): AuctionApi {
   const c = new Contract(address, SkillAuctionAbi, runner);
   const send = async (fn: string, ...args: unknown[]) => {
-    const tx = (await c.getFunction(fn)(...args)) as Tx;
-    await tx.wait();
+    const { tx } = await trackTx(() => c.getFunction(fn)(...args) as Promise<Tx>);
     return tx.hash;
   };
   return {
@@ -120,12 +120,12 @@ export function auctionApi(runner: ContractRunner, address: string = auctionAddr
       return [h[0] as Hex, h[1] as Hex];
     },
     async create(skillRef, endTime, reserve) {
-      const tx = (
-        typeof reserve === 'bigint'
-          ? await c.getFunction('createAuction')(skillRef, endTime, reserve)
-          : await c.getFunction('createAuctionSealedReserve')(skillRef, endTime, reserve.handle, reserve.inputProof)
-      ) as Tx;
-      const receipt = await tx.wait();
+      const { receipt } = await trackTx(
+        () =>
+          (typeof reserve === 'bigint'
+            ? c.getFunction('createAuction')(skillRef, endTime, reserve)
+            : c.getFunction('createAuctionSealedReserve')(skillRef, endTime, reserve.handle, reserve.inputProof)) as Promise<Tx>,
+      );
       for (const log of receipt?.logs ?? []) {
         try {
           const parsed = c.interface.parseLog(log as { topics: string[]; data: string });
