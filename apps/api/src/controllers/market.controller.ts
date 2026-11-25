@@ -89,6 +89,8 @@ export class MarketController {
         rankedMatches: p?.rankedMatches ?? 0,
         /** null when not benchmarked, offline (needs a model key) or not finished. */
         benchmarkScore: p?.benchmarkScore ?? null,
+        /** On-chain benchmark seed progress (committed, published, revealed); null for keyed seeds. */
+        benchmarkSeeds: p?.benchmarkSeeds ?? null,
         owned: ownedKeys.has(key(v)),
       };
     });

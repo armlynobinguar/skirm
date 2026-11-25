@@ -10,6 +10,7 @@ import {
   QUEUE_TOURNAMENTS,
   RedisCostStore,
   createAuctionReader,
+  createBenchmarkSeeder,
   createNearAdapters,
   createQueue,
   createRedis,
@@ -181,6 +182,8 @@ export async function startWorkerApp(
   const brain = createV2Brain(env, { onUsage: (c) => recordCost(c.costUsd), warn: (m) => logger.warn(m) });
 
   const vault = createVault(config);
+  // Benchmark seeds drawn on chain (ZAMA_ENABLED, BenchmarkSeeds deployed, operator key); else keyed hash.
+  const benchmarkSeeder = createBenchmarkSeeder(env, { warn: (m) => logger.warn(m) });
   const deps: WorkerDeps = {
     repos: createRepos(db),
     vault,
@@ -190,6 +193,7 @@ export async function startWorkerApp(
     seasons: near.seasons,
     benchmarkQueue: bullBenchmarkQueue(benchmarkQueue),
     ...(env.BENCH_SECRET?.trim() ? { benchSecret: env.BENCH_SECRET.trim() } : {}),
+    benchmarkSeeder,
     clock: systemClock,
     logger,
   };
@@ -214,6 +218,7 @@ export async function startWorkerApp(
     seasons: near.seasons.kind,
     eloDecay: decay,
     sealedAuctions: auctionReader ? auctionReader.address : 'off',
+    benchmarkSeeds: benchmarkSeeder ? benchmarkSeeder.address : 'keyed',
   });
 
   // Official starter skills for the market (idempotent, advisory-locked across workers). In the

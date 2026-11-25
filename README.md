@@ -129,7 +129,7 @@ The local stack plays with the offline **greedy brain**, so nothing calls a mode
 
 **Own and trade**
 - **Exchange**: mint, list and buy skills as NEAR NFTs with creator royalties on every resale
-- **Proof** on every version: a hidden benchmark (win, leak and manipulation rates), ranked stats per map, 3 free trials
+- **Proof** on every version: a hidden benchmark (win, leak and manipulation rates), ranked stats per map, 3 free trials (on the Zama Protocol, the benchmark seeds are drawn with on-chain FHE randomness after the prompt is committed, sealed until the run and revealed with a proof: [Benchmarks](docs/benchmarks.md))
 - **Back a writer**: stake on a skill writer for a capped share of future royalties
 - **Arena cosmetics** (NEP-245): skins, trails and nameplates, purely visual
 - **Agent rentals** for one match, and **gasless onboarding** through a NEP-366 relayer ([gasless](docs/gasless.md))

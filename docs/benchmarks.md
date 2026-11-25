@@ -62,6 +62,22 @@ Status moves `queued` → `running` → `done`, `needs_model` or `failed`. BullM
 stable job id per version means a retry takes over a row left `running`; the last failed attempt
 marks it `failed`.
 
+## Seeds drawn on chain (Zama)
+
+With `ZAMA_ENABLED=1`, the `BenchmarkSeeds` contract deployed on Sepolia (`packages/fhevm`) and the operator key in `ZAMA_OPERATOR_PRIVATE_KEY`, the gauntlet's picks no longer come from `BENCH_SECRET`. They come from a seed drawn with on-chain FHE randomness, which stays encrypted until the benchmark has run:
+
+1. **Commit.** The worker calls `commit(skillRef, promptHash)`: `skillRef` is keccak256 of `skirm-skill:<skillId>:<version>` (the same reference sealed auctions use) and `promptHash` is the version's prompt sha256. The same transaction draws one encrypted 64-bit seed (`FHE.randEuint64`). A version commits once, so the seed can't be redrawn.
+2. **Draw.** Only the operator and the contract are on the seed's ACL. The worker user-decrypts it through the Zama relayer (`@zama-fhe/relayer-sdk/node`) and maps it to the six picks with `benchmarkSeedPicks` (`packages/shared/src/benchmark-seeds.ts`). Pick `i` is the seed's 10-bit value `v` at bits `10i`..`10i+9`, on map `PRACTICE_MAPS[(v >> 1) % maps]` at difficulty `v & 1` (Easy, Normal). Picks 2, 4 and 6 are the hijack picks, as before.
+3. **Run.** The six matches play as described above.
+4. **Publish.** The worker posts `publish(skillRef, resultsHash, scoreBps)`. `resultsHash` is keccak256 of the six match log head hashes in play order, and the score is in basis points. Only then is the seed opened for public decryption, so the results are fixed before anyone else can see the seed.
+5. **Reveal.** `finalize` submits the seed with its KMS proof (`FHE.checkSignatures`), and the contract stores it.
+
+If the operator never publishes, anyone can call `forceReveal(skillRef)` after the reveal deadline (`BENCHMARK_REVEAL_WINDOW_SECONDS`, default a day, fixed when the version is committed). The seed then becomes public with no results, which shows on chain as a missed benchmark.
+
+The steps are stored in `skill_benchmarks.onchain`, so a job that is retried picks up where the last one stopped. `GET /market/:skillId` returns that record with each played match's map, difficulty, hijack flag and log hash. The Exchange shows **Benchmark seeds: 🎲 drawn on-chain, 🔒 sealed until run → ✅ revealed** on the skill page and on the card. **Verify benchmark** (on the skill page) reads the record from the chain and checks four things: the revealed seed deals exactly the matches that were played, the log hashes hash to the posted results, the committed prompt hash is this version's, and the posted score is the one shown.
+
+**What this does and doesn't prove.** The operator has to know the picks to play the matches, so it can read the seed early. But it can't choose the seed, which is drawn after the prompt is fixed. It can't redraw it, and it can't change the results once the seed is public. With the keyed hash, writers had to trust the operator not to leak `BENCH_SECRET` or grind it for a friend. Now the only early reader is the operator itself, and every benchmark is checkable after the fact. If BenchmarkSeeds is not deployed, ZAMA is off or the key is missing, the worker falls back to the keyed hash.
+
 ## Trials
 
 `POST /market/:skillId/trial { agentId, version? }` queues `{ kind: 'trial', trialId }` and returns

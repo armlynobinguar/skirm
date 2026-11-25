@@ -3,6 +3,7 @@
 // brain) benchmarks and trials are `needs_model` with no score: the greedy brain never reads skills.
 import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { Executor } from '../client';
+import type { OnchainBenchmark } from '@skirm/shared';
 import { newId } from '../ids';
 import {
   accounts,
@@ -41,6 +42,8 @@ export interface BenchmarkResultInput {
   manipulations: number;
   score: number | null;
   results?: unknown;
+  /** The on-chain seed record, when the seeds were drawn on chain (BenchmarkSeeds). */
+  onchain?: OnchainBenchmark | null;
 }
 
 export interface RecordTally {
@@ -68,6 +71,8 @@ export interface MarketRate {
   /** null when not benchmarked, offline (needs_model) or not finished. */
   benchmarkScore: number | null;
   benchmarkStatus: ProofJobStatus | null;
+  /** How far the on-chain benchmark seed got (OnchainBenchmark.status); null for keyed-hash seeds. */
+  benchmarkSeeds: OnchainBenchmark['status'] | null;
 }
 
 export const versionKey = (skillId: string, version: number) => `${skillId}:${version}`;
@@ -134,8 +139,14 @@ export class ProofRepo {
       manipulations: input.manipulations,
       score: input.brain === 'greedy' ? null : input.score,
       results: input.results ?? null,
+      onchain: input.onchain ?? null,
       error: null,
     });
+  }
+
+  /** Updates the on-chain seed record of a benchmark (as its reveal moves on); keeps everything else. */
+  async setBenchmarkOnchain(skillId: string, version: number, onchain: OnchainBenchmark): Promise<void> {
+    await this.db.update(skillBenchmarks).set({ onchain }).where(this.byVersion(skillId, version));
   }
 
   /** Offline: no matches are played and no score is stored. */
@@ -302,11 +313,11 @@ export class ProofRepo {
       select v.skill_id, v.version,
         count(s.id)::int as matches,
         count(s.id) filter (where s.outcome = 'win')::int as wins,
-        b.score, b.status
+        b.score, b.status, b.onchain->>'status' as seeds
       from v
       left join ${matchSkillStats} s on s.skill_id = v.skill_id and s.version = v.version and s.ranked
       left join ${skillBenchmarks} b on b.skill_id = v.skill_id and b.version = v.version
-      group by v.skill_id, v.version, b.score, b.status`);
+      group by v.skill_id, v.version, b.score, b.status, b.onchain->>'status'`);
     for (const r of rowsOf<{
       skill_id: string;
       version: number;
@@ -314,6 +325,7 @@ export class ProofRepo {
       wins: number;
       score: number | string | null;
       status: ProofJobStatus | null;
+      seeds: OnchainBenchmark['status'] | null;
     }>(res)) {
       const matches = Number(r.matches);
       const wins = Number(r.wins);
@@ -323,6 +335,7 @@ export class ProofRepo {
         rankedWinRate: matches > 0 ? wins / matches : null,
         benchmarkScore: r.status === 'done' && r.score !== null ? Number(r.score) : null,
         benchmarkStatus: r.status ?? null,
+        benchmarkSeeds: r.seeds ?? null,
       });
     }
     return out;

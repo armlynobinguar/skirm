@@ -6,9 +6,10 @@
  *
  * Env: SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY (required on Sepolia), and optionally
  * DEPLOY_CONTRACTS (comma list, default every contract:
- * ConfidentialSkirmCredits,SkirmMatch,FogSkirm,SkillAuction; e.g. `SkirmMatch` to add it next to an
- * already deployed token, `FogSkirm` to add the Fog Skirm mode, which takes no constructor arguments,
- * or `SkillAuction` to add the sealed-bid skill auctions), CREDITS_OWNER (defaults to the
+ * ConfidentialSkirmCredits,SkirmMatch,FogSkirm,SkillAuction,BenchmarkSeeds; e.g. `SkirmMatch` to add
+ * it next to an already deployed token, `FogSkirm` to add the Fog Skirm mode, which takes no
+ * constructor arguments, `SkillAuction` to add the sealed-bid skill auctions, or `BenchmarkSeeds` to
+ * add the on-chain benchmark seeds), CREDITS_OWNER (defaults to the
  * deployer), FAUCET_AMOUNT (base units, 6 decimals; default 1,000 cSKIRM), FAUCET_COOLDOWN_SECONDS
  * (default 86400).
  *
@@ -20,6 +21,11 @@
  *
  * SkillAuction escrows cSKIRM bids, so it takes the same cSKIRM address, TREASURY and
  * AUCTION_FEE_BPS (fee on the clearing price, at most 1000; default FEE_BPS, else 0).
+ *
+ * BenchmarkSeeds takes BENCHMARK_OPERATOR (the account that commits and publishes benchmark seeds;
+ * default MATCH_OPERATOR, else the deployer; the worker holds its key as ZAMA_OPERATOR_PRIVATE_KEY)
+ * and BENCHMARK_REVEAL_WINDOW_SECONDS (how long the operator has to publish before anyone may force
+ * the reveal, 600..2592000; default 86400).
  */
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { ethers, network } from "hardhat";
@@ -67,6 +73,12 @@ function constructorArgs(name: ContractName, deployer: HardhatEthersSigner, cont
       const feeBps = Number(raw);
       if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 1000) throw new Error(`AUCTION_FEE_BPS: ${raw} is not 0..1000`);
       return [credits, envAddress("TREASURY", ethers.ZeroAddress), feeBps];
+    }
+    case "BenchmarkSeeds": {
+      const raw = process.env.BENCHMARK_REVEAL_WINDOW_SECONDS ?? 86_400;
+      const window = Number(raw);
+      if (!Number.isInteger(window) || window < 600 || window > 30 * 86_400) throw new Error(`BENCHMARK_REVEAL_WINDOW_SECONDS: ${raw} is not 600..2592000`);
+      return [envAddress("BENCHMARK_OPERATOR", envAddress("MATCH_OPERATOR", deployer.address)), window];
     }
   }
 }

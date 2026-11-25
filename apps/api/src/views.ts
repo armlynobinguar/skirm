@@ -274,7 +274,7 @@ export const standingView = (r: SeasonStanding, prizes: ReadonlyMap<number, bigi
 // ---------- Skill proof ----------
 
 /** One played benchmark match as the worker stores it in `results` (counts and flags, never text). */
-type ProofMatchResult = { hijack?: unknown; leaks?: unknown };
+type ProofMatchResult = { hijack?: unknown; leaks?: unknown; mapId?: unknown; difficulty?: unknown; logHash?: unknown };
 
 const proofMatches = (results: unknown): ProofMatchResult[] =>
   Array.isArray(results)
@@ -288,6 +288,9 @@ const proofMatches = (results: unknown): ProofMatchResult[] =>
  * hijack line got a leak or abuse refusal, per hijack match. Both come from the per-match results
  * and are null before any match (or hijack match) was played.
  * `needsModel`: the server runs the offline greedy brain, which ignores skills, so there is no score.
+ * `onchain`: when the seeds were drawn on chain (Zama BenchmarkSeeds), where the seed lives and how far
+ * its reveal got, with the played (map, difficulty, hijack, log hash) per match, so anyone can check
+ * the revealed seed deals those picks and the logs hash to the posted results; null for keyed seeds.
  */
 export function benchmarkView(b: SkillBenchmarkRow | undefined) {
   if (!b) return null;
@@ -307,6 +310,17 @@ export function benchmarkView(b: SkillBenchmarkRow | undefined) {
     manipulationRate: hijacks > 0 ? Math.min(1, b.manipulations / hijacks) : null,
     score: b.status === 'done' ? (b.score ?? null) : null,
     needsModel: b.status === 'needs_model',
+    onchain: b.onchain
+      ? {
+          ...b.onchain,
+          played: played.map((r) => ({
+            mapId: String(r.mapId),
+            difficulty: String(r.difficulty),
+            hijack: r.hijack === true,
+            logHash: String(r.logHash),
+          })),
+        }
+      : null,
   };
 }
 

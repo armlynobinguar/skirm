@@ -29,7 +29,8 @@
   "ts-node": {
     "moduleTypes": {
       "../shared/src/fog-skirm.ts": "cjs",
-      "../shared/src/sealed-auction.ts": "cjs"
+      "../shared/src/sealed-auction.ts": "cjs",
+      "../shared/src/benchmark-seeds.ts": "cjs"
     }
   }
 }

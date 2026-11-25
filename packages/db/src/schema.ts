@@ -21,7 +21,7 @@ import {
   uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
-import type { SkillTrigger } from '@skirm/shared';
+import type { OnchainBenchmark, SkillTrigger } from '@skirm/shared';
 
 /** bytea column mapped to Uint8Array. */
 export const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | Buffer | string }>({
@@ -940,6 +940,11 @@ export const skillBenchmarks = pgTable(
     manipulations: integer('manipulations').notNull().default(0),
     score: real('score'),
     results: jsonb('results'),
+    /**
+     * The on-chain seed record when the seeds were drawn on chain (Zama FHEVM BenchmarkSeeds,
+     * @skirm/shared OnchainBenchmark); null for keyed-hash seeds.
+     */
+    onchain: jsonb('onchain').$type<OnchainBenchmark>(),
     error: text('error'),
     createdAt: createdAt(),
     finishedAt: ts('finished_at'),

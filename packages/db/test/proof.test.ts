@@ -100,7 +100,28 @@ describe('skill benchmarks', () => {
         score: 0.5,
         results: [{ map: 'copper-hollow' }],
       }),
-    ).toMatchObject({ status: 'done', score: 0.5, leaks: 1, results: [{ map: 'copper-hollow' }] });
+    ).toMatchObject({ status: 'done', score: 0.5, leaks: 1, results: [{ map: 'copper-hollow' }], onchain: null });
+
+    // Seeds drawn on chain: the record is stored with the result and moves on with the reveal.
+    const chained = await skill(ctx, ana.id, 'Chained');
+    await proof.enqueueBenchmark(chained.id, 1);
+    const onchain = {
+      contract: '0x00000000000000000000000000000000000000aa',
+      skillRef: `0x${'11'.repeat(32)}`,
+      promptHash: `0x${'22'.repeat(32)}`,
+      status: 'committed' as const,
+      resultsHash: null,
+      scoreBps: null,
+      seed: null,
+      commitTx: `0x${'33'.repeat(32)}`,
+      publishTx: null,
+      finalizeTx: null,
+    };
+    await proof.finishBenchmark(chained.id, 1, { ...result, brain: 'model', score: 0.5, onchain });
+    expect((await proof.benchmark(chained.id, 1))!.onchain).toEqual(onchain);
+    await proof.setBenchmarkOnchain(chained.id, 1, { ...onchain, status: 'revealed', seed: '42' });
+    expect(await proof.benchmark(chained.id, 1)).toMatchObject({ status: 'done', score: 0.5, onchain: { status: 'revealed', seed: '42' } });
+    expect((await proof.marketRates([{ skillId: chained.id, version: 1 }])).get(versionKey(chained.id, 1))?.benchmarkSeeds).toBe('revealed');
 
     const offline = await skill(ctx, ana.id, 'Offline');
     await proof.enqueueBenchmark(offline.id, 1);
@@ -227,6 +248,7 @@ describe('ranked records', () => {
       rankedWinRate: 2 / 3,
       benchmarkScore: 0.5,
       benchmarkStatus: 'done',
+      benchmarkSeeds: null,
     });
     expect(rates.get(versionKey(wall.id, 1))).toEqual({
       rankedMatches: 3,
@@ -234,6 +256,7 @@ describe('ranked records', () => {
       rankedWinRate: 1 / 3,
       benchmarkScore: null,
       benchmarkStatus: 'needs_model',
+      benchmarkSeeds: null,
     });
     expect(rates.get(versionKey(idle.id, 1))).toEqual({
       rankedMatches: 0,
@@ -241,6 +264,7 @@ describe('ranked records', () => {
       rankedWinRate: null,
       benchmarkScore: null,
       benchmarkStatus: null,
+      benchmarkSeeds: null,
     });
     expect(rates.get(versionKey('skl_unknown', 2))?.rankedMatches).toBe(0);
     expect((await new ProofRepo(c.db).marketRates([])).size).toBe(0);

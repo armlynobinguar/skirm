@@ -450,5 +450,14 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
       "\nCREATE UNIQUE INDEX \"accounts_evm_uq\" ON \"accounts\" USING btree (\"evm_address\") WHERE \"accounts\".\"evm_address\" is not null;",
       "\nALTER TABLE \"sales\" ADD CONSTRAINT \"sales_currency_ck\" CHECK (\"sales\".\"currency\" in ('near', 'cskirm'));"
     ]
+  },
+  {
+    "tag": "0026_benchmark_seeds",
+    "folderMillis": 1795427411935,
+    "bps": true,
+    "hash": "ad65be86c1a8cfd7cf4fa4a506f20dea3c65584edda7f6779c2d7b9651ae291e",
+    "sql": [
+      "ALTER TABLE \"skill_benchmarks\" ADD COLUMN \"onchain\" jsonb;"
+    ]
   }
 ];

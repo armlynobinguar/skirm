@@ -7,8 +7,11 @@
 // trial proves nothing. Those jobs play no match and end `needs_model` with no score; model keys are
 // required for the real gauntlet.
 //
-// The gauntlet: 6 (map, difficulty) picks from PRACTICE_MAPS x [easy, normal], drawn from
-// HMAC-SHA256(BENCH_SECRET, `<skillId>:<version>`) so a creator cannot tune for them. The tested
+// The gauntlet: 6 (map, difficulty) picks from PRACTICE_MAPS x [easy, normal]. With ZAMA_ENABLED and
+// an operator key (deps.benchmarkSeeder) they come from a seed drawn with on-chain FHE randomness once
+// the version's prompt hash is committed, sealed until the run and revealed with a KMS proof after
+// it (./benchmark-seeds); otherwise from HMAC-SHA256(BENCH_SECRET, `<skillId>:<version>`). Either way
+// a creator cannot tune for them. The tested
 // crew is one Standard agent carrying the skill; every second pick also feeds it hijack lines
 // (straight into what it hears). score = wins/matches x (1 - share of matches with a leak).
 //
@@ -29,11 +32,12 @@ import { WorkerError, errorCode, type WorkerDeps } from './deps';
 import { processBenchRun } from './bench-processor';
 import { processDailyAttempt } from './daily-processor';
 import { processPuzzleRun } from './puzzle-processor';
-import { skillTextForModel } from '@skirm/shared';
+import { skillTextForModel, type OnchainBenchmark } from '@skirm/shared';
+import { drawOnchainSeed, revealOnchainSeed } from './benchmark-seeds';
 
 export type BenchmarkDeps = Pick<
   WorkerDeps,
-  'repos' | 'vault' | 'logger' | 'brain' | 'benchSecret'
+  'repos' | 'vault' | 'logger' | 'brain' | 'benchSecret' | 'benchmarkSeeder' | 'clock'
 >;
 
 export interface BenchmarkAttempt {
@@ -189,6 +193,14 @@ async function benchmarkVersion(
   if (!row) {
     const cur = await repos.proof.benchmark(skillId, version);
     if (cur?.status === 'running') row = cur;
+    // Done, but its on-chain reveal did not finish (a retried job): resume it.
+    else if (cur?.status === 'done' && cur.onchain && cur.onchain.status !== 'revealed' && deps.benchmarkSeeder) {
+      await revealOnchainSeed({ ...deps, benchmarkSeeder: deps.benchmarkSeeder }, skillId, version, cur.onchain, {
+        logHashes: ((cur.results ?? []) as ProofMatch[]).map((r) => r.logHash),
+        score: cur.score,
+      });
+      return out('done', cur.score !== null ? { score: cur.score } : {});
+    }
   }
   if (!row) {
     logger.info('benchmark skipped', { skillId, version, reason: 'not_queued' });
@@ -201,14 +213,24 @@ async function benchmarkVersion(
     return out('needs_model');
   }
 
+  let onchain: OnchainBenchmark | null = null;
+  let played: { logHashes: string[]; score: number | null };
   try {
     const skill = await skillContext(deps, skillId, version);
     if (skill === undefined) {
       await repos.proof.failBenchmark(skillId, version, 'skill_not_found');
       return out('failed', { reason: 'skill_not_found' });
     }
-    const secret = deps.benchSecret || DEFAULT_BENCH_SECRET;
-    const picks = benchmarkPicks(secret, skillId, version);
+    let picks: (ProofPick & { hijack: boolean })[];
+    if (deps.benchmarkSeeder) {
+      const v = await repos.skills.get(skillId, version);
+      if (!v) throw new WorkerError('skill_not_found', `no version ${skillId}:${version}`);
+      const drawn = await drawOnchainSeed({ ...deps, benchmarkSeeder: deps.benchmarkSeeder }, skillId, version, v.promptSha256);
+      picks = drawn.picks;
+      onchain = drawn.onchain;
+    } else {
+      picks = benchmarkPicks(deps.benchSecret || DEFAULT_BENCH_SECRET, skillId, version);
+    }
     const [tester] = botCrew(1, 'tester') as [AgentSpec];
     const crew: AgentSpec = { ...tester, name: 'Tester' };
     const results: ProofMatch[] = [];
@@ -222,6 +244,7 @@ async function benchmarkVersion(
       seeds: picks,
       ...t,
       results,
+      onchain,
     });
     logger.info('benchmark done', {
       skillId,
@@ -231,8 +254,9 @@ async function benchmarkVersion(
       leaks: t.leaks,
       manipulations: t.manipulations,
       score: t.score,
+      seeds: onchain ? 'onchain' : 'keyed',
     });
-    return out('done', t.score !== null ? { score: t.score } : {});
+    played = { logHashes: results.map((r) => r.logHash), score: t.score };
   } catch (err) {
     const last = attempt.attemptsMade + 1 >= attempt.attempts;
     logger.warn('benchmark failed', { skillId, version, code: errorCode(err), last });
@@ -240,6 +264,17 @@ async function benchmarkVersion(
       await repos.proof.failBenchmark(skillId, version, errorCode(err)).catch(() => undefined);
     throw err;
   }
+  // The result is stored; now open the seed on chain. A throw retries the job, which resumes here
+  // (the row is done); if it never lands, anyone can force the reveal after the deadline.
+  if (onchain && deps.benchmarkSeeder) {
+    try {
+      await revealOnchainSeed({ ...deps, benchmarkSeeder: deps.benchmarkSeeder }, skillId, version, onchain, played);
+    } catch (err) {
+      logger.warn('benchmark seed reveal failed', { skillId, version, code: errorCode(err), last: attempt.attemptsMade + 1 >= attempt.attempts });
+      throw err;
+    }
+  }
+  return out('done', played.score !== null ? { score: played.score } : {});
 }
 
 async function runTrial(
