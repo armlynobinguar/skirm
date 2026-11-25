@@ -10,6 +10,7 @@
 // timeout), SEPOLIA_RPC_URL, ZAMA_MATCH_ADDRESS (see sealed-match.ts). The key is never logged.
 import { SkirmMatchAbi, sepolia } from '@skirm/fhevm/generated';
 import { Contract, JsonRpcProvider, Wallet } from 'ethers';
+import { OperatorQueue, operatorQueue } from './operator-queue';
 import { SEALED_MATCH_STATUSES, sealedMatchKey, zamaServerConfig, type ZamaServerConfig } from './sealed-match';
 
 /** SkirmMatch.NO_SIDE: the seat a draw is settled with. */
@@ -47,7 +48,10 @@ export interface SettleContract {
 
 /** Settles through a SkirmMatch contract (an ethers Contract bound to the operator wallet, or a fake). */
 export class ContractMatchSettler implements MatchSettler {
-  constructor(private readonly contract: SettleContract) {}
+  constructor(
+    private readonly contract: SettleContract,
+    private readonly queue = new OperatorQueue(),
+  ) {}
 
   async settle(matchId: string, winner: 'A' | 'B' | null, logHash: string): Promise<SettleOutcome> {
     const key = sealedMatchKey(matchId);
@@ -55,9 +59,11 @@ export class ContractMatchSettler implements MatchSettler {
     const m = await this.contract.getMatch(key);
     const status = SEALED_MATCH_STATUSES[Number(m.status)] ?? 'none';
     if (status !== 'revealed') return { status: 'skipped', reason: `match is ${status} on chain` };
-    const tx = await this.contract.settle(key, winnerSeat(winner), anchor);
-    await tx.wait();
-    return { status: 'settled', txHash: tx.hash };
+    return this.queue.run(async () => {
+      const tx = await this.contract.settle(key, winnerSeat(winner), anchor);
+      await tx.wait();
+      return { status: 'settled', txHash: tx.hash };
+    });
   }
 }
 
@@ -89,8 +95,11 @@ export function createMatchSettler(
   }
   const wallet = new Wallet(key.startsWith('0x') ? key : `0x${key}`, new JsonRpcProvider(cfg.rpcUrl, sepolia.chainId, { staticNetwork: true }));
   const contract = new Contract(cfg.matchAddress, SkirmMatchAbi, wallet);
-  return new ContractMatchSettler({
-    getMatch: (k) => contract.getFunction('getMatch')(k) as Promise<{ status: bigint }>,
-    settle: (k, seat, hash) => contract.getFunction('settle')(k, seat, hash) as Promise<{ hash: string; wait(): Promise<unknown> }>,
-  });
+  return new ContractMatchSettler(
+    {
+      getMatch: (k) => contract.getFunction('getMatch')(k) as Promise<{ status: bigint }>,
+      settle: (k, seat, hash) => contract.getFunction('settle')(k, seat, hash) as Promise<{ hash: string; wait(): Promise<unknown> }>,
+    },
+    operatorQueue(wallet.address),
+  );
 }
