@@ -15,6 +15,7 @@ import { PrivateLadderAbi, sepolia } from '@skirm/fhevm/generated';
 import { LADDER_NO_SIDE } from '@skirm/shared';
 import { Contract, JsonRpcProvider, Wallet } from 'ethers';
 import { nodeRelayer, type OperatorSigner, type RelayerInstance } from './benchmark-seeds';
+import { OperatorQueue, operatorQueue } from './operator-queue';
 import { sealedMatchKey, zamaServerConfig, type ZamaServerConfig } from './sealed-match';
 import { OPERATOR_KEY_RE } from './settlement';
 
@@ -66,14 +67,14 @@ function clearOf(values: Record<string, bigint | boolean | string>, handle: stri
 /** PrivateLadder as the operator: ethers for transactions, the relayer for decryption. */
 export class ContractLadderOperator implements LadderOperator {
   readonly address: string;
-  /** One operator transaction at a time, so concurrent reports never race for a nonce. */
-  private queue: Promise<unknown> = Promise.resolve();
 
   constructor(
     address: string,
     private readonly contract: LadderContract,
     private readonly signer: OperatorSigner,
     private readonly relayer: () => Promise<Pick<RelayerInstance, 'generateKeypair' | 'createEIP712' | 'userDecrypt' | 'publicDecrypt'>>,
+    /** One operator transaction at a time (shared with the operator's other senders), so none race for a nonce. */
+    private readonly queue = new OperatorQueue(),
   ) {
     this.address = address.toLowerCase();
   }
@@ -126,13 +127,11 @@ export class ContractLadderOperator implements LadderOperator {
   }
 
   private send(fn: () => Promise<Tx>): Promise<string> {
-    const run = this.queue.then(async () => {
+    return this.queue.run(async () => {
       const tx = await fn();
       await tx.wait();
       return tx.hash;
     });
-    this.queue = run.catch(() => undefined);
-    return run;
   }
 }
 
@@ -184,5 +183,5 @@ export function createLadderOperator(
     address: wallet.address,
     signTypedData: (domain, types, message) => wallet.signTypedData(domain, types as never, message),
   };
-  return new ContractLadderOperator(address, contract, signer, nodeRelayer(cfg.rpcUrl, env.ZAMA_RELAYER_URL?.trim() || undefined));
+  return new ContractLadderOperator(address, contract, signer, nodeRelayer(cfg.rpcUrl, env.ZAMA_RELAYER_URL?.trim() || undefined), operatorQueue(wallet.address));
 }

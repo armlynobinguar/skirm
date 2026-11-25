@@ -15,6 +15,7 @@ import { PREDICTION_NO_SIDE, predictionStatus, type PredictionStatus } from '@sk
 import { Contract, JsonRpcProvider, Wallet } from 'ethers';
 import { nodeRelayer, type RelayerInstance } from './benchmark-seeds';
 import { sealedMatchKey, zamaServerConfig, type ZamaServerConfig } from './sealed-match';
+import { OperatorQueue, operatorQueue } from './operator-queue';
 import { OPERATOR_KEY_RE } from './settlement';
 
 /** MatchPredictions.getMarket, as the server uses it. */
@@ -82,6 +83,7 @@ export class ContractPredictionOperator implements PredictionOperator {
   constructor(
     private readonly contract: PredictionsContract,
     private readonly relayer: () => Promise<Pick<RelayerInstance, 'publicDecrypt'>>,
+    private readonly queue = new OperatorQueue(),
   ) {}
 
   async read(matchId: string): Promise<ChainMarket> {
@@ -89,29 +91,31 @@ export class ContractPredictionOperator implements PredictionOperator {
   }
 
   open(matchId: string, closesAt: number): Promise<string> {
-    return this.send(this.contract.openMarket(sealedMatchKey(matchId), closesAt));
+    return this.send(() => this.contract.openMarket(sealedMatchKey(matchId), closesAt));
   }
 
   close(matchId: string): Promise<string> {
-    return this.send(this.contract.close(sealedMatchKey(matchId)));
+    return this.send(() => this.contract.close(sealedMatchKey(matchId)));
   }
 
   async revealTotals(matchId: string): Promise<{ txHash: string; totalA: bigint; totalB: bigint }> {
     const key = sealedMatchKey(matchId);
     const handles = (await this.contract.totalHandles(key)).map(String);
     const res = await (await this.relayer()).publicDecrypt(handles);
-    const txHash = await this.send(this.contract.revealTotals(key, res.abiEncodedClearValues, res.decryptionProof));
+    const txHash = await this.send(() => this.contract.revealTotals(key, res.abiEncodedClearValues, res.decryptionProof));
     return { txHash, totalA: clearOf(res.clearValues, handles[0]!), totalB: clearOf(res.clearValues, handles[1]!) };
   }
 
   resolve(matchId: string, winner: 'A' | 'B' | null): Promise<string> {
-    return this.send(this.contract.resolve(sealedMatchKey(matchId), predictionWinnerSide(winner)));
+    return this.send(() => this.contract.resolve(sealedMatchKey(matchId), predictionWinnerSide(winner)));
   }
 
-  private async send(p: Promise<Tx>): Promise<string> {
-    const tx = await p;
-    await tx.wait();
-    return tx.hash;
+  private send(fn: () => Promise<Tx>): Promise<string> {
+    return this.queue.run(async () => {
+      const tx = await fn();
+      await tx.wait();
+      return tx.hash;
+    });
   }
 }
 
@@ -158,5 +162,5 @@ export function createPredictionOperator(
     revealTotals: (k, clear, proof) => fn('revealTotals')(k, clear, proof) as Promise<Tx>,
     resolve: (k, side) => fn('resolve')(k, side) as Promise<Tx>,
   };
-  return new ContractPredictionOperator(contract, nodeRelayer(cfg.rpcUrl, env.ZAMA_RELAYER_URL?.trim() || undefined));
+  return new ContractPredictionOperator(contract, nodeRelayer(cfg.rpcUrl, env.ZAMA_RELAYER_URL?.trim() || undefined), operatorQueue(wallet.address));
 }
