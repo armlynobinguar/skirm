@@ -14,6 +14,7 @@ import { errorMessage } from '@/features/zama/credits/CSkirmBalance';
 import { explorerUrl, readOnlyRunner } from '@/features/zama/randomness/randomness';
 import { marketOdds, oddsLabel, predictionsApi, revealMine, type ChainMarket, type MyPrediction, type PredictionsApi, type RevealedPrediction } from './predictions';
 import s from './predictions.module.css';
+import { SealBadge, WhoCanSee } from '@/features/zama/privacy/WhoCanSee';
 
 export interface PredictionClaimProps {
   matchId: string;
@@ -108,9 +109,12 @@ export function PredictionClaim({ matchId, names, api: injected, contract: fixed
   return (
     <section className={`sk-panel ${s.card}`} data-testid="zama-prediction-claim">
       <div className={s.head}>
-        <span className={s.title}>Your prediction 🔒</span>
+        <span className={s.title}>
+          Your prediction <SealBadge state="sealed">sealed</SealBadge>
+        </span>
         <span className={s.muted}>{market.predictors} sealed</span>
       </div>
+      <WhoCanSee topic="predictions" />
       {market.totalA + market.totalB > 0n ? (
         <dl className={s.pool}>
           {(['A', 'B'] as const).map((t) => (

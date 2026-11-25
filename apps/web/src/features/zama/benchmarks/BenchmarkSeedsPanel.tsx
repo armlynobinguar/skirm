@@ -16,6 +16,7 @@ import {
 } from './benchmarks';
 import { SeedsBadge } from './SeedsBadge';
 import s from './benchmarks.module.css';
+import { WhoCanSee } from '@/features/zama/privacy/WhoCanSee';
 
 export interface BenchmarkSeedsPanelProps {
   skillId: string;
@@ -78,6 +79,7 @@ export function BenchmarkSeedsPanel({ skillId, version, onchain, promptSha256, s
           </button>
         ) : null}
       </p>
+      <WhoCanSee topic="benchmarks" />
       {error ? (
         <p className={s.error} role="alert">
           {error}

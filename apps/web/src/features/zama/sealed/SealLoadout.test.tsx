@@ -120,7 +120,7 @@ describe('sealed lock-in', () => {
     setup();
     const input = await screen.findByTestId('zama-stake-input');
     expect(input).toHaveValue('10');
-    expect(screen.getByText('Stake (🔒 encrypted)')).toBeInTheDocument();
+    expect(screen.getByText('🔒 encrypted')).toBeInTheDocument();
     await userEvent.clear(input);
     await userEvent.type(input, '2.5');
     expect(screen.getByTestId('zama-stake-low')).toBeInTheDocument();

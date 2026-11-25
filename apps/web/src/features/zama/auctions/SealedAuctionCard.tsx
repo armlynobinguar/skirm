@@ -30,6 +30,7 @@ import {
   type ChainAuction,
 } from './auctions';
 import s from './auctions.module.css';
+import { SealBadge, WhoCanSee } from '@/features/zama/privacy/WhoCanSee';
 
 export interface SealedAuctionCardProps {
   card: Card;
@@ -173,7 +174,7 @@ export function SealedAuctionCard({ card, contract, api: injected, address: fixe
         <p className={s.name}>
           {card.skill.name ?? card.skill.id} <span className={s.muted}>v{card.skill.version}</span>
         </p>
-        <span className={s.tag}>Sealed auction 🔒</span>
+        <SealBadge state="sealed">Sealed auction</SealBadge>
       </div>
       <p className={s.stats}>
         <span>by {card.seller.handle ?? 'unknown'}</span>
@@ -183,8 +184,10 @@ export function SealedAuctionCard({ card, contract, api: injected, address: fixe
           </span>
         ) : null}
         <span data-testid="zama-auction-bids">{sealedBidsLabel(chain.bidders)}</span>
-        <span>{chain.reserveEncrypted ? 'reserve sealed 🔒' : chain.reserve > 0n ? `reserve ${formatUnits6(chain.reserve)} cSKIRM` : 'no reserve'}</span>
+        <span>{chain.reserveEncrypted ? <SealBadge state="sealed">reserve sealed</SealBadge> : chain.reserve > 0n ? `reserve ${formatUnits6(chain.reserve)} cSKIRM` : 'no reserve'}</span>
       </p>
+
+      <WhoCanSee topic="auction" />
 
       {phase === 'bidding' && role !== 'seller' ? (
         <div className={s.row}>

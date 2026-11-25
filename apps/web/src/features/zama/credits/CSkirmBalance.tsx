@@ -12,6 +12,7 @@ import { getFhevmInstance } from '@/lib/zama/relayer';
 import { connectEvmWallet, restoreEvmWallet, type EvmConnection } from '@/lib/zama/wallet';
 import { claimFaucet, creditsAddress, formatWait, readBalanceHandle, readFaucet, shortAddress, type FaucetStatus } from './credits';
 import s from './credits.module.css';
+import { WhoCanSee } from '@/features/zama/privacy/WhoCanSee';
 
 type Busy = null | 'connect' | 'reveal' | 'faucet';
 
@@ -159,6 +160,7 @@ export function CSkirmBalance() {
           <p className={s.note}>
             Encrypted on chain. Only <span className={s.mono}>{shortAddress(conn.address)}</span> can decrypt it.
           </p>
+          <WhoCanSee topic="credits" />
           <div className={s.actions}>
             {revealed === null ? (
               <Button size="sm" icon="lock" loading={busy === 'reveal'} disabled={!handle || busy !== null} onClick={reveal} data-testid="zama-reveal">
