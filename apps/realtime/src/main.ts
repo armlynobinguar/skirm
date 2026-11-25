@@ -27,6 +27,14 @@ import { RedisPubSub } from './pubsub';
 import { parseV2TickMs } from './timing';
 import { createRealtimeV2Brain } from './v2/brain';
 
+/** ZAMA_LADDER_MATCHMAKING (1/true) and ZAMA_LADDER_CHECK_TIMEOUT_MS (a positive whole number of ms). */
+function ladderMatchmakingFrom(env: NodeJS.ProcessEnv): { enabled: boolean; timeoutMs?: number } {
+  const on = env.ZAMA_LADDER_MATCHMAKING === '1' || env.ZAMA_LADDER_MATCHMAKING === 'true';
+  const raw = env.ZAMA_LADDER_CHECK_TIMEOUT_MS?.trim();
+  const ms = raw ? Number(raw) : NaN;
+  return { enabled: on, ...(Number.isInteger(ms) && ms > 0 ? { timeoutMs: ms } : {}) };
+}
+
 async function bootstrap(): Promise<void> {
   installCrashReporting('realtime');
   const config = loadConfig(process.env);
@@ -78,8 +86,10 @@ async function bootstrap(): Promise<void> {
     // operator key): null when off.
     predictionMarkets: createPredictionOperator(process.env, log),
     // The private ladder (ZAMA_ENABLED, PrivateLadder deployed, the same operator key): ranked results
-    // between linked, registered players are reported on chain. Null when off.
+    // between linked, registered players are reported on chain; ZAMA_LADDER_MATCHMAKING=1 adds the
+    // isCloseMatch pairing check. Null when off.
     privateLadder: createLadderOperator(process.env, log),
+    ladderMatchmaking: ladderMatchmakingFrom(process.env),
     log,
   };
 

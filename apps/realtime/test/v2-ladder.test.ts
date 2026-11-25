@@ -276,4 +276,38 @@ describe('the private ladder over the hub', () => {
     hub = undefined;
     expect(op.calls).toEqual([]);
   });
+
+  it('keeps a pair the ladder calls far apart searching, and pairs a close one', async () => {
+    let answer = false;
+    const op = fakeLadder({ close: async () => answer });
+    const deps = await makeDeps({ v2Timing: FAST_V2, privateLadder: op, ladderMatchmaking: { enabled: true, timeoutMs: 1_000, vetoMs: 300 } });
+    hub = new RealtimeHub(deps);
+    const ana = await player(hub, deps, 'ana', EVM_A);
+    const ben = await player(hub, deps, 'ben', EVM_B);
+    await ana.send({ type: 'v2_queue', crew: [{ agentId: ana.agents[0]!.id, tier: 'standard' }], ranked: true });
+    await ben.send({ type: 'v2_queue', crew: [{ agentId: ben.agents[0]!.id, tier: 'standard' }], ranked: true });
+    await new Promise((r) => setTimeout(r, 150));
+    // Asked once, far: both still searching, and no match was found while the veto holds.
+    expect(op.calls.filter((c) => c.startsWith('isClose'))).toHaveLength(1);
+    expect(ana.inbox.all.some((m) => m.type === 'v2_found')).toBe(false);
+    expect(ana.inbox.all.some((m) => m.type === 'queue_status')).toBe(true);
+    // Once the veto lapses they are asked again; close now, so they pair.
+    answer = true;
+    const found = await ana.inbox.next('v2_found', () => true, 5_000);
+    expect(found.matchId).toBeTruthy();
+    expect(op.calls.filter((c) => c.startsWith('isClose'))).toHaveLength(2);
+  });
+
+  it('pairs anyway when the check times out', async () => {
+    const op = fakeLadder({ close: () => new Promise(() => undefined) });
+    const deps = await makeDeps({ v2Timing: FAST_V2, privateLadder: op, ladderMatchmaking: { enabled: true, timeoutMs: 50 } });
+    hub = new RealtimeHub(deps);
+    const ana = await player(hub, deps, 'ana', EVM_A);
+    const ben = await player(hub, deps, 'ben', EVM_B);
+    await ana.send({ type: 'v2_queue', crew: [{ agentId: ana.agents[0]!.id, tier: 'standard' }], ranked: true });
+    await ben.send({ type: 'v2_queue', crew: [{ agentId: ben.agents[0]!.id, tier: 'standard' }], ranked: true });
+    const found = await ana.inbox.next('v2_found', () => true, 5_000);
+    expect(found.matchId).toBeTruthy();
+    expect(op.calls.filter((c) => c.startsWith('isClose'))).toHaveLength(1);
+  });
 });

@@ -236,6 +236,7 @@ export class V2Hub {
       status: (e, searchingMs, range) => this.deps.send(e.key, { type: 'queue_status', searchingMs, eloRange: range }),
       pair: (a, b) => this.track(this.start(a, b)),
       pools: v2PoolsMatch,
+      allowPair: (a, b) => !deps.ladder?.vetoed(a.key, b.key),
     });
     this.matchmaker.start();
   }
@@ -964,13 +965,21 @@ export class V2Hub {
     const keys = [a.key, b.key];
     for (const k of keys) this.playing.set(k, undefined);
     let clash: string[];
+    let far = false;
     try {
       clash = await this.pairClash(a, b);
+      far = !clash.length && (await this.ladderFar(a, b));
     } catch (err) {
       this.deps.log.warn(`v2 pairing ${a.key} / ${b.key}: busy check failed: ${(err as Error).message}`);
       clash = [];
     } finally {
       for (const k of keys) if (this.playing.get(k) === undefined) this.playing.delete(k);
+    }
+    if (far) {
+      // The private ladder says the hidden ratings are too far apart: both keep searching (their
+      // range keeps widening), and this pair stays apart until the veto lapses.
+      for (const e of [a, b]) if (!this.closing && !this.isBusy(e.key)) this.matchmaker.restore(e);
+      return;
     }
     if (clash.length) {
       for (const e of [a, b]) {
@@ -991,6 +1000,19 @@ export class V2Hub {
     } finally {
       unhold();
     }
+  }
+
+  /**
+   * The private ladder's optional pairing check: true only when isCloseMatch answered "far" for two
+   * linked ranked searches. No answer in time, an error or an unlinked player pairs on Elo alone.
+   */
+  private async ladderFar(a: QueueEntry<V2Search>, b: QueueEntry<V2Search>): Promise<boolean> {
+    const ladder = this.deps.ladder;
+    const [ea, eb] = [a.payload.evm, b.payload.evm];
+    if (!ladder?.matchmaking || !a.payload.ranked || !ea || !eb || ea === eb) return false;
+    const verdict = await ladder.check([a.key, b.key], [ea, eb]);
+    if (verdict !== 'unknown') this.deps.log.info(`v2 pairing ${a.key} / ${b.key}: private ladder says ${verdict}`);
+    return verdict === 'far';
   }
 
   private async launchPair(a: QueueEntry<V2Search>, b: QueueEntry<V2Search>, unhold: () => void): Promise<void> {

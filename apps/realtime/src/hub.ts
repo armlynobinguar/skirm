@@ -99,9 +99,9 @@ export class RealtimeHub {
       ...(deps.privateLadder
         ? {
             ladder: new PrivateLadderSync(deps.privateLadder, deps.repos, this.log, {
-              matchmaking: false,
-              checkTimeoutMs: LADDER_CHECK_TIMEOUT_MS,
-              vetoMs: LADDER_VETO_MS,
+              matchmaking: deps.ladderMatchmaking?.enabled ?? false,
+              checkTimeoutMs: deps.ladderMatchmaking?.timeoutMs ?? LADDER_CHECK_TIMEOUT_MS,
+              vetoMs: deps.ladderMatchmaking?.vetoMs ?? LADDER_VETO_MS,
               now: () => this.scheduler.now(),
               setTimeout: (fn, ms) => this.scheduler.setTimeout(fn, ms),
               clearTimeout: (t) => this.scheduler.clearTimeout(t),

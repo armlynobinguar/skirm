@@ -60,6 +60,11 @@ export interface RealtimeDeps {
   predictionMarkets?: PredictionOperator | null;
   /** The private ladder (ZAMA_ENABLED, ZAMA_OPERATOR_PRIVATE_KEY): ranked results reported on chain. */
   privateLadder?: LadderOperator | null;
+  /**
+   * The private ladder's pairing check (ZAMA_LADDER_MATCHMAKING=1): isCloseMatch before two linked
+   * ranked searches pair, `timeoutMs` (ZAMA_LADDER_CHECK_TIMEOUT_MS) before pairing without it.
+   */
+  ladderMatchmaking?: { enabled: boolean; timeoutMs?: number; vetoMs?: number };
   /** Tests only: the external agents' webhook transport (default: the SSRF-safe POST). */
   externalPost?: WebhookPost;
   /** v2 map pool (default: MAPS_V2). */
