@@ -301,6 +301,15 @@ export class AccountsRepo {
     }
   }
 
+  /**
+   * Caches the account's public PrivateLadder tier (0 Bronze .. 5 Master, null: off the ladder),
+   * as the server revealed it on chain. Nothing else on the account changes.
+   */
+  async setLadderTier(id: string, tier: number | null): Promise<void> {
+    if (tier !== null && (!Number.isInteger(tier) || tier < 0 || tier > 5)) throw new RangeError(`ladder tier ${tier} is not 0..5`);
+    await this.db.update(accounts).set({ ladderTier: tier }).where(eq(accounts.id, id));
+  }
+
   /** The live account an EVM address is linked to (any case). */
   async byEvmAddress(address: string): Promise<AccountRow | undefined> {
     const [row] = await this.db

@@ -459,5 +459,14 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     "sql": [
       "ALTER TABLE \"skill_benchmarks\" ADD COLUMN \"onchain\" jsonb;"
     ]
+  },
+  {
+    "tag": "0027_private_ladder",
+    "folderMillis": 1795431623072,
+    "bps": true,
+    "hash": "a14026edb89c0f73330eb4a1d2fbfb3cec88ef902c55e71d52bf56080451718b",
+    "sql": [
+      "ALTER TABLE \"accounts\" ADD COLUMN \"ladder_tier\" smallint;"
+    ]
   }
 ];

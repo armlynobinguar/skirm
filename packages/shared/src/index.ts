@@ -25,3 +25,4 @@ export * from './fog-skirm';
 export * from './sealed-auction';
 export * from './benchmark-seeds';
 export * from './match-predictions';
+export * from './private-ladder';

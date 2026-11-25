@@ -31,7 +31,8 @@
       "../shared/src/fog-skirm.ts": "cjs",
       "../shared/src/sealed-auction.ts": "cjs",
       "../shared/src/benchmark-seeds.ts": "cjs",
-      "../shared/src/match-predictions.ts": "cjs"
+      "../shared/src/match-predictions.ts": "cjs",
+      "../shared/src/private-ladder.ts": "cjs"
     }
   }
 }
