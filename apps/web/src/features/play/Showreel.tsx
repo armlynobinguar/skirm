@@ -6,7 +6,7 @@
 // frame per reel and changes reel only when asked.
 import { DisplayHeading } from '@skirm/ui';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { alignPrev, barksAt } from '@/features/arena/ArenaCanvas';
 import { composeV2Arena, walkMs, type LiveArena } from '@/features/arena/live';
 import * as proto from '@/features/arena/proto/world';
@@ -32,7 +32,8 @@ interface Hud {
   cut: boolean;
 }
 
-export function Showreel() {
+/** `cta` replaces the foot's "Queue ranked" and "All maps" links (the signed-out pitch offers practice instead). */
+export function Showreel({ cta }: { cta?: ReactNode } = {}) {
   const maps = useMemo(() => reelMaps(), []);
   const { reducedMotion } = usePreferences();
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -266,12 +267,16 @@ export function Showreel() {
           ))}
         </nav>
         <div className={r.cta}>
-          <Link href={routes.pvp()} className={r.ctaMain}>
-            Queue ranked ▸
-          </Link>
-          <Link href={routes.atlas()} className={r.ctaGhost}>
-            All maps
-          </Link>
+          {cta ?? (
+            <>
+              <Link href={routes.pvp()} className={r.ctaMain}>
+                Queue ranked ▸
+              </Link>
+              <Link href={routes.atlas()} className={r.ctaGhost}>
+                All maps
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </section>
