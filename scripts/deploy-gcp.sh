@@ -32,6 +32,12 @@
 # Also passed through when set (.env.example): LLM_MODELS, BACKING_CONTRACT, NEAR_RENTALS_ONCHAIN,
 # RELAYER_ACCOUNT_ID, RELAYER_FREE_TXS; RELAYER_PRIVATE_KEY is the <env>-relayer-private-key secret
 # (api only). SAMPLE_MATCH_ID is baked into the web image as NEXT_PUBLIC_SAMPLE_MATCH_ID.
+# Zama Protocol (Sepolia): ZAMA_ENABLED=1 turns the confidential features on in the api, worker and
+# realtime and is baked into the web image as NEXT_PUBLIC_ZAMA_ENABLED; SEPOLIA_RPC_URL,
+# ZAMA_RELAYER_URL and ZAMA_LADDER_MATCHMAKING pass through when set. The operator key (settles
+# sealed matches, commits benchmark seeds, runs prediction markets, reports to the private ladder) is
+# the <env>-zama-operator-key secret (ZAMA_OPERATOR_PRIVATE_KEY); without it the servers only read
+# the chain. Contract addresses come from packages/fhevm/generated, bundled into every image.
 #
 # Env vars and secrets are merged into each service (--update-env-vars / --update-secrets), so a
 # value set by hand on a service survives a deploy. The flip side: unsetting a variable here does not
@@ -64,14 +70,14 @@ ALL=(migrate api worker web realtime)
 COMMON=(package.json package-lock.json tsconfig.base.json turbo.json .dockerignore
   docker/node.Dockerfile scripts/deploy-gcp.sh .github/workflows/deploy.yml)
 BACKEND=(packages/shared packages/engine packages/db packages/server packages/ledger
-  packages/decision-engine spec docker/cloudbuild.yaml)
+  packages/decision-engine packages/fhevm/generated spec docker/cloudbuild.yaml)
 NOT_TESTS=(':(exclude,glob)**/*.test.ts' ':(exclude,glob)**/*.test.tsx' ':(exclude,glob)**/e2e/**')
 inputs() {
   case $1 in
     migrate) echo packages/db packages/shared docker/tsup.migrate.config.ts docker/cloudbuild.yaml ;;
     api | worker | realtime) echo "apps/$1 ${BACKEND[*]}" ;;
     # packages/engine imports the map JSON from spec/.
-    web) echo apps/web packages/shared packages/engine packages/ui spec docker/cloudbuild.web.yaml ;;
+    web) echo apps/web packages/shared packages/engine packages/ui packages/fhevm/generated spec docker/cloudbuild.web.yaml ;;
   esac
 }
 # The commit tag of the image a piece runs now; empty when it doesn't exist or can't be read (a
@@ -140,7 +146,7 @@ if [ "${SKIP_BUILD:-}" != 1 ]; then
   fi
   if deploying web && ! has_image "web-$ENV"; then
     g builds submit --region="$R" --config=docker/cloudbuild.web.yaml \
-      --substitutions="_REG=$REG,_TAG=$TAG,_IMAGE=web-$ENV,_API_URL=$API_URL,_WS_URL=$WS_URL,_PRIVY_APP_ID=$PRIVY_APP_ID,_NEAR_NETWORK=$NEAR_NETWORK,_SAMPLE_MATCH_ID=${SAMPLE_MATCH_ID:-}" .
+      --substitutions="_REG=$REG,_TAG=$TAG,_IMAGE=web-$ENV,_API_URL=$API_URL,_WS_URL=$WS_URL,_PRIVY_APP_ID=$PRIVY_APP_ID,_NEAR_NETWORK=$NEAR_NETWORK,_SAMPLE_MATCH_ID=${SAMPLE_MATCH_ID:-},_ZAMA_ENABLED=${ZAMA_ENABLED:-}" .
   fi
 fi
 
@@ -155,7 +161,8 @@ ENV_VARS+="@REDIS_URL=redis://$REDIS_HOST:6379@NEAR_NETWORK=$NEAR_NETWORK"
 ENV_VARS+="@SKILL_KEK_KMS=projects/$PROJECT/locations/$R/keyRings/skill-vault/cryptoKeys/skill-prompt-kek-$ENV"
 ENV_VARS+="@PUBLIC_API_URL=$API_URL@PUBLIC_WS_URL=$WS_URL@CORS_ORIGINS=$CORS"
 for v in LLM_BASE_URL LLM_MODEL LLM_PLANNER_MODEL LLM_PRICE_INPUT_USD LLM_PRICE_OUTPUT_USD LLM_MODELS \
-  BACKING_CONTRACT NEAR_RENTALS_ONCHAIN RELAYER_ACCOUNT_ID RELAYER_FREE_TXS; do
+  BACKING_CONTRACT NEAR_RENTALS_ONCHAIN RELAYER_ACCOUNT_ID RELAYER_FREE_TXS \
+  ZAMA_ENABLED SEPOLIA_RPC_URL ZAMA_RELAYER_URL ZAMA_LADDER_MATCHMAKING; do
   if [ -n "${!v:-}" ]; then
     # '@' is the list delimiter; a value holding one would split into a bogus variable.
     if [[ ${!v} == *@* ]]; then echo "$v must not contain '@'" >&2; exit 1; fi
@@ -174,6 +181,13 @@ for s in llm-api-key openrouter-api-key near-ops-key bench-secret; do
   fi
 done
 if has_secret near-ops-key; then ENV_VARS+="@NEAR_OPS_ACCOUNT=${NEAR_OPS_ACCOUNT:?set NEAR_OPS_ACCOUNT}"; fi
+# The Zama operator (the deployer of packages/fhevm by default): realtime settles, predicts and
+# reports to the ladder with it, the worker commits benchmark seeds.
+if has_secret zama-operator-key; then
+  SECRETS+=",ZAMA_OPERATOR_PRIVATE_KEY=$ENV-zama-operator-key:latest"
+elif [ -n "${ZAMA_ENABLED:-}" ]; then
+  echo "ZAMA_ENABLED is set but the $ENV-zama-operator-key secret does not exist: the servers only read the chain" >&2
+fi
 # Only the api reads OPS_TOKEN (GET /ops/stats for the skirm-ops dashboard); without the secret the route is off.
 API_SECRETS=$SECRETS
 if has_secret ops-token; then API_SECRETS+=",OPS_TOKEN=$ENV-ops-token:latest"; fi

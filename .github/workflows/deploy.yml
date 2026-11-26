@@ -74,5 +74,12 @@ jobs:
           # Baked into the web image (NEXT_PUBLIC_SAMPLE_MATCH_ID). An image built for a commit is
           # reused, so a new value lands on the next commit deployed with services=web (or all).
           SAMPLE_MATCH_ID: ${{ vars.SAMPLE_MATCH_ID }}
+          # Zama Protocol on Sepolia: 1 turns the confidential features on (servers and the web image).
+          # The operator key is the <env>-zama-operator-key secret in Secret Manager, never a GitHub
+          # secret. Contract addresses come from packages/fhevm/generated.
+          ZAMA_ENABLED: ${{ vars.ZAMA_ENABLED }}
+          SEPOLIA_RPC_URL: ${{ vars.SEPOLIA_RPC_URL }}
+          ZAMA_RELAYER_URL: ${{ vars.ZAMA_RELAYER_URL }}
+          ZAMA_LADDER_MATCHMAKING: ${{ vars.ZAMA_LADDER_MATCHMAKING }}
           # Pushes deploy only the pieces whose inputs changed (scripts/deploy-gcp.sh, "Only what changed").
           SERVICES: ${{ inputs.services || 'auto' }}

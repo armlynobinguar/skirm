@@ -51,7 +51,7 @@ The layout follows System Architecture, everything in `us-central1`. One project
 | Postgres | Cloud SQL for PostgreSQL 16 `skirm-pg-<env>` | db-f1-micro, 10 GiB SSD, private IP |
 | Redis | Memorystore for Redis `skirm-redis-<env>` | Basic, 1 GiB, `maxmemory-policy=noeviction` (BullMQ) |
 | Maps | Cloud Storage | bucket `<project>-<env>-maps` (for later; maps are bundled) |
-| Secrets | Secret Manager | `<env>-database-url`, `<env>-privy-verification-key`; optional `<env>-llm-api-key` (the model brain's `LLM_API_KEY`; the older `<env>-openrouter-api-key` still works as `OPENROUTER_API_KEY`), `<env>-bench-secret` (worker: keys the hidden benchmark picks), `<env>-near-ops-key`, `<env>-ops-token` (api only, turns on `GET /ops/stats` for the skirm-ops dashboard), `<env>-relayer-private-key` (api only: the gasless relayer's `RELAYER_PRIVATE_KEY`; needs the `RELAYER_ACCOUNT_ID` variable, and the deploy stops if only one of the two is set; [gasless.md](gasless.md)) |
+| Secrets | Secret Manager | `<env>-database-url`, `<env>-privy-verification-key`; optional `<env>-llm-api-key` (the model brain's `LLM_API_KEY`; the older `<env>-openrouter-api-key` still works as `OPENROUTER_API_KEY`), `<env>-bench-secret` (worker: keys the hidden benchmark picks), `<env>-near-ops-key`, `<env>-ops-token` (api only, turns on `GET /ops/stats` for the skirm-ops dashboard), `<env>-relayer-private-key` (api only: the gasless relayer's `RELAYER_PRIVATE_KEY`; needs the `RELAYER_ACCOUNT_ID` variable, and the deploy stops if only one of the two is set; [gasless.md](gasless.md)), `<env>-zama-operator-key` (the Zama operator's `ZAMA_OPERATOR_PRIVATE_KEY`; see Zama Protocol below) |
 | Skill vault key | Cloud KMS | key ring `skill-vault`, key `skill-prompt-kek-<env>` (`SKILL_KEK_KMS`) |
 | Images | Artifact Registry | repo `skirm`, tagged with the commit |
 | Runtime identity | service account `skirm-run-<env>` | reads only `<env>-*` secrets |
@@ -197,6 +197,18 @@ gcloud iam service-accounts add-iam-policy-binding $SA --project=$P --role=roles
 ```
 
 Repository variables (Settings → Secrets and variables → Actions → Variables; none are secret): `GCP_PROJECT`, `GCP_WIF_PROVIDER` (`projects/<number>/locations/global/workloadIdentityPools/github/providers/skirm`), `GCP_DEPLOY_SA` and `PRIVY_APP_ID`. Optional: `NEAR_OPS_ACCOUNT` (the platform signer; read only when the `<env>-near-ops-key` secret exists) and the model settings `LLM_BASE_URL`, `LLM_MODEL`, `LLM_PLANNER_MODEL`, `LLM_PRICE_INPUT_USD` and `LLM_PRICE_OUTPUT_USD` (unset: OpenRouter and its default model; the deploy sets `V2_BRAIN=model`, and without the `<env>-llm-api-key` or `<env>-openrouter-api-key` secret every agent plays the greedy brain). For the custom domain, also `PUBLIC_API_URL` (`https://api.playskirm.xyz`), `PUBLIC_WS_URL` (`wss://rt.playskirm.xyz/ws`) and `CORS_ORIGINS` (`https://playskirm.xyz,<web run.app URL>`); without them the deploy points web at the run.app URLs and the api refuses the custom domain's origin. Run `scripts/deploy-gcp.sh` by hand with the same three variables. Also optional, passed to the services only when set: `LLM_MODELS` (the per-agent model catalog, JSON; [economy.md](economy.md)), `BACKING_CONTRACT` (empty keeps writer backing off on staging), `NEAR_RENTALS_ONCHAIN`, `RELAYER_ACCOUNT_ID` and `RELAYER_FREE_TXS` (gasless onboarding, with the `<env>-relayer-private-key` secret), and `SAMPLE_MATCH_ID`, which is baked into the web image as `NEXT_PUBLIC_SAMPLE_MATCH_ID` (the ranked, recorded match behind `/verify`'s "Try a sample match"; empty hides the button). No value may contain `@`.
+
+### Zama Protocol (Sepolia)
+
+The confidential features (sealed loadouts and stakes, Fog Skirm, sealed auctions, benchmark seeds, sealed predictions, the private ladder) stay off until the `ZAMA_ENABLED` repository variable is `1`. The deploy then sets `ZAMA_ENABLED=1` on api, worker and realtime and bakes `NEXT_PUBLIC_ZAMA_ENABLED=1` into the web image. Contract addresses come from `packages/fhevm/generated` (written by `npm run deploy:sepolia -w @skirm/fhevm`, [packages/fhevm/README.md](../packages/fhevm/README.md)), which is bundled into every image, so a redeploy of the contracts redeploys every service on the next push. Optional variables: `SEPOLIA_RPC_URL` (default publicnode), `ZAMA_RELAYER_URL` (default the SDK's Sepolia relayer) and `ZAMA_LADDER_MATCHMAKING`.
+
+The operator key settles sealed matches, commits benchmark seeds, runs the prediction markets and reports to the private ladder. It is the deployer of `packages/fhevm` unless the deploy set `MATCH_OPERATOR` and the others. Keep it in Secret Manager, never in GitHub. Without the secret, the servers only read the chain and the deploy prints a warning.
+
+```bash
+printf %s "$OPERATOR_PRIVATE_KEY" | gcloud secrets create $ENV-zama-operator-key --data-file=-
+gh variable set ZAMA_ENABLED --body 1
+gh workflow run deploy.yml -f services=all
+```
 
 After changing a variable or a secret, run the deploy workflow by hand with `services=all`: the default `services=auto` redeploys only the pieces whose files changed, so a new value would wait for the next commit that touches each service (the web image built for a commit is reused, so a new `SAMPLE_MATCH_ID` lands with the next commit deployed with `services=web` or `all`).
 

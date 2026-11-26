@@ -17,6 +17,8 @@ substitutions:
   _NEAR_NETWORK: testnet
   # A ranked, recorded match for /verify's "Try a sample match"; empty hides the button.
   _SAMPLE_MATCH_ID: ''
+  # 1 turns on the confidential (Zama Protocol, Sepolia) features in the browser bundle.
+  _ZAMA_ENABLED: ''
 options:
   env: ['DOCKER_BUILDKIT=1']
   machineType: E2_HIGHCPU_8
@@ -42,6 +44,8 @@ steps:
       - NEXT_PUBLIC_NEAR_NETWORK=${_NEAR_NETWORK}
       - --build-arg
       - NEXT_PUBLIC_SAMPLE_MATCH_ID=${_SAMPLE_MATCH_ID}
+      - --build-arg
+      - NEXT_PUBLIC_ZAMA_ENABLED=${_ZAMA_ENABLED}
       - -t
       - ${_REG}/${_IMAGE}:${_TAG}
       - .
