@@ -68,8 +68,8 @@ describe('migrations', () => {
     // 0014_campaign, 0015_daily_challenge, 0016_agent_progression, 0017_community_maps,
     // 0018_puzzles, 0019_writer_backing, 0020_rental_credits, 0021_match_heartbeat, 0022_gasless_relay,
     // 0023_cosmetic_items, 0024_agent_accounts, 0025_sealed_auctions,
-    // 0026_benchmark_seeds.
-    expect(embeddedMigrations()).toHaveLength(27);
+    // 0026_benchmark_seeds, 0027_private_ladder.
+    expect(embeddedMigrations()).toHaveLength(28);
   });
 
   it('refuses a second account linking the same NEAR account', async () => {
