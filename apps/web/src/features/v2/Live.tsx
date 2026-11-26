@@ -42,6 +42,7 @@ import { calloutOf, difficultyOf, type Callout, type FeedFilter } from './hud/mo
 import { Banner, CalloutBar, CountIn } from './hud/parts';
 import { ThirdPerson } from './hud/ThirdPerson';
 import { Inspect } from './hud/Inspect';
+import { ZamaPredictSlot } from '@/features/zama/predictions/ZamaPredictionSlots';
 import { ZamaRandomnessSlot } from '@/features/zama/randomness/ZamaRandomnessSlot';
 import type { V2CommsLine, V2MatchView } from './v2Store';
 
@@ -381,6 +382,8 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
       {!intro && view.zama ? (
         <ZamaRandomnessSlot matchId={view.matchId} mapId={view.mapId} team={watch || replay ? null : team} mode="live" seed={view.zama.seed} />
       ) : null}
+      {/* Spectators back a crew with a sealed prediction (Zama): betting closes at tick 30. */}
+      {watch && !replay && !intro && !view.practice && view.phase === 'live' ? <ZamaPredictSlot matchId={view.matchId} tick={tick} /> : null}
       <Inspect frame={frame} tickMs={view.tickMs} enabled={!intro && !tpv && !control.controlled} onWatch={enterTpv} />
       {watched ? (
         <ThirdPerson

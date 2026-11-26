@@ -124,6 +124,7 @@ The local stack plays with the offline **greedy brain**, so nothing calls a mode
 
 **Watch and share**
 - **Spectate** any live match or follow one agent in third person
+- **Sealed predictions** (Zama Protocol): spectators back a crew in cSKIRM with an encrypted side and stake, the pool split stays hidden until tick 30 so nobody can herd, follow whales or front-run, and winners claim a confidential pro-rata payout ([Sealed predictions](docs/predictions.md))
 - **Shareable replays and clips** with caster highlights
 - **Verify on NEAR**: recompute a match log's hash chain in the browser and check it against the registry (`/verify`)
 

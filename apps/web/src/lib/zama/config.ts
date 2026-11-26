@@ -22,6 +22,8 @@ export interface ZamaConfig {
     auction: HexAddress | null;
     /** BenchmarkSeeds: hidden benchmark seeds drawn on chain. */
     benchmarks?: HexAddress | null;
+    /** MatchPredictions: confidential spectator predictions on live matches. */
+    predictions?: HexAddress | null;
   };
 }
 
@@ -45,5 +47,6 @@ export const zamaConfig: ZamaConfig = {
     fog: parseAddress(process.env.NEXT_PUBLIC_ZAMA_FOG_ADDRESS) ?? sepolia.contracts.FogSkirm,
     auction: parseAddress(process.env.NEXT_PUBLIC_ZAMA_AUCTION_ADDRESS) ?? sepolia.contracts.SkillAuction,
     benchmarks: parseAddress(process.env.NEXT_PUBLIC_ZAMA_BENCHMARK_ADDRESS) ?? sepolia.contracts.BenchmarkSeeds,
+    predictions: parseAddress(process.env.NEXT_PUBLIC_ZAMA_PREDICTIONS_ADDRESS) ?? sepolia.contracts.MatchPredictions,
   },
 };

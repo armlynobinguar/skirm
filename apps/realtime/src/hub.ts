@@ -5,6 +5,7 @@ import { AuthError, externalSecretMatches, parseExternalAgentToken, verifyCreden
 import { createGreedyBrain } from '@skirm/decision-engine/v2';
 import { consoleLogger, type Logger, type RealtimeDeps } from './deps';
 import { V2Hub, V2HubError } from './v2/hub';
+import { LADDER_CHECK_TIMEOUT_MS, LADDER_VETO_MS, PrivateLadderSync } from './v2/ladder';
 import { DEFAULT_V2_TIMING } from './v2/match';
 import { PubSubV2FrameStore } from './v2/replay';
 import {
@@ -94,6 +95,19 @@ export class RealtimeHub {
       ...(deps.v2Models ? { models: deps.v2Models } : {}),
       ...(deps.sealedMatches ? { sealed: deps.sealedMatches } : {}),
       ...(deps.matchSettler ? { settler: deps.matchSettler } : {}),
+      ...(deps.predictionMarkets ? { predictions: deps.predictionMarkets } : {}),
+      ...(deps.privateLadder
+        ? {
+            ladder: new PrivateLadderSync(deps.privateLadder, deps.repos, this.log, {
+              matchmaking: deps.ladderMatchmaking?.enabled ?? false,
+              checkTimeoutMs: deps.ladderMatchmaking?.timeoutMs ?? LADDER_CHECK_TIMEOUT_MS,
+              vetoMs: deps.ladderMatchmaking?.vetoMs ?? LADDER_VETO_MS,
+              now: () => this.scheduler.now(),
+              setTimeout: (fn, ms) => this.scheduler.setTimeout(fn, ms),
+              clearTimeout: (t) => this.scheduler.clearTimeout(t),
+            }),
+          }
+        : {}),
       log: this.log,
     });
     this.scheduleSweep(0);
