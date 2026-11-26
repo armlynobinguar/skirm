@@ -1,0 +1,81 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "contracts": {
+    "ConfidentialSkirmCredits": {
+      "address": "0x15d81dFa6db62CF489EaC3f2e2d72854c86b3376",
+      "txHash": "0x6e343fab2821ae836d813df38448c5c9dbbb8b808067a6fd7462b0f309888d2e",
+      "blockNumber": 12214303,
+      "deployedAt": "2026-11-26T04:54:12.985Z",
+      "args": [
+        "0xBF0e6e7E330Df6e5a8043E793F64c31415B15c6D",
+        "1000000000",
+        "86400"
+      ]
+    },
+    "SkirmMatch": {
+      "address": "0x843775E7a83dCA83Ca5c8F4De7c3588f2a8525e0",
+      "txHash": "0x800bfa0a2e57508a043f428c0416079a33b4003e6ffdee7c9eddd3875305d2b9",
+      "blockNumber": 12214310,
+      "deployedAt": "2026-11-26T04:55:38.792Z",
+      "args": [
+        "0x15d81dFa6db62CF489EaC3f2e2d72854c86b3376",
+        "0xBF0e6e7E330Df6e5a8043E793F64c31415B15c6D",
+        "0x0000000000000000000000000000000000000000",
+        0
+      ]
+    },
+    "FogSkirm": {
+      "address": "0x4BA934B7c8E671e6824B3D7Bc78744687a458ee9",
+      "txHash": "0xade61e6e7a4f1d58cbf08541bef194257073a70169da25fdd0a5001fd5e5ad56",
+      "blockNumber": 12214311,
+      "deployedAt": "2026-11-26T04:55:50.129Z",
+      "args": []
+    },
+    "SkillAuction": {
+      "address": "0x8e0343e89a7a355313Db90387764ea30Da93A65F",
+      "txHash": "0x8381e6ec4e17abbfb713af946fd633ebad57a706bbc7f51c9148e9dcfeff2832",
+      "blockNumber": 12214312,
+      "deployedAt": "2026-11-26T04:56:01.728Z",
+      "args": [
+        "0x15d81dFa6db62CF489EaC3f2e2d72854c86b3376",
+        "0x0000000000000000000000000000000000000000",
+        0
+      ]
+    },
+    "BenchmarkSeeds": {
+      "address": "0x14652eFa5938480798840635BffEDEb5F6608D72",
+      "txHash": "0x5adbe9c221094435820ddcda8c2a1dcaf15e41e692eb0668b7ebda6a81175ad6",
+      "blockNumber": 12214313,
+      "deployedAt": "2026-11-26T04:56:13.253Z",
+      "args": [
+        "0xBF0e6e7E330Df6e5a8043E793F64c31415B15c6D",
+        86400
+      ]
+    },
+    "MatchPredictions": {
+      "address": "0x683A95c91669b7e657323F8B74e616F647DB3359",
+      "txHash": "0x2bea8ce3c0238be51fbfa44743d6bfb4fb6c2e29355e634ee259b68be6616f47",
+      "blockNumber": 12214314,
+      "deployedAt": "2026-11-26T04:56:25.213Z",
+      "args": [
+        "0x15d81dFa6db62CF489EaC3f2e2d72854c86b3376",
+        "0x843775E7a83dCA83Ca5c8F4De7c3588f2a8525e0",
+        "0xBF0e6e7E330Df6e5a8043E793F64c31415B15c6D",
+        "0x0000000000000000000000000000000000000000",
+        0
+      ]
+    },
+    "PrivateLadder": {
+      "address": "0xD87047D054c09972e4807c35174FcB46AdCeE841",
+      "txHash": "0x44a0c5dd3781355d468eb52c6eb23ae25211eb7e253518baf9a6015d0e5432e7",
+      "blockNumber": 12214315,
+      "deployedAt": "2026-11-26T04:56:36.920Z",
+      "args": [
+        "0x843775E7a83dCA83Ca5c8F4De7c3588f2a8525e0",
+        "0xBF0e6e7E330Df6e5a8043E793F64c31415B15c6D",
+        200
+      ]
+    }
+  }
+}
