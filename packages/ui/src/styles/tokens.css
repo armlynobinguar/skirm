@@ -13,7 +13,7 @@
 
   /* Palette */
   --ink-2: #0a1119;
-  --panel: rgba(9, 15, 23, 0.88);
+  --panel: rgba(12, 19, 24, 0.94);
   --panel-solid: #0c141d;
   --bone: #ece8e1;
   --text: #dfe6ea;
@@ -30,6 +30,11 @@
   --fire: #ff8a3a;
   --lava: #ff5a2a;
   --cut: 14px;
+  /* Tactical HUD (B): panels and buttons cut at two opposite corners, top right and bottom left. */
+  --clip-cut2: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+  --clip-cut2-sm: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  /* The teal glow behind every screen. */
+  --glow: radial-gradient(ellipse 70% 60% at 72% 18%, rgba(52, 224, 200, .11), transparent 70%), radial-gradient(ellipse 50% 50% at 10% 100%, rgba(52, 224, 200, .05), transparent 70%);
   --tape: repeating-linear-gradient(-45deg, var(--amber) 0 8px, transparent 8px 16px);
   /* Film grain (a 140px noise tile) and fine diagonal hatching: the texture on tabs, tiles and buttons. */
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.32'/%3E%3C/svg%3E");
@@ -37,7 +42,7 @@
   --hatch-dark: repeating-linear-gradient(-45deg, rgba(0, 0, 0, .07) 0 1px, transparent 1px 5px);
 
   /* Semantic names used across the app */
-  --bg: #05080d;
+  --bg: #07090d;
   --surface: #0c141d;
   --surface-raised: #111c27;
   --surface-sunken: #0a1119;
