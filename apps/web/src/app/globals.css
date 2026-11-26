@@ -302,3 +302,52 @@ a.app-dock-tutorial:hover { color: var(--bone); }
   .app-wipe { display: none; }
   .app-dock { animation: none; }
 }
+
+/* ==================== Tactical HUD (B) ====================
+ * The revamp's app layer, kept in one block over the rules above: the arena falls back behind a teal
+ * glow, headings grow, cards cut at two corners, and the top bar becomes one solid band with flat
+ * section tabs (no icon plates or serial codes) and a teal underline on the active one. Phones keep
+ * the Menu dropdown from the 720px rules above. */
+.app-arena-dim { opacity: .84; }
+.app-shell::before { background: var(--glow), radial-gradient(120% 90% at 50% 40%, transparent 35%, rgba(3, 6, 10, .8) 100%); }
+.app-shell::after { opacity: .035; }
+.app-h1 { font: 800 56px/52px var(--font-display); letter-spacing: .02em; }
+.app-h2 { font: 800 32px/32px var(--font-display); letter-spacing: .03em; }
+.app-card { clip-path: var(--clip-cut2); }
+.app-banner { clip-path: var(--clip-cut2-sm); }
+.app-link-strong { color: var(--you); }
+a.app-link-strong:hover { color: var(--you-hover); }
+@media (max-width: 600px) {
+  .app-h1 { font-size: 40px; line-height: 38px; }
+  .app-h2 { font-size: 26px; line-height: 26px; }
+}
+
+/* Top bar: a solid band with a hairline under it. */
+.app-topbar::before { background: rgba(7, 9, 13, .96); box-shadow: inset 0 -1px 0 #1c2a2f, 0 12px 24px -16px rgba(0, 0, 0, .9); }
+.app-topbar-grp { filter: none; }
+.app-topbar-chip:not(.app-topbar-link) { background-color: #0e1519; background-image: none; clip-path: var(--clip-cut2-sm); }
+.app-topbar-logo .sk-logo-word { font-size: 26px !important; letter-spacing: .18em; }
+@media (min-width: 721px) {
+  .app-topbar { padding-top: 0; padding-bottom: 0; min-height: 64px; }
+  .app-topbar-nav { gap: 2px; align-self: stretch; }
+  .app-topbar-link { height: 64px; padding: 0 18px; color: #9aa6a8; background: none; box-shadow: none; clip-path: none; font: 800 19px/1 var(--font-display); letter-spacing: .1em; }
+  .app-topbar-link::before { display: none; }
+  .app-topbar-link::after { left: 0; right: 0; bottom: 0; height: 3px; }
+  a.app-topbar-link:hover { transform: none; color: var(--bone); background: rgba(255, 255, 255, .03); }
+  .app-topbar-link[aria-current='page'] { color: var(--bone); background: linear-gradient(180deg, transparent, rgba(52, 224, 200, .13)); box-shadow: none; }
+  .app-topbar-link .sk-ni, .app-topbar-serial { display: none; }
+}
+@media (min-width: 721px) and (max-width: 1300px) { .app-topbar-link { padding: 0 13px; font-size: 17px; } }
+@media (min-width: 721px) and (max-width: 1240px) {
+  :root { --topbar-extra: 48px; }
+  .app-topbar-link { height: 46px; }
+  .app-topbar-link::after { left: 0; right: 0; }
+}
+
+/* Section and panel headings everywhere in the app read as HUD labels: condensed and uppercase, each
+ * screen's own size kept. Long-form prose (the docs pages, /terms and /privacy) keeps sentence case. */
+.app-main :is(h2, h3):not(.sk-sr-only) { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .04em; }
+.app-main :is(.legal, article[data-testid^="doc-"]) :is(h2, h3) { font-family: var(--font-sans); text-transform: none; letter-spacing: normal; }
+.app-h3 { font: 800 21px/24px var(--font-display); letter-spacing: .04em; text-transform: uppercase; color: var(--bone); }
+/* Table headers: mono labels, as in the HUD's stat rows. */
+.app-main th { font: 500 11px/16px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
