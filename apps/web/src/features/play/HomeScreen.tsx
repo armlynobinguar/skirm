@@ -28,7 +28,7 @@ function Home() {
     <>
       <h1 className="sk-sr-only">Play</h1>
       {me.isError && !me.data ? <ErrorCard error={me.error} onRetry={() => void me.refetch()} /> : null}
-      <CommandDeck lead={lead} agents={me.data?.agents} elo={me.data?.rank.elo} hub={<HomeHub lead={lead} />} />
+      <CommandDeck lead={lead} agents={me.data?.agents} elo={me.data?.rank.elo} rankTitle={me.data?.rank.title} hub={<HomeHub lead={lead} />} />
       <Showreel />
     </>
   );
