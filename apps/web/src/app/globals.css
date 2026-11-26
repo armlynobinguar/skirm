@@ -166,7 +166,8 @@ a.app-dock-tutorial:hover { color: var(--bone); }
 /* ---------- S01 Sign in ---------- */
 .s01 { position: relative; min-height: 100vh; color: var(--ink); isolation: isolate; }
 .s01-header { position: relative; z-index: 1; }
-.s01-legal { position: relative; z-index: 1; margin: 18px 0 0; font-size: 13px; text-align: center; }
+.s01-legal { position: relative; z-index: 1; margin: 18px 0 0; font-size: 14px; line-height: 20px; text-align: center; color: var(--ink); }
+.s01-legal a { color: var(--bone); text-decoration: underline; text-underline-offset: 3px; }
 /* /terms and /privacy: a readable column of prose. */
 .legal { max-width: 72ch; }
 .legal p, .legal li { line-height: 1.55; }
@@ -176,32 +177,48 @@ a.app-dock-tutorial:hover { color: var(--bone); }
 
 .s01-header { max-width: 1280px; margin: 0 auto; padding: 20px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; }
 .s01-main { max-width: 1280px; margin: 0 auto; padding: 8px 24px 48px; display: flex; flex-direction: column; gap: 48px; }
-/* The first screen: pitch, explainer and sign-in on the left, the gameplay clip and the practice
- * call to action on the right. One column under 900px, the clip right after the sign-in. */
+/* The first screen: pitch, explainer and the one call to action (a free practice match, sign-in
+ * under it) on the left, the gameplay clip and the season's pulse on the right. One column under
+ * 900px, the clip right after the actions. */
 .s01-hero {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); column-gap: 56px; row-gap: 20px; align-items: start;
-  grid-template-areas: "title media" "lede media" "actions media" "actions practice";
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-areas: "title media" "lede media" "actions media";
+  grid-template-rows: auto auto 1fr;
 }
 .s01-title { grid-area: title; margin: 0; font: 800 60px/56px var(--font-display); text-transform: uppercase; color: var(--bone); max-width: 600px; text-wrap: balance; }
 .s01-lede { grid-area: lede; margin: 0; font-size: 18px; line-height: 27px; color: var(--ink); max-width: 540px; text-wrap: pretty; }
-.s01-actions { grid-area: actions; display: flex; flex-direction: column; gap: 12px; max-width: 380px; }
+.s01-actions { grid-area: actions; display: flex; flex-direction: column; gap: 16px; max-width: 420px; }
 .s01-form { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
 .s01-note { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
 .s01-media { grid-area: media; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .s01-media img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: var(--surface-sunken); box-shadow: var(--elev-2); outline: 1px solid var(--line-strong); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); }
 .s01-media-cap { display: flex; align-items: center; gap: 8px; font: 500 11px/16px var(--font-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-muted); }
 .s01-live-dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--rival); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rival) 25%, transparent); }
-.s01-practice { grid-area: practice; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; border-left: 3px solid var(--you); }
-.s01-practice-text { display: flex; flex-direction: column; gap: 4px; flex: 1 1 260px; min-width: 0; }
-.s01-practice-text p { margin: 0; }
+.s01-practice { display: flex; flex-direction: column; gap: 6px; }
+.s01-practice p { margin: 0; }
+.s01-signin-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.s01-or { font: 500 11px/16px var(--font-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-muted); }
+.s01-form-row { flex-direction: row; flex: 1 1 auto; margin-top: 0; }
+.s01-form-row > * { flex: 1 1 0; }
+.s01-pulse { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 4px 0 0; font: 500 13px/18px var(--font-mono); color: var(--ink); }
+.s01-pulse .sk-icon { color: var(--you); }
+.s01-pulse a { margin-left: auto; font-family: var(--font-sans); }
+.s01-reel-cta { min-width: 240px; }
+.s01-zama { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px 40px; align-items: start; border-left: 3px solid var(--you); }
+.s01-zama-head { display: flex; flex-direction: column; gap: 8px; }
+.s01-zama-head h2 { margin: 0; }
+.s01-zama-head .sk-icon { vertical-align: -2px; }
+.s01-zama-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; color: var(--ink); }
+.s01-zama-list b { color: var(--bone); }
+.s01-zama .s01-step-links { grid-column: 1 / -1; }
+@media (max-width: 900px) { .s01-zama { grid-template-columns: minmax(0, 1fr); } }
 .s01-practice-name { font: 700 16px/22px var(--font-sans); color: var(--bone); }
 .s01-practice-meta { font: 500 12px/17px var(--font-mono); color: var(--ink-muted); }
 .s01-practice-hint { font: 600 13px/18px var(--font-sans); color: var(--you); }
 .s01-eyebrow { font: 500 11px/16px var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: var(--you); }
 .s01-step-links { display: flex; flex-wrap: wrap; gap: 0 20px; margin-top: auto; }
 @media (max-width: 900px) {
-  .s01-hero { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "lede" "actions" "media" "practice"; grid-template-rows: none; row-gap: 16px; }
+  .s01-hero { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "lede" "actions" "media"; grid-template-rows: none; row-gap: 16px; }
   .s01-actions { max-width: none; }
   .s01-title { font-size: 48px; line-height: 46px; }
 }
@@ -274,6 +291,10 @@ a.app-dock-tutorial:hover { color: var(--bone); }
   .s01-lede { font-size: 16px; line-height: 23px; }
   .s01-header { padding-top: 14px; padding-bottom: 14px; }
   .s01-steps { grid-template-columns: 1fr; }
+  /* The ladder link folds into a trophy icon so the headline starts higher. */
+  .s01-ladder-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .s01-ladder .sk-icon { width: 22px; height: 22px; }
+  .s01-header { flex-wrap: nowrap; }
 }
 
 @media (prefers-reduced-motion: reduce) {

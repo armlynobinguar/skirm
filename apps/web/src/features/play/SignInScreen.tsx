@@ -1,12 +1,13 @@
 'use client';
-// S01 Sign in (/). The first screen, over the arena: the pitch, a one-line explainer, sign-in with no
-// wallet and a gameplay clip. Then the practice call to action and the three-part pitch (write a
-// skill, the crew plays it, ranked results on NEAR) with links to /verify and the season ladder,
-// both open without sign-in.
+// S01 Sign in (/). The first screen, over the arena: the pitch, a one-line explainer, one main call
+// to action (a free practice match) with sign-in under it, a gameplay clip and the season's pulse.
+// Below: the showreel (real bot-vs-bot matches played in the browser, no sign-in), the Zama strip
+// when NEXT_PUBLIC_ZAMA_ENABLED is on, and the three-part pitch (write a skill, the crew plays it,
+// ranked results on NEAR) with links to /verify and the season ladder, both open without sign-in.
 //
-// "Start a practice match" signs in like the buttons do, then opens the practice crew screen vs the
-// bot (routes.practice(DEFAULT_PRACTICE)) instead of `?next=` or /play: in dev mode it submits the
-// typed handle (or focuses the empty field), in privy mode it focuses Continue with Google.
+// "Play a free match" signs in, then opens the practice crew screen vs the bot
+// (routes.practice(DEFAULT_PRACTICE)) instead of `?next=` or /play: in privy mode it opens Google
+// sign-in at once, in dev mode it submits the typed handle (or focuses the empty field).
 //
 // dev mode (NEXT_PUBLIC_AUTH_MODE unset or `dev`): a handle field. The handle is sent as
 //   `x-dev-user`; POST /auth/session creates the account with the starter defaults.
@@ -26,17 +27,58 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import { isApiError } from '@/lib/api/errors';
+import { useCurrentSeason, useSeasonStandings, useV2LiveMatches } from '@/lib/api/queries';
 import { config } from '@/lib/config';
 import { useSession } from '@/lib/auth/session';
 import { DAILY_FREE_ALLOWANCE } from '@/lib/constants';
 import { routes } from '@/lib/routes';
+import { zamaConfig } from '@/lib/zama/config';
 import { ArenaCanvas } from '@/features/arena/ArenaCanvas';
+import { Showreel } from './Showreel';
 
 /** The NEAR network the app talks to (NEXT_PUBLIC_NEAR_NETWORK), as shown in the badge. */
 const NETWORK_LABEL = config.near.network === 'mainnet' ? 'Mainnet' : 'Testnet';
 
 /** The practice pitch: what a new player can do before spending anything. */
 export const PRACTICE_LINE = 'Play a practice match against a bot crew: free, no keys needed';
+
+/** "3 d 4 h", "5 h 12 m", "12 m" until `at`; null once it has passed. */
+export function timeLeft(at: string, now: number): string | null {
+  const ms = Date.parse(at) - now;
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const min = Math.max(1, Math.floor(ms / 60_000));
+  const d = Math.floor(min / 1440);
+  const h = Math.floor((min % 1440) / 60);
+  if (d > 0) return `${d} d ${h} h`;
+  return h > 0 ? `${h} h ${min % 60} m` : `${min} m`;
+}
+
+/**
+ * The season's pulse under the clip: its number and time left, and only the counts that are not
+ * zero (matches live now, players ranked), so a quiet testnet never reads as an empty one.
+ */
+function SeasonPulse() {
+  const current = useCurrentSeason();
+  const season = current.data?.season;
+  const standings = useSeasonStandings(season?.id, { limit: 1 });
+  const live = useV2LiveMatches();
+  if (!season || season.status !== 'open') return null;
+  const left = timeLeft(season.endsAt, Date.now());
+  const liveNow = Array.isArray(live.data) ? live.data.length : 0;
+  const ranked = standings.data?.total ?? 0;
+  const parts = [`Season ${season.number}`, left ? `ends in ${left}` : 'ending now'];
+  if (liveNow > 0) parts.push(`${liveNow} ${liveNow === 1 ? 'match' : 'matches'} live now`);
+  if (ranked > 0) parts.push(`${ranked} ${ranked === 1 ? 'player' : 'players'} ranked`);
+  return (
+    <p className="s01-pulse" data-testid="s01-pulse">
+      <Icon name="trophy" />
+      <span>{parts.join(' · ')}</span>
+      <Link href={routes.leaderboards()} className="app-link-strong">
+        Top 10 split the prize pool
+      </Link>
+    </p>
+  );
+}
 
 function useOnline(): boolean {
   return useSyncExternalStore(
@@ -130,15 +172,40 @@ export function SignInScreen() {
 
   const disabled = !online || pending !== null;
 
+  /**
+   * Sign in, then open practice vs the bot. privy: Google at once (one click). dev: the typed handle,
+   * or focus the empty field and say what happens next.
+   */
   function startPractice() {
     practiceIntent.current = true;
     setPracticeArmed(true);
-    const root = actionsRef.current;
-    const form = root?.querySelector<HTMLFormElement>('form');
+    if (session.mode !== 'dev') {
+      void signIn('google');
+      return;
+    }
+    const form = actionsRef.current?.querySelector<HTMLFormElement>('form');
     const handle = form?.querySelector<HTMLInputElement>('input[name="handle"]');
     if (form && handle && handle.value.trim() !== '') form.requestSubmit();
-    else (handle ?? root?.querySelector<HTMLButtonElement>('[data-testid="s01-google"]'))?.focus();
+    else {
+      handle?.focus();
+      handle?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    }
   }
+
+  const practiceButton = (testId: string, label = 'Play a free match') => (
+    <Button
+      variant="primary"
+      size="lg"
+      block
+      icon="play"
+      loading={practiceArmed && pending !== null && pending !== 'email'}
+      disabled={disabled}
+      onClick={startPractice}
+      data-testid={testId}
+    >
+      {label}
+    </Button>
+  );
 
   return (
     <div className="s01" data-testid="screen-s01">
@@ -147,9 +214,9 @@ export function SignInScreen() {
           <Logo size={28} />
           <Badge data-testid="s01-network">{NETWORK_LABEL}</Badge>
         </div>
-        <Link href={routes.leaderboards()} className="app-link-strong" data-testid="s01-ladder">
+        <Link href={routes.leaderboards()} className="app-link-strong s01-ladder" aria-label="See the season ladder, no sign-in" data-testid="s01-ladder">
           <Icon name="trophy" />
-          See the season ladder, no sign-in
+          <span className="s01-ladder-text">See the season ladder, no sign-in</span>
         </Link>
       </header>
 
@@ -170,6 +237,19 @@ export function SignInScreen() {
           </p>
 
           <div className="s01-actions" ref={actionsRef}>
+            <div className="s01-practice" data-testid="s01-practice">
+              {session.mode === 'dev' ? null : practiceButton('s01-practice-start')}
+              <p className="s01-practice-name">{PRACTICE_LINE}.</p>
+              <p className="s01-practice-meta">
+                Your crew against the {BOT_HANDLE}. It starts at once, with no matchmaking, Elo or ladder at stake.
+              </p>
+              {practiceArmed && pending === null && session.mode === 'dev' ? (
+                <p className="s01-practice-hint" role="status" data-testid="s01-practice-hint">
+                  Pick a handle below. Your practice match opens right after.
+                </p>
+              ) : null}
+            </div>
+
             {session.mode === 'dev' ? (
               <form className="s01-form" method="get" onSubmit={(e) => void signIn('dev', e)} data-testid="s01-dev-form">
                 <TextField
@@ -183,41 +263,36 @@ export function SignInScreen() {
                   disabled={disabled}
                   data-testid="s01-handle"
                 />
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="lg"
-                  block
-                  loading={pending === 'dev'}
-                  disabled={disabled}
-                  data-testid="s01-signin"
-                >
+                {practiceButton('s01-practice-start')}
+                <Button type="submit" size="lg" block loading={pending === 'dev' && !practiceArmed} disabled={disabled} data-testid="s01-signin">
                   Sign in
                 </Button>
               </form>
             ) : (
-              <div className="s01-form">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  block
-                  loading={pending === 'google'}
-                  disabled={disabled}
-                  onClick={() => void signIn('google')}
-                  data-testid="s01-google"
-                >
-                  Continue with Google
-                </Button>
-                <Button
-                  size="lg"
-                  block
-                  loading={pending === 'email'}
-                  disabled={disabled}
-                  onClick={() => void signIn('email')}
-                  data-testid="s01-email"
-                >
-                  Continue with email
-                </Button>
+              <div className="s01-signin-row">
+                <span className="s01-or">Or sign in</span>
+                <div className="s01-form s01-form-row">
+                  <Button
+                    loading={pending === 'google' && !practiceArmed}
+                    disabled={disabled}
+                    onClick={() => {
+                      practiceIntent.current = false;
+                      setPracticeArmed(false);
+                      void signIn('google');
+                    }}
+                    data-testid="s01-google"
+                  >
+                    Google
+                  </Button>
+                  <Button
+                    loading={pending === 'email'}
+                    disabled={disabled}
+                    onClick={() => void signIn('email')}
+                    data-testid="s01-email"
+                  >
+                    Email
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -253,26 +328,43 @@ export function SignInScreen() {
               <span className="s01-live-dot" aria-hidden="true" />
               A live match: two crews, one goal
             </figcaption>
+            <SeasonPulse />
           </figure>
-
-          <div className="s01-practice app-card" data-testid="s01-practice">
-            <div className="s01-practice-text">
-              <span className="s01-eyebrow">Practice</span>
-              <p className="s01-practice-name">{PRACTICE_LINE}.</p>
-              <p className="s01-practice-meta">
-                Your crew against the {BOT_HANDLE}. It starts at once, with no matchmaking, Elo or ladder at stake.
-              </p>
-              {practiceArmed && pending === null ? (
-                <p className="s01-practice-hint" role="status" data-testid="s01-practice-hint">
-                  Sign in above. Your practice match opens right after.
-                </p>
-              ) : null}
-            </div>
-            <Button icon="play" disabled={disabled} onClick={startPractice} data-testid="s01-practice-start">
-              Start a practice match
-            </Button>
-          </div>
         </section>
+
+        <Showreel cta={<div className="s01-reel-cta">{practiceButton('s01-reel-play', 'Play one yourself, free')}</div>} />
+
+        {zamaConfig.enabled ? (
+          <section className="app-card s01-zama" aria-labelledby="s01-zama-title" data-testid="s01-zama">
+            <div className="s01-zama-head">
+              <span className="s01-eyebrow">
+                <Icon name="lock" /> Sealed on Zama
+              </span>
+              <h2 id="s01-zama-title" className="app-h3">
+                What a public chain can&apos;t keep secret, skirm seals.
+              </h2>
+            </div>
+            <ul className="s01-zama-list">
+              <li>
+                <b>Hidden loadouts.</b> Both crews lock in sealed, so nobody counter-picks.
+              </li>
+              <li>
+                <b>Sealed bids.</b> Skill auctions in cSKIRM with no bid visible until the close.
+              </li>
+              <li>
+                <b>Private rating.</b> Your exact rating stays encrypted; the ladder shows only your tier.
+              </li>
+            </ul>
+            <div className="s01-step-links">
+              <Link href={routes.verify()} className="app-link-strong" data-testid="s01-zama-verify">
+                Verify a sealed match
+              </Link>
+              <Link href={routes.fog()} className="app-link-strong" data-testid="s01-zama-fog">
+                Try Fog Skirm
+              </Link>
+            </div>
+          </section>
+        ) : null}
 
         <section aria-label="How it works" className="s01-steps" data-testid="s01-steps">
           <article className="app-card s01-step">
@@ -281,9 +373,14 @@ export function SignInScreen() {
               <h2 className="app-h3">Write a skill</h2>
             </div>
             <p className="sk-muted">
-              A strategy in plain words. Mint it as an NFT on NEAR and sell it on the market: resales pay you a
-              royalty, and buyers run it without ever seeing your text.
+              A strategy in plain words. Mint it as an NFT on NEAR and sell it: resales pay you a royalty, and buyers run
+              it without ever seeing your text.
             </p>
+            <div className="s01-step-links">
+              <Link href={routes.market()} className="app-link-strong" data-testid="s01-market">
+                Browse the Exchange
+              </Link>
+            </div>
           </article>
           <article className="app-card s01-step">
             <div className="app-row">
@@ -291,11 +388,11 @@ export function SignInScreen() {
               <h2 className="app-h3">Your crew plays it</h2>
             </div>
             <p className="sk-muted">
-              Multi-agentic crews: each agent has a role, sight and voice range. Two-second ticks, five minutes at most; rivals
-              near a speaker overhear it.
+              Each agent has a role, sight and voice range. Two-second ticks, five minutes at most, and rivals near a
+              speaker overhear it.
             </p>
-            <div className="app-row">
-              <AgentAvatar size={32} label="Rook" role="Scout" body="#8fa8ff" crew="a" />
+            <div className="app-row s01-step-links">
+              <AgentAvatar size={32} label="Rook" role="Builder" body="#8fa8ff" crew="a" />
               <span className="sk-mono sk-muted">Rook · Builder · Standard</span>
             </div>
           </article>
@@ -305,8 +402,8 @@ export function SignInScreen() {
               <h2 className="app-h3">Results on NEAR</h2>
             </div>
             <p className="sk-muted">
-              Every ranked result is recorded on NEAR {NETWORK_LABEL.toLowerCase()} with its Elo change, and anyone
-              can check a match against the chain. The 14-day season&apos;s top 10 split the prize pool.
+              Every ranked result is recorded on NEAR {NETWORK_LABEL.toLowerCase()} with its Elo change, so anyone can
+              check a match. Each 14-day season&apos;s top 10 split the prize pool.
             </p>
             <div className="s01-step-links">
               <Link href={routes.verify()} className="app-link-strong" data-testid="s01-verify">
@@ -318,7 +415,7 @@ export function SignInScreen() {
             </div>
           </article>
         </section>
-        <p className="sk-muted s01-legal" data-testid="s01-legal">
+        <p className="s01-legal" data-testid="s01-legal">
           {NETWORK_LABEL}. By playing you accept the <Link href={routes.terms()}>terms</Link>; how your data is used is in the{' '}
           <Link href={routes.privacy()}>privacy policy</Link>. New here? Read the{' '}
           <Link href={routes.docs()} data-testid="s01-docs">

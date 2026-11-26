@@ -2,8 +2,9 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
 import { FakePrivy } from '@/test/fakePrivy';
+import { currentSeasonFixture, seasonFixture, v2LiveMatchFixture } from '@/test/fixtures';
 import { renderWithProviders } from '@/test/render';
-import { SignInScreen } from './SignInScreen';
+import { SignInScreen, timeLeft } from './SignInScreen';
 
 describe('S01 Sign in', () => {
   it('signs in with a dev handle and goes to Home', async () => {
@@ -98,13 +99,47 @@ describe('S01 Sign in', () => {
     expect(api.createSession).not.toHaveBeenCalled();
   });
 
-  it('privy mode: Start a practice match focuses Continue with Google, and sign-in goes on to practice', async () => {
+  it('privy mode: Play a free match signs in with Google in one click, then opens practice', async () => {
     const privy = new FakePrivy({ ready: true, authenticated: false, token: 'jwt_g' });
     const { user, router } = renderWithProviders(<SignInScreen />, { authMode: 'privy', privy });
     await user.click(await screen.findByTestId('s01-practice-start'));
-    expect(screen.getByTestId('s01-google')).toHaveFocus();
-    await user.click(screen.getByTestId('s01-google'));
+    expect(privy.login).toHaveBeenCalledWith('google');
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/maps/copper-hollow/crew?d=easy&opponent=bot'));
+  });
+
+  it('privy mode: the showreel offers the same free match', async () => {
+    const privy = new FakePrivy({ ready: true, authenticated: false, token: 'jwt_g' });
+    const { user, router } = renderWithProviders(<SignInScreen />, { authMode: 'privy', privy });
+    await user.click(await screen.findByTestId('s01-reel-play'));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/maps/copper-hollow/crew?d=easy&opponent=bot'));
+  });
+
+  it('shows the season pulse with only the counts that are not zero', async () => {
+    const endsAt = new Date(Date.now() + (3 * 24 + 4) * 3_600_000 + 60_000).toISOString();
+    renderWithProviders(<SignInScreen />, {
+      api: {
+        currentSeason: async () => currentSeasonFixture({ season: seasonFixture({ number: 2, endsAt, status: 'open' }) }),
+        seasonStandings: async () => ({ rows: [], total: 0 }),
+        v2LiveMatches: async () => [v2LiveMatchFixture(), v2LiveMatchFixture({ id: 'mat_2' })],
+      },
+    });
+    const pulse = await screen.findByTestId('s01-pulse');
+    await waitFor(() => expect(pulse).toHaveTextContent('2 matches live now'));
+    expect(pulse).toHaveTextContent('Season 2 · ends in 3 d 4 h');
+    expect(pulse).not.toHaveTextContent('ranked');
+  });
+
+  it('formats the time left in days, hours and minutes', () => {
+    const now = Date.parse('2026-11-26T00:00:00Z');
+    expect(timeLeft('2026-11-29T05:00:00Z', now)).toBe('3 d 5 h');
+    expect(timeLeft('2026-11-26T02:30:00Z', now)).toBe('2 h 30 m');
+    expect(timeLeft('2026-11-26T00:00:20Z', now)).toBe('1 m');
+    expect(timeLeft('2026-11-25T00:00:00Z', now)).toBeNull();
+  });
+
+  it('keeps the Zama strip off while NEXT_PUBLIC_ZAMA_ENABLED is off', () => {
+    renderWithProviders(<SignInScreen />);
+    expect(screen.queryByTestId('s01-zama')).not.toBeInTheDocument();
   });
 
   it('reads the handle from the field on submit (text typed before hydration counts)', async () => {
