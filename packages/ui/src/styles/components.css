@@ -19,23 +19,24 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f
 :where(.sk-btn, .sk-tab, .sk-iconbtn, .sk-pack):focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* ---------- Card ---------- */
-.sk-card { background: var(--panel); border-radius: 0; box-shadow: var(--elev-1); padding: var(--space-4); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); }
+.sk-card { background: var(--panel); border-radius: 0; box-shadow: var(--elev-1); padding: var(--space-4); clip-path: var(--clip-cut2); }
 
 /* ---------- Button ---------- */
-.sk-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); height: 36px; padding: 0 var(--space-4); border-radius: 0; border: 1px solid transparent; font: 700 16px/18px var(--font-display); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard); }
+.sk-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); height: 40px; padding: 0 var(--space-5); border-radius: 0; border: 1px solid transparent; font: 800 17px/18px var(--font-display); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard); }
 .sk-btn:active:not(:disabled) { transform: translateY(1px); }
 .sk-btn:disabled { cursor: not-allowed; opacity: .5; }
 .sk-btn.is-loading { opacity: 1; cursor: progress; }
-.sk-btn-sm { height: 28px; padding: 0 var(--space-2); gap: 6px; }
-.sk-btn-lg { height: 44px; padding: 0 var(--space-5); font-size: 19px; line-height: 22px; }
+.sk-btn-sm { height: 30px; padding: 0 var(--space-3); gap: 6px; font-size: 15px; }
+.sk-btn-lg { height: 52px; padding: 0 var(--space-6); font-size: 22px; line-height: 24px; letter-spacing: .12em; }
 .sk-btn-block { display: flex; width: 100%; }
-.sk-btn-primary { background: var(--you); color: var(--you-ink); clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
+.sk-btn-primary { background: var(--you); color: var(--you-ink); clip-path: var(--clip-cut2-sm); }
 .sk-btn-primary:hover:not(:disabled) { background: var(--you-hover); }
-.sk-btn-secondary { background: rgba(255, 255, 255, .03); color: var(--bone); border-color: var(--line-strong); }
-.sk-btn-secondary:hover:not(:disabled) { background: var(--chalk-soft); }
+/* Secondary: a teal outline (B), the cut drawn by the clip so the border follows it. */
+.sk-btn-secondary { background: rgba(52, 224, 200, .04); color: var(--you); border-color: rgba(52, 224, 200, .7); clip-path: var(--clip-cut2-sm); }
+.sk-btn-secondary:hover:not(:disabled) { background: rgba(52, 224, 200, .12); color: var(--you-hover); }
 .sk-btn-ghost { background: transparent; color: var(--ink); }
 .sk-btn-ghost:hover:not(:disabled) { background: var(--chalk-soft); }
-.sk-btn-danger { background: var(--rival); color: #fff; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
+.sk-btn-danger { background: var(--rival); color: #2a0408; clip-path: var(--clip-cut2-sm); }
 .sk-btn-danger:hover:not(:disabled) { background: var(--rival-hover); }
 .sk-btn-primary, .sk-btn-secondary, .sk-btn-danger { background-image: var(--grain), var(--hatch); background-size: 140px 140px, auto; }
 .sk-btn-primary, .sk-btn-danger { background-image: var(--grain), var(--hatch-dark); }
@@ -71,10 +72,10 @@ textarea.sk-input { resize: vertical; min-height: 88px; }
 .sk-tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 /* Phones: tabs wrap onto a second row rather than hiding the last ones off-screen. */
 @media (max-width: 480px) { .sk-tabs { flex-wrap: wrap; overflow-x: visible; } }
-.sk-tab { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 10px var(--space-4); background: none; border: 0; border-radius: 0; color: var(--ink-muted); font: 700 18px/20px var(--font-display); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+.sk-tab { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 12px var(--space-4); background: none; border: 0; border-radius: 0; color: var(--ink-muted); font: 800 19px/20px var(--font-display); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
 .sk-tab:hover { color: var(--ink); background: var(--chalk-soft); }
-.sk-tab.is-selected { color: var(--ink); }
-.sk-tab.is-selected::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--you); }
+.sk-tab.is-selected { color: var(--bone); background: linear-gradient(180deg, transparent, rgba(52, 224, 200, .12)); }
+.sk-tab.is-selected::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--you); }
 .sk-tab:disabled { opacity: .45; cursor: not-allowed; }
 .sk-tab-count { font: 500 11px/14px var(--font-mono); padding: 1px 5px; border-radius: var(--radius-1); background: var(--surface-sunken); color: var(--ink-muted); }
 
@@ -93,7 +94,7 @@ textarea.sk-input { resize: vertical; min-height: 88px; }
 /* ---------- Modal ---------- */
 .sk-scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--space-4); background: rgba(3, 5, 8, .72); }
 .sk-scrim.is-inline { position: relative; inset: auto; z-index: auto; min-height: 100%; box-sizing: border-box; }
-.sk-modal { width: min(460px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--panel-solid); color: var(--ink); border-radius: 0; box-shadow: var(--elev-3); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); animation: sk-in var(--duration-base) var(--ease-standard) both; outline: none; }
+.sk-modal { width: min(460px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--panel-solid); color: var(--ink); border-radius: 0; box-shadow: var(--elev-3); clip-path: var(--clip-cut2); animation: sk-in var(--duration-base) var(--ease-standard) both; outline: none; }
 .sk-modal.is-lg { width: min(720px, 100%); }
 .sk-modal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-5) var(--space-5) 0; }
 .sk-modal-title { margin: 0; font: 800 32px/32px var(--font-display); text-transform: uppercase; color: var(--bone); }
@@ -140,7 +141,7 @@ textarea.sk-input { resize: vertical; min-height: 88px; }
 }
 
 /* ---------- Meter ---------- */
-.sk-meter { display: block; height: 6px; background: var(--surface-sunken); border-radius: var(--radius-1); overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
+.sk-meter { display: block; height: 8px; background: var(--surface-sunken); border-radius: var(--radius-1); overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
 .sk-meter-fill { display: block; height: 100%; background: var(--chalk); transition: width var(--duration-step) var(--ease-step); }
 .sk-meter.sk-tone-warning .sk-meter-fill { background: var(--warning); }
 
@@ -172,7 +173,7 @@ textarea.sk-input { resize: vertical; min-height: 88px; }
 
 /* ---------- v2 Arena primitives ---------- */
 /* Panel: the cut-corner HUD panel. Modifiers: is-you / is-rival put a 3px side colour on top. */
-.sk-panel { position: relative; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: var(--space-4); }
+.sk-panel { position: relative; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); clip-path: var(--clip-cut2); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: var(--space-4); }
 .sk-panel.is-flush { padding: 0; }
 .sk-panel.is-you { box-shadow: inset 0 3px 0 var(--you), inset 0 0 0 1px var(--line); }
 .sk-panel.is-rival { box-shadow: inset 0 3px 0 var(--rival), inset 0 0 0 1px var(--line); }
