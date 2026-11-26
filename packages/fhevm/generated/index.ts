@@ -15,22 +15,22 @@ export interface FhevmNetwork {
 export const sepolia: FhevmNetwork = {
   "chainId": 11155111,
   "contracts": {
-    "ConfidentialSkirmCredits": null,
-    "SkirmMatch": null,
-    "FogSkirm": null,
-    "SkillAuction": null,
-    "BenchmarkSeeds": null,
-    "MatchPredictions": null,
-    "PrivateLadder": null
+    "ConfidentialSkirmCredits": "0x15d81dFa6db62CF489EaC3f2e2d72854c86b3376",
+    "SkirmMatch": "0x843775E7a83dCA83Ca5c8F4De7c3588f2a8525e0",
+    "FogSkirm": "0x4BA934B7c8E671e6824B3D7Bc78744687a458ee9",
+    "SkillAuction": "0x8e0343e89a7a355313Db90387764ea30Da93A65F",
+    "BenchmarkSeeds": "0x14652eFa5938480798840635BffEDEb5F6608D72",
+    "MatchPredictions": "0x683A95c91669b7e657323F8B74e616F647DB3359",
+    "PrivateLadder": "0xD87047D054c09972e4807c35174FcB46AdCeE841"
   },
   "deployBlocks": {
-    "ConfidentialSkirmCredits": null,
-    "SkirmMatch": null,
-    "FogSkirm": null,
-    "SkillAuction": null,
-    "BenchmarkSeeds": null,
-    "MatchPredictions": null,
-    "PrivateLadder": null
+    "ConfidentialSkirmCredits": 12214303,
+    "SkirmMatch": 12214310,
+    "FogSkirm": 12214311,
+    "SkillAuction": 12214312,
+    "BenchmarkSeeds": 12214313,
+    "MatchPredictions": 12214314,
+    "PrivateLadder": 12214315
   }
 };
 
