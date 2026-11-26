@@ -10,6 +10,7 @@ import {
   RedisExternalTurnStore,
   createQueue,
   createRedis,
+  createLadderOperator,
   createMatchSettler,
   createPredictionOperator,
   createSealedMatchReader,
@@ -76,6 +77,9 @@ async function bootstrap(): Promise<void> {
     // Spectator prediction markets on PvP matches (ZAMA_ENABLED, MatchPredictions deployed, the same
     // operator key): null when off.
     predictionMarkets: createPredictionOperator(process.env, log),
+    // The private ladder (ZAMA_ENABLED, PrivateLadder deployed, the same operator key): ranked results
+    // between linked, registered players are reported on chain. Null when off.
+    privateLadder: createLadderOperator(process.env, log),
     log,
   };
 

@@ -78,6 +78,7 @@ import { sleep, type QueueTiming, type Scheduler } from '../timing';
 import { LedgerV2Credits, v2HoldId } from './credits';
 import { ExternalBrain, isExternalBrain, type WebhookPost } from './external';
 import { DEFAULT_V2_TIMING, TEAMS, V2Match, crewLimitOf, type V2BanError, type V2CommandError, type V2CommandInput, type V2ControlError, type V2Finish, type V2MatchDeps, type V2MatchEnd, type V2Playbook, type V2Roster, type V2Setup, type V2Side, type V2SkillMeta, type V2Timing } from './match';
+import { PrivateLadderSync } from './ladder';
 import { MatchMarkets } from './predictions';
 import type { V2FrameStore } from './replay';
 
@@ -94,6 +95,8 @@ export interface V2Search {
   draft?: boolean;
   /** The player's Elo and ranked matches as they queued (their tier on v2_found). */
   rank?: { elo: number; rankedMatches: number };
+  /** Ranked, with the private ladder on: the EVM address linked as the player queued. */
+  evm?: string;
 }
 
 /** A crew readied in a private lobby. */
@@ -163,6 +166,8 @@ export interface V2HubDeps {
   settler?: MatchSettler | null;
   /** Spectator prediction markets (ZAMA_ENABLED, operator key set): opened on every PvP match. Absent: none. */
   predictions?: PredictionOperator | null;
+  /** The private ladder (ZAMA_ENABLED, operator key set): ranked results reported on chain, optional pairing check. Absent: none. */
+  ladder?: PrivateLadderSync | null;
   log: Logger;
 }
 
@@ -213,6 +218,8 @@ export class V2Hub {
   private readonly waitingIn = new Map<string, string>();
   /** Matches started from a lobby: settled when they end. */
   private readonly lobbyMatches = new Set<string>();
+  /** Live ranked matches with the private ladder on: the addresses linked as the players queued. */
+  private readonly ladderAddresses = new Map<string, Record<Team, string | undefined>>();
   /** Campaign matches: match id → the player and the mission, recorded when they end. */
   private readonly campaignMatches = new Map<string, { accountId: string; missionId: string }>();
   /** Agents of pairs being set up (paired, no live v2_matches row yet), so no other crew can take them meanwhile. */
@@ -272,6 +279,7 @@ export class V2Hub {
       ...(mapId !== undefined ? { mapId } : {}),
       ...(opts.draft ? { draft: true } : {}),
       ...(account ? { rank: { elo: account.elo, rankedMatches: account.rankedMatches } } : {}),
+      ...(ranked && this.deps.ladder && account?.evmAddress ? { evm: account.evmAddress } : {}),
     };
     const pool = v2Pool(payload);
     this.matchmaker.add({ key: user.accountId, lane: lane(ranked), ...(pool ? { pool } : {}), rating: account?.elo ?? 1200, payload });
@@ -999,6 +1007,7 @@ export class V2Hub {
       if (pickedId !== undefined && !picked) throw new V2HubError('invalid_crew', 'the picked map does not take both crews');
       const map = picked ?? (this.deps.pickMap ?? ((f) => f[Math.floor(Math.random() * f.length)]!))(fits);
       const ranked = a.payload.ranked;
+      if (ranked && this.deps.ladder) this.ladderAddresses.set(matchId, { A: a.payload.evm, B: b.payload.evm });
       const difficulty = ranked ? RANKED_DIFFICULTY : a.payload.difficulty;
       // Draft searches pair only with draft searches (v2PoolsMatch).
       const draft = !ranked && !!a.payload.draft;
@@ -1072,6 +1081,7 @@ export class V2Hub {
       match = await prepare();
     } catch (err) {
       release(undefined);
+      this.ladderAddresses.delete(matchId);
       const msg = err instanceof V2HubError ? err.message : 'could not start the match';
       if (!(err instanceof V2HubError)) log.error(`v2 match setup failed: ${(err as Error).stack ?? String(err)}`);
       for (const k of keys) this.deps.send(k, { type: 'error', code: err instanceof V2HubError ? err.code : 'internal', message: msg });
@@ -1087,6 +1097,7 @@ export class V2Hub {
       log.info(`v2 match ${matchId} ended: ${end.result?.winner ?? 'void'} (${end.reason})`);
     } finally {
       this.matches.delete(matchId);
+      this.ladderAddresses.delete(matchId);
       this.watchers.delete(matchId);
       release(match);
     }
@@ -1105,6 +1116,7 @@ export class V2Hub {
     const stored = !!end.result && row?.status === 'ended';
     const settled = this.settleSealed(end, match, stored);
     this.resolveMarket(end, stored, settled);
+    this.reportLadder(end, match, stored, settled);
     if (end.result && !stored) {
       log.error(`v2 match ${end.matchId}: result not stored (${row ? `row is ${row.status}` : 'record failed'}), ending it void`);
       this.campaignMatches.delete(end.matchId);
@@ -1195,6 +1207,20 @@ export class V2Hub {
     this.track(this.markets.end(end.matchId, winner, settled));
   }
 
+  /**
+   * A stored ranked result goes to the private ladder in the background (after the sealed
+   * settlement, if any): both players must have queued with a linked address that joined the ladder.
+   */
+  private reportLadder(end: V2MatchEnd, match: V2Match, stored: boolean, settled: Promise<void> | undefined): void {
+    const ladder = this.deps.ladder;
+    if (!ladder || !match.setup.ranked || !stored || !end.result) return;
+    const winner = end.result.winner !== 'draw' ? end.result.winner : null;
+    const { sides } = match.setup;
+    const at = this.ladderAddresses.get(end.matchId);
+    const entrant = (t: Team) => ({ accountId: sides[t].accountId, address: at?.[t] });
+    this.track(ladder.afterMatch(end.matchId, { A: entrant('A'), B: entrant('B') }, winner, settled));
+  }
+
   /** A campaign match's result for its player; a cleared chapter grants its rewards (logged, never fatal). */
   private async recordCampaign(matchId: string, c: { accountId: string; missionId: string }, result: MatchResult): Promise<void> {
     const { repos, log } = this.deps;
@@ -1260,6 +1286,7 @@ export class V2Hub {
   /** Voids every live match (credits returned) and stops matchmaking. */
   async close(): Promise<void> {
     this.closing = true;
+    this.deps.ladder?.stop();
     this.matchmaker.stop();
     this.matchmaker.clear();
     for (const a of [...this.waitingIn.keys()]) this.unready(a);
