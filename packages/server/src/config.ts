@@ -1,4 +1,5 @@
 // Env config for api, worker and realtime, parsed with zod (docs/backend-contract.md, Environment).
+import { DbConfigError, resolveDbConnection } from '@skirm/db';
 import { DEFAULTS, ModelCatalogError, parseModelCatalog, type ModelChoice } from '@skirm/shared';
 import { z } from 'zod';
 
@@ -95,6 +96,15 @@ export const envSchema = z
   .object({
     NODE_ENV: withDefault('development'),
     DATABASE_URL: url(ENV_DEFAULTS.DATABASE_URL, ['postgres:', 'postgresql:']),
+    /**
+     * Postgres TLS (@skirm/db resolveDbConnection): unset follows DATABASE_URL's `sslmode` (no TLS
+     * without one, as for the local Docker Postgres); true/require, verify-ca, verify-full or false.
+     */
+    DATABASE_SSL: optional(),
+    /** PEM CA for verify-ca / verify-full (and a chain check under require). */
+    DATABASE_SSL_CA: optional(),
+    /** Postgres pool size per process (2-100; default 5). Sum over every process stays under the pooler's limit. */
+    DATABASE_POOL_MAX: optional(),
     REDIS_URL: url(ENV_DEFAULTS.REDIS_URL, ['redis:', 'rediss:']),
     AUTH_MODE: enumWithDefault(['dev', 'privy'] as const, 'dev'),
     /**
@@ -231,6 +241,23 @@ export const envSchema = z
     PUBLIC_WS_URL: url(ENV_DEFAULTS.PUBLIC_WS_URL, ['ws:', 'wss:']),
   })
   .superRefine((env, ctx) => {
+    try {
+      resolveDbConnection(env.DATABASE_URL, {
+        DATABASE_SSL: env.DATABASE_SSL,
+        DATABASE_SSL_CA: env.DATABASE_SSL_CA,
+        DATABASE_POOL_MAX: env.DATABASE_POOL_MAX,
+      });
+    } catch (err) {
+      if (!(err instanceof DbConfigError)) throw err;
+      const path = /^DATABASE_POOL_MAX/.test(err.message)
+        ? 'DATABASE_POOL_MAX'
+        : /needs a CA/.test(err.message)
+          ? 'DATABASE_SSL_CA'
+          : /^DATABASE_SSL/.test(err.message)
+            ? 'DATABASE_SSL'
+            : 'DATABASE_URL';
+      ctx.addIssue({ code: 'custom', path: [path], message: err.message.replace(/^[A-Z_]+ /, '') });
+    }
     if (env.AUTH_MODE === 'privy') {
       if (!env.PRIVY_APP_ID)
         ctx.addIssue({

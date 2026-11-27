@@ -3,6 +3,7 @@ import type { ExtractTablesWithRelations } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { PgDatabase, PgQueryResultHKT, PgTransaction } from 'drizzle-orm/pg-core';
 import pg from 'pg';
+import { resolveDbConnection } from './connection';
 import * as schema from './schema';
 
 export type Schema = typeof schema;
@@ -12,13 +13,23 @@ export type Tx = PgTransaction<PgQueryResultHKT, Schema, ExtractTablesWithRelati
 export type Executor = Db | Tx;
 
 export interface CreateDbOptions {
-  /** Pool size (default 10). */
+  /** Pool size; default DATABASE_POOL_MAX, else DEFAULT_POOL_MAX (5). */
   max?: number;
+  /** Where DATABASE_SSL, DATABASE_SSL_CA and DATABASE_POOL_MAX are read (default process.env). */
+  env?: Record<string, string | undefined>;
 }
 
-/** Postgres through node-postgres. Close with `closeDb(db)`. */
+/**
+ * Postgres through node-postgres. Close with `closeDb(db)`. TLS follows the URL's `sslmode` or
+ * DATABASE_SSL (off when neither is set, as for the local Docker Postgres; `resolveDbConnection`).
+ * Every query is an unnamed (unprepared) statement and there is no LISTEN/NOTIFY, so a
+ * session-mode pooler (Supabase Supavisor on 5432) works; transaction mode (6543) breaks
+ * `withAdvisoryLock`, which holds a session lock across queries.
+ */
 export function createDb(url: string, opts: CreateDbOptions = {}): Db {
-  const pool = new pg.Pool({ connectionString: url, max: opts.max ?? 10 });
+  const { connectionString, ssl, max } = resolveDbConnection(url, opts.env ?? process.env, { max: opts.max });
+  // keepAlive: a remote database (the Supabase pooler) sits behind NAT that drops idle TCP flows.
+  const pool = new pg.Pool({ connectionString, ssl, max, keepAlive: true });
   // Never log query parameters: they can carry ciphertext and receipts.
   pool.on('error', (err) => {
     console.error(`[db] idle client error: ${err.message}`);

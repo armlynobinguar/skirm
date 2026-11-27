@@ -2,6 +2,7 @@
 export * as schema from './schema';
 export * from './schema';
 export * from './client';
+export * from './connection';
 export { migrate, embeddedMigrations, nextBatch, addsEnumValue, runMigrateCli, type MigrateOptions } from './migrator';
 export * from './ids';
 export * from './types';

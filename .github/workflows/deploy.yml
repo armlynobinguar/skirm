@@ -71,6 +71,11 @@ jobs:
           # a GitHub secret; the account is required when that secret exists.
           RELAYER_ACCOUNT_ID: ${{ vars.RELAYER_ACCOUNT_ID }}
           RELAYER_FREE_TXS: ${{ vars.RELAYER_FREE_TXS }}
+          # Database (docs/deploy.md, Database): DATABASE_URL is the <env>-database-url secret, the
+          # Supabase session pooler with sslmode=require. Optional: the Postgres pool size per
+          # process (empty: 5) and a TLS override (empty: the URL's sslmode decides).
+          DATABASE_POOL_MAX: ${{ vars.DATABASE_POOL_MAX }}
+          DATABASE_SSL: ${{ vars.DATABASE_SSL }}
           # Baked into the web image (NEXT_PUBLIC_SAMPLE_MATCH_ID). An image built for a commit is
           # reused, so a new value lands on the next commit deployed with services=web (or all).
           SAMPLE_MATCH_ID: ${{ vars.SAMPLE_MATCH_ID }}

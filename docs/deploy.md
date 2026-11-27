@@ -48,7 +48,7 @@ The layout follows System Architecture, everything in `us-central1`. One project
 | `worker` | Cloud Run worker pool `worker-<env>` | 1 instance |
 | `migrate` | Cloud Run job `migrate-<env>` | run before every deploy |
 | `web` | Cloud Run service `web-<env>` | port 3000, 0–1 instances; image `web-<env>` is built per environment (public URLs are build args) |
-| Postgres | Cloud SQL for PostgreSQL 16 `skirm-pg-<env>` | db-f1-micro, 10 GiB SSD, private IP |
+| Postgres | Supabase project `dzbiuvcfwegxyavzemfe` (staging) | reached through the Supavisor session pooler over TLS ("Database (Supabase)" below); the old Cloud SQL instance is kept for rollback (Appendix) |
 | Redis | Memorystore for Redis `skirm-redis-<env>` | Basic, 1 GiB, `maxmemory-policy=noeviction` (BullMQ) |
 | Maps | Cloud Storage | bucket `<project>-<env>-maps` (for later; maps are bundled) |
 | Secrets | Secret Manager | `<env>-database-url`, `<env>-privy-verification-key`; optional `<env>-llm-api-key` (the model brain's `LLM_API_KEY`; the older `<env>-openrouter-api-key` still works as `OPENROUTER_API_KEY`), `<env>-bench-secret` (worker: keys the hidden benchmark picks), `<env>-near-ops-key`, `<env>-ops-token` (api only, turns on `GET /ops/stats` for the skirm-ops dashboard), `<env>-relayer-private-key` (api only: the gasless relayer's `RELAYER_PRIVATE_KEY`; needs the `RELAYER_ACCOUNT_ID` variable, and the deploy stops if only one of the two is set; [gasless.md](gasless.md)) |
@@ -56,11 +56,12 @@ The layout follows System Architecture, everything in `us-central1`. One project
 | Images | Artifact Registry | repo `skirm`, tagged with the commit |
 | Runtime identity | service account `skirm-run-<env>` | reads only `<env>-*` secrets |
 
-Postgres and Redis have no public endpoint. The Cloud Run pieces reach them through Direct VPC egress (`--network default --subnet default --vpc-egress private-ranges-only`). Cloud Run URLs are `https://<service>-<project number>.<region>.run.app`, so they are known before the first deploy.
+Redis has no public endpoint: the Cloud Run pieces reach it through Direct VPC egress (`--network default --subnet default --vpc-egress private-ranges-only`). Postgres is Supabase's public pooler host; with `private-ranges-only`, traffic to public addresses skips the VPC and leaves through Cloud Run's own internet egress (IPv4), so no NAT or connector is needed. Don't switch to `--vpc-egress all-traffic` without a Cloud NAT on the subnet, or the pooler becomes unreachable. Cloud Run URLs are `https://<service>-<project number>.<region>.run.app`, so they are known before the first deploy.
 
 ### What the user supplies
 
 - A GCP project with billing, and a deployer service account with Owner on it. Don't use the Compute Engine default service account: it only has Editor, which can't set IAM policies, read secrets, use KMS keys or create the VPC peering.
+- A Supabase project for Postgres, its database password and its session-pooler host ("Database (Supabase)" below).
 - An API key for an OpenAI-compatible model provider (default: OpenRouter with `anthropic/claude-haiku-5.5`). Without it every match plays the offline greedy brain and benchmarks and trials end `needs_model`; `scripts/deploy-gcp.sh` sets `V2_BRAIN=model` when `<env>-llm-api-key` (or the older `<env>-openrouter-api-key`) exists, `greedy` otherwise. Another provider or model: set the `LLM_BASE_URL`, `LLM_MODEL` (and optionally `LLM_PLANNER_MODEL`, `LLM_PRICE_INPUT_USD`, `LLM_PRICE_OUTPUT_USD`) repository variables, which `deploy.yml` passes to the script; unset keeps the defaults.
 - The Privy app id and its **verification key** (Privy dashboard → Basics → API keys → "Verify with key instead"; a `-----BEGIN PUBLIC KEY-----` PEM, not the `privy_app_secret_…`). Add the web URL to Privy's allowed domains (Basics → Domains and clients). Never run a deployed environment with `AUTH_MODE=dev`: dev mode trusts any `x-dev-user` header.
 - NEAR testnet accounts, with the contracts deployed (`contracts/README.md`, seasons included) and the `ops` account's key (`NEAR_OPS_ACCOUNT`, `<env>-near-ops-key`; a full-access key, see `contracts/README.md`). Without them the Noop adapters record ranked results as `local` and season pools read `local`.
@@ -80,29 +81,13 @@ NUM=$(gcloud projects describe $P --format='value(projectNumber)')
 gcloud config set project $P
 
 # Per project
-gcloud services enable run.googleapis.com artifactregistry.googleapis.com sqladmin.googleapis.com \
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
   redis.googleapis.com secretmanager.googleapis.com cloudkms.googleapis.com cloudbuild.googleapis.com \
   servicenetworking.googleapis.com compute.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com
 gcloud artifacts repositories create skirm --repository-format=docker --location=$R
 gcloud kms keyrings create skill-vault --location=$R
 
-# Private services access for Cloud SQL. On a fresh project the Service Networking agent may not exist
-# yet ("Permission denied to add peering"): create it and give it its role first.
-curl -fsS -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" -H 'Content-Type: application/json' -d '{}' \
-  https://serviceusage.googleapis.com/v1beta1/projects/$P/services/servicenetworking.googleapis.com:generateServiceIdentity
-gcloud projects add-iam-policy-binding $P --condition=None --role=roles/servicenetworking.serviceAgent \
-  --member=serviceAccount:service-$NUM@service-networking.iam.gserviceaccount.com
-gcloud compute addresses create google-managed-services --global --purpose=VPC_PEERING \
-  --prefix-length=16 --network=default
-gcloud services vpc-peerings connect --service=servicenetworking.googleapis.com \
-  --ranges=google-managed-services --network=default
-
-# Per environment (create Cloud SQL only after the peering exists, or it fails)
-gcloud sql instances create skirm-pg-$ENV --database-version=POSTGRES_16 --edition=enterprise \
-  --tier=db-f1-micro --storage-type=SSD --storage-size=10 --region=$R --network=default --no-assign-ip \
-  --backup-start-time=03:00 --retained-backups-count=14 \
-  --enable-point-in-time-recovery --retained-transaction-log-days=7
-gcloud sql databases create skirm --instance=skirm-pg-$ENV
+# Per environment. Postgres is a Supabase project ("Database (Supabase)" below), not created here.
 gcloud redis instances create skirm-redis-$ENV --size=1 --tier=basic --region=$R \
   --redis-version=redis_7_2 --network=default
 gcloud redis instances update skirm-redis-$ENV --region=$R --update-redis-config=maxmemory-policy=noeviction
@@ -124,17 +109,14 @@ Create them from files so values never reach the shell history or a log, and del
 
 ```sh
 umask 077
-openssl rand -hex 24 > pgpw
-gcloud sql users create skirm --instance=skirm-pg-$ENV --password="$(cat pgpw)"
-PGIP=$(gcloud sql instances describe skirm-pg-$ENV --format='value(ipAddresses[0].ipAddress)')
-printf 'postgres://skirm:%s@%s:5432/skirm' "$(cat pgpw)" "$PGIP" > dburl
+# $ENV-database-url: the Supabase session-pooler URL, written to a file as in
+# "Database (Supabase)" below; `create` the first time, `versions add` afterwards.
 gcloud secrets create $ENV-database-url --data-file=dburl
-
-shred -u pgpw dburl
+shred -u dburl
 
 gcloud secrets create $ENV-privy-verification-key --data-file=privy-es256.pub.pem
 # Optional: $ENV-llm-api-key (or the older $ENV-openrouter-api-key), $ENV-bench-secret (openssl rand -hex 32), $ENV-near-ops-key, $ENV-ops-token,
-# $ENV-relayer-private-key (api only). The runtime account's secretAccessor binding above covers every $ENV- secret.
+# $ENV-relayer-private-key (api only), $ENV-database-ssl-ca (a PEM CA, becomes DATABASE_SSL_CA). The runtime account's secretAccessor binding above covers every $ENV- secret.
 ```
 
 ### Each deploy
@@ -200,42 +182,107 @@ Repository variables (Settings → Secrets and variables → Actions → Variabl
 
 After changing a variable or a secret, run the deploy workflow by hand with `services=all`: the default `services=auto` redeploys only the pieces whose files changed, so a new value would wait for the next commit that touches each service (the web image built for a commit is reused, so a new `SAMPLE_MATCH_ID` lands with the next commit deployed with `services=web` or `all`).
 
-## Backups and restore
+## Database (Supabase)
+
+Production Postgres is the Supabase project `dzbiuvcfwegxyavzemfe` (Postgres 15 or 17; the
+migrations need no extension, role or superuser). api, worker, realtime and the `migrate-<env>` job
+all read `DATABASE_URL` from the `<env>-database-url` secret.
+
+### The secret
+
+Use the Supavisor **session** pooler. Copy its host from the dashboard (Connect → Session pooler):
+
+```
+postgresql://postgres.dzbiuvcfwegxyavzemfe:<url-encoded password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+- **Session pooler, port 5432.** The direct host `db.<ref>.supabase.co` is IPv6 only and Cloud Run
+  egress is IPv4, so it can't be reached. The transaction pooler (port 6543) hands each statement to
+  any server connection, which breaks the session advisory lock the worker takes while seeding
+  (`withAdvisoryLock`). In session mode each client connection keeps one server connection, so
+  advisory locks and transactions behave as on a plain Postgres. skirm sends only unnamed statements
+  and uses no LISTEN/NOTIFY (pub/sub is Redis).
+- **User `postgres.<ref>`, database `postgres`.** Nothing in the code assumes the old `skirm` user or
+  database name.
+- **URL-encode the password** (`@`, `:`, `/`, `?`, `#` and `%` break the URL otherwise).
+- **`sslmode=require`** turns TLS on with libpq's meaning: encrypted, certificate not checked.
+  `@skirm/db` (`resolveDbConnection`) strips `sslmode` before node-postgres sees it, because
+  node-postgres would otherwise treat `require` as `verify-full` and fail on Supabase's own CA. To
+  check the certificate too, download the CA (Database settings → SSL configuration), store it as the
+  `<env>-database-ssl-ca` secret (the deploy maps it to `DATABASE_SSL_CA`) and use
+  `sslmode=verify-full`. `DATABASE_SSL` (repository variable) overrides the URL's mode. A URL without
+  `sslmode` (the local Docker Postgres) connects without TLS.
+
+Set or rotate it from a file, so the password never reaches the shell history or a log:
+
+```sh
+umask 077
+# pgpw: the database password (Supabase dashboard → Database settings → Reset database password).
+python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(open(sys.argv[1]).read().strip(), safe=""), end="")' pgpw > pgpw.enc
+printf 'postgresql://postgres.%s:%s@%s:5432/postgres?sslmode=require' \
+  dzbiuvcfwegxyavzemfe "$(cat pgpw.enc)" aws-0-<region>.pooler.supabase.com > dburl
+gcloud secrets versions add $ENV-database-url --data-file=dburl     # `secrets create` the first time
+shred -u pgpw pgpw.enc dburl
+```
+
+The services read `:latest` only when an instance starts, and realtime and the worker never restart
+on their own, so after a new version run the deploy workflow with `services=all` (or
+`SERVICES=all scripts/deploy-gcp.sh`). A plain push deploys only what changed and would leave the
+old URL on the untouched services. To rotate the password without downtime, add the new version
+and redeploy right after resetting the password in Supabase; the old connections stay up until the
+new revisions replace them. Disable the old secret version afterwards
+(`gcloud secrets versions disable <n> --secret=$ENV-database-url`).
+
+### Connections
+
+Every process opens one node-postgres pool, at most `DATABASE_POOL_MAX` connections (default 5,
+2 at least; repository variable), opened on demand and closed after 10 s idle; the migrate job uses
+one. Supavisor's session mode allows as many clients as its pool size (Database settings →
+Connection pooling), and every pooled connection also counts towards the compute size's Postgres
+`max_connections` (about 60 on the free and small tiers), shared with the dashboard and Supabase's
+own services. Budget: api + worker + realtime at 5 each is 15, and twice that while a deploy runs
+old and new revisions side by side, plus 1 for migrate, so 31. Set the pooler's pool size to about
+35, or lower `DATABASE_POOL_MAX` to 3 on a smaller pool. "Max client connections reached" in the
+logs means the budget is too small.
+
+### Supabase settings
+
+- **Data API off** (Project settings → Data API, or remove `public` from the exposed schemas).
+  skirm never uses it. Migration `0028_supabase_api_roles` also revokes the `anon` and
+  `authenticated` roles' grants on `public`, now and for later tables, so the public anon key can't
+  read or write skirm's tables even with the Data API on.
+- **Network restrictions:** leave them off, or allow all IPv4. Cloud Run's egress addresses change;
+  pinning them would need Cloud NAT with a static IP and `--vpc-egress all-traffic`.
+- **SSL enforcement** (Database settings → SSL configuration) may be on; the URL above uses TLS.
+
+### Backups and restore
 
 Postgres holds everything that matters: accounts, the credits ledger, purchases, rental passes and
-match history. The instance keeps a daily automated backup (03:00 UTC, 14 kept) and point-in-time
-recovery (7 days of transaction logs), so it can be brought back to any second of the last week.
+match history.
 
-An instance created before these flags existed gets them with:
+- **Daily backups** come with the Pro plan and up (kept 7 days on Pro, longer on higher plans;
+  Database → Backups). The free plan has none you can restore, so on it take the logical dump below
+  every day.
+- **Point-in-time recovery** is a paid add-on (Pro plan, Small compute or larger; 7, 14 or 28 days).
+  With it on, the daily backups are replaced by continuous WAL archiving, and the project can be
+  restored to any second in the window.
+- **Restore** from the dashboard (Database → Backups → Restore, or Point in time). An in-place
+  restore replaces the project's data and takes the database offline for a while, so expect errors
+  from the services meanwhile (don't run it during a demo window) and redeploy with `services=all`
+  afterwards so every pool reconnects cleanly. Prefer "Restore to a new project" where the plan
+  offers it: check the rows there, then point `<env>-database-url` at the new project's session
+  pooler as in "The secret" and redeploy.
+- **Our own copy**, plan independent: a logical dump through the session pooler, kept outside Supabase.
 
-```bash
-gcloud sql instances patch skirm-pg-$ENV --backup-start-time=03:00 --retained-backups-count=14 \
-  --enable-point-in-time-recovery --retained-transaction-log-days=7
-```
+  ```sh
+  pg_dump "$(cat dburl)" --format=custom --no-owner --no-privileges --file=skirm-$(date -u +%F).dump
+  gcloud storage cp skirm-*.dump gs://<backup bucket>/   # create one with a retention policy
+  ```
 
-`ENV=staging PROJECT=$PROJECT scripts/check-backups.sh` checks it (read only): backups and
-point-in-time recovery on, at least 7 kept, and a successful backup in the last 36 hours. It exits
-non-zero when anything is off.
-
-**Restore** never overwrites the live instance. Clone it to the moment before the damage, check the
-clone, then point the services at it:
-
-```bash
-# 1. A new instance as it was at that moment (UTC); takes minutes.
-gcloud sql instances clone skirm-pg-$ENV skirm-pg-$ENV-restore --point-in-time=2026-11-03T14:04:00Z
-# 2. Check it: connect through the Cloud SQL proxy and look at the rows that went wrong.
-# 3. Point DATABASE_URL at it: add a new version of the `$ENV-database-url` secret with the
-#    clone's private IP, then redeploy api, realtime and worker ("Each deploy" above).
-# 4. Once traffic runs on the clone and it looks right, delete the old instance or keep it for review.
-```
-
-To restore a whole daily backup instead: `gcloud sql backups list --instance=skirm-pg-$ENV`, then
-`gcloud sql backups restore <BACKUP_ID> --restore-instance=skirm-pg-$ENV-restore --backup-instance=skirm-pg-$ENV`
-(create the target instance first; restoring onto the live one replaces its data).
-
-**Restore drill**, once a month and before mainnet: clone to a point in time, run
-`SELECT count(*) FROM accounts; SELECT count(*) FROM ledger_rows;` on the clone, compare with the
-live instance, then delete the clone. A backup that has never been restored is not a backup yet.
+**Restore drill**, once a month and before mainnet: restore a backup (or a dump with
+`pg_restore --no-owner`) into a scratch project or local Postgres, run
+`SELECT count(*) FROM accounts; SELECT count(*) FROM ledger_rows;`, compare with production, then
+delete it. A backup that has never been restored is not a backup yet.
 
 ## Error reporting
 
@@ -277,3 +324,28 @@ Milestones (Observability) asks for a cost alert, and System Architecture routes
 - worker and realtime add every model call's `costUsd` to a per-UTC-day total in Redis (`cost:usd:<YYYY-MM-DD>`, shared by all instances).
 - When the day's total crosses 50 % and 80 % of `COST_ALERT_DAILY_USD` (default 10, `0` = off), one instance logs `cost_alert` at warn. At 100 % it logs at error. Fields: `day`, `level`, `spentUsd`, `budgetUsd`.
 - On GCP, create a log-based metric on `jsonPayload.msg="cost_alert"` (the realtime line starts with `[realtime] cost_alert`) and alert on it in Cloud Monitoring. Keep the Billing budget and the provider spend limits on each key: they are the hard stops.
+
+## Appendix: Cloud SQL (legacy)
+
+Until the move to Supabase, production ran on Cloud SQL for PostgreSQL 16 `skirm-pg-<env>`
+(db-f1-micro, 10 GiB SSD, private IP only, database `skirm_kms`, user `skirm`), reached over
+private services access and Direct VPC egress. The instance is **kept for rollback** until it is
+decommissioned; nothing in the code depends on it.
+
+- **Rollback:** add a version of `<env>-database-url` with the Cloud SQL URL
+  (`postgres://skirm:<password>@<private IP>:5432/skirm_kms`, no `sslmode`: the private IP path has
+  no TLS) and redeploy with `services=all`. Writes made on Supabase since the cutover are not on
+  the instance; copy them back first or accept losing them.
+- **Backups** (still on while it exists): daily at 03:00 UTC, 14 kept, point-in-time recovery with 7
+  days of logs. `ENV=staging PROJECT=$PROJECT scripts/check-backups.sh` checks them (read only).
+  Restore by cloning, never in place:
+  `gcloud sql instances clone skirm-pg-$ENV skirm-pg-$ENV-restore --point-in-time=<UTC time>`, or
+  `gcloud sql backups restore <BACKUP_ID> --restore-instance=<new instance> --backup-instance=skirm-pg-$ENV`.
+- **Recreating it** (only for a rollback after decommissioning): enable `sqladmin.googleapis.com` and
+  `servicenetworking.googleapis.com`, set up private services access (the `google-managed-services`
+  range and `gcloud services vpc-peerings connect` on `default`; on a fresh project first create the
+  Service Networking agent and give it `roles/servicenetworking.serviceAgent`), then
+  `gcloud sql instances create skirm-pg-$ENV --database-version=POSTGRES_16 --edition=enterprise --tier=db-f1-micro --storage-type=SSD --storage-size=10 --region=$R --network=default --no-assign-ip --backup-start-time=03:00 --retained-backups-count=14 --enable-point-in-time-recovery --retained-transaction-log-days=7`.
+- **Decommissioning:** once Supabase has run cleanly for a while and a Supabase restore drill has
+  passed, take a final export (`gcloud sql export sql skirm-pg-$ENV gs://<bucket>/final.sql.gz --database=skirm_kms`),
+  then `gcloud sql instances delete skirm-pg-$ENV`, delete `scripts/check-backups.sh` and this appendix.

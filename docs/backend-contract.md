@@ -16,6 +16,9 @@ The single reference for `apps/api`, `apps/worker`, `apps/realtime` and `apps/we
 | Var | Default | Use |
 | --- | --- | --- |
 | `DATABASE_URL` | `postgres://skirm:skirm@localhost:5432/skirm` | all |
+| `DATABASE_SSL` | unset (the URL's `sslmode` decides; no TLS without one) | all |
+| `DATABASE_SSL_CA` | unset (PEM CA for `verify-ca` / `verify-full`) | all |
+| `DATABASE_POOL_MAX` | `5` (Postgres pool size per process, 2-100) | all |
 | `REDIS_URL` | `redis://localhost:6379` | all |
 | `AUTH_MODE` | `dev` | `dev`: trust the `x-dev-user: <handle>` header (local and judges only). `privy`: verify the Privy JWT (`Authorization: Bearer`) with `PRIVY_APP_ID` and `PRIVY_VERIFICATION_KEY` |
 | `V2_BRAIN` | unset (compose: `greedy`) | realtime, worker and the api's replay caster: `model` \| `greedy` (`haiku` is the old name of `model`). `greedy` forces the offline greedy brain: no model calls, no spend, practice is free. Anything else plays the configured model (`LLM_*` below) when a model key is set, and greedy without it; `model` with a non-OpenRouter `LLM_BASE_URL` also plays a keyless local server (Ollama, LM Studio, vLLM). Not part of `loadConfig()`: each app reads it from the environment |
