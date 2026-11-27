@@ -13,6 +13,7 @@ import { Contract, id as keccakUtf8, type ContractRunner } from 'ethers';
 import { zamaConfig, type HexAddress } from '@/lib/zama/config';
 import { MAX_U64, checkUint, isZeroHandle, toHex, userDecrypt, type Hex, type TypedDataSigner } from '@/lib/zama/fhe';
 import { ZamaWalletError } from '@/lib/zama/wallet';
+import { trackRelayer, trackTx } from '@/lib/zama/steps';
 
 /** How often the panel re-reads the market. */
 export const PREDICTION_POLL_MS = 6_000;
@@ -85,8 +86,7 @@ export function parseMarket(m: { closesAt: bigint; status: bigint; winner: bigin
 export function predictionsApi(runner: ContractRunner, address: string = predictionsAddress()): PredictionsApi {
   const c = new Contract(address, MatchPredictionsAbi, runner);
   const send = async (fn: string, ...args: unknown[]) => {
-    const tx = (await c.getFunction(fn)(...args)) as Tx;
-    await tx.wait();
+    const { tx } = await trackTx(() => c.getFunction(fn)(...args) as Promise<Tx>);
     return tx.hash;
   };
   return {
@@ -115,7 +115,7 @@ export async function encryptPrediction(instance: EncryptInstance, contract: str
   const input = instance.createEncryptedInput(contract, user);
   input.addBool(team === 'B');
   input.add64(v);
-  const { handles, inputProof } = await input.encrypt();
+  const { handles, inputProof } = await trackRelayer('encrypt', () => input.encrypt());
   return { side: toHex(handles[0]!), amount: toHex(handles[1]!), inputProof: toHex(inputProof) };
 }
 

@@ -4,6 +4,7 @@ import { Contract, type ContractRunner } from 'ethers';
 import { zamaConfig, type HexAddress } from '@/lib/zama/config';
 import type { Handle } from '@/lib/zama/fhe';
 import { ZamaWalletError } from '@/lib/zama/wallet';
+import { trackTx } from '@/lib/zama/steps';
 
 /** The deployed cSKIRM address, or a `not_deployed` error. */
 export function creditsAddress(): HexAddress {
@@ -44,8 +45,7 @@ export async function readFaucet(runner: ContractRunner, holder: string): Promis
 
 /** Sends claimFaucet() and waits for one confirmation; returns the tx hash. */
 export async function claimFaucet(signer: ContractRunner): Promise<string> {
-  const tx = (await credits(signer).getFunction('claimFaucet')()) as { hash: string; wait: () => Promise<unknown> };
-  await tx.wait();
+  const { tx } = await trackTx(() => credits(signer).getFunction('claimFaucet')() as Promise<{ hash: string; wait: () => Promise<unknown> }>);
   return tx.hash;
 }
 

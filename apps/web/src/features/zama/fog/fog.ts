@@ -22,6 +22,7 @@ import { Contract, ZeroAddress, type ContractRunner, type Log } from 'ethers';
 import { zamaConfig, type HexAddress } from '@/lib/zama/config';
 import { publicDecrypt, userDecrypt, type EncryptedInputs, type Hex, type TypedDataSigner } from '@/lib/zama/fhe';
 import { ZamaWalletError } from '@/lib/zama/wallet';
+import { trackTx } from '@/lib/zama/steps';
 
 export const FOG_STATUSES = ['none', 'waiting', 'playing', 'ended', 'cancelled'] as const;
 export type FogStatus = (typeof FOG_STATUSES)[number];
@@ -145,7 +146,7 @@ export function parseGame(id: bigint, g: RawGame): FogGame {
 export function fogApi(runner: ContractRunner, address: string = fogAddress()): FogApi {
   const c = new Contract(address, FogSkirmAbi, runner);
   const call = <T>(fn: string, ...args: unknown[]) => c.getFunction(fn)(...args) as Promise<T>;
-  const send = async (fn: string, ...args: unknown[]) => (await (await call<Tx>(fn, ...args)).wait())?.logs ?? [];
+  const send = async (fn: string, ...args: unknown[]) => (await trackTx(() => call<Tx>(fn, ...args))).receipt?.logs ?? [];
   const hex = (h: unknown) => String(h) as Hex;
   return {
     read: async (id) => parseGame(id, await call<RawGame>('getGame', id)),

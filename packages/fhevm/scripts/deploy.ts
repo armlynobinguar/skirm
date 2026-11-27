@@ -12,7 +12,7 @@
  * `BenchmarkSeeds` to add the on-chain benchmark seeds, `MatchPredictions` to add confidential
  * spectator predictions, or `PrivateLadder` to add the encrypted rating ladder), CREDITS_OWNER (defaults to the
  * deployer), FAUCET_AMOUNT (base units, 6 decimals; default 1,000 cSKIRM), FAUCET_COOLDOWN_SECONDS
- * (default 86400).
+ * (default 86400), SEPOLIA_GAS_PRICE_GWEI (fixed fee and tip per gas, e.g. 0.05; default ethers').
  *
  * SkirmMatch escrows cSKIRM stakes, so it takes: the cSKIRM address (CREDITS_ADDRESS, else the one
  * deployed in this run or recorded in deployments/<network>.json), MATCH_OPERATOR (the game server
@@ -65,14 +65,14 @@ function constructorArgs(name: ContractName, deployer: HardhatEthersSigner, cont
   switch (name) {
     case "ConfidentialSkirmCredits":
       return [
-        process.env.CREDITS_OWNER ?? deployer.address,
-        BigInt(process.env.FAUCET_AMOUNT ?? DEFAULT_FAUCET_AMOUNT),
-        BigInt(process.env.FAUCET_COOLDOWN_SECONDS ?? DEFAULT_FAUCET_COOLDOWN),
+        envAddress("CREDITS_OWNER", deployer.address),
+        BigInt(process.env.FAUCET_AMOUNT || DEFAULT_FAUCET_AMOUNT),
+        BigInt(process.env.FAUCET_COOLDOWN_SECONDS || DEFAULT_FAUCET_COOLDOWN),
       ];
     case "SkirmMatch": {
       const credits = envAddress("CREDITS_ADDRESS", contracts.ConfidentialSkirmCredits?.address ?? "");
       if (!credits) throw new Error("SkirmMatch needs cSKIRM: deploy ConfidentialSkirmCredits first or set CREDITS_ADDRESS");
-      const feeBps = Number(process.env.FEE_BPS ?? 0);
+      const feeBps = Number(process.env.FEE_BPS || 0);
       if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 1000) throw new Error(`FEE_BPS: ${process.env.FEE_BPS} is not 0..1000`);
       return [credits, envAddress("MATCH_OPERATOR", deployer.address), envAddress("TREASURY", ethers.ZeroAddress), feeBps];
     }
@@ -81,13 +81,13 @@ function constructorArgs(name: ContractName, deployer: HardhatEthersSigner, cont
     case "SkillAuction": {
       const credits = envAddress("CREDITS_ADDRESS", contracts.ConfidentialSkirmCredits?.address ?? "");
       if (!credits) throw new Error("SkillAuction needs cSKIRM: deploy ConfidentialSkirmCredits first or set CREDITS_ADDRESS");
-      const raw = process.env.AUCTION_FEE_BPS ?? process.env.FEE_BPS ?? 0;
+      const raw = process.env.AUCTION_FEE_BPS || process.env.FEE_BPS || 0;
       const feeBps = Number(raw);
       if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 1000) throw new Error(`AUCTION_FEE_BPS: ${raw} is not 0..1000`);
       return [credits, envAddress("TREASURY", ethers.ZeroAddress), feeBps];
     }
     case "BenchmarkSeeds": {
-      const raw = process.env.BENCHMARK_REVEAL_WINDOW_SECONDS ?? 86_400;
+      const raw = process.env.BENCHMARK_REVEAL_WINDOW_SECONDS || 86_400;
       const window = Number(raw);
       if (!Number.isInteger(window) || window < 600 || window > 30 * 86_400) throw new Error(`BENCHMARK_REVEAL_WINDOW_SECONDS: ${raw} is not 600..2592000`);
       return [envAddress("BENCHMARK_OPERATOR", envAddress("MATCH_OPERATOR", deployer.address)), window];
@@ -129,10 +129,22 @@ function selected(): ContractName[] {
   return names as ContractName[];
 }
 
+/**
+ * SEPOLIA_GAS_PRICE_GWEI, when set, caps the fee and tip of every deploy. ethers' default tip is
+ * 1 gwei, far above Sepolia's base fee, and an FHEVM deploy takes 10-35M gas: the default asks the
+ * wallet to cover ~0.035 ETH per contract up front.
+ */
+function feeOverrides(): { maxFeePerGas?: bigint; maxPriorityFeePerGas?: bigint } {
+  const gwei = Number(process.env.SEPOLIA_GAS_PRICE_GWEI);
+  if (!(gwei > 0)) return {};
+  const wei = BigInt(Math.round(gwei * 1e9));
+  return { maxFeePerGas: wei, maxPriorityFeePerGas: wei };
+}
+
 async function deployOne(name: ContractName, deployer: HardhatEthersSigner, contracts: Record<string, DeploymentRecord>): Promise<DeploymentRecord> {
   const args = constructorArgs(name, deployer, contracts);
   const factory = await ethers.getContractFactory(name, deployer);
-  const contract = await factory.deploy(...args);
+  const contract = await factory.deploy(...args, feeOverrides());
   const tx = contract.deploymentTransaction();
   await contract.waitForDeployment();
   const receipt = tx ? await tx.wait() : null;

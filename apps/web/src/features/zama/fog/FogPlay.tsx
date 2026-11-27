@@ -28,6 +28,7 @@ import {
 } from './fog';
 import { FogBoard } from './FogBoard';
 import s from './fog.module.css';
+import { WhoCanSee } from '@/features/zama/privacy/WhoCanSee';
 
 /** The relayer SDK calls the screen uses (encrypt, user and public decryption). */
 export type FogInstance = Parameters<typeof encryptU8s>[0] & Parameters<typeof decryptView>[0] & Parameters<typeof finalizePendingRound>[1];
@@ -358,6 +359,7 @@ export function FogPlay({ gameId, address, contract, api, signer, instance, onLe
             </>
           ) : null}
         </p>
+        <WhoCanSee topic="fog" />
       </section>
 
       <aside className={s.side}>

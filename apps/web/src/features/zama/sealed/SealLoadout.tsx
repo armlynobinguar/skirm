@@ -21,6 +21,7 @@ import { other } from '@/features/v2/common';
 import type { V2MatchView } from '@/features/v2/v2Store';
 import { SEAL_MIN_STAKE, matchAddress, sealLoadout, sideOf, skirmMatchApi, type ChainMatch, type SealStep } from './sealed';
 import s from './sealed.module.css';
+import { SealBadge, WhoCanSee } from '@/features/zama/privacy/WhoCanSee';
 
 const STEP_TEXT: Record<SealStep, string> = {
   create: 'Opening the match on Sepolia…',
@@ -146,7 +147,9 @@ export function SealLoadout({ view, picks, roster, playbookPick, onSealing }: Se
           </p>
           {staked ? (
             <label className={s.stake}>
-              <span className={s.who}>Stake (🔒 encrypted)</span>
+              <span className={s.who}>
+                Stake <SealBadge state="sealed">encrypted</SealBadge>
+              </span>
               <span className={s.stakeRow}>
                 <input
                   className={s.stakeInput}
@@ -182,11 +185,11 @@ export function SealLoadout({ view, picks, roster, playbookPick, onSealing }: Se
         <ul className={s.sides} aria-live="polite">
           <li data-testid="zama-seal-you">
             <span className={s.who}>You</span>
-            <span className={mineSealed ? s.sealed : s.pending}>{mineSealed ? '🔒 sealed' : 'sealing…'}</span>
+            {mineSealed ? <SealBadge state="sealed">sealed</SealBadge> : <span className={s.pending}>sealing…</span>}
           </li>
           <li data-testid="zama-seal-rival">
             <span className={s.who}>Rival</span>
-            <span className={rivalSealed ? s.sealed : s.pending}>{rivalSealed ? '🔒 sealed · hidden' : rivalSealing ? 'sealing… · hidden' : 'not sealing yet'}</span>
+            {rivalSealed ? <SealBadge state="sealed">sealed · hidden</SealBadge> : <span className={s.pending}>{rivalSealing ? 'sealing… · hidden' : 'not sealing yet'}</span>}
           </li>
         </ul>
       ) : null}
@@ -196,6 +199,7 @@ export function SealLoadout({ view, picks, roster, playbookPick, onSealing }: Se
           {phase.address ? <span className={s.mono}> · {shortAddress(phase.address)}</span> : null}
         </p>
       ) : null}
+      <WhoCanSee topic="loadout" />
       {phase.kind === 'error' ? (
         <>
           <p className={s.error} role="alert">

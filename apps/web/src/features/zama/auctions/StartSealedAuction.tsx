@@ -16,6 +16,7 @@ import { errorMessage } from '@/features/zama/credits/CSkirmBalance';
 import { parseCskirm } from '@/features/zama/stakes/stakes';
 import { AUCTION_DURATIONS, auctionAddress, auctionApi, auctionSkillRef, linkMessage, type AuctionApi } from './auctions';
 import s from './auctions.module.css';
+import { trackStep } from '@/lib/zama/steps';
 
 export interface StartSealedAuctionProps {
   skillId: string;
@@ -56,7 +57,7 @@ export function StartSealedAuction({ skillId, version, accountId, api: injected,
       const linked = await client.evmLink();
       if (linked.address !== me) {
         setStep('Sign to link this wallet to your account…');
-        const signature = await conn.signer.signMessage(linkMessage(accountId, me));
+        const signature = await trackStep('sign', () => conn.signer.signMessage(linkMessage(accountId, me)));
         await client.linkEvm({ address: me, signature });
       }
       const api = injected ?? auctionApi(conn.signer, contract);

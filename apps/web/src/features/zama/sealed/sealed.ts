@@ -16,6 +16,7 @@ import { ZamaWalletError } from '@/lib/zama/wallet';
 import type { Team } from '@/lib/realtime/protocol';
 import type { FhevmInstance } from '@zama-fhe/relayer-sdk/web';
 import { CSKIRM_UNIT, parseCskirm } from '@/features/zama/stakes/stakes';
+import { trackRelayer, trackTx } from '@/lib/zama/steps';
 
 export const MATCH_STATUSES = ['none', 'open', 'locked', 'revealing', 'revealed', 'forfeited', 'cancelled', 'settled'] as const;
 export type ChainStatus = (typeof MATCH_STATUSES)[number];
@@ -76,8 +77,7 @@ type Tx = { wait: () => Promise<unknown> };
 export function skirmMatchApi(runner: ContractRunner, address: string = matchAddress()): SkirmMatchApi {
   const c = new Contract(address, SkirmMatchAbi, runner);
   const send = async (fn: string, ...args: unknown[]) => {
-    const tx = (await c.getFunction(fn)(...args)) as Tx;
-    await tx.wait();
+    await trackTx(() => c.getFunction(fn)(...args) as Promise<Tx>);
   };
   return {
     async read(key) {
@@ -119,7 +119,7 @@ export async function encryptSeal(
   const input = instance.createEncryptedInput(contract, user);
   values.forEach((v, i) => input.add8(checkUint(v, MAX_U8, `loadout[${i}]`)));
   input.add64(checkUint(stake, MAX_U64, 'stake'));
-  const { handles, inputProof } = await input.encrypt();
+  const { handles, inputProof } = await trackRelayer('encrypt', () => input.encrypt());
   return { handles: handles.map((h) => toHex(h)), inputProof: toHex(inputProof) };
 }
 

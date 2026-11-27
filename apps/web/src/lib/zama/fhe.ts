@@ -6,6 +6,7 @@
 //   handles (which the user must hold ACL access to) to that key and the SDK decrypts locally.
 // - publicDecrypt: handles a contract marked publicly decryptable (FHE.makePubliclyDecryptable).
 import type { FhevmInstance } from '@zama-fhe/relayer-sdk/web';
+import { trackRelayer, trackStep } from './steps';
 
 export type Hex = `0x${string}`;
 
@@ -50,14 +51,14 @@ type Instance = Pick<FhevmInstance, 'createEncryptedInput' | 'generateKeypair' |
 /** Encrypts a uint64 for `contract`, to be submitted by `user`. */
 export async function encryptU64(instance: Instance, contract: string, user: string, value: number | bigint): Promise<EncryptedInput> {
   const v = checkUint(value, MAX_U64, 'encryptU64');
-  const { handles, inputProof } = await instance.createEncryptedInput(contract, user).add64(v).encrypt();
+  const { handles, inputProof } = await trackRelayer('encrypt', () => instance.createEncryptedInput(contract, user).add64(v).encrypt());
   return { handle: toHex(handles[0]!), inputProof: toHex(inputProof) };
 }
 
 /** Encrypts a uint8 for `contract`, to be submitted by `user`. */
 export async function encryptU8(instance: Instance, contract: string, user: string, value: number | bigint): Promise<EncryptedInput> {
   const v = checkUint(value, MAX_U8, 'encryptU8');
-  const { handles, inputProof } = await instance.createEncryptedInput(contract, user).add8(v).encrypt();
+  const { handles, inputProof } = await trackRelayer('encrypt', () => instance.createEncryptedInput(contract, user).add8(v).encrypt());
   return { handle: toHex(handles[0]!), inputProof: toHex(inputProof) };
 }
 
@@ -72,7 +73,7 @@ export interface EncryptedInputs {
 export async function encryptU8s(instance: Instance, contract: string, user: string, values: readonly (number | bigint)[]): Promise<EncryptedInputs> {
   const input = instance.createEncryptedInput(contract, user);
   values.forEach((v, i) => input.add8(checkUint(v, MAX_U8, `encryptU8s[${i}]`)));
-  const { handles, inputProof } = await input.encrypt();
+  const { handles, inputProof } = await trackRelayer('encrypt', () => input.encrypt());
   return { handles: handles.map((h) => toHex(h)), inputProof: toHex(inputProof) };
 }
 
@@ -123,10 +124,12 @@ async function decryptAuth(instance: Instance, signer: TypedDataSigner, user: st
 
   const { publicKey, privateKey } = instance.generateKeypair();
   const eip712 = instance.createEIP712(publicKey, contracts, nowSec, DECRYPT_AUTH_DAYS);
-  const signature = await signer.signTypedData(
-    eip712.domain as unknown as Record<string, unknown>,
-    { UserDecryptRequestVerification: [...eip712.types.UserDecryptRequestVerification] },
-    eip712.message as unknown as Record<string, unknown>,
+  const signature = await trackStep('sign', () =>
+    signer.signTypedData(
+      eip712.domain as unknown as Record<string, unknown>,
+      { UserDecryptRequestVerification: [...eip712.types.UserDecryptRequestVerification] },
+      eip712.message as unknown as Record<string, unknown>,
+    ),
   );
   const auth = { publicKey, privateKey, signature: signature.replace(/^0x/, ''), startTimestamp: nowSec, durationDays: DECRYPT_AUTH_DAYS };
   authCache.set(key, auth);
@@ -149,15 +152,17 @@ export async function userDecrypt(instance: Instance, signer: TypedDataSigner, r
     const user = await signer.getAddress();
     const contracts = contractSet(live);
     const auth = await decryptAuth(instance, signer, user, contracts);
-    clear = await instance.userDecrypt(
-      live.map((r) => ({ handle: r.handle, contractAddress: r.contractAddress })),
-      auth.privateKey,
-      auth.publicKey,
-      auth.signature,
-      contracts,
-      user,
-      auth.startTimestamp,
-      auth.durationDays,
+    clear = await trackRelayer('decrypt', () =>
+      instance.userDecrypt(
+        live.map((r) => ({ handle: r.handle, contractAddress: r.contractAddress })),
+        auth.privateKey,
+        auth.publicKey,
+        auth.signature,
+        contracts,
+        user,
+        auth.startTimestamp,
+        auth.durationDays,
+      ),
     );
   }
   return refs.map((r) => (isZeroHandle(r.handle) ? 0n : lookup(clear, r.handle)));
@@ -179,7 +184,7 @@ export interface PublicDecryption {
 
 /** Decrypts handles that were made publicly decryptable on chain. */
 export async function publicDecrypt(instance: Instance, handles: readonly Handle[]): Promise<PublicDecryption> {
-  const res = await instance.publicDecrypt([...handles]);
+  const res = await trackRelayer('decrypt', () => instance.publicDecrypt([...handles]));
   return {
     values: handles.map((h) => lookup(res.clearValues, h)),
     abiEncodedClearValues: res.abiEncodedClearValues,
