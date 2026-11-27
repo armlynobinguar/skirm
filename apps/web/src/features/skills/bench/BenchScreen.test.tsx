@@ -81,7 +81,8 @@ describe('Test bench', () => {
     });
     expect(await screen.findByTestId('bench-cost')).toHaveTextContent('Free here');
     const prompt = await screen.findByTestId('bench-prompt');
-    expect(prompt).toHaveValue(SECRET_PROMPT);
+    // The box renders empty and fills once the skill's text has loaded: wait for it.
+    await waitFor(() => expect(prompt).toHaveValue(SECRET_PROMPT));
     await user.selectOptions(screen.getByTestId('bench-difficulty'), 'normal');
     await user.type(prompt, ' Then haul.');
     await user.click(screen.getByTestId('bench-run'));
