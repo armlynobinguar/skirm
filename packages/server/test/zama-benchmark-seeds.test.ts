@@ -1,3 +1,4 @@
+import { sepolia } from '@skirm/fhevm/generated';
 import { describe, expect, it } from 'vitest';
 import {
   ContractBenchmarkSeeder,
@@ -131,11 +132,17 @@ describe('createBenchmarkSeeder', () => {
     return { lines, log: { warn: (m: string) => void lines.push(m) } };
   };
 
-  it('is off without ZAMA_ENABLED or a deployed contract', () => {
+  it('is off without ZAMA_ENABLED', () => {
     const l = log();
     expect(createBenchmarkSeeder({ ZAMA_BENCHMARK_ADDRESS: ADDRESS }, l.log)).toBeNull();
-    expect(createBenchmarkSeeder({ ZAMA_ENABLED: '1' }, l.log)).toBeNull();
     expect(l.lines).toEqual([]);
+  });
+
+  it('falls back to the Sepolia deployment, still needing the key', () => {
+    const l = log();
+    expect(createBenchmarkSeeder({ ZAMA_ENABLED: '1' }, l.log)).toBeNull();
+    expect(l.lines).toHaveLength(1);
+    expect(benchmarkSeedsAddress({})).toBe(sepolia.contracts.BenchmarkSeeds);
   });
 
   it('warns without the key or with a malformed one, never printing it', () => {
@@ -149,6 +156,6 @@ describe('createBenchmarkSeeder', () => {
   it('builds a seeder with a key and an address', () => {
     const seeder = createBenchmarkSeeder({ ZAMA_ENABLED: 'true', ZAMA_BENCHMARK_ADDRESS: ADDRESS, ZAMA_OPERATOR_PRIVATE_KEY: '1'.repeat(64) }, log().log);
     expect(seeder?.address).toBe(ADDRESS.toLowerCase());
-    expect(benchmarkSeedsAddress({ ZAMA_BENCHMARK_ADDRESS: 'nope' })).toBeNull();
+    expect(benchmarkSeedsAddress({ ZAMA_BENCHMARK_ADDRESS: 'nope' })).toBe(sepolia.contracts.BenchmarkSeeds);
   });
 });
