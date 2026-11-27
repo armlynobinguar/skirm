@@ -1,3 +1,4 @@
+import { sepolia } from '@skirm/fhevm/generated';
 import { describe, expect, it } from 'vitest';
 import { creditsAddress, formatWait, shortAddress } from './credits';
 
@@ -16,8 +17,8 @@ describe('cSKIRM helpers', () => {
     expect(shortAddress('0x12')).toBe('0x12');
   });
 
-  it('explains when cSKIRM is not deployed', () => {
-    // generated/index.ts has no Sepolia address until the contracts are deployed.
-    expect(() => creditsAddress()).toThrow(/not deployed/);
+  it('uses the Sepolia cSKIRM deployment by default', () => {
+    // generated/index.ts holds the addresses packages/fhevm deployed to Sepolia (#125).
+    expect(creditsAddress().toLowerCase()).toBe(sepolia.contracts.ConfidentialSkirmCredits?.toLowerCase());
   });
 });
