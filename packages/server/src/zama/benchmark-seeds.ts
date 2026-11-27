@@ -14,7 +14,7 @@
 // sepolia.json, via @skirm/fhevm/generated), ZAMA_RELAYER_URL (default: the SDK's Sepolia relayer).
 // The key is never logged.
 import { BenchmarkSeedsAbi, sepolia } from '@skirm/fhevm/generated';
-import { benchmarkSeedStatus, resultsHashPreimage, type BenchmarkSeedStatus } from '@skirm/shared';
+import { benchmarkSeedStatus, resultsHashPreimage, withFreshKmsProof, type BenchmarkSeedStatus } from '@skirm/shared';
 import { Contract, JsonRpcProvider, Wallet, keccak256 } from 'ethers';
 import { OPERATOR_KEY_RE } from './settlement';
 import { zamaServerConfig, type ZamaServerConfig } from './sealed-match';
@@ -182,10 +182,15 @@ export class ContractBenchmarkSeeder implements BenchmarkSeeder {
 
   async finalize(skillRef: string, seedHandle: string): Promise<{ txHash: string; seed: bigint }> {
     const sdk = await this.relayer();
-    const res = await sdk.publicDecrypt([seedHandle]);
-    const tx = await this.contract.finalize(skillRef, res.abiEncodedClearValues, res.decryptionProof);
-    await tx.wait();
-    return { txHash: tx.hash, seed: clearValue(res.clearValues, seedHandle) };
+    // A rejected KMS proof (KMSInvalidSigner) is fetched again and resent.
+    return withFreshKmsProof(
+      () => sdk.publicDecrypt([seedHandle]),
+      async (res) => {
+        const tx = await this.contract.finalize(skillRef, res.abiEncodedClearValues, res.decryptionProof);
+        await tx.wait();
+        return { txHash: tx.hash, seed: clearValue(res.clearValues, seedHandle) };
+      },
+    );
   }
 }
 

@@ -9,7 +9,7 @@
 // After the end anyone closes it, public-decrypts the two outcome handles (winner index, price) and
 // sends finalize; then every bidder's escrow comes back with refund (the winner gets bid - price).
 import { SkillAuctionAbi } from '@skirm/fhevm/generated';
-import { auctionStatus, evmLinkMessage, skillRefPreimage, type AuctionStatus } from '@skirm/shared';
+import { auctionStatus, evmLinkMessage, skillRefPreimage, withFreshKmsProof, type AuctionStatus } from '@skirm/shared';
 import { Contract, ZeroAddress, id as keccakUtf8, type ContractRunner } from 'ethers';
 import { zamaConfig, type HexAddress } from '@/lib/zama/config';
 import { isZeroHandle, publicDecrypt, userDecryptUint, type EncryptedInput, type Hex, type TypedDataSigner } from '@/lib/zama/fhe';
@@ -204,8 +204,11 @@ export async function closeAndFinalize(api: AuctionApi, instance: Parameters<typ
   }
   if (a.status === 'closing') {
     const handles = await api.revealHandles(auctionId);
-    const res = await publicDecrypt(instance, handles);
-    await api.finalize(auctionId, res.abiEncodedClearValues, res.decryptionProof);
+    // A rejected KMS proof (KMSInvalidSigner) is fetched again and resent.
+    await withFreshKmsProof(
+      () => publicDecrypt(instance, handles),
+      (res) => api.finalize(auctionId, res.abiEncodedClearValues, res.decryptionProof),
+    );
     a = await api.get(auctionId);
   }
   return a;

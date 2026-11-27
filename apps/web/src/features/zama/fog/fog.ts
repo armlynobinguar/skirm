@@ -11,6 +11,7 @@ import { FogSkirmAbi } from '@skirm/fhevm/generated';
 import {
   FOG_NO_TILE,
   verifyFogGame,
+  withFreshKmsProof,
   type FogCheck,
   type FogOutcome,
   type FogReplayInput,
@@ -254,9 +255,12 @@ export async function finalizePendingRound(api: FogApi, instance: PublicInstance
   const g = await api.read(id);
   if (g.status !== 'playing' || !g.awaitingReveal) return false;
   const handles = await api.roundHandles(id);
-  const res = await publicDecrypt(instance, handles);
   try {
-    await api.finalizeRound(id, res.abiEncodedClearValues, res.decryptionProof);
+    // A rejected KMS proof (KMSInvalidSigner) is fetched again and resent.
+    await withFreshKmsProof(
+      () => publicDecrypt(instance, handles),
+      (res) => api.finalizeRound(id, res.abiEncodedClearValues, res.decryptionProof),
+    );
     return true;
   } catch (e) {
     // Lost the race: the rival's tab already finalized it.
@@ -271,9 +275,12 @@ export async function revealEndedGame(api: FogApi, instance: PublicInstance, id:
   const g = await api.read(id);
   if (g.status !== 'ended') throw new Error(`Game ${id} has not ended (${g.status}).`);
   if (!g.revealed) {
-    const res = await publicDecrypt(instance, await api.revealHandles(id));
+    const handles = await api.revealHandles(id);
     try {
-      await api.finalizeGameReveal(id, res.abiEncodedClearValues, res.decryptionProof);
+      await withFreshKmsProof(
+        () => publicDecrypt(instance, handles),
+        (res) => api.finalizeGameReveal(id, res.abiEncodedClearValues, res.decryptionProof),
+      );
     } catch (e) {
       if (!(await api.read(id)).revealed) throw e;
     }
