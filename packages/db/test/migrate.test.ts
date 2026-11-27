@@ -68,8 +68,30 @@ describe('migrations', () => {
     // 0014_campaign, 0015_daily_challenge, 0016_agent_progression, 0017_community_maps,
     // 0018_puzzles, 0019_writer_backing, 0020_rental_credits, 0021_match_heartbeat, 0022_gasless_relay,
     // 0023_cosmetic_items, 0024_agent_accounts, 0025_sealed_auctions,
-    // 0026_benchmark_seeds, 0027_private_ladder.
-    expect(embeddedMigrations()).toHaveLength(28);
+    // 0026_benchmark_seeds, 0027_private_ladder, 0028_supabase_api_roles.
+    expect(embeddedMigrations()).toHaveLength(29);
+  });
+
+  it('takes the Supabase Data API roles grants away (0028), now and for later tables', async () => {
+    const [{ PGlite }, { drizzle }] = await Promise.all([
+      import('@electric-sql/pglite'),
+      import('drizzle-orm/pglite'),
+    ]);
+    const db = drizzle({ client: new PGlite() }) as unknown as Parameters<typeof migrate>[0];
+    // What a Supabase project starts with: the roles, and default grants on new public tables.
+    await db.execute(sql`create role anon nologin`);
+    await db.execute(sql`create role authenticated nologin`);
+    await db.execute(sql`alter default privileges in schema public grant all on tables to anon, authenticated`);
+    await migrate(db);
+    const priv = async (table: string) =>
+      rowsOf<{ anon: boolean; auth: boolean }>(
+        await db.execute(
+          sql`select has_table_privilege('anon', ${table}, 'SELECT') as anon, has_table_privilege('authenticated', ${table}, 'INSERT') as auth`,
+        ),
+      )[0]!;
+    expect(await priv('public.accounts')).toEqual({ anon: false, auth: false });
+    await db.execute(sql`create table public.later_table (id int)`);
+    expect(await priv('public.later_table')).toEqual({ anon: false, auth: false });
   });
 
   it('refuses a second account linking the same NEAR account', async () => {
