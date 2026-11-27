@@ -27,6 +27,6 @@
 .stats dd { margin: 0; font: 700 17px/24px var(--font-mono); font-variant-numeric: tabular-nums; }
 .goals { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 18px; }
 
-.diff { margin: 0; padding: 12px; background: var(--surface-sunken); border-radius: 4px; font: 400 13px/20px var(--font-mono); white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow-y: auto; }
+.diff { margin: 0; padding: 12px; background: var(--surface-sunken); border-radius: 0; font: 400 13px/20px var(--font-mono); white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow-y: auto; }
 .del { background: var(--critical-soft, rgba(220, 60, 60, .18)); color: var(--critical); text-decoration: line-through; }
 .ins { background: var(--good-soft, rgba(60, 180, 120, .18)); color: var(--good); text-decoration: none; }

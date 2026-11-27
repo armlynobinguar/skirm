@@ -4,7 +4,7 @@
 .head { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .lede { margin: 0; color: var(--ink-muted); max-width: 720px; }
 .note { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
-.panel { background: var(--panel); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); border-radius: 6px; box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel { background: var(--panel); clip-path: var(--clip-cut2); box-shadow: var(--elev-1); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .h2 { margin: 0; font: 700 17px/24px var(--font-sans); }
 
 .cardHead { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
@@ -31,7 +31,7 @@
 .hash { font: 400 13px/18px var(--font-mono); color: var(--ink-muted); }
 
 .dateLabel { display: flex; flex-direction: column; gap: 6px; font: 700 13px/18px var(--font-sans); }
-.select { min-height: 40px; padding: 0 8px; background: var(--surface-sunken); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 4px; font: 400 15px/22px var(--font-sans); max-width: 100%; }
+.select { min-height: 40px; padding: 0 8px; background: var(--surface-sunken); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 0; font: 400 15px/22px var(--font-sans); max-width: 100%; }
 
 .tableWrap { display: flex; flex-direction: column; gap: 8px; overflow-x: auto; min-width: 0; }
 .table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 22px; }
