@@ -14,12 +14,15 @@ import * as proto from '../proto/world';
 import { TOOL_INFO } from '../gear';
 import type { LiveArena } from '../live';
 import { MAPS, ROTATION_INDEX, mapById, type Arena, type ArenaState } from '../world';
-import type { ChaseCamOptions, ChaseCamState } from './index';
+import type { CamView, ChaseCamOptions, ChaseCamState } from './index';
+import { CHASE_FOV, VISOR_FOV, visorRig } from './visor';
 import {
   DIST_START,
   HEADING_STEPS,
   angDiff,
+  SWEEP_S,
   approach,
+  boardStart,
   chaseRig,
   ease,
   headingYaw,
@@ -27,6 +30,8 @@ import {
   softFog,
   stepAgentFade,
   stepSoftFog,
+  sweepLift,
+  sweepPoint,
   wallBlocks,
   wheelDist,
   type SoftFog,
@@ -178,6 +183,12 @@ interface Rig {
   focusAt: { x: number; z: number } | null;
   target: string | null;
   steps: [number, number][];
+  /** The view drawn last (mode and agent): a change starts a sweep. */
+  viewKey: string | null;
+  /** Where the camera looked last frame. */
+  lookAt: { x: number; y: number; z: number } | null;
+  /** A sweep from the last view to the new one (null: none running). */
+  sweep: { pos: { x: number; y: number; z: number }; look: { x: number; y: number; z: number }; fov: number; t: number; lift: number } | null;
 }
 
 const tmp = new THREE.Object3D();
@@ -800,9 +811,11 @@ export interface FrameInput {
   dragging: boolean;
 }
 
-/** Steps the world and the camera rig for one animation frame; the caller renders. */
-export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: FrameInput) {
+/** Steps the world and the camera rig for one animation frame; the caller renders. Returns where the camera looks. */
+export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: FrameInput): CamView {
   const { state, dt, still, dragging } = f;
+  // First person: the camera is the watched agent's eyes (its own figure is hidden, walls stand).
+  const visor = state.mode === 'visor';
   const time = still ? 0 : f.time;
   const cur = state.arena.state;
   const prev = state.prev;
@@ -904,7 +917,11 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
       ...(a.persona ? { persona: a.persona } : {}),
     });
     // Anyone between the camera and the watched agent fades so they never hide it.
-    const blocking = !!rig.pos && !!rig.focusAt && a.id !== state.focus && segDist(x, z, rig.pos.x, rig.pos.z, rig.focusAt.x, rig.focusAt.z) < 0.75;
+    const blocking = !visor && !!rig.pos && !!rig.focusAt && a.id !== state.focus && segDist(x, z, rig.pos.x, rig.pos.z, rig.focusAt.x, rig.focusAt.z) < 0.75;
+    // In the visor the watched agent is the camera, and anyone standing in the lens is not drawn.
+    // (Its own figure stays until a sweep into the visor is nearly at the eyes.)
+    const atEyes = !rig.sweep || rig.sweep.t / SWEEP_S > 0.7;
+    if (visor && ag.g.visible && ((a.id === state.focus && atEyes) || (!!rig.pos && Math.hypot(x - rig.pos.x, z - rig.pos.z) < 0.45))) ag.g.visible = false;
     const op = (a.down ? 0.5 : blocking ? 0.28 : 1) * af;
     for (const m of ag.mats) {
       m.transparent = op < 1;
@@ -982,21 +999,50 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
   w.ring.rotation.z = time * 0.8;
   for (const wh of w.wheels) wh.rotation.z = time * 1.5;
 
-  // The chase camera: behind the agent, a little to the right, looking past it.
+  // The chase camera: behind the agent, a little to the right, looking past it. The visor: at its eyes.
   const fp: { x: number; z: number } = focus ?? { x: w.W / 2, z: w.H / 2 };
   const yaw0: number = rig.yaw ?? rig.tyaw;
   rig.yaw = still ? rig.tyaw : yaw0 + angDiff(yaw0, rig.tyaw) * approach(dt, 2.4);
   if (!dragging) rig.look *= still ? 0 : Math.exp(-dt * 1.5);
-  const want = chaseRig(fp, rig.yaw + rig.look, rig.dist);
-  if (!rig.pos || still) rig.pos = new THREE.Vector3(want.pos.x, want.pos.y, want.pos.z);
+  const viewYaw = rig.yaw + rig.look;
+  const want = visor ? visorRig(fp, viewYaw) : chaseRig(fp, viewYaw, rig.dist);
+  const toFov = visor ? VISOR_FOV : CHASE_FOV;
+  // A new view (chase cam ⇄ visor, another agent, or coming in from the board) sweeps there from
+  // the camera as it is, in a low arc; reduced motion cuts straight to it.
+  const key = `${visor ? 'visor' : 'chase'}:${state.focus}`;
+  if (still) rig.sweep = null;
+  else if (rig.viewKey !== key) {
+    const from = rig.viewKey && rig.lookAt ? { pos: { x: cam.position.x, y: cam.position.y, z: cam.position.z }, look: rig.lookAt } : boardStart(fp, viewYaw);
+    rig.sweep = { pos: from.pos, look: from.look, fov: rig.viewKey ? cam.fov : CHASE_FOV, t: 0, lift: rig.viewKey ? sweepLift(from.pos, want.pos) : 0 };
+  }
+  rig.viewKey = key;
+  // The eye moves with the agent; the chase cam trails behind it (and during a sweep, the sweep does).
+  if (!rig.pos || still || visor || rig.sweep) rig.pos = new THREE.Vector3(want.pos.x, want.pos.y, want.pos.z);
   else rig.pos.lerp(new THREE.Vector3(want.pos.x, want.pos.y, want.pos.z), approach(dt, 6));
-  cam.position.copy(rig.pos);
+  let camPos: { x: number; y: number; z: number } = rig.pos;
+  let lookAt: { x: number; y: number; z: number } = want.look;
+  let fov = toFov;
+  if (rig.sweep) {
+    const sw = rig.sweep;
+    sw.t += dt;
+    const k = ease(sw.t / SWEEP_S);
+    camPos = sweepPoint(sw.pos, rig.pos, k, sw.lift);
+    lookAt = sweepPoint(sw.look, want.look, k);
+    fov = sw.fov + (toFov - sw.fov) * k;
+    if (sw.t >= SWEEP_S) rig.sweep = null;
+  }
+  cam.position.set(camPos.x, camPos.y, camPos.z);
+  rig.lookAt = { x: lookAt.x, y: lookAt.y, z: lookAt.z };
   rig.focusAt = { x: fp.x, z: fp.z };
+  if (cam.fov !== fov) {
+    cam.fov = fov;
+    cam.updateProjectionMatrix();
+  }
 
-  // Walls between the camera and the agent drop to a low cutaway so they never hide it.
+  // Walls between the camera and the agent drop to a low cutaway so they never hide it (not in the visor).
   let cutChanged = false;
   w.wl.forEach((s, i) => {
-    const cut = wallBlocks(s.x, s.y, rig.pos!, fp);
+    const cut = !visor && wallBlocks(s.x, s.y, rig.pos!, fp);
     if (cut === s.cut) return;
     s.cut = cut;
     cutChanged = true;
@@ -1008,7 +1054,7 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
     w.walls.instanceMatrix.needsUpdate = true;
     w.caps.instanceMatrix.needsUpdate = true;
   }
-  cam.lookAt(want.look.x, want.look.y, want.look.z);
+  cam.lookAt(lookAt.x, lookAt.y, lookAt.z);
   w.sun.position.set(fp.x + 7, 16, fp.z + 5);
   w.sun.target.position.set(fp.x, 0, fp.z);
   w.sun.target.updateMatrixWorld();
@@ -1029,10 +1075,11 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
     }
     attr.needsUpdate = true;
   }
+  return { mode: visor ? 'visor' : 'chase', yaw: viewYaw, x: fp.x, z: fp.z };
 }
 
 export function newRig(): Rig {
-  return { yaw: null, tyaw: 0, look: 0, dist: DIST_START, pos: null, focusAt: null, target: null, steps: [] };
+  return { yaw: null, tyaw: 0, look: 0, dist: DIST_START, pos: null, focusAt: null, target: null, steps: [], viewKey: null, lookAt: null, sweep: null };
 }
 
 /** Frees every geometry, material and texture the world holds. */
@@ -1086,7 +1133,7 @@ export function startChaseCam(el: HTMLElement, getState: () => ChaseCamState | n
   const cv = r.domElement;
   Object.assign(cv.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block', touchAction: 'none', cursor: 'grab' });
   el.appendChild(cv);
-  const cam = new THREE.PerspectiveCamera(58, 1, 0.1, 160);
+  const cam = new THREE.PerspectiveCamera(CHASE_FOV, 1, 0.05, 160);
   const size = () => {
     const w = el.clientWidth || window.innerWidth;
     const h = el.clientHeight || window.innerHeight;
@@ -1158,8 +1205,9 @@ export function startChaseCam(el: HTMLElement, getState: () => ChaseCamState | n
           world = buildWorld(st.arena, st.look);
           rig.pos = null;
         }
-        stepWorld(world, rig, cam, { state: st, dt, time: (now - t0) / 1000, now: Date.now(), still: !!opts.still?.(), dragging: !!drag });
+        const view = stepWorld(world, rig, cam, { state: st, dt, time: (now - t0) / 1000, now: Date.now(), still: !!opts.still?.(), dragging: !!drag });
         r.render(world.scene, cam);
+        opts.onView?.(view);
       }
     } catch (err) {
       stop();

@@ -157,3 +157,24 @@ export function stepAgentFade(
   }
   return fade;
 }
+
+/** How long a sweep between views lasts (seconds): chase cam ⇄ visor, one agent to another, board in. */
+export const SWEEP_S = 0.75;
+
+type P3 = { x: number; y: number; z: number };
+
+/** Lifts a sweep over the walls in an arc, more for a longer trip (at most 2.5 tiles up). */
+export function sweepLift(a: P3, b: P3): number {
+  return Math.min(2.5, Math.hypot(b.x - a.x, b.z - a.z) * 0.25);
+}
+
+/** The point `k` (0..1, already eased) along a sweep from a to b, raised by `lift` at its middle. */
+export function sweepPoint(a: P3, b: P3, k: number, lift = 0): P3 {
+  const t = Math.max(0, Math.min(1, k));
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t + Math.sin(Math.PI * t) * lift, z: a.z + (b.z - a.z) * t };
+}
+
+/** Where a camera entering third person from the board starts: high above and behind the agent. */
+export function boardStart(focus: { x: number; z: number }, yaw: number): { pos: P3; look: P3 } {
+  return { pos: { x: focus.x - Math.sin(yaw) * 4, y: 14, z: focus.z - Math.cos(yaw) * 4 }, look: { x: focus.x, y: 0, z: focus.z } };
+}

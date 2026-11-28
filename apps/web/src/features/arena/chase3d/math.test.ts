@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIST_MAX, DIST_MIN, angDiff, chaseRig, ease, headingYaw, segDist, softFog, stepAgentFade, stepSoftFog, wallBlocks, wheelDist } from './math';
+import { DIST_MAX, DIST_MIN, angDiff, chaseRig, ease, headingYaw, segDist, softFog, stepAgentFade, stepSoftFog, wallBlocks, wheelDist, SWEEP_S, boardStart, sweepLift, sweepPoint } from './math';
 
 describe('chase cam maths', () => {
   it('measures distance to a segment, clamped to its ends', () => {
@@ -114,5 +114,35 @@ describe('chase cam maths', () => {
     expect(fade.b).toBeCloseTo(1);
     // No fog: everyone shows.
     expect(stepAgentFade({}, agents, null, 'A', 3, 0.05)).toEqual({ a: 1, b: 1 });
+  });
+});
+
+describe('camera sweeps', () => {
+  const a = { x: 0, y: 4, z: 0 };
+  const b = { x: 8, y: 0.8, z: 6 };
+  it('runs from one view to the next, arcing up in the middle', () => {
+    expect(sweepPoint(a, b, 0, 2)).toEqual(a);
+    const end = sweepPoint(a, b, 1, 2);
+    expect(end.x).toBeCloseTo(b.x);
+    expect(end.y).toBeCloseTo(b.y);
+    expect(end.z).toBeCloseTo(b.z);
+    const mid = sweepPoint(a, b, 0.5, 2);
+    expect(mid.y).toBeCloseTo((a.y + b.y) / 2 + 2);
+    expect(sweepPoint(a, b, 3, 2)).toEqual(sweepPoint(a, b, 1, 2));
+    expect(SWEEP_S).toBeGreaterThan(0.3);
+  });
+
+  it('lifts longer trips more, capped', () => {
+    expect(sweepLift(a, a)).toBe(0);
+    expect(sweepLift(a, b)).toBeCloseTo(2.5);
+    expect(sweepLift(a, { x: 4, y: 0, z: 0 })).toBeCloseTo(1);
+    expect(sweepLift(a, { x: 400, y: 0, z: 0 })).toBe(2.5);
+  });
+
+  it('enters from high above and behind the agent, looking at it', () => {
+    const s = boardStart({ x: 5, z: 5 }, 0);
+    expect(s.pos.y).toBe(14);
+    expect(s.pos.z).toBeLessThan(5);
+    expect(s.look).toEqual({ x: 5, y: 0, z: 5 });
   });
 });
