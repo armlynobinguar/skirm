@@ -11,6 +11,7 @@ import { FogSkirmAbi } from '@skirm/fhevm/generated';
 import {
   FOG_NO_TILE,
   verifyFogGame,
+  withFreshKmsProof,
   type FogCheck,
   type FogOutcome,
   type FogReplayInput,
@@ -33,6 +34,21 @@ export type FogEndReason = (typeof FOG_END_REASONS)[number];
 export const FOG_DEFAULT_WINDOW_S = 10 * 60;
 /** How often the screen re-reads the game while it waits. */
 export const FOG_POLL_MS = 4_000;
+
+/**
+ * Gas for submitMove. The first move of a round is cheap (~0.7M on Sepolia), but the second one
+ * resolves the round inline under FHE (up to ~7.5M measured). Both players often move at once, so a
+ * wallet that estimates while the rival's move is still pending prices the cheap case and the
+ * transaction runs out of gas on chain. Every move therefore gets at least FOG_MOVE_GAS_FLOOR (unused
+ * gas is refunded), capped under the per-transaction limit (EIP-7825, 2^24).
+ */
+export const FOG_MOVE_GAS_FLOOR = 9_000_000n;
+export const FOG_MOVE_GAS_CAP = 16_000_000n;
+export function fogMoveGasLimit(estimate: bigint): bigint {
+  const padded = (estimate * 12n) / 10n;
+  const limit = padded > FOG_MOVE_GAS_FLOOR ? padded : FOG_MOVE_GAS_FLOOR;
+  return limit < FOG_MOVE_GAS_CAP ? limit : FOG_MOVE_GAS_CAP;
+}
 
 /** The public game header. */
 export interface FogGame {
@@ -165,7 +181,12 @@ export function fogApi(runner: ContractRunner, address: string = fogAddress()): 
       throw new Error('The game was created but its id was not in the receipt.');
     },
     join: async (id, enc) => void (await send('joinGame', id, enc.handles[0], enc.handles[1], enc.inputProof)),
-    move: async (id, enc) => void (await send('submitMove', id, enc.handles[0], enc.inputProof)),
+    async move(id, enc) {
+      const args = [id, enc.handles[0], enc.inputProof] as const;
+      // A real revert (not your turn, game over) still fails here, before anything is sent.
+      const estimate = (await c.getFunction('submitMove').estimateGas(...args)) as bigint;
+      await send('submitMove', ...args, { gasLimit: fogMoveGasLimit(estimate) });
+    },
     cancel: async (id) => void (await send('cancelGame', id)),
     claimTimeout: async (id) => void (await send('claimTimeout', id)),
     roundHandles: async (id) => (await call<unknown[]>('roundHandles', id)).map(hex),
@@ -254,9 +275,12 @@ export async function finalizePendingRound(api: FogApi, instance: PublicInstance
   const g = await api.read(id);
   if (g.status !== 'playing' || !g.awaitingReveal) return false;
   const handles = await api.roundHandles(id);
-  const res = await publicDecrypt(instance, handles);
   try {
-    await api.finalizeRound(id, res.abiEncodedClearValues, res.decryptionProof);
+    // A rejected KMS proof (KMSInvalidSigner) is fetched again and resent.
+    await withFreshKmsProof(
+      () => publicDecrypt(instance, handles),
+      (res) => api.finalizeRound(id, res.abiEncodedClearValues, res.decryptionProof),
+    );
     return true;
   } catch (e) {
     // Lost the race: the rival's tab already finalized it.
@@ -271,9 +295,12 @@ export async function revealEndedGame(api: FogApi, instance: PublicInstance, id:
   const g = await api.read(id);
   if (g.status !== 'ended') throw new Error(`Game ${id} has not ended (${g.status}).`);
   if (!g.revealed) {
-    const res = await publicDecrypt(instance, await api.revealHandles(id));
+    const handles = await api.revealHandles(id);
     try {
-      await api.finalizeGameReveal(id, res.abiEncodedClearValues, res.decryptionProof);
+      await withFreshKmsProof(
+        () => publicDecrypt(instance, handles),
+        (res) => api.finalizeGameReveal(id, res.abiEncodedClearValues, res.decryptionProof),
+      );
     } catch (e) {
       if (!(await api.read(id)).revealed) throw e;
     }

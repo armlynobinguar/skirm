@@ -1,4 +1,5 @@
 import { evmLinkMessage } from '@skirm/shared';
+import { sepolia } from '@skirm/fhevm/generated';
 import { Wallet } from 'ethers';
 import { describe, expect, it } from 'vitest';
 import {
@@ -111,9 +112,9 @@ describe('auction helpers', () => {
     expect(a).toMatchObject({ seller: SELLER, status: 'won', bidders: 4, endTime: 10, price: 55n });
   });
 
-  it('stays off without ZAMA_ENABLED or a deployed contract', () => {
+  it('stays off without ZAMA_ENABLED, and falls back to the Sepolia deployment', () => {
     expect(createAuctionReader({})).toBeNull();
-    expect(createAuctionReader({ ZAMA_ENABLED: '1' })).toBeNull(); // not deployed yet
+    expect(createAuctionReader({ ZAMA_ENABLED: '1' })?.address).toBe(sepolia.contracts.SkillAuction?.toLowerCase());
     expect(createAuctionReader({ ZAMA_ENABLED: '1', ZAMA_AUCTION_ADDRESS: CONTRACT })?.address).toBe(CONTRACT);
   });
 

@@ -38,6 +38,9 @@
 # sealed matches, commits benchmark seeds, runs prediction markets, reports to the private ladder) is
 # the <env>-zama-operator-key secret (ZAMA_OPERATOR_PRIVATE_KEY); without it the servers only read
 # the chain. Contract addresses come from packages/fhevm/generated, bundled into every image.
+# Database (docs/deploy.md, Database): DATABASE_URL is the <env>-database-url secret (the Supabase
+# session pooler with sslmode=require). Passed through when set: DATABASE_POOL_MAX (per process,
+# default 5) and DATABASE_SSL; the optional <env>-database-ssl-ca secret becomes DATABASE_SSL_CA.
 #
 # Env vars and secrets are merged into each service (--update-env-vars / --update-secrets), so a
 # value set by hand on a service survives a deploy. The flip side: unsetting a variable here does not
@@ -152,6 +155,9 @@ fi
 
 # ---------- config ----------
 REDIS_HOST=$(g redis instances describe "skirm-redis-$ENV" --region="$R" --format='value(host)')
+# Direct VPC egress for private ranges only: Redis (Memorystore) is reached over the VPC, and public
+# hosts such as the Supabase pooler go straight out to the internet from Cloud Run (IPv4). Don't
+# switch to all-traffic without a Cloud NAT on the subnet, or public hosts become unreachable.
 NET=(--region="$R" --service-account="$SA" --network=default --subnet=default --vpc-egress=private-ranges-only)
 # No volumes: a match's log and hash are on its row, its frames a while in Redis.
 NOVOL=(--clear-volume-mounts --clear-volumes)
@@ -161,7 +167,7 @@ ENV_VARS+="@REDIS_URL=redis://$REDIS_HOST:6379@NEAR_NETWORK=$NEAR_NETWORK"
 ENV_VARS+="@SKILL_KEK_KMS=projects/$PROJECT/locations/$R/keyRings/skill-vault/cryptoKeys/skill-prompt-kek-$ENV"
 ENV_VARS+="@PUBLIC_API_URL=$API_URL@PUBLIC_WS_URL=$WS_URL@CORS_ORIGINS=$CORS"
 for v in LLM_BASE_URL LLM_MODEL LLM_PLANNER_MODEL LLM_PRICE_INPUT_USD LLM_PRICE_OUTPUT_USD LLM_MODELS \
-  BACKING_CONTRACT NEAR_RENTALS_ONCHAIN RELAYER_ACCOUNT_ID RELAYER_FREE_TXS \
+  BACKING_CONTRACT NEAR_RENTALS_ONCHAIN RELAYER_ACCOUNT_ID RELAYER_FREE_TXS DATABASE_POOL_MAX DATABASE_SSL \
   ZAMA_ENABLED SEPOLIA_RPC_URL ZAMA_RELAYER_URL ZAMA_LADDER_MATCHMAKING; do
   if [ -n "${!v:-}" ]; then
     # '@' is the list delimiter; a value holding one would split into a bogus variable.
@@ -170,7 +176,10 @@ for v in LLM_BASE_URL LLM_MODEL LLM_PLANNER_MODEL LLM_PRICE_INPUT_USD LLM_PRICE_
   fi
 done
 # Never SKILL_KEK here: Cloud KMS (SKILL_KEK_KMS) seals the skill vault (docs/deploy.md).
-SECRETS="DATABASE_URL=$ENV-database-url:latest"
+DB_SECRETS="DATABASE_URL=$ENV-database-url:latest"
+# A PEM CA for DATABASE_SSL=verify-full (or a chain check under sslmode=require); optional.
+if has_secret database-ssl-ca; then DB_SECRETS+=",DATABASE_SSL_CA=$ENV-database-ssl-ca:latest"; fi
+SECRETS=$DB_SECRETS
 SECRETS+=",PRIVY_VERIFICATION_KEY=$ENV-privy-verification-key:latest"
 # LLM_API_KEY (or OPENROUTER_API_KEY, its old name) is the v2 brain's key; BENCH_SECRET keys the
 # hidden benchmark picks (worker).
@@ -205,7 +214,7 @@ fi
 # ---------- 1. migrations ----------
 if deploying migrate; then
   g run jobs deploy "migrate-$ENV" --image="$REG/migrate:$TAG" "${NET[@]}" \
-    --set-secrets="DATABASE_URL=$ENV-database-url:latest" --max-retries=0
+    --set-secrets="$DB_SECRETS" ${DATABASE_SSL:+--update-env-vars="DATABASE_SSL=$DATABASE_SSL"} --max-retries=0
   g run jobs execute "migrate-$ENV" --region="$R" --wait
 fi
 

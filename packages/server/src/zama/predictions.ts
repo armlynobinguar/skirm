@@ -11,7 +11,7 @@
 // MatchPredictions address in packages/fhevm/deployments/sepolia.json, via @skirm/fhevm/generated),
 // ZAMA_RELAYER_URL (default: the SDK's Sepolia relayer). The key is never logged.
 import { MatchPredictionsAbi, sepolia } from '@skirm/fhevm/generated';
-import { PREDICTION_NO_SIDE, predictionStatus, type PredictionStatus } from '@skirm/shared';
+import { PREDICTION_NO_SIDE, predictionStatus, withFreshKmsProof, type PredictionStatus } from '@skirm/shared';
 import { Contract, JsonRpcProvider, Wallet } from 'ethers';
 import { nodeRelayer, type RelayerInstance } from './benchmark-seeds';
 import { sealedMatchKey, zamaServerConfig, type ZamaServerConfig } from './sealed-match';
@@ -101,8 +101,11 @@ export class ContractPredictionOperator implements PredictionOperator {
   async revealTotals(matchId: string): Promise<{ txHash: string; totalA: bigint; totalB: bigint }> {
     const key = sealedMatchKey(matchId);
     const handles = (await this.contract.totalHandles(key)).map(String);
-    const res = await (await this.relayer()).publicDecrypt(handles);
-    const txHash = await this.send(() => this.contract.revealTotals(key, res.abiEncodedClearValues, res.decryptionProof));
+    // A rejected KMS proof (KMSInvalidSigner) is fetched again and resent.
+    const { res, txHash } = await withFreshKmsProof(
+      async () => (await this.relayer()).publicDecrypt(handles),
+      async (res) => ({ res, txHash: await this.send(() => this.contract.revealTotals(key, res.abiEncodedClearValues, res.decryptionProof)) }),
+    );
     return { txHash, totalA: clearOf(res.clearValues, handles[0]!), totalB: clearOf(res.clearValues, handles[1]!) };
   }
 

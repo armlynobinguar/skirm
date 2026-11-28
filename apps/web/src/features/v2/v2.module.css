@@ -106,7 +106,7 @@
 .draftHead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px; }
 .draftHead :global(.sk-disp) { margin: 0; font-size: clamp(40px, 6vw, 72px); color: var(--bone); }
 .pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
-.banPick { display: grid; gap: 4px; width: 100%; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, .03); color: var(--bone); text-align: left; cursor: pointer; }
+.banPick { display: grid; gap: 4px; width: 100%; padding: 14px; border: 1px solid var(--line); border-radius: 0; background: rgba(255, 255, 255, .03); color: var(--bone); text-align: left; cursor: pointer; }
 .banPick:hover:not(:disabled), .banPick:focus-visible { border-color: var(--rival); box-shadow: inset 0 0 0 1px var(--rival); }
 .banPick:disabled { cursor: default; opacity: .6; }
 .banPick b { font: 600 16px/20px var(--font-display); overflow-wrap: anywhere; }

@@ -148,6 +148,18 @@ describe('loadConfig', () => {
     ).toThrow(ConfigError);
     expect(() => loadConfig({ NEAR_CONTRACT_SEASONS: 'Seasons!' })).toThrow(ConfigError);
     expect(() => loadConfig({ DATABASE_URL: 'mysql://x' })).toThrow(ConfigError);
+    const dbIssue = (env: Record<string, string>) => {
+      try {
+        loadConfig(env);
+      } catch (err) {
+        return (err as ConfigError).issues.map((i) => i.path);
+      }
+      return [];
+    };
+    expect(dbIssue({ DATABASE_POOL_MAX: '0' })).toEqual(['DATABASE_POOL_MAX']);
+    expect(dbIssue({ DATABASE_SSL: 'maybe' })).toEqual(['DATABASE_SSL']);
+    expect(dbIssue({ DATABASE_URL: 'postgres://u:secret@h:5432/d?sslmode=bogus' })).toEqual(['DATABASE_URL']);
+    expect(dbIssue({ DATABASE_URL: 'postgres://u:p@h:5432/d?sslmode=require', DATABASE_POOL_MAX: '6' })).toEqual([]);
     expect(() => loadConfig({ OPS_TOKEN: 'too-short' })).toThrow(ConfigError);
     expect(DEV_SKILL_KEK).toBe(Buffer.from('skirm-dev-kek-not-for-production').toString('base64'));
   });

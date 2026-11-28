@@ -8,7 +8,10 @@ vi.mock('@/lib/zama/config', () => ({
 
 import { boardCells, displayOrder, togglePick } from './board';
 import {
+  FOG_MOVE_GAS_CAP,
+  FOG_MOVE_GAS_FLOOR,
   fogAddress,
+  fogMoveGasLimit,
   finalizePendingRound,
   logEntries,
   parseGame,
@@ -70,6 +73,14 @@ const relayer = () => ({
 });
 
 describe('fog client', () => {
+  it('sends every move with room for the round-resolving second move', () => {
+    // A first move estimates ~0.7M, but if the rival's move lands first it costs ~7.5M.
+    expect(fogMoveGasLimit(684_255n)).toBe(FOG_MOVE_GAS_FLOOR);
+    expect(fogMoveGasLimit(7_541_015n)).toBe(9_049_218n); // the measured worst case, plus 20%
+    expect(fogMoveGasLimit(9_000_000n)).toBe(10_800_000n); // 20% over a larger estimate
+    expect(fogMoveGasLimit(15_000_000n)).toBe(FOG_MOVE_GAS_CAP);
+  });
+
   it('maps the contract tuple and finds the player side', () => {
     const g = parseGame(3n, {
       players: [A.toUpperCase().replace('0X', '0x'), B],

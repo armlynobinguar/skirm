@@ -12,7 +12,7 @@
 // PrivateLadder address in packages/fhevm/deployments/sepolia.json, via @skirm/fhevm/generated),
 // ZAMA_RELAYER_URL (default: the SDK's Sepolia relayer). The key is never logged.
 import { PrivateLadderAbi, sepolia } from '@skirm/fhevm/generated';
-import { LADDER_NO_SIDE } from '@skirm/shared';
+import { LADDER_NO_SIDE, withFreshKmsProof } from '@skirm/shared';
 import { Contract, JsonRpcProvider, Wallet } from 'ethers';
 import { nodeRelayer, type OperatorSigner, type RelayerInstance } from './benchmark-seeds';
 import { OperatorQueue, operatorQueue } from './operator-queue';
@@ -94,8 +94,14 @@ export class ContractLadderOperator implements LadderOperator {
 
   async revealTier(address: string): Promise<number> {
     const handle = await this.contract.tierHandle(address);
-    const res = await (await this.relayer()).publicDecrypt([handle]);
-    await this.send(() => this.contract.revealTier(address, res.abiEncodedClearValues, res.decryptionProof));
+    // A rejected KMS proof (KMSInvalidSigner) is fetched again and resent.
+    const res = await withFreshKmsProof(
+      async () => (await this.relayer()).publicDecrypt([handle]),
+      async (res) => {
+        await this.send(() => this.contract.revealTier(address, res.abiEncodedClearValues, res.decryptionProof));
+        return res;
+      },
+    );
     return Number(clearOf(res.clearValues, handle));
   }
 

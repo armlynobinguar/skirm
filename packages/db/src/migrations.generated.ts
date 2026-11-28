@@ -468,5 +468,14 @@ export const MIGRATIONS: readonly EmbeddedMigration[] = [
     "sql": [
       "ALTER TABLE \"accounts\" ADD COLUMN \"ladder_tier\" smallint;"
     ]
+  },
+  {
+    "tag": "0028_supabase_api_roles",
+    "folderMillis": 1795760437642,
+    "bps": true,
+    "hash": "08b9a5769369ae2e2fa8e45ab014f2e82d9f56f16473f3770b429d88b753d491",
+    "sql": [
+      "-- Supabase serves the public schema through its Data API (PostgREST) as the anon and authenticated\n-- roles, and by default grants them every table the postgres role creates there. With the public\n-- anon key, that would be read and write access to every skirm table. skirm never uses the Data\n-- API (its services connect to Postgres as the tables' owner), so take those grants away, now and\n-- for tables later migrations create. A no-op where the roles don't exist (local Docker, PGlite,\n-- Cloud SQL). docs/deploy.md, Database: also turn the Data API off in the Supabase dashboard.\nDO $$\nBEGIN\n  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')\n     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN\n    REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;\n    REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;\n    ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;\n    ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;\n  END IF;\nEND\n$$;\n"
+    ]
   }
 ];

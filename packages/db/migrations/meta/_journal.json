@@ -197,6 +197,13 @@
       "when": 1795431623072,
       "tag": "0027_private_ladder",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795760437642,
+      "tag": "0028_supabase_api_roles",
+      "breakpoints": true
     }
   ]
 }
