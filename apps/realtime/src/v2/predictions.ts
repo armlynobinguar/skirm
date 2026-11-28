@@ -9,7 +9,7 @@
 //                          which refunds everyone; a sealed match's winner is read from SkirmMatch)
 // A step that fails is logged and the market's later steps are skipped: nobody is stuck, since
 // anyone can close after closesAt and void a market nobody resolved (voidStale) a day later.
-import { PREDICTION_CLOSE_TICK } from '@skirm/shared';
+import { PREDICTION_CLOSE_TICK, waitForChain } from '@skirm/shared';
 import type { PredictionOperator } from '@skirm/server';
 import type { Logger } from '../deps';
 
@@ -87,8 +87,9 @@ export class MatchMarkets {
     run.closing = true;
     this.step(matchId, run, 'closed', () => this.operator.close(matchId));
     this.step(matchId, run, 'totals revealed', async () => {
-      // An empty market is void at close: nothing to reveal.
-      const m = await this.operator.read(matchId);
+      // An empty market is void at close: nothing to reveal. Right after the close, a lagging RPC
+      // node can still say Open, so wait until it shows the close (Closed, or Void when empty).
+      const m = await waitForChain(() => this.operator.read(matchId), (x) => x.status !== 'open', { what: 'the prediction market to close' });
       if (m.status !== 'closed') return null;
       const r = await this.operator.revealTotals(matchId);
       this.log.info(`v2 match ${matchId}: prediction pool A ${r.totalA} / B ${r.totalB} (${m.predictors} sealed predictions)`);

@@ -115,6 +115,26 @@ describe('closeAndFinalize', () => {
     await closeAndFinalize(done, instance, 1n);
     expect(done.calls).toEqual([]);
   });
+
+  it('waits out a lagging RPC: Open after the close, zero handles, and a read that times out', async () => {
+    const api = fakeApi([]);
+    const reads = [auction({ endTime: 0 }), auction({ endTime: 0 }), auction({ status: 'closing' }), auction({ status: 'closing' }), auction({ status: 'won', winner: ME })];
+    const timeout = Object.assign(new Error('request timeout'), { code: 'TIMEOUT' });
+    let n = 0;
+    api.get = vi.fn(async () => {
+      if (n === 1 && !api.calls.includes('timed out')) {
+        api.calls.push('timed out');
+        throw timeout;
+      }
+      return reads[Math.min(n++, reads.length - 1)]!;
+    });
+    const zero = H(0);
+    api.revealHandles = vi.fn().mockResolvedValueOnce([zero, zero]).mockResolvedValue([H(1), H(2)]);
+    const out = await closeAndFinalize(api, instance, 1n, { sleep: async () => {} });
+    expect(api.calls).toEqual(['close', 'timed out', 'finalize 0xabc 0xdef']);
+    expect(api.revealHandles).toHaveBeenCalledTimes(2);
+    expect(out.status).toBe('won');
+  });
 });
 
 describe('revealMyBid', () => {

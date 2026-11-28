@@ -11,7 +11,7 @@
 // MatchPredictions address in packages/fhevm/deployments/sepolia.json, via @skirm/fhevm/generated),
 // ZAMA_RELAYER_URL (default: the SDK's Sepolia relayer). The key is never logged.
 import { MatchPredictionsAbi, sepolia } from '@skirm/fhevm/generated';
-import { PREDICTION_NO_SIDE, predictionStatus, withFreshKmsProof, type PredictionStatus } from '@skirm/shared';
+import { PREDICTION_NO_SIDE, predictionStatus, retryRead, waitForHandles, withFreshKmsProof, type PredictionStatus } from '@skirm/shared';
 import { Contract, JsonRpcProvider, Wallet } from 'ethers';
 import { nodeRelayer, type RelayerInstance } from './benchmark-seeds';
 import { sealedMatchKey, zamaServerConfig, type ZamaServerConfig } from './sealed-match';
@@ -87,7 +87,7 @@ export class ContractPredictionOperator implements PredictionOperator {
   ) {}
 
   async read(matchId: string): Promise<ChainMarket> {
-    return parseChainMarket(await this.contract.getMarket(sealedMatchKey(matchId)));
+    return parseChainMarket(await retryRead(() => this.contract.getMarket(sealedMatchKey(matchId))));
   }
 
   open(matchId: string, closesAt: number): Promise<string> {
@@ -100,7 +100,8 @@ export class ContractPredictionOperator implements PredictionOperator {
 
   async revealTotals(matchId: string): Promise<{ txHash: string; totalA: bigint; totalB: bigint }> {
     const key = sealedMatchKey(matchId);
-    const handles = (await this.contract.totalHandles(key)).map(String);
+    // Zero handles (a lagging RPC node right after close) are read again: the relayer won't decrypt them.
+    const handles = (await waitForHandles(async () => (await this.contract.totalHandles(key)).map(String))).slice();
     // A rejected KMS proof (KMSInvalidSigner) is fetched again and resent.
     const { res, txHash } = await withFreshKmsProof(
       async () => (await this.relayer()).publicDecrypt(handles),
