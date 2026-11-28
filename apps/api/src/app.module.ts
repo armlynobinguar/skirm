@@ -2,9 +2,10 @@
 // HTTP app (error filter, CORS) the same way for main.ts and the tests.
 import 'reflect-metadata';
 import { Module, type DynamicModule, type INestApplication } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD, NestFactory } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { SessionGuard } from './auth';
+import { CacheInvalidationInterceptor } from './cache-invalidation';
 import { AgentAccountsController } from './controllers/agent-accounts.controller';
 import { BackingController } from './controllers/backing.controller';
 import { BenchController } from './controllers/bench.controller';
@@ -77,6 +78,7 @@ export class AppModule {
           : []),
         { provide: APP_GUARD, useClass: SessionGuard },
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
+        { provide: APP_INTERCEPTOR, useClass: CacheInvalidationInterceptor },
       ],
     };
   }
