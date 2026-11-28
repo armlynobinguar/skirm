@@ -14,7 +14,8 @@ import * as proto from '../proto/world';
 import { TOOL_INFO } from '../gear';
 import type { LiveArena } from '../live';
 import { MAPS, ROTATION_INDEX, mapById, type Arena, type ArenaState } from '../world';
-import type { ChaseCamOptions, ChaseCamState } from './index';
+import type { CamView, ChaseCamOptions, ChaseCamState } from './index';
+import { CHASE_FOV, VISOR_FOV, visorRig } from './visor';
 import {
   DIST_START,
   HEADING_STEPS,
@@ -339,7 +340,7 @@ export function buildWorld(arena: LiveArena, look: string): World {
     sandbag: inst(new THREE.CapsuleGeometry(0.14, 0.5, 4, 8).rotateZ(Math.PI / 2), lambert({ color: TOOL_INFO.sandbag.colour }), cap * 2),
     bridge: inst(box, lambert({ color: TOOL_INFO.bridge.colour }), cap * 3),
     pump: inst(new THREE.CylinderGeometry(0.16, 0.2, 0.45, 10).translate(0, 0.225, 0), lambert({ color: '#2a4a5c', emissive: TOOL_INFO.pump.colour, emissiveIntensity: 0.35 }), cap),
-    tool: inst(box, new THREE.MeshBasicMaterial({ color: '#ffd27a' }), cap, true),
+    tool: inst(box, new THREE.MeshBasicMaterial({ color: '#ffffff' }), cap, true),
   };
 
   // The delivery point: a turning ring and a soft beam.
@@ -774,7 +775,13 @@ function layTiles(w: World, state: ArenaState, seen: ((i: number) => boolean) | 
     } else if (p.kind === 'bridge') for (const k of [-0.3, 0, 0.3]) put('bridge', x + k, 0.04, y, 0.24, 0.08, 1.04);
     else put('pump', x, 0, y, 1, 1, 1);
   }
-  for (const g of gear?.tools ?? []) put('tool', g.at[0], 0.15, g.at[1], 0.34, 0.3, 0.34, 0.6);
+  // A tool waiting on the ground glows in its own colour, so a drop's contents read from afar (and in the visor).
+  for (const g of gear?.tools ?? []) {
+    const i = n.tool ?? 0;
+    put('tool', g.at[0], 0.15, g.at[1], 0.34, 0.3, 0.34, 0.6);
+    dyn.tool.setColorAt(i, col.set(TOOL_INFO[g.kind].colour));
+  }
+  if (dyn.tool.instanceColor) dyn.tool.instanceColor.needsUpdate = true;
   for (const key of Object.keys(dyn) as DynKey[]) {
     dyn[key].count = n[key] ?? 0;
     dyn[key].instanceMatrix.needsUpdate = true;
@@ -800,9 +807,11 @@ export interface FrameInput {
   dragging: boolean;
 }
 
-/** Steps the world and the camera rig for one animation frame; the caller renders. */
-export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: FrameInput) {
+/** Steps the world and the camera rig for one animation frame; the caller renders. Returns where the camera looks. */
+export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: FrameInput): CamView {
   const { state, dt, still, dragging } = f;
+  // First person: the camera is the watched agent's eyes (its own figure is hidden, walls stand).
+  const visor = state.mode === 'visor';
   const time = still ? 0 : f.time;
   const cur = state.arena.state;
   const prev = state.prev;
@@ -904,7 +913,9 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
       ...(a.persona ? { persona: a.persona } : {}),
     });
     // Anyone between the camera and the watched agent fades so they never hide it.
-    const blocking = !!rig.pos && !!rig.focusAt && a.id !== state.focus && segDist(x, z, rig.pos.x, rig.pos.z, rig.focusAt.x, rig.focusAt.z) < 0.75;
+    const blocking = !visor && !!rig.pos && !!rig.focusAt && a.id !== state.focus && segDist(x, z, rig.pos.x, rig.pos.z, rig.focusAt.x, rig.focusAt.z) < 0.75;
+    // In the visor the watched agent is the camera, and anyone standing in the lens is not drawn.
+    if (visor && ag.g.visible && (a.id === state.focus || (!!rig.pos && Math.hypot(x - rig.pos.x, z - rig.pos.z) < 0.45))) ag.g.visible = false;
     const op = (a.down ? 0.5 : blocking ? 0.28 : 1) * af;
     for (const m of ag.mats) {
       m.transparent = op < 1;
@@ -982,21 +993,28 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
   w.ring.rotation.z = time * 0.8;
   for (const wh of w.wheels) wh.rotation.z = time * 1.5;
 
-  // The chase camera: behind the agent, a little to the right, looking past it.
+  // The chase camera: behind the agent, a little to the right, looking past it. The visor: at its eyes.
   const fp: { x: number; z: number } = focus ?? { x: w.W / 2, z: w.H / 2 };
   const yaw0: number = rig.yaw ?? rig.tyaw;
   rig.yaw = still ? rig.tyaw : yaw0 + angDiff(yaw0, rig.tyaw) * approach(dt, 2.4);
   if (!dragging) rig.look *= still ? 0 : Math.exp(-dt * 1.5);
-  const want = chaseRig(fp, rig.yaw + rig.look, rig.dist);
-  if (!rig.pos || still) rig.pos = new THREE.Vector3(want.pos.x, want.pos.y, want.pos.z);
+  const viewYaw = rig.yaw + rig.look;
+  const want = visor ? visorRig(fp, viewYaw) : chaseRig(fp, viewYaw, rig.dist);
+  // The eye moves with the agent; the chase cam trails behind it.
+  if (!rig.pos || still || visor) rig.pos = new THREE.Vector3(want.pos.x, want.pos.y, want.pos.z);
   else rig.pos.lerp(new THREE.Vector3(want.pos.x, want.pos.y, want.pos.z), approach(dt, 6));
   cam.position.copy(rig.pos);
   rig.focusAt = { x: fp.x, z: fp.z };
+  const fov = visor ? VISOR_FOV : CHASE_FOV;
+  if (cam.fov !== fov) {
+    cam.fov = fov;
+    cam.updateProjectionMatrix();
+  }
 
-  // Walls between the camera and the agent drop to a low cutaway so they never hide it.
+  // Walls between the camera and the agent drop to a low cutaway so they never hide it (not in the visor).
   let cutChanged = false;
   w.wl.forEach((s, i) => {
-    const cut = wallBlocks(s.x, s.y, rig.pos!, fp);
+    const cut = !visor && wallBlocks(s.x, s.y, rig.pos!, fp);
     if (cut === s.cut) return;
     s.cut = cut;
     cutChanged = true;
@@ -1029,6 +1047,7 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
     }
     attr.needsUpdate = true;
   }
+  return { mode: visor ? 'visor' : 'chase', yaw: viewYaw, x: fp.x, z: fp.z };
 }
 
 export function newRig(): Rig {
@@ -1086,7 +1105,7 @@ export function startChaseCam(el: HTMLElement, getState: () => ChaseCamState | n
   const cv = r.domElement;
   Object.assign(cv.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block', touchAction: 'none', cursor: 'grab' });
   el.appendChild(cv);
-  const cam = new THREE.PerspectiveCamera(58, 1, 0.1, 160);
+  const cam = new THREE.PerspectiveCamera(CHASE_FOV, 1, 0.05, 160);
   const size = () => {
     const w = el.clientWidth || window.innerWidth;
     const h = el.clientHeight || window.innerHeight;
@@ -1158,8 +1177,9 @@ export function startChaseCam(el: HTMLElement, getState: () => ChaseCamState | n
           world = buildWorld(st.arena, st.look);
           rig.pos = null;
         }
-        stepWorld(world, rig, cam, { state: st, dt, time: (now - t0) / 1000, now: Date.now(), still: !!opts.still?.(), dragging: !!drag });
+        const view = stepWorld(world, rig, cam, { state: st, dt, time: (now - t0) / 1000, now: Date.now(), still: !!opts.still?.(), dragging: !!drag });
         r.render(world.scene, cam);
+        opts.onView?.(view);
       }
     } catch (err) {
       stop();

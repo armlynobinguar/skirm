@@ -5,6 +5,7 @@ import { composeV2Arena, type LiveArena } from '../live';
 import type { ArenaState } from '../world';
 import { mountChaseCam, type ChaseCamState } from './index';
 import { DIST_START } from './math';
+import { VISOR_EYE, VISOR_FOV } from './visor';
 import { buildWorld, newRig, startChaseCam, stepWorld, worldKey, type FrameInput, type RendererLike } from './scene3d';
 
 const LOOK = 'copper-hollow';
@@ -176,6 +177,73 @@ describe('chase cam world', () => {
     expect(again).not.toBe(first);
     expect(w.scene.children).not.toContain(first.g);
     expect(again.trail).toHaveLength(0);
+  });
+});
+
+describe('visor (first person)', () => {
+  it('tints each tool on the ground in its own colour, so a drop reads at a glance', () => {
+    const a = arena();
+    const withTools: LiveArena = {
+      ...a,
+      state: { ...a.state, gear: { tools: [{ at: [2, 2], kind: 'sandbag' }, { at: [3, 2], kind: 'pump' }], placed: [] } },
+    };
+    const w = buildWorld(a, LOOK);
+    stepWorld(w, newRig(), cam(), input({ arena: withTools, prev: null, at: 0, focus: 'wick', look: LOOK, mode: 'visor' }));
+    expect(w.dyn.tool.count).toBe(2);
+    const c0 = new THREE.Color();
+    const c1 = new THREE.Color();
+    w.dyn.tool.getColorAt(0, c0);
+    w.dyn.tool.getColorAt(1, c1);
+    expect(c0.getHexString()).toBe('c9a46a');
+    expect(c1.getHexString()).toBe('5fd3ff');
+  });
+
+  it('puts the camera at the watched agent eyes, hides its figure and keeps every wall standing', () => {
+    const a = arena();
+    const w = buildWorld(a, LOOK);
+    const rig = newRig();
+    const c = cam();
+    const view = stepWorld(w, rig, c, input({ arena: a, prev: null, at: 0, focus: 'wick', look: LOOK, mode: 'visor' }));
+    expect(c.position.y).toBeCloseTo(VISOR_EYE);
+    expect(Math.hypot(c.position.x - 1, c.position.z - 1)).toBeLessThan(0.2);
+    expect(c.fov).toBe(VISOR_FOV);
+    expect(w.agents.get('wick')!.g.visible).toBe(false);
+    expect(w.agents.get('moss')!.g.visible).toBe(true);
+    expect(w.wl.every((s) => !s.cut)).toBe(true);
+    expect(view).toMatchObject({ mode: 'visor', x: 1, z: 1 });
+    // Crew A starts facing the middle (+x).
+    expect(view.yaw).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('goes back to the chase cam behind the agent', () => {
+    const a = arena();
+    const w = buildWorld(a, LOOK);
+    const rig = newRig();
+    const c = cam();
+    stepWorld(w, rig, c, input({ arena: a, prev: null, at: 0, focus: 'wick', look: LOOK, mode: 'visor' }));
+    const view = stepWorld(w, rig, c, input({ arena: a, prev: null, at: 0, focus: 'wick', look: LOOK }));
+    expect(view.mode).toBe('chase');
+    expect(c.fov).toBe(58);
+    expect(c.position.y).toBeCloseTo(DIST_START * 0.66 + 0.4);
+    expect(w.agents.get('wick')!.g.visible).toBe(true);
+  });
+
+  it('reports the view after each drawn frame', () => {
+    let queue: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => queue.push(cb));
+    vi.stubGlobal('cancelAnimationFrame', () => {
+      queue = [];
+    });
+    const r = { domElement: document.createElement('canvas'), setPixelRatio: vi.fn(), setSize: vi.fn(), render: vi.fn(), dispose: vi.fn() };
+    const onView = vi.fn();
+    const state: ChaseCamState = { arena: arena(), prev: null, at: 0, focus: 'wick', look: LOOK, mode: 'visor' };
+    const stop = startChaseCam(document.createElement('div'), () => state, { still: () => true, onView }, { renderer: () => r as RendererLike });
+    const q = queue;
+    queue = [];
+    for (const cb of q) cb(16);
+    expect(onView).toHaveBeenCalledWith(expect.objectContaining({ mode: 'visor', x: 1, z: 1 }));
+    stop();
+    vi.unstubAllGlobals();
   });
 });
 

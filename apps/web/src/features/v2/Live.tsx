@@ -11,7 +11,10 @@
 //             just under the clock card.
 // The match is server-paced: Pause freezes this view only (resume jumps back to live), Story keeps
 // third person subtitles up for their full time, and the speed control shows only for a replay.
-// Keys: Space pause, V third person, ← → next agent in third person, Enter / Esc skip the intro,
+// Watching one agent is the 3D chase cam behind it or the Visor, first person from its eyes (the
+// HUD frame in hud/Visor.tsx); the last one picked is remembered (hud/camPref.ts).
+// Keys: Space pause, V third person (in the remembered camera), F visor / chase cam, ← → next agent
+// while watching one, Enter / Esc skip the intro,
 // Esc leaves third person, 1 / 2 / 4 replay speed. While you steer an agent: WASD / arrows step, E
 // use, T take, G deliver, X stop, Esc hands it back (third person's Esc comes first), a click on the
 // board walks there.
@@ -22,7 +25,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/components/shell/GlobalKeys';
 import { useToast } from '@/components/toast/ToastProvider';
-import type { ChaseCamState } from '@/features/arena/chase3d';
+import type { CamMode, CamView, ChaseCamState } from '@/features/arena/chase3d';
 import { liveEmotesOf } from '@/features/arena/emotes';
 import { composeV2Arena, liveFx, setLiveFx } from '@/features/arena/live';
 import { OVERVIEW, ZOOM_MAX, ZOOM_MIN, arenaStore, useArena } from '@/features/arena/store';
@@ -41,6 +44,8 @@ import { MatchTop } from './hud/MatchTop';
 import { calloutOf, difficultyOf, type Callout, type FeedFilter } from './hud/model';
 import { Banner, CalloutBar, CountIn } from './hud/parts';
 import { ThirdPerson } from './hud/ThirdPerson';
+import { Visor } from './hud/Visor';
+import { readCamMode, writeCamMode } from './hud/camPref';
 import { Inspect } from './hud/Inspect';
 import { ZamaPredictSlot } from '@/features/zama/predictions/ZamaPredictionSlots';
 import { ZamaRandomnessSlot } from '@/features/zama/randomness/ZamaRandomnessSlot';
@@ -55,6 +60,7 @@ export const RESULT_AT_MS = 2700;
 /** Matches whose intro this tab already played (it plays once, at the start). */
 const introPlayed = new Set<string>();
 let tpvHintShown = false;
+let visorHintShown = false;
 
 /** What the HUD draws: the live view, a paused copy of it, or a replay position. */
 export interface HudSource {
@@ -104,6 +110,9 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   const [story, setStory] = useState(true);
   const [held, setHeld] = useState(false);
   const [use3d, setUse3d] = useState(true);
+  const [camMode, setCamMode] = useState<CamMode>('chase');
+  // The remembered camera (read after mount: storage is the browser's).
+  useEffect(() => setCamMode(readCamMode()), []);
   const [intro, setIntro] = useState(() => !replay && !watch && view.phase === 'live' && !introPlayed.has(view.matchId) && (frame?.tick ?? 0) <= 2);
   const [count, setCount] = useState<string | null>(null);
   const [callout, setCallout] = useState<Callout | null>(null);
@@ -180,16 +189,32 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
     return r ? { agent: r, inSight: false } : null;
   };
 
-  const enterTpv = (id: string | null) => {
+  const enterTpv = (id: string | null, mode: CamMode = camMode) => {
     if (intro) return;
     const pick = findAgent(id)?.agent ?? agents.find((a) => a.team === team && !a.out) ?? agents[0];
     if (!pick) return;
     setTpv(pick.id);
     setFocus(pick.id);
-    if (!tpvHintShown) {
+    hintCam(mode);
+  };
+  const hintCam = (mode: CamMode) => {
+    if (mode === 'visor' && use3d) {
+      if (visorHintShown) return;
+      visorHintShown = true;
+      toast.show({ title: 'Visor', message: 'Its eyes, its compass, its inner voice · drag to look around · ← → switch agent · F for third person · Esc to leave' });
+    } else if (!tpvHintShown) {
       tpvHintShown = true;
       toast.show({ title: 'Third person', message: 'Drag to look around · scroll to zoom · ← → switch agent · I for its card and mind · Esc to leave' });
     }
+  };
+  // The camera buttons: pick that camera (remembered) and watch the selected agent; pressing the one
+  // already showing leaves it.
+  const pickCam = (mode: CamMode) => {
+    if (tpv && camMode === mode) return exitTpv();
+    setCamMode(mode);
+    writeCamMode(mode);
+    if (tpv) hintCam(mode);
+    else enterTpv(focus, mode);
   };
   const exitTpv = () => {
     setTpv(null);
@@ -244,6 +269,9 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
     } else if (e.key === 'v' || e.key === 'V') {
       take();
       toggleTpv();
+    } else if ((e.key === 'f' || e.key === 'F') && use3d) {
+      take();
+      pickCam(tpv && camMode === 'visor' ? 'chase' : 'visor');
     } else if (tpv && (e.key === 'ArrowRight' || e.key === 'ArrowLeft') && agents.length) {
       take();
       const i = agents.findIndex((a) => a.id === tpv);
@@ -283,13 +311,18 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   }, []);
 
   // The 3D chase cam reads the arena every frame (lazy: `three` loads only in third person).
-  const chase = useRef({ tpv, paused });
-  chase.current = { tpv, paused };
+  const chase = useRef({ tpv, paused, camMode });
+  chase.current = { tpv, paused, camMode };
   const chaseState = useCallback((): ChaseCamState | null => {
     const live = arenaStore().get().live;
     const id = chase.current.tpv;
     if (!live || !id) return null;
-    return { arena: live.arena, prev: prevArena.current, at: live.at, focus: id, look: live.look, paused: chase.current.paused };
+    return { arena: live.arena, prev: prevArena.current, at: live.at, focus: id, look: live.look, paused: chase.current.paused, mode: chase.current.camMode };
+  }, []);
+  // Where the 3D cam looks, each frame (the visor's compass reads it without re-rendering).
+  const camView = useRef<CamView | null>(null);
+  const onCamView = useCallback((v: CamView) => {
+    camView.current = v;
   }, []);
   const on3dFail = useCallback(() => {
     setUse3d(false);
@@ -303,6 +336,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   });
   const unseen = Math.max(0, (view.rivalAgents ?? 0) - rivals.length);
   const watched = findAgent(tpv);
+  const visorOn = !!watched && use3d && camMode === 'visor';
   const onPick = (id: string) => (tpv ? enterTpv(id) : setFocus((f) => (f === id ? null : id)));
   const cls = [c.hud, intro && c.introing, tpv && c.tpv, (intro || tpv) && c.cine].filter(Boolean).join(' ');
   const tick = frame?.tick ?? 0;
@@ -345,10 +379,16 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
             <AkIcon name={paused ? 'resume' : 'pause'} />
           </Button>
           {replay ? <Segmented label="Speed" options={SPEEDS} value={String(replay.speed)} onChange={(s) => replay.onSpeed(Number(s))} data-testid="v2-speed" /> : null}
-          <Button size="sm" className={c.tg} aria-pressed={!!tpv} onClick={toggleTpv} aria-label="3rd person" title="Third person on the selected agent (V)" data-testid="v2-tpv-toggle">
+          <Button size="sm" className={c.tg} aria-pressed={!!tpv && !visorOn} onClick={() => pickCam('chase')} aria-label="3rd person" title="Third person on the selected agent (V)" data-testid="v2-tpv-toggle">
             <AkIcon name="tpv" />
             <span className={c.bl}>3rd person</span>
           </Button>
+          {use3d ? (
+            <Button size="sm" className={c.tg} aria-pressed={visorOn} onClick={() => pickCam('visor')} aria-label="Visor" title="First person through the selected agent's visor (F)" data-testid="v2-visor-toggle">
+              <AkIcon name="visor" />
+              <span className={c.bl}>Visor</span>
+            </Button>
+          ) : null}
           <Button size="sm" className={`${c.tg} ${held ? c.held : ''}`} aria-pressed={story} onClick={toggleStory} aria-label="Story" title="Story pace: third person subtitles stay up until read" data-testid="v2-story">
             <AkIcon name="story" />
             <span className={c.bl}>Story</span>
@@ -402,8 +442,9 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
           onExit={exitTpv}
         />
       ) : null}
-      {watched && use3d ? <ChaseCam className={c.chase} getState={chaseState} onFail={on3dFail} /> : null}
-      {watched && use3d && watched.inSight ? <TpvEmote lines={comms} agentId={watched.agent.id} tick={tick} /> : null}
+      {watched && use3d ? <ChaseCam className={c.chase} getState={chaseState} onFail={on3dFail} onView={onCamView} /> : null}
+      {visorOn && watched ? <Visor agent={watched.agent} team={team} mapId={view.mapId} view={camView} tools={frame?.tools ?? []} /> : null}
+      {watched && use3d && !visorOn && watched.inSight ? <TpvEmote lines={comms} agentId={watched.agent.id} tick={tick} /> : null}
       {intro ? (
         <Intro
           mapId={view.mapId}

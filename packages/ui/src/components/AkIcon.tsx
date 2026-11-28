@@ -22,6 +22,7 @@ export type AkIconName =
   | 'pause'
   | 'resume'
   | 'tpv'
+  | 'visor'
   | 'story'
   | 'back';
 
@@ -214,6 +215,18 @@ export function akIconMarkup(kind: AkIconName, uid: string): string {
         ln('M13.5 24.5L4.5 11M18.5 24.5L27.5 11', 0.9, 'stroke-dasharray="1.4 1.4" opacity=".7"') +
         accF('M12.5 24.5H19.5V29H12.5Z') +
         acc('M14.5 7.5h3', 1.6);
+      break;
+    }
+    case 'visor': {
+      // A cut-corner visor slit seen from inside, with the reticle and a compass tick over it.
+      const lens = 'M4.5 11.5H24.5L28.5 15.5V22.5H8.5L4.5 18.5Z';
+      defs = clip('l', lens);
+      g =
+        dots('l', 4.5, 11.5, 28.5, 22.5, '-y', 1.9, 0.9) +
+        ln(lens, 1.2) +
+        ln('M16.5 14.5L19 17L16.5 19.5L14 17Z', 1.1) +
+        ln('M10.5 5.5v2M16.5 4.5v3M22.5 5.5v2', 0.9, 'opacity=".7"') +
+        acc('M4.5 26.5H28.5', 1.8);
       break;
     }
     case 'story': {
