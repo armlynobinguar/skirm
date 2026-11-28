@@ -22,6 +22,20 @@ export interface ChaseCamState {
   look: string;
   /** View-only pause: hold the picture. */
   paused?: boolean;
+  /** 'visor': first person from the watched agent's eyes (./visor); default the chase cam behind it. */
+  mode?: CamMode;
+}
+
+export type CamMode = 'chase' | 'visor';
+
+/** Where the camera looks this frame, for HUD overlays (the visor's compass). */
+export interface CamView {
+  mode: CamMode;
+  /** Heading the view faces (radians, 0 = +z), drag included. */
+  yaw: number;
+  /** The watched agent on the ground plane (x column, z row), as drawn this frame. */
+  x: number;
+  z: number;
 }
 
 export interface ChaseCamOptions {
@@ -29,6 +43,8 @@ export interface ChaseCamOptions {
   onFail?: (err: unknown) => void;
   /** Read every frame: reduced motion (no bob, spin, flicker or weather, and the camera snaps). */
   still?: () => boolean;
+  /** Called after every drawn frame with where the camera looks. */
+  onView?: (v: CamView) => void;
 }
 
 /** Mounts the 3D chase cam into `el`; returns the unmount (removes the canvas, frees the GPU). */
