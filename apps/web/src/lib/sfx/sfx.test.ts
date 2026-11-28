@@ -3,13 +3,24 @@ import { CUES, createSfx } from './index';
 
 function fakeContext() {
   const oscillators: { type: string; start: number; stop: number }[] = [];
+  const gains: { gain: { setValueAtTime: ReturnType<typeof vi.fn> } }[] = [];
+  const panners: { pan: { value: number } }[] = [];
   const param = () => ({ setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() });
   const ctx = {
     currentTime: 10,
     state: 'suspended' as AudioContextState,
     destination: {} as AudioDestinationNode,
     resume: vi.fn(async () => undefined),
-    createGain: () => ({ gain: param(), connect: (n: unknown) => n }),
+    createGain: () => {
+      const g = { gain: param(), connect: (n: unknown) => n };
+      gains.push(g);
+      return g;
+    },
+    createStereoPanner: () => {
+      const p = { pan: { value: 0 }, connect: (n: unknown) => n };
+      panners.push(p);
+      return p;
+    },
     createOscillator: () => {
       const o = {
         type: 'sine',
@@ -21,7 +32,7 @@ function fakeContext() {
       return o;
     },
   };
-  return { ctx, oscillators };
+  return { ctx, oscillators, gains, panners };
 }
 
 describe('sfx', () => {
@@ -36,6 +47,23 @@ describe('sfx', () => {
     expect(ctx.resume).toHaveBeenCalled();
     expect(oscillators).toHaveLength(CUES.click.length + CUES.good.length);
     expect(oscillators[1]).toMatchObject({ type: 'triangle', start: 10.05 });
+  });
+
+  it('places an agent sound: panned to its side and quieter with distance; unplaced plays centred', () => {
+    const { ctx, gains, panners } = fakeContext();
+    const sfx = createSfx(() => ctx as never);
+    sfx.agent!({ kind: 'step', pitch: 1 });
+    expect(panners).toHaveLength(0);
+    const full = gains[0]!.gain.setValueAtTime.mock.calls[0]![0] as number;
+    sfx.agent!({ kind: 'step', pitch: 1 }, { pan: -2, gain: 0.5 });
+    expect(panners).toHaveLength(1);
+    expect(panners[0]!.pan.value).toBe(-1);
+    expect(gains[1]!.gain.setValueAtTime.mock.calls[0]![0]).toBeCloseTo(full * 0.5);
+    // Too far to hear: nothing scheduled.
+    sfx.agent!({ kind: 'step', pitch: 1 }, { pan: 0, gain: 0 });
+    expect(gains).toHaveLength(2);
+    sfx.play('visorOn');
+    expect(gains).toHaveLength(2 + CUES.visorOn.length);
   });
 
   it('stays silent without audio support or when the context throws', () => {

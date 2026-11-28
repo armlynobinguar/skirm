@@ -10,13 +10,15 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { usePreferences } from '@/lib/preferences';
 import { useSfx } from '@/lib/sfx';
+import { listener } from '@/lib/sfx/listener';
 import { screenOf } from '@/lib/routes';
 import { drawEmotes } from './emotes';
 import { drawCosmetics2D, type CosmeticDrawOpts } from './cosmetics';
 import { drawGear2D } from './gear';
 import * as proto from './proto/world';
 import { cameraFor, easeRateFor, fitBox, sceneForMatchView, sceneForScreen, stepCamera, type ArenaScene, type Camera } from './scene';
-import { frameSounds, liveFx, type LiveArena, walkMs } from './live';
+import { spatialOf } from './chase3d/visor';
+import { frameSounds, liveFx, type FrameSound, type LiveArena, walkMs } from './live';
 import { setArenaProjection } from './pick';
 import { useArena, type ArenaStateSnapshot } from './store';
 import { MAPS, mapById, restingState, type ArenaState, type V2Map } from './world';
@@ -244,7 +246,12 @@ export function ArenaCanvas({ scene: forced }: ArenaCanvasProps) {
     sounded.current = { at: liveMatch.at, state: liveMatch.arena.state };
     const inMatch = scene === 'match' || scene === 'follow' || scene === 'tpv';
     if (!inMatch || typeof document === 'undefined' || document.visibilityState !== 'visible') return;
-    const timers = frameSounds(liveMatch.arena, prevState, walkMs(gap)).map((s) => setTimeout(() => sfx.agent?.(s.sound), s.delay));
+    // In the visor, sounds come from where they happen (the listener is the watched agent's ears).
+    const play = (s: FrameSound) => {
+      const l = listener();
+      sfx.agent?.(s.sound, l && s.at ? spatialOf(l, { x: s.at[0], z: s.at[1] }) : undefined);
+    };
+    const timers = frameSounds(liveMatch.arena, prevState, walkMs(gap)).map((s) => setTimeout(() => play(s), s.delay));
     return () => timers.forEach(clearTimeout);
   }, [liveMatch, scene, sfx]);
 

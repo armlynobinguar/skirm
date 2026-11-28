@@ -633,6 +633,8 @@ export function walkBob(alpha: number): number {
 export interface FrameSound {
   delay: number;
   sound: AgentSound;
+  /** The tile it comes from (the agent's), for positional sound in the visor. */
+  at?: [number, number];
 }
 
 /** Each crew slot gets its own voice; the B crew a little lower. */
@@ -655,21 +657,22 @@ export function frameSounds(arena: LiveArena, prev: ArenaState | null, walk: num
   for (const a of arena.state.agents) {
     if (a.out) continue;
     const pitch = voicePitch(a.team, a.slot);
+    const at: [number, number] = [a.x, a.y];
     const so = a.social;
     if (so?.talk) {
       const text = arena.barks?.[a.id]?.text ?? '';
       const words = text.split(/\s+/).filter(Boolean).length;
-      out.push({ delay: 0, sound: { kind: 'voice', syllables: Math.max(2, Math.min(7, words)), pitch, seed: (arena.tick ?? 0) * 7 + a.slot } });
+      out.push({ delay: 0, sound: { kind: 'voice', syllables: Math.max(2, Math.min(7, words)), pitch, seed: (arena.tick ?? 0) * 7 + a.slot }, at });
     }
-    if (so?.cough) out.push({ delay: 0, sound: { kind: 'cough' } });
-    if (so?.slip) out.push({ delay: 0, sound: { kind: 'slide' } });
+    if (so?.cough) out.push({ delay: 0, sound: { kind: 'cough' }, at });
+    if (so?.slip) out.push({ delay: 0, sound: { kind: 'slide' }, at });
     if (so?.scheme) out.push({ delay: 80, sound: { kind: 'scheme' } });
-    if (so?.fooled) out.push({ delay: 120, sound: { kind: 'fooled' } });
+    if (so?.fooled) out.push({ delay: 120, sound: { kind: 'fooled' }, at });
     const p = was.get(a.id);
     if (p && steps < STEP_VOICES && Math.abs(p.x - a.x) + Math.abs(p.y - a.y) === 1) {
       steps++;
-      out.push({ delay: Math.round(walk * 0.3), sound: { kind: 'step', pitch } });
-      out.push({ delay: Math.round(walk * 0.8), sound: { kind: 'step', pitch: pitch * 0.94 } });
+      out.push({ delay: Math.round(walk * 0.3), sound: { kind: 'step', pitch }, at });
+      out.push({ delay: Math.round(walk * 0.8), sound: { kind: 'step', pitch: pitch * 0.94 }, at });
     }
   }
   return out;
