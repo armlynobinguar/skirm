@@ -12,7 +12,7 @@
   padding: 0;
   border: 0;
   color: var(--amber);
-  background: rgba(5, 8, 13, .72);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
   box-shadow: inset 0 0 0 1px var(--line-strong);
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
   cursor: pointer;
@@ -20,7 +20,7 @@
   -webkit-backdrop-filter: blur(6px);
   transition: box-shadow .25s, color .25s, background-color .25s;
 }
-.bulb:hover, .bulb[aria-expanded="true"] { color: var(--bone); background: rgba(16, 26, 38, .9); box-shadow: inset 0 0 0 1px var(--amber); }
+.bulb:hover, .bulb[aria-expanded="true"] { color: var(--bone); background: color-mix(in srgb, var(--surface-raised) 90%, transparent); box-shadow: inset 0 0 0 1px var(--amber); }
 .bulb:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .bulbIcon { width: 24px; height: 24px; }
 /* A quest ready to claim: the bulb glows. */
@@ -38,7 +38,7 @@
   display: grid;
   place-items: center;
   font: 700 10px/1 var(--font-mono);
-  color: #05080d;
+  color: var(--on-warning);
   background: var(--amber);
 }
 
@@ -54,7 +54,7 @@
   flex-direction: column;
   gap: var(--space-5);
   padding: var(--space-4) var(--space-5) var(--space-5);
-  background: #090f17;
+  background: var(--surface-sunken);
   box-shadow: inset 0 0 0 1px var(--line-strong), var(--elev-2, var(--elev-1));
   clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
 }

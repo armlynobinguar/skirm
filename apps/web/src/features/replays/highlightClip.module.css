@@ -9,14 +9,14 @@
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: #05080d;
+  background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--line-strong), 0 24px 70px rgba(0, 0, 0, .45);
   clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 24px 100%, 0 calc(100% - 24px));
 }
 .canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .bars { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(#000 0 8%, transparent 8% 92%, #000 92%); }
 .vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, transparent 50%, rgba(0, 0, 0, .6)); }
-.flash { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, rgba(255, 236, 200, .55), rgba(255, 181, 71, .12) 60%, transparent); animation: flash .8s ease-out both; }
+.flash { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, rgba(255, 236, 200, .55), color-mix(in srgb, var(--amber) 12%, transparent) 60%, transparent); animation: flash .8s ease-out both; }
 @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
 
 .top {
@@ -70,7 +70,7 @@
   font: 800 clamp(18px, 3.4vw, 40px)/1.05 var(--font-display);
   text-transform: uppercase;
   color: var(--bone);
-  background: rgba(5, 8, 13, .82);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
   box-shadow: inset 4px 0 0 var(--tone);
   text-shadow: 0 2px 18px rgba(0, 0, 0, .6);
   animation: capIn .5s var(--ease-out) .2s both;
@@ -85,7 +85,7 @@
   padding: 3px 10px;
   font: 600 13px/18px var(--font-sans);
   color: var(--text);
-  background: rgba(5, 8, 13, .72);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
   animation: capIn .5s var(--ease-out) .45s both;
 }
 @keyframes capIn { from { opacity: 0; transform: translateY(8px); } }

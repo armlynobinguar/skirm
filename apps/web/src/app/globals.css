@@ -31,7 +31,7 @@ details summary { cursor: pointer; font: 500 11px/16px var(--font-mono); letter-
 /* Behind every screen: the arena canvas (.app-arena), its ink dimming (.app-arena-dim), a vignette and
  * faint scanlines (the prototype's #world, #dim, #shade and #scan). */
 .app-shell { position: relative; min-height: 100vh; display: flex; flex-direction: column; isolation: isolate; }
-.app-shell::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(120% 90% at 50% 40%, transparent 30%, rgba(3, 6, 10, .85) 100%), linear-gradient(180deg, rgba(5, 8, 13, .6), transparent 22%, transparent 70%, rgba(5, 8, 13, .85)); }
+.app-shell::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(120% 90% at 50% 40%, transparent 30%, color-mix(in srgb, var(--bg) 85%, transparent) 100%), linear-gradient(180deg, color-mix(in srgb, var(--bg) 60%, transparent), transparent 22%, transparent 70%, color-mix(in srgb, var(--bg) 85%, transparent)); }
 .app-shell::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .05; background: repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 3px); }
 .app-arena { position: fixed; inset: 0; z-index: -3; width: 100%; height: 100%; display: block; pointer-events: none; }
 .app-arena-dim { position: fixed; inset: 0; z-index: -2; pointer-events: none; background: var(--bg); opacity: .6; }
@@ -49,28 +49,28 @@ details summary { cursor: pointer; font: 500 11px/16px var(--font-mono); letter-
  * containing block for the menu) with a hairline under it, so scrolled content never shows through.
  * The bar is sticky and in flow, so every screen's content starts below it. */
 .app-topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); color: var(--ink); }
-.app-topbar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(180deg, rgba(5, 8, 13, .94), rgba(5, 8, 13, .86)); box-shadow: inset 0 -1px 0 var(--line), 0 10px 24px -12px rgba(0, 0, 0, .8); backdrop-filter: blur(10px) saturate(1.1); -webkit-backdrop-filter: blur(10px) saturate(1.1); }
+.app-topbar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 94%, transparent), color-mix(in srgb, var(--bg) 86%, transparent)); box-shadow: inset 0 -1px 0 var(--line), 0 10px 24px -12px rgba(0, 0, 0, .8); backdrop-filter: blur(10px) saturate(1.1); -webkit-backdrop-filter: blur(10px) saturate(1.1); }
 /* Desktop: the wrapper is transparent to layout and the Menu button is hidden. */
 .app-topbar-navwrap { display: contents; }
 .app-topbar-chip.app-topbar-menu { display: none; }
 .app-topbar-grp { display: flex; align-items: center; gap: 5px; min-width: 0; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .55)); }
-.app-topbar-chip { position: relative; display: flex; align-items: center; height: 38px; border: 0; color: var(--muted); text-decoration: none; background-color: rgba(9, 15, 23, .9); background-image: var(--grain); background-size: 140px 140px; box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); transition: color .2s, background-color .2s, transform .25s var(--ease-out); }
-a.app-topbar-chip:hover, button.app-topbar-chip:hover { color: var(--bone); background-color: rgba(18, 30, 42, .96); transform: translateY(-2px); }
+.app-topbar-chip { position: relative; display: flex; align-items: center; height: 38px; border: 0; color: var(--muted); text-decoration: none; background-color: color-mix(in srgb, var(--surface-sunken) 90%, transparent); background-image: var(--grain); background-size: 140px 140px; box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); transition: color .2s, background-color .2s, transform .25s var(--ease-out); }
+a.app-topbar-chip:hover, button.app-topbar-chip:hover { color: var(--bone); background-color: color-mix(in srgb, var(--surface-raised) 96%, transparent); transform: translateY(-2px); }
 .app-topbar-back { justify-content: center; width: 38px; padding: 0; color: var(--bone); cursor: pointer; }
 .app-topbar-back .sk-ak { width: 24px; height: 24px; }
 .app-topbar-logo { display: inline-flex; align-items: center; min-height: 44px; margin: 0 6px 0 8px; color: var(--bone); text-decoration: none; text-shadow: 0 2px 14px rgba(0, 0, 0, .9); }
 .app-topbar-logo .sk-logo-word { font-size: 22px !important; }
 .app-topbar-crumb { font: 500 11px/16px var(--font-mono); letter-spacing: .2em; text-transform: uppercase; color: var(--you); white-space: nowrap; text-shadow: 0 1px 8px rgba(0, 0, 0, .9); }
 .app-topbar-nav { gap: 4px; }
-.app-topbar-link { gap: 8px; padding: 0 15px 0 5px; font: 700 15.5px/1 var(--font-display); letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; background-color: rgba(9, 15, 23, .92); background-image: var(--grain), repeating-linear-gradient(-45deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 4px); background-size: 140px 140px, auto; }
-.app-topbar-link::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle, rgba(52, 224, 200, .55) .9px, transparent 1.35px) 0 0 / 4px 4px; -webkit-mask-image: linear-gradient(270deg, #000 0%, rgba(0, 0, 0, .4) 30%, transparent 62%); mask-image: linear-gradient(270deg, #000 0%, rgba(0, 0, 0, .4) 30%, transparent 62%); transition: opacity .3s; }
+.app-topbar-link { gap: 8px; padding: 0 15px 0 5px; font: 700 15.5px/1 var(--font-display); letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; background-color: color-mix(in srgb, var(--surface-sunken) 92%, transparent); background-image: var(--grain), repeating-linear-gradient(-45deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 4px); background-size: 140px 140px, auto; }
+.app-topbar-link::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle, color-mix(in srgb, var(--you) 55%, transparent) .9px, transparent 1.35px) 0 0 / 4px 4px; -webkit-mask-image: linear-gradient(270deg, #000 0%, rgba(0, 0, 0, .4) 30%, transparent 62%); mask-image: linear-gradient(270deg, #000 0%, rgba(0, 0, 0, .4) 30%, transparent 62%); transition: opacity .3s; }
 .app-topbar-link::after { content: ""; position: absolute; left: 41px; right: 13px; bottom: 5px; height: 2px; background: var(--you); transform: scaleX(0); transform-origin: left; transition: transform .35s var(--ease-out); }
 .app-topbar-link:hover::before { opacity: .45; }
 .app-topbar-link:hover .sk-ni { color: var(--bone); }
-.app-topbar-link[aria-current='page'] { color: var(--bone); background-color: rgba(10, 30, 34, .97); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .38); }
+.app-topbar-link[aria-current='page'] { color: var(--bone); background-color: color-mix(in srgb, var(--surface-you) 97%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--you) 38%, transparent); }
 .app-topbar-link[aria-current='page']::before { opacity: 1; }
 .app-topbar-link[aria-current='page']::after { transform: scaleX(1); }
-.app-topbar-link[aria-current='page'] .sk-ni { color: var(--bone); background: rgba(52, 224, 200, .13); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .6); }
+.app-topbar-link[aria-current='page'] .sk-ni { color: var(--bone); background: color-mix(in srgb, var(--you) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--you) 60%, transparent); }
 .app-topbar-serial { position: absolute; top: 3px; right: 12px; font: normal 400 7px/1 var(--font-mono); letter-spacing: .14em; color: var(--faint); }
 .app-topbar-link[aria-current='page'] .app-topbar-serial { color: var(--you); }
 /* z-index: the account card drops over the tab row when the tabs wrap to their own row. */
@@ -91,14 +91,14 @@ button.app-topbar-toggle:hover { color: var(--bone); }
  * screens' drawers) and is hidden while closed. */
 .app-acct { position: relative; display: flex; }
 .app-acct-badge { gap: 9px; max-width: 280px; padding: 0 14px 0 11px; color: var(--bone); cursor: pointer; text-decoration: none; }
-.app-acct-badge[aria-expanded='true'] { background-color: rgba(10, 30, 34, .97); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .38); }
+.app-acct-badge[aria-expanded='true'] { background-color: color-mix(in srgb, var(--surface-you) 97%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--you) 38%, transparent); }
 a.app-acct-badge .app-dock-net { font-size: 9.5px; }
-.app-acct-dia { flex: none; width: 9px; height: 9px; background: var(--amber); transform: rotate(45deg); box-shadow: 0 0 10px rgba(255, 181, 71, .55); }
+.app-acct-dia { flex: none; width: 9px; height: 9px; background: var(--amber); transform: rotate(45deg); box-shadow: 0 0 10px color-mix(in srgb, var(--amber) 55%, transparent); }
 .app-acct-handle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 15px/1 var(--font-display); letter-spacing: .06em; text-transform: uppercase; }
 .app-acct-cr { flex: none; padding-left: 9px; font: 500 11px/1 var(--font-mono); letter-spacing: .08em; color: var(--you); box-shadow: inset 1px 0 0 var(--line); white-space: nowrap; }
 .app-acct-chev { flex: none; width: 10px; height: 6px; color: var(--muted); transition: transform .25s var(--ease-out); }
 .app-acct-badge[aria-expanded='true'] .app-acct-chev { transform: rotate(180deg); color: var(--you); }
-.app-dock { position: absolute; z-index: 40; top: calc(100% + 8px); right: 0; display: grid; width: min(500px, calc(100vw - 32px)); color: var(--ink); background-color: rgba(9, 15, 23, .96); background-image: var(--grain); background-size: 140px 140px; box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: app-dock-in .25s var(--ease-out) both; }
+.app-dock { position: absolute; z-index: 40; top: calc(100% + 8px); right: 0; display: grid; width: min(500px, calc(100vw - 32px)); color: var(--ink); background-color: color-mix(in srgb, var(--surface-sunken) 96%, transparent); background-image: var(--grain); background-size: 140px 140px; box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: app-dock-in .25s var(--ease-out) both; }
 .app-dock[hidden] { display: none; }
 @keyframes app-dock-in { from { opacity: 0; transform: translate3d(0, -8px, 0); } }
 .app-dock-head { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 9px 26px 9px 14px; box-shadow: inset 0 -1px 0 var(--line); }
@@ -173,7 +173,7 @@ a.app-dock-tutorial:hover { color: var(--bone); }
 .legal p, .legal li { line-height: 1.55; }
 .legal ul { display: grid; gap: 6px; margin: 0; padding-left: 20px; }
 .legal a { text-decoration: underline; }
-.s01::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(120% 90% at 50% 40%, transparent 30%, rgba(3, 6, 10, .85) 100%), linear-gradient(180deg, rgba(5, 8, 13, .6), transparent 22%, transparent 70%, rgba(5, 8, 13, .85)); }
+.s01::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(120% 90% at 50% 40%, transparent 30%, color-mix(in srgb, var(--bg) 85%, transparent) 100%), linear-gradient(180deg, color-mix(in srgb, var(--bg) 60%, transparent), transparent 22%, transparent 70%, color-mix(in srgb, var(--bg) 85%, transparent)); }
 
 .s01-header { max-width: 1280px; margin: 0 auto; padding: 20px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; }
 .s01-main { max-width: 1280px; margin: 0 auto; padding: 8px 24px 48px; display: flex; flex-direction: column; gap: 48px; }
@@ -255,9 +255,9 @@ a.app-dock-tutorial:hover { color: var(--bone); }
   .app-topbar { flex-wrap: nowrap; gap: 8px; }
   .app-topbar-navwrap { display: block; position: static; flex: none; }
   .app-topbar-chip.app-topbar-menu { display: flex; flex: none; gap: 8px; padding: 0 12px 0 10px; font: 700 14px/1 var(--font-display); letter-spacing: .07em; text-transform: uppercase; color: var(--bone); cursor: pointer; }
-  .app-topbar-menu[aria-expanded='true'] { background-color: rgba(10, 30, 34, .97); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .38); }
+  .app-topbar-menu[aria-expanded='true'] { background-color: color-mix(in srgb, var(--surface-you) 97%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--you) 38%, transparent); }
   .app-topbar-nav { display: none; }
-  .app-topbar-nav[data-open] { position: absolute; z-index: 45; top: calc(100% + 6px); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 4px; order: 0; overflow: visible; padding: 6px; background: rgba(5, 8, 13, .97); box-shadow: inset 0 0 0 1px var(--line); filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .6)); animation: app-dock-in .2s var(--ease-out) both; }
+  .app-topbar-nav[data-open] { position: absolute; z-index: 45; top: calc(100% + 6px); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 4px; order: 0; overflow: visible; padding: 6px; background: color-mix(in srgb, var(--bg) 97%, transparent); box-shadow: inset 0 0 0 1px var(--line); filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .6)); animation: app-dock-in .2s var(--ease-out) both; }
   .app-topbar-nav[data-open] .app-topbar-link { height: 46px; font-size: 16px; padding: 0 14px 0 6px; gap: 10px; }
   .app-topbar-nav[data-open] .app-topbar-link::after { left: 44px; right: auto; width: 40px; }
   .app-topbar-toggle { width: 38px; justify-content: center; padding: 0; }
@@ -309,7 +309,7 @@ a.app-dock-tutorial:hover { color: var(--bone); }
  * section tabs (no icon plates or serial codes) and a teal underline on the active one. Phones keep
  * the Menu dropdown from the 720px rules above. */
 .app-arena-dim { opacity: .84; }
-.app-shell::before { background: var(--glow), radial-gradient(120% 90% at 50% 40%, transparent 35%, rgba(3, 6, 10, .8) 100%); }
+.app-shell::before { background: var(--glow), radial-gradient(120% 90% at 50% 40%, transparent 35%, color-mix(in srgb, var(--bg) 80%, transparent) 100%); }
 .app-shell::after { opacity: .035; }
 .app-h1 { font: 800 56px/52px var(--font-display); letter-spacing: .02em; }
 .app-h2 { font: 800 32px/32px var(--font-display); letter-spacing: .03em; }
@@ -323,18 +323,18 @@ a.app-link-strong:hover { color: var(--you-hover); }
 }
 
 /* Top bar: a solid band with a hairline under it. */
-.app-topbar::before { background: rgba(7, 9, 13, .96); box-shadow: inset 0 -1px 0 #1c2a2f, 0 12px 24px -16px rgba(0, 0, 0, .9); }
+.app-topbar::before { background: color-mix(in srgb, var(--bg) 96%, transparent); box-shadow: inset 0 -1px 0 var(--line), 0 12px 24px -16px rgba(0, 0, 0, .9); }
 .app-topbar-grp { filter: none; }
-.app-topbar-chip:not(.app-topbar-link) { background-color: #0e1519; background-image: none; clip-path: var(--clip-cut2-sm); }
+.app-topbar-chip:not(.app-topbar-link) { background-color: var(--surface); background-image: none; clip-path: var(--clip-cut2-sm); }
 .app-topbar-logo .sk-logo-word { font-size: 26px !important; letter-spacing: .18em; }
 @media (min-width: 721px) {
   .app-topbar { padding-top: 0; padding-bottom: 0; min-height: 64px; }
   .app-topbar-nav { gap: 2px; align-self: stretch; }
-  .app-topbar-link { height: 64px; padding: 0 18px; color: #9aa6a8; background: none; box-shadow: none; clip-path: none; font: 800 19px/1 var(--font-display); letter-spacing: .1em; }
+  .app-topbar-link { height: 64px; padding: 0 18px; color: var(--muted); background: none; box-shadow: none; clip-path: none; font: 800 19px/1 var(--font-display); letter-spacing: .1em; }
   .app-topbar-link::before { display: none; }
   .app-topbar-link::after { left: 0; right: 0; bottom: 0; height: 3px; }
   a.app-topbar-link:hover { transform: none; color: var(--bone); background: rgba(255, 255, 255, .03); }
-  .app-topbar-link[aria-current='page'] { color: var(--bone); background: linear-gradient(180deg, transparent, rgba(52, 224, 200, .13)); box-shadow: none; }
+  .app-topbar-link[aria-current='page'] { color: var(--bone); background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--you) 13%, transparent)); box-shadow: none; }
   .app-topbar-link .sk-ni, .app-topbar-serial { display: none; }
 }
 @media (min-width: 721px) and (max-width: 1300px) { .app-topbar-link { padding: 0 13px; font-size: 17px; } }

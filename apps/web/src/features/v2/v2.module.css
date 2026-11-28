@@ -3,7 +3,7 @@
 .ended { display: grid; justify-items: center; gap: 14px; max-width: 640px; margin: 12vh auto 0; padding: 24px 16px; text-align: center; }
 /* Cards over the live arena: a dark glass backing so text never sits on the board. */
 .ended,
-.lock { background: rgba(5, 8, 13, .84); border: 1px solid var(--line); backdrop-filter: blur(6px); }
+.lock { background: color-mix(in srgb, var(--bg) 84%, transparent); border: 1px solid var(--line); backdrop-filter: blur(6px); }
 .ended :global(.sk-disp) { font-size: clamp(56px, 9vw, 120px); color: var(--bone); }
 .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .note { margin: 0; color: var(--muted); }
@@ -17,7 +17,7 @@
 .squad > li { display: grid; gap: 10px; padding: 14px 16px; }
 .name { font: 800 22px/1 var(--font-display); text-transform: uppercase; color: var(--bone); }
 .tiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.tier { display: grid; gap: 2px; padding: 10px 12px; text-align: left; color: var(--text); background: rgba(9, 15, 23, .8); border: 1px solid var(--line); cursor: pointer; }
+.tier { display: grid; gap: 2px; padding: 10px 12px; text-align: left; color: var(--text); background: color-mix(in srgb, var(--surface-sunken) 80%, transparent); border: 1px solid var(--line); cursor: pointer; }
 .tier b { font: 700 15px/1.1 var(--font-display); text-transform: uppercase; }
 .tier small { font: 400 11px/15px var(--font-mono); color: var(--muted); }
 .tier[data-on] { border-color: var(--you); box-shadow: inset 0 0 0 1px var(--you); }
@@ -56,7 +56,7 @@
 .trow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 9px; font-size: 14px; color: var(--muted); box-shadow: inset 0 -1px 0 var(--line); }
 .trow b { font: 500 14px/18px var(--font-mono); text-align: right; color: var(--bone); }
 .verify { display: flex; align-items: center; gap: 10px; overflow: hidden; padding: 10px 12px; font: 400 11px/16px var(--font-mono); letter-spacing: .06em; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
-.verify[data-ok] { color: var(--you); background: rgba(52, 224, 200, .06); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .35); }
+.verify[data-ok] { color: var(--you); background: color-mix(in srgb, var(--you) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--you) 35%, transparent); }
 .verify span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .verify code { color: var(--text); }
 @keyframes fromL { from { opacity: .001; transform: translate3d(-40px, 0, 0); } }
@@ -82,12 +82,12 @@
 .heard { color: var(--amber); }
 
 /* Match found: the VS takeover (Accept) and the accept / lock-in countdown. */
-.vs { position: fixed; inset: 0; z-index: 40; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; overflow: hidden; background: rgba(5, 8, 13, .95); }
+.vs { position: fixed; inset: 0; z-index: 40; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; overflow: hidden; background: color-mix(in srgb, var(--bg) 95%, transparent); }
 .found { position: absolute; top: 70px; left: 0; right: 0; padding-inline: 16px; text-align: center; }
 .vside { display: grid; gap: 8px; height: 100%; min-width: 0; padding: 36px; align-content: center; }
 .vside :global(.sk-disp) { font-size: clamp(44px, 6.4vw, 96px); overflow-wrap: anywhere; }
-.va { justify-items: start; background: linear-gradient(90deg, rgba(52, 224, 200, .25), transparent); animation: fromL .8s var(--ease-out) both; }
-.vb { justify-items: end; text-align: right; background: linear-gradient(270deg, rgba(255, 70, 85, .28), transparent); animation: fromR .8s var(--ease-out) both; }
+.va { justify-items: start; background: linear-gradient(90deg, color-mix(in srgb, var(--you) 25%, transparent), transparent); animation: fromL .8s var(--ease-out) both; }
+.vb { justify-items: end; text-align: right; background: linear-gradient(270deg, color-mix(in srgb, var(--rival) 28%, transparent), transparent); animation: fromR .8s var(--ease-out) both; }
 .vmid { display: grid; justify-items: center; gap: 18px; padding: 16px; }
 .vsWord { font-size: 120px; color: var(--amber); animation: pop2 .8s var(--ease-out) both .3s; }
 .vsCount { font: 800 64px/1 var(--font-display); color: var(--bone); }
@@ -121,11 +121,11 @@
 .poses { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
 .poses li { position: relative; display: flex; flex-direction: column; align-items: center; width: 104px; animation: poseIn .6s var(--ease-out) both; }
 .poseFig { width: 96px; height: 112px; }
-.poseEmote { position: absolute; top: 0; left: 50%; transform: translateX(-50%); padding: 2px 8px; font: 700 12px/16px var(--font-mono); color: var(--ink, #05080d); background: var(--you); white-space: nowrap; z-index: 1; }
+.poseEmote { position: absolute; top: 0; left: 50%; transform: translateX(-50%); padding: 2px 8px; font: 700 12px/16px var(--font-mono); color: var(--you-ink); background: var(--you); white-space: nowrap; z-index: 1; }
 .poses[data-outcome='defeat'] .poseEmote { color: var(--bone); background: var(--line-strong); }
 .poses[data-outcome='draw'] .poseEmote { color: var(--bone); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
 .poseName { display: flex; align-items: center; gap: 6px; max-width: 100%; font: 600 13px/18px var(--font-sans); color: var(--bone); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.poseMvp { padding: 0 5px; font: 700 10px/16px var(--font-mono); letter-spacing: .08em; color: #05080d; background: var(--amber); }
+.poseMvp { padding: 0 5px; font: 700 10px/16px var(--font-mono); letter-spacing: .08em; color: var(--on-warning); background: var(--amber); }
 @keyframes poseIn { from { opacity: 0; transform: translateY(14px); } }
 @media (prefers-reduced-motion: reduce) {
   .poses li { animation: none; }

@@ -20,7 +20,7 @@
   padding: 9px 22px 10px 16px;
   overflow: hidden;
   text-align: left;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 30%, rgba(5, 8, 13, .9)), rgba(5, 8, 13, .7));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 30%, color-mix(in srgb, var(--bg) 90%, transparent)), color-mix(in srgb, var(--bg) 70%, transparent));
   box-shadow: inset 4px 0 0 var(--c);
   clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
   animation: cardL .55s var(--ease-out) both;
@@ -29,7 +29,7 @@
 .colB .card {
   padding: 9px 16px 10px 22px;
   text-align: right;
-  background: linear-gradient(270deg, color-mix(in srgb, var(--c) 30%, rgba(5, 8, 13, .9)), rgba(5, 8, 13, .7));
+  background: linear-gradient(270deg, color-mix(in srgb, var(--c) 30%, color-mix(in srgb, var(--bg) 90%, transparent)), color-mix(in srgb, var(--bg) 70%, transparent));
   box-shadow: inset -4px 0 0 var(--c);
   clip-path: polygon(0 0, 100% 0, 100% 100%, 14px 100%);
   animation-name: cardR;
@@ -41,7 +41,7 @@
 .name { overflow: hidden; font: 800 clamp(20px, 2.2vw, 32px)/1 var(--font-display); letter-spacing: .04em; text-transform: uppercase; color: var(--bone); white-space: nowrap; text-overflow: ellipsis; }
 .meta { overflow: hidden; min-height: 1.2em; font: 600 12px/1.2 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; text-overflow: ellipsis; }
 .meta b { font-weight: 700; color: var(--c); }
-.unseen { background: rgba(5, 8, 13, .6); box-shadow: inset 4px 0 0 color-mix(in srgb, var(--c) 45%, transparent); }
+.unseen { background: color-mix(in srgb, var(--bg) 60%, transparent); box-shadow: inset 4px 0 0 color-mix(in srgb, var(--c) 45%, transparent); }
 .colB .unseen { box-shadow: inset -4px 0 0 color-mix(in srgb, var(--c) 45%, transparent); }
 .unseen .name { color: color-mix(in srgb, var(--bone) 55%, transparent); }
 .more { font: 600 12px/1.2 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); animation: fade .4s ease-out both; animation-delay: calc(var(--i, 0) * 110ms + 120ms); }
