@@ -24,6 +24,7 @@
   --you-hover: #5ef0dc;
   --rival: #ff4655;
   --rival-hover: #ff6370;
+  --rival-ink: #2a0408;
   --amber: #ffb547;
   --violet: #a98bff;
   --water: #3b8fe8;
@@ -46,6 +47,8 @@
   --surface: #0c141d;
   --surface-raised: #111c27;
   --surface-sunken: #0a1119;
+  /* A dark surface tinted teal: the selected nav chip, the open map pin. */
+  --surface-you: #0a1e22;
   --line: rgba(140, 175, 200, 0.2);
   --line-strong: rgba(140, 175, 200, 0.38);
   --ink: #dfe6ea;
