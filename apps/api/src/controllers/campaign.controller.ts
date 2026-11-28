@@ -69,19 +69,21 @@ export class CampaignController {
     };
   }
 
-  private async view(accountId: string) {
-    const { campaign } = this.deps.repos;
-    const [rows, rewards] = await Promise.all([campaign.progress(accountId), campaign.rewards(accountId)]);
-    return campaignView(rows, rewards, (m, cleared, row) => this.missionView(m, cleared, row), v2BrainKind(this.deps.config));
-  }
-
   @Get()
   async get(@CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
-    await this.ensureRewardSkills();
-    // A chapter cleared while a grant failed is granted here (idempotent).
-    await this.deps.repos.campaign.grantDue(account.id);
-    return this.view(account.id);
+    const { campaign } = this.deps.repos;
+    const read = () => Promise.all([campaign.progress(account.id), campaign.rewards(account.id)]);
+    let [[rows, rewards]] = await Promise.all([read(), this.ensureRewardSkills()]);
+    // A chapter cleared while a grant failed is granted here (idempotent). Usually there is none,
+    // and the page costs the one read above.
+    const cleared = new Set(rows.filter((r) => r.clearedAt).map((r) => r.missionId));
+    const rewarded = new Set(rewards.map((r) => r.chapterId));
+    if (CAMPAIGN_CHAPTERS.some((c) => !rewarded.has(c.id) && chapterComplete(c, cleared))) {
+      await campaign.grantDue(account.id);
+      [rows, rewards] = await read();
+    }
+    return campaignView(rows, rewards, (m, cl, row) => this.missionView(m, cl, row), v2BrainKind(this.deps.config));
   }
 
   /** The v2_queue that plays this mission; 403 mission_locked until the missions before it are cleared. */

@@ -65,8 +65,7 @@ export class PublicController {
       ids.add(m.teamAAccountId);
       if (!m.practice) ids.add(m.teamBAccountId);
     }
-    const accounts = await Promise.all([...ids].map((id) => repos.accounts.get(id)));
-    const handle = new Map(accounts.flatMap((a) => (a ? [[a.id, a.handle] as const] : [])));
+    const handle = await repos.accounts.handlesOf(ids);
     return rows.map((m) =>
       v2LiveView(m, {
         A: handle.get(m.teamAAccountId) ?? null,
@@ -84,9 +83,7 @@ export class PublicController {
   async v2Recorded() {
     const { repos } = this.deps;
     const rows = await repos.v2Matches.listRecorded(5);
-    const ids = new Set(rows.flatMap((m) => [m.teamAAccountId, m.teamBAccountId]));
-    const accounts = await Promise.all([...ids].map((id) => repos.accounts.get(id)));
-    const handle = new Map(accounts.flatMap((a) => (a ? [[a.id, a.handle] as const] : [])));
+    const handle = await repos.accounts.handlesOf(rows.flatMap((m) => [m.teamAAccountId, m.teamBAccountId]));
     return rows.map((m) => ({
       id: m.id,
       mapId: m.mapId,
@@ -135,10 +132,9 @@ export class PublicController {
   @Get('v2/matches/:id')
   async v2Match(@Param('id') id: string, @CurrentAccount() account?: AccountRow) {
     const { repos } = this.deps;
-    const m = await repos.v2Matches.get(idOr404(matchId, id, 'match'));
-    if (!m) throw notFound('match');
-    const [a, b] = await Promise.all([repos.accounts.get(m.teamAAccountId), repos.accounts.get(m.teamBAccountId)]);
-    return v2MatchView(m, { A: a?.handle ?? null, B: b?.handle ?? null }, account?.id);
+    const found = await repos.v2Matches.getWithHandles(idOr404(matchId, id, 'match'));
+    if (!found) throw notFound('match');
+    return v2MatchView(found.match, found.handles, account?.id);
   }
 }
 

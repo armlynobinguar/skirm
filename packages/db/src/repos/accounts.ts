@@ -69,6 +69,17 @@ export class AccountsRepo {
     return row;
   }
 
+  /** Handles of the given accounts in one query (missing ids are left out). */
+  async handlesOf(ids: Iterable<string>): Promise<Map<string, string>> {
+    const uniq = [...new Set(ids)];
+    if (!uniq.length) return new Map();
+    const rows = await this.db
+      .select({ id: accounts.id, handle: accounts.handle })
+      .from(accounts)
+      .where(inArray(accounts.id, uniq));
+    return new Map(rows.map((r) => [r.id, r.handle]));
+  }
+
   async byHandle(handle: string): Promise<AccountRow | undefined> {
     const [row] = await this.db.select().from(accounts).where(eq(accounts.handle, handle));
     return row;

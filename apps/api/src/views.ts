@@ -12,7 +12,7 @@ import {
   type SkillBenchmarkRow,
   type SkillTrialRow,
   type SkillVersionView,
-  type V2MatchRow,
+  type V2MatchSummaryRow,
 } from '@skirm/db';
 import { BOT_HANDLE } from '@skirm/engine/v2';
 import { SEASON, normalizeSkillRoles, skillTriggerOf, splitSale, type SkillPublic, type SkillRole } from '@skirm/shared';
@@ -152,7 +152,7 @@ export const messageView = (r: MatchMessageRow) => ({
  * crew stats; `you` and the caller's own `debrief` only for a player of the match. The log stays
  * server side (its hash is the proof).
  */
-export function v2MatchView(m: V2MatchRow, handles: { A: string | null; B: string | null }, viewerId?: string) {
+export function v2MatchView(m: V2MatchSummaryRow, handles: { A: string | null; B: string | null }, viewerId?: string) {
   const you = viewerId === m.teamAAccountId ? 'A' : viewerId === m.teamBAccountId ? 'B' : undefined;
   // The rival stays hidden until the match ends (found, lock-in and live share status 'live'):
   // until then only a player's own side is shown, and only to that player.
@@ -194,7 +194,7 @@ export function v2MatchView(m: V2MatchRow, handles: { A: string | null; B: strin
  * A row of GET /v2/matches/live: who plays (the bot side of a practice match as the greedy bot) and
  * how many agents each side brought. Crew agents stay hidden while the match is live.
  */
-export function v2LiveView(m: V2MatchRow, handles: { A: string | null; B: string | null }) {
+export function v2LiveView(m: V2MatchSummaryRow, handles: { A: string | null; B: string | null }) {
   const team = (t: 'A' | 'B') => ({
     handle: m.practice && t === 'B' ? PRACTICE_BOT_HANDLE : handles[t],
     size: m.crews?.[t]?.length ?? 0,
@@ -215,7 +215,7 @@ export function v2LiveView(m: V2MatchRow, handles: { A: string | null; B: string
  * 'void' for a void match and 'live' while it plays; `score` is the caller's deliveries against the
  * rival's (null until the match has a score); `eloDelta` is null for a casual or void match.
  */
-export function myMatchView(m: V2MatchRow, accountId: string) {
+export function myMatchView(m: V2MatchSummaryRow, accountId: string) {
   const team: 'A' | 'B' = m.teamAAccountId === accountId ? 'A' : 'B';
   const rival = team === 'A' ? 'B' : 'A';
   const result =

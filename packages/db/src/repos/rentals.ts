@@ -5,11 +5,13 @@
 // While NEAR_RENTALS_ONCHAIN is off a rental is paid in credits instead (payWithCredits): the
 // renter's paid credits, the owner's share credited, in one transaction.
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import type { V2Role, V2TalkTier } from '../types';
 import type { Executor } from '../client';
 import { newId } from '../ids';
 import { accounts, agents, rentalOffers, rentals } from '../schema';
 import { RepoError } from '../types';
 import { LedgerRepo, type LedgerRepoOptions } from './ledger';
+import { agentRoleOf, agentTierOf } from './agents';
 import { tx } from './util';
 
 export type RentalOfferRow = typeof rentalOffers.$inferSelect;
@@ -87,6 +89,17 @@ export class RentalsRepo {
       .from(rentalOffers)
       .where(and(eq(rentalOffers.agentId, agentId), eq(rentalOffers.active, true)));
     return row;
+  }
+
+  /** The owner's active offers, in their agents' order (GET /rentals/mine): one query. */
+  async offersOfOwner(ownerId: string): Promise<RentalOfferRow[]> {
+    const rows = await this.db
+      .select({ offer: rentalOffers })
+      .from(rentalOffers)
+      .innerJoin(agents, eq(agents.id, rentalOffers.agentId))
+      .where(and(eq(agents.ownerId, ownerId), eq(rentalOffers.active, true)))
+      .orderBy(asc(agents.createdAt), asc(agents.id));
+    return rows.map((r) => r.offer);
   }
 
   async getOffer(offerId: string): Promise<RentalOfferRow | undefined> {
@@ -216,6 +229,47 @@ export class RentalsRepo {
       .from(rentals)
       .where(and(eq(rentals.renterId, renterId), isNull(rentals.matchId)))
       .orderBy(desc(rentals.createdAt));
+  }
+
+  /**
+   * `unusedPasses` with each rented agent's public stats and its owner's handle, in one query
+   * (agent null when it is gone).
+   */
+  async unusedPassesWithAgents(renterId: string): Promise<
+    {
+      pass: RentalRow;
+      agent: { name: string; role: V2Role; vision: number; comms: number; tier: V2TalkTier; ownerHandle: string } | null;
+    }[]
+  > {
+    const rows = await this.db
+      .select({
+        pass: rentals,
+        name: agents.name,
+        role: agents.role,
+        vision: agents.vision,
+        comms: agents.comms,
+        tier: agents.tier,
+        ownerHandle: accounts.handle,
+      })
+      .from(rentals)
+      .leftJoin(agents, eq(agents.id, rentals.agentId))
+      .leftJoin(accounts, eq(accounts.id, rentals.ownerId))
+      .where(and(eq(rentals.renterId, renterId), isNull(rentals.matchId)))
+      .orderBy(desc(rentals.createdAt));
+    return rows.map((r) => ({
+      pass: r.pass,
+      agent:
+        r.name === null || r.role === null || r.vision === null || r.comms === null || r.tier === null
+          ? null
+          : {
+              name: r.name,
+              role: agentRoleOf(r.role),
+              vision: r.vision,
+              comms: r.comms,
+              tier: agentTierOf(r.tier),
+              ownerHandle: r.ownerHandle ?? '',
+            },
+    }));
   }
 
   /** Agents among `agentIds` the renter holds an unused pass for. */

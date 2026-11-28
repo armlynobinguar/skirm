@@ -27,11 +27,11 @@ export class SeasonsController {
   /** The pool and the prize per place: projected from the pool while open, as written once locked. */
   private async money(season: SeasonRow): Promise<{ pool: bigint; prizes: Map<number, bigint> }> {
     const { seasons } = this.deps.repos;
-    const pool = await seasons.pool(season.id);
     if (season.status !== 'open') {
-      const payouts = await seasons.payouts(season.id);
+      const [pool, payouts] = await Promise.all([seasons.poolOf(season), seasons.payouts(season.id)]);
       return { pool, prizes: new Map(payouts.map((p) => [p.rank, BigInt(p.amountYocto)])) };
     }
+    const pool = await seasons.poolOf(season);
     const places = SEASON.splitBps.map((_, i) => ({ accountId: String(i) }));
     const { payouts } = seasonPayouts(pool, places);
     return { pool, prizes: new Map(payouts.map((p) => [p.rank, p.amountYocto])) };
@@ -42,7 +42,7 @@ export class SeasonsController {
     const { limit } = parse(listQuery, query);
     const rows = await this.deps.repos.seasons.list(limit);
     return Promise.all(
-      rows.map(async (s) => seasonView(s, await this.deps.repos.seasons.pool(s.id))),
+      rows.map(async (s) => seasonView(s, await this.deps.repos.seasons.poolOf(s))),
     );
   }
 
