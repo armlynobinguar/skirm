@@ -344,6 +344,21 @@ export class MarketRepo {
     return row;
   }
 
+  /** Who bought this version last (its holder after resales), or undefined before its first sale. */
+  async lastBuyer(
+    skillId: string,
+    version: number,
+  ): Promise<{ id: string; handle: string; nearAccountId: string | null } | undefined> {
+    const [row] = await this.db
+      .select({ id: accounts.id, handle: accounts.handle, nearAccountId: accounts.nearAccountId })
+      .from(sales)
+      .innerJoin(accounts, eq(accounts.id, sales.buyerId))
+      .where(and(eq(sales.skillId, skillId), eq(sales.version, version)))
+      .orderBy(desc(sales.createdAt))
+      .limit(1);
+    return row;
+  }
+
   async salesOf(skillId: string, limit = 20): Promise<SaleRow[]> {
     return this.db
       .select()

@@ -14,7 +14,7 @@ import type { Executor } from '../client';
 import { newId } from '../ids';
 import { prizePayouts, sales, seasonStandings, seasons, v2Matches } from '../schema';
 import { RepoError, type RegistryState } from '../types';
-import { rowsOf, tx, type Clock } from './util';
+import { concurrently, rowsOf, tx, type Clock } from './util';
 import type { V2MatchRow } from './v2-matches';
 
 export type SeasonRow = typeof seasons.$inferSelect;
@@ -222,12 +222,17 @@ export class SeasonsRepo {
   ): Promise<{ rows: SeasonStanding[]; total: number }> {
     const limit = Math.max(0, Math.min(opts.limit ?? 50, 200));
     const offset = Math.max(0, opts.offset ?? 0);
-    const res = await t.execute(sql`${rankedCte(seasonId)}
-      select * from ranked order by rank limit ${limit} offset ${offset}`);
-    const [count] = await t
-      .select({ n: sql<number>`count(*)::int` })
-      .from(seasonStandings)
-      .where(eq(seasonStandings.seasonId, seasonId));
+    const [res, [count]] = await concurrently(
+      t,
+      () =>
+        t.execute(sql`${rankedCte(seasonId)}
+      select * from ranked order by rank limit ${limit} offset ${offset}`),
+      () =>
+        t
+          .select({ n: sql<number>`count(*)::int` })
+          .from(seasonStandings)
+          .where(eq(seasonStandings.seasonId, seasonId)),
+    );
     return { rows: rowsOf<StandingSqlRow>(res).map(standingOf), total: Number(count?.n ?? 0) };
   }
 
@@ -243,6 +248,14 @@ export class SeasonsRepo {
   async pool(seasonId: string, t: Executor = this.db): Promise<bigint> {
     const season = await this.get(seasonId, t);
     if (!season) throw new RepoError('not_found', `season ${seasonId} not found`);
+    return this.poolOf(season, t);
+  }
+
+  /** `pool` for a season row already read: one query (its sales) instead of two. */
+  async poolOf(
+    season: Pick<SeasonRow, 'startsAt' | 'endsAt' | 'fundedYocto'>,
+    t: Executor = this.db,
+  ): Promise<bigint> {
     const rows = await t
       .select({ priceYocto: sales.priceYocto })
       .from(sales)
@@ -262,7 +275,7 @@ export class SeasonsRepo {
     return tx(this.db, async (t) => {
       const [season] = await t.select().from(seasons).where(eq(seasons.id, seasonId)).for('update');
       if (!season) throw new RepoError('not_found', `season ${seasonId} not found`);
-      const pool = await this.pool(seasonId, t);
+      const pool = await this.poolOf(season, t);
       if (season.status !== 'open') {
         const payouts = await this.payouts(seasonId, t);
         return {

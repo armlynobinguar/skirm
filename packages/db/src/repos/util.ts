@@ -1,3 +1,4 @@
+import { PgTransaction } from 'drizzle-orm/pg-core';
 import type { Executor } from '../client';
 
 /** Postgres unique_violation (23505), unwrapping Drizzle's query error. */
@@ -38,4 +39,21 @@ export type Clock = () => number;
 export function rowsOf<T>(res: unknown): T[] {
   if (Array.isArray(res)) return res as T[];
   return ((res as { rows?: T[] }).rows ?? []) as T[];
+}
+
+/**
+ * Runs independent reads at once on a pool handle, so they cost one database round trip instead of
+ * one each; on a transaction (a single connection, where node-postgres would only queue them and
+ * warn) they run one after another.
+ */
+export async function concurrently<T extends readonly unknown[]>(
+  db: Executor,
+  ...reads: { [K in keyof T]: () => PromiseLike<T[K]> }
+): Promise<T> {
+  if (db instanceof PgTransaction) {
+    const out: unknown[] = [];
+    for (const read of reads) out.push(await read());
+    return out as unknown as T;
+  }
+  return Promise.all(reads.map((read) => read())) as unknown as Promise<T>;
 }

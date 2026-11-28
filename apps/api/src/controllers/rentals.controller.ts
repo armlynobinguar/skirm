@@ -102,17 +102,13 @@ export class RentalsController {
   @Get('rentals/mine')
   async mine(@CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
-    const { rentals, agents } = this.deps.repos;
-    const own = await agents.listByOwner(account.id);
-    const offers = (await Promise.all(own.map((a) => rentals.offerFor(a.id)))).filter((o): o is RentalOfferRow => !!o);
-    // Each pass with the rented agent's public stats and owner, for the crew picker.
-    const passes = await Promise.all(
-      (await rentals.unusedPasses(account.id)).map(async (r) => {
-        const [v, owner] = await Promise.all([agents.view(r.agentId), this.deps.repos.accounts.get(r.ownerId)]);
-        const agent = v ? { name: v.name, role: v.role, vision: v.vision, comms: v.comms, tier: v.tier, ownerHandle: owner?.handle ?? '' } : null;
-        return { ...passView(r), agent };
-      }),
-    );
+    const { rentals } = this.deps.repos;
+    // Each pass comes with the rented agent's public stats and owner, for the crew picker.
+    const [offers, held] = await Promise.all([
+      rentals.offersOfOwner(account.id),
+      rentals.unusedPassesWithAgents(account.id),
+    ]);
+    const passes = held.map(({ pass, agent }) => ({ ...passView(pass), agent }));
     return { offers: offers.map(offerView), passes };
   }
 

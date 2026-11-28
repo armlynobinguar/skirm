@@ -22,7 +22,7 @@ import type { Executor } from '../client';
 import { accounts, campaignProgress, campaignRewards, cosmeticsOwned, skillOwnership, skillVersions, skills } from '../schema';
 import { SYSTEM_ACCOUNT_ID, SYSTEM_HANDLE } from '../starter';
 import { RepoError, type SkillSealer } from '../types';
-import { tx } from './util';
+import { concurrently, tx } from './util';
 
 export type CampaignProgressRow = typeof campaignProgress.$inferSelect;
 export type CampaignRewardRow = typeof campaignRewards.$inferSelect;
@@ -117,10 +117,16 @@ export class CampaignRepo {
    * Idempotent: the (account, chapter) key of campaign_rewards decides who grants.
    */
   async grantDue(accountId: string, only?: CampaignChapter): Promise<string[]> {
-    const cleared = await this.cleared(accountId);
+    const [cleared, have] = await concurrently(
+      this.db,
+      () => this.cleared(accountId),
+      () => this.rewards(accountId),
+    );
+    const rewarded = new Set(have.map((r) => r.chapterId));
     const granted: string[] = [];
     for (const chapter of only ? [only] : CAMPAIGN_CHAPTERS) {
-      if (!chapterComplete(chapter, cleared)) continue;
+      // A chapter already rewarded is skipped without opening a transaction for it.
+      if (rewarded.has(chapter.id) || !chapterComplete(chapter, cleared)) continue;
       const { skill, cosmetic } = chapter.rewards;
       const done = await tx(this.db, async (t) => {
         const rows = await t

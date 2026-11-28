@@ -309,13 +309,20 @@ export class CoreController {
     const account = mustAccount(acc);
     const agent = idOr404(agentId, id, 'agent');
     const { agents, seasons, v2Matches } = this.deps.repos;
-    const row = await agents.get(agent);
-    if (!row || row.ownerId !== account.id) throw new ApiError(404, 'not_found', 'agent not found');
-    const current = await seasons.current();
-    const [allTime, season] = await Promise.all([
+    // The ownership check, the all-time record and the season run together (one round trip, then
+    // the season's record); nothing is returned before the check passes.
+    const seasonRecord = seasons
+      .current()
+      .then(async (current) => ({
+        current,
+        record: current ? await v2Matches.agentRecord(agent, { since: current.startsAt, until: current.endsAt }) : null,
+      }));
+    const [row, allTime, { current, record: season }] = await Promise.all([
+      agents.get(agent),
       v2Matches.agentRecord(agent),
-      current ? v2Matches.agentRecord(agent, { since: current.startsAt, until: current.endsAt }) : null,
+      seasonRecord,
     ]);
+    if (!row || row.ownerId !== account.id) throw new ApiError(404, 'not_found', 'agent not found');
     return { allTime, season: current && season ? { number: current.number, endsAt: current.endsAt.toISOString(), ...season } : null };
   }
 
@@ -328,10 +335,9 @@ export class CoreController {
   async agentProgression(@Param('id') id: string, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
     const agent = idOr404(agentId, id, 'agent');
-    const row = await this.deps.repos.agents.get(agent);
-    if (!row || row.ownerId !== account.id) throw new ApiError(404, 'not_found', 'agent not found');
-    const view = await this.deps.repos.agents.view(agent);
-    return { agentId: agent, progression: view!.progression, ...traitCatalogue() };
+    const [row, view] = await Promise.all([this.deps.repos.agents.get(agent), this.deps.repos.agents.view(agent)]);
+    if (!row || row.ownerId !== account.id || !view) throw new ApiError(404, 'not_found', 'agent not found');
+    return { agentId: agent, progression: view.progression, ...traitCatalogue() };
   }
 
   /**

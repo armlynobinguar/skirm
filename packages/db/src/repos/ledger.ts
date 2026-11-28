@@ -30,7 +30,7 @@ import { holdCredits } from '@skirm/shared';
 import type { Executor } from '../client';
 import { freeBudgetDays, ledgerAccounts, ledgerRows, runHolds, v2Matches } from '../schema';
 import { RepoError } from '../types';
-import { isUniqueViolation, nextUtcMidnight, rowsOf, tx, utcDay, type Clock } from './util';
+import { concurrently, isUniqueViolation, nextUtcMidnight, rowsOf, tx, utcDay, type Clock } from './util';
 
 export type LedgerRowRecord = typeof ledgerRows.$inferSelect;
 
@@ -219,15 +219,16 @@ export class LedgerRepo {
   async balance(accountId: string): Promise<CreditsView> {
     const now = this.clock();
     const day = utcDay(now);
-    const [acc] = await this.db
-      .select()
-      .from(ledgerAccounts)
-      .where(eq(ledgerAccounts.accountId, accountId));
-    const [g] = await this.db.select().from(freeBudgetDays).where(eq(freeBudgetDays.day, day));
-    const holds = await this.db
-      .select()
-      .from(runHolds)
-      .where(and(eq(runHolds.accountId, accountId), eq(runHolds.status, 'held')));
+    const [[acc], [g], holds] = await concurrently(
+      this.db,
+      () => this.db.select().from(ledgerAccounts).where(eq(ledgerAccounts.accountId, accountId)),
+      () => this.db.select().from(freeBudgetDays).where(eq(freeBudgetDays.day, day)),
+      () =>
+        this.db
+          .select()
+          .from(runHolds)
+          .where(and(eq(runHolds.accountId, accountId), eq(runHolds.status, 'held'))),
+    );
     const state: LedgerState = {
       seq: 0,
       players: acc ? { [accountId]: this.playerOf(acc, day) } : {},

@@ -61,14 +61,16 @@ export class MarketController {
   async list(@Query() query: unknown, @CurrentAccount() account?: AccountRow) {
     const q = parse(marketQuery, query);
     const { repos } = this.deps;
-    let versions = await repos.skills.listPublic();
-    if (q.tag) versions = versions.filter((v) => v.handlesTags.includes(q.tag!));
-    if (q.role) versions = versions.filter((v) => skillFitsRole(v.roles, q.role!));
-    const [listings, owned, proof] = await Promise.all([
+    // Versions, listings and the caller's skills together; the proof rates need the versions.
+    const [all, listings, owned] = await Promise.all([
+      repos.skills.listPublic(),
       repos.market.activeListings(),
       account ? repos.skills.listOwned(account.id) : Promise.resolve([]),
-      repos.proof.marketRates(versions.map((v) => ({ skillId: v.id, version: v.version }))),
     ]);
+    let versions = all;
+    if (q.tag) versions = versions.filter((v) => v.handlesTags.includes(q.tag!));
+    if (q.role) versions = versions.filter((v) => skillFitsRole(v.roles, q.role!));
+    const proof = await repos.proof.marketRates(versions.map((v) => ({ skillId: v.id, version: v.version })));
     const listingBy = new Map<string, ListingRow>();
     for (const l of listings)
       if (!listingBy.has(key({ id: l.skillId, version: l.version })))
@@ -149,9 +151,10 @@ export class MarketController {
     const { version } = parse(versionQuery, query);
     const v = await this.version(account, id, version);
     const { repos } = this.deps;
-    const [sales, listing, owned, benchmark, ranked, counters, trialsUsed] =
+    const [sales, owner, listing, owned, benchmark, ranked, counters, trialsUsed] =
       await Promise.all([
         repos.market.salesOf(v.id),
+        repos.market.lastBuyer(v.id, v.version),
         repos.market.activeListing(v.id, v.version),
         account ? repos.skills.owns(account.id, v.id, v.version) : Promise.resolve(false),
         repos.proof.benchmark(v.id, v.version),
@@ -159,8 +162,6 @@ export class MarketController {
         repos.proof.counters(v.id, v.version),
         account ? repos.proof.trialsUsed(account.id, v.id, v.version) : Promise.resolve(0),
       ]);
-    const lastSale = sales.find((s) => s.version === v.version);
-    const owner = lastSale ? await repos.accounts.get(lastSale.buyerId) : undefined;
     return {
       skill: skillPublic(v, owner ? (owner.nearAccountId ?? owner.handle) : undefined),
       /** v2 proof: the hidden benchmark (null before one is queued), the ranked record, counters. */

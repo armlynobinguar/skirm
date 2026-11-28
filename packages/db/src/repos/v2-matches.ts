@@ -2,7 +2,8 @@
 // to the 20th ranked match, then 16, floor 100). Elo moves only for ranked matches that end with a
 // result, in the same transaction that closes the match; that transaction also adds the season
 // standings and the skill versions' ranked records, and stamps each player's last ranked result.
-import { and, asc, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, inArray, lt, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { levelOf, matchXp, progressionOf, seasonPoints, updateMatch, type EloResult } from '@skirm/shared';
 import type { Executor } from '../client';
 import { newId } from '../ids';
@@ -24,6 +25,11 @@ import { SeasonsRepo } from './seasons';
 import { tx, type Clock } from './util';
 
 export type V2MatchRow = typeof v2Matches.$inferSelect;
+/** A v2 match without its log (lists and the result screen never send it; it is the bulk of a row). */
+export type V2MatchSummaryRow = Omit<V2MatchRow, 'log'>;
+
+/** Every v2_matches column but `log`. */
+const { log: _log, ...summaryColumns } = getTableColumns(v2Matches);
 
 /** One agent's results over a set of ended v2 matches (practice against the bot left out). */
 export interface V2AgentRecord {
@@ -95,7 +101,7 @@ export function v2DebriefRegistry(m: Pick<V2MatchRow, 'ranked' | 'status' | 'reg
 }
 
 /** A stored debrief with its Elo change and registry line taken from the match row. */
-export function v2DebriefOf(m: V2MatchRow, team: 'A' | 'B'): V2DebriefRecord | null {
+export function v2DebriefOf(m: V2MatchSummaryRow, team: 'A' | 'B'): V2DebriefRecord | null {
   const d = m.debriefs?.[team];
   if (!d) return null;
   const elo = m.eloDeltas?.find((e) => e.team === team);
@@ -133,6 +139,21 @@ export class V2MatchesRepo {
     return row;
   }
 
+  /** A match without its log, with both players' handles: one query (GET /v2/matches/:id). */
+  async getWithHandles(
+    id: string,
+  ): Promise<{ match: V2MatchSummaryRow; handles: { A: string | null; B: string | null } } | undefined> {
+    const a = alias(accounts, 'team_a');
+    const b = alias(accounts, 'team_b');
+    const [row] = await this.db
+      .select({ match: summaryColumns, handleA: a.handle, handleB: b.handle })
+      .from(v2Matches)
+      .leftJoin(a, eq(a.id, v2Matches.teamAAccountId))
+      .leftJoin(b, eq(b.id, v2Matches.teamBAccountId))
+      .where(eq(v2Matches.id, id));
+    return row ? { match: row.match, handles: { A: row.handleA, B: row.handleB } } : undefined;
+  }
+
   /** Marks a live match as still being played (see the realtime orphan sweep). */
   async heartbeat(id: string, at: Date = new Date()): Promise<void> {
     await this.db.update(v2Matches).set({ heartbeatAt: at }).where(and(eq(v2Matches.id, id), eq(v2Matches.status, 'live')));
@@ -144,9 +165,9 @@ export class V2MatchesRepo {
   }
 
   /** Ended ranked matches whose result is recorded on the NEAR registry, latest first (the /verify examples). */
-  async listRecorded(limit = 5): Promise<V2MatchRow[]> {
+  async listRecorded(limit = 5): Promise<V2MatchSummaryRow[]> {
     return this.db
-      .select()
+      .select(summaryColumns)
       .from(v2Matches)
       .where(and(eq(v2Matches.status, 'ended'), eq(v2Matches.ranked, true), eq(v2Matches.registryStatus, 'recorded')))
       .orderBy(desc(v2Matches.endedAt))
@@ -154,9 +175,9 @@ export class V2MatchesRepo {
   }
 
   /** A player's latest matches, newest first. */
-  async listForAccount(accountId: string, limit = 20): Promise<V2MatchRow[]> {
+  async listForAccount(accountId: string, limit = 20): Promise<V2MatchSummaryRow[]> {
     return this.db
-      .select()
+      .select(summaryColumns)
       .from(v2Matches)
       .where(or(eq(v2Matches.teamAAccountId, accountId), eq(v2Matches.teamBAccountId, accountId)))
       .orderBy(desc(v2Matches.createdAt))

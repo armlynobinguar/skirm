@@ -1,5 +1,5 @@
 // Agents, equipped skills and unlock items (Game Spec §8).
-import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   appearanceOr,
   isAppearance,
@@ -33,7 +33,7 @@ import {
   type V2Role,
   type V2TalkTier,
 } from '../types';
-import { tx } from './util';
+import { concurrently, tx } from './util';
 
 export type AgentRow = typeof agents.$inferSelect;
 
@@ -54,6 +54,13 @@ export interface AgentPatch {
 
 const isAttr = (n: unknown) => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 5;
 
+/** A stored role as a v2 role (Runner for an unknown one). */
+export const agentRoleOf = (role: string): V2Role =>
+  (V2_ROLES as readonly string[]).includes(role) ? (role as V2Role) : 'Runner';
+/** A stored talk tier as a v2 tier (standard for an unknown one). */
+export const agentTierOf = (tier: string): V2TalkTier =>
+  (V2_TALK_TIERS as readonly string[]).includes(tier) ? (tier as V2TalkTier) : 'standard';
+
 export class AgentsRepo {
   constructor(private readonly db: Executor) {}
 
@@ -63,25 +70,36 @@ export class AgentsRepo {
   }
 
   async listByOwner(ownerId: string): Promise<AgentView[]> {
-    const rows = await this.db
-      .select()
-      .from(agents)
-      .where(eq(agents.ownerId, ownerId))
-      .orderBy(asc(agents.createdAt), asc(agents.id));
-    return this.views(rows);
+    // The agents, their skills and their unlocks in one round trip: the last two select by owner.
+    const ofOwner = this.db.select({ id: agents.id }).from(agents).where(eq(agents.ownerId, ownerId));
+    const [rows, equipped, unlocks] = await concurrently(
+      this.db,
+      () =>
+        this.db
+          .select()
+          .from(agents)
+          .where(eq(agents.ownerId, ownerId))
+          .orderBy(asc(agents.createdAt), asc(agents.id)),
+      () => this.equipped(inArray(agentSkills.agentId, ofOwner)),
+      () => this.unlocksOn(inArray(unlockItems.attachedAgentId, ofOwner)),
+    );
+    return this.viewsOf(rows, equipped, unlocks);
   }
 
   async view(id: string): Promise<AgentView | undefined> {
-    const row = await this.get(id);
+    const [row, equipped, unlocks] = await concurrently(
+      this.db,
+      () => this.get(id),
+      () => this.equipped(eq(agentSkills.agentId, id)),
+      () => this.unlocksOn(eq(unlockItems.attachedAgentId, id)),
+    );
     if (!row) return undefined;
-    const [v] = await this.views([row]);
-    return v;
+    return this.viewsOf([row], equipped, unlocks)[0];
   }
 
-  private async views(rows: AgentRow[]): Promise<AgentView[]> {
-    if (rows.length === 0) return [];
-    const ids = rows.map((r) => r.id);
-    const equipped = await this.db
+  /** Equipped skills (with their names) of the agents `where` picks, by slot. */
+  private equipped(where: SQL) {
+    return this.db
       .select({
         agentId: agentSkills.agentId,
         slot: agentSkills.slot,
@@ -97,12 +115,34 @@ export class AgentsRepo {
           eq(skillVersions.version, agentSkills.version),
         ),
       )
-      .where(inArray(agentSkills.agentId, ids))
+      .where(where)
       .orderBy(asc(agentSkills.slot));
-    const unlocks = await this.db
+  }
+
+  /** Unlock items attached to the agents `where` picks. */
+  private unlocksOn(where: SQL) {
+    return this.db
       .select({ agentId: unlockItems.attachedAgentId, kind: unlockItems.kind })
       .from(unlockItems)
-      .where(inArray(unlockItems.attachedAgentId, ids));
+      .where(where);
+  }
+
+  private async views(rows: AgentRow[]): Promise<AgentView[]> {
+    if (rows.length === 0) return [];
+    const ids = rows.map((r) => r.id);
+    const [equipped, unlocks] = await concurrently(
+      this.db,
+      () => this.equipped(inArray(agentSkills.agentId, ids)),
+      () => this.unlocksOn(inArray(unlockItems.attachedAgentId, ids)),
+    );
+    return this.viewsOf(rows, equipped, unlocks);
+  }
+
+  private viewsOf(
+    rows: AgentRow[],
+    equipped: { agentId: string; id: string; version: number; name: string }[],
+    unlocks: { agentId: string | null; kind: Unlock }[],
+  ): AgentView[] {
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -115,10 +155,10 @@ export class AgentsRepo {
         .filter((s) => s.agentId === r.id)
         .map((s) => ({ id: s.id, version: s.version, name: s.name })),
       unlocks: sortUnlocks(unlocks.filter((u) => u.agentId === r.id).map((u) => u.kind)),
-      role: (V2_ROLES as readonly string[]).includes(r.role) ? (r.role as V2Role) : 'Runner',
+      role: agentRoleOf(r.role),
       vision: r.vision,
       comms: r.comms,
-      tier: (V2_TALK_TIERS as readonly string[]).includes(r.tier) ? (r.tier as V2TalkTier) : 'standard',
+      tier: agentTierOf(r.tier),
       systemPrompt: r.systemPrompt ?? null,
       appearance: appearanceOr(r.appearance, r.id),
       progression: progressionOf(r.xp, r.traits),
