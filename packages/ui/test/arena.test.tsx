@@ -90,7 +90,7 @@ describe('Arena primitives', () => {
 });
 
 describe('AkIcon', () => {
-  const NAMES: AkIconName[] = ['play', 'mine', 'market', 'skirm', 'pvp', 'lb', 'sfx', 'notes', 'atlas', 'crew', 'proof', 'practice', 'pause', 'resume', 'tpv', 'story', 'back'];
+  const NAMES: AkIconName[] = ['play', 'mine', 'market', 'skirm', 'pvp', 'lb', 'sfx', 'notes', 'atlas', 'crew', 'proof', 'practice', 'pause', 'resume', 'tpv', 'visor', 'story', 'back'];
 
   it('draws every icon with brackets, dots and an accent, and only references its own clip paths', () => {
     for (const name of NAMES) {
