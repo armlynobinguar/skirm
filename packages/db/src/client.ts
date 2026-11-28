@@ -26,10 +26,16 @@ export interface CreateDbOptions {
  * session-mode pooler (Supabase Supavisor on 5432) works; transaction mode (6543) breaks
  * `withAdvisoryLock`, which holds a session lock across queries.
  */
+/** How long the pool keeps an idle connection open (node-postgres' default is 10 s). */
+export const IDLE_CONNECTION_MS = 5 * 60_000;
+
 export function createDb(url: string, opts: CreateDbOptions = {}): Db {
   const { connectionString, ssl, max } = resolveDbConnection(url, opts.env ?? process.env, { max: opts.max });
   // keepAlive: a remote database (the Supabase pooler) sits behind NAT that drops idle TCP flows.
-  const pool = new pg.Pool({ connectionString, ssl, max, keepAlive: true });
+  // idleTimeoutMillis: node-postgres closes a connection idle for 10 s by default, and opening one
+  // to a far database (TCP, TLS, startup and auth) costs several round trips, so a request after a
+  // short lull paid far more than its queries. Idle connections are kept for IDLE_CONNECTION_MS.
+  const pool = new pg.Pool({ connectionString, ssl, max, keepAlive: true, idleTimeoutMillis: IDLE_CONNECTION_MS });
   // Never log query parameters: they can carry ciphertext and receipts.
   pool.on('error', (err) => {
     console.error(`[db] idle client error: ${err.message}`);
