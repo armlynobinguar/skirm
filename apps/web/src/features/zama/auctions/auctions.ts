@@ -9,7 +9,7 @@
 // After the end anyone closes it, public-decrypts the two outcome handles (winner index, price) and
 // sends finalize; then every bidder's escrow comes back with refund (the winner gets bid - price).
 import { SkillAuctionAbi } from '@skirm/fhevm/generated';
-import { auctionStatus, evmLinkMessage, skillRefPreimage, withFreshKmsProof, type AuctionStatus } from '@skirm/shared';
+import { auctionStatus, evmLinkMessage, retryRead, skillRefPreimage, waitForChain, waitForHandles, withFreshKmsProof, type AuctionStatus, type WaitOptions } from '@skirm/shared';
 import { Contract, ZeroAddress, id as keccakUtf8, type ContractRunner } from 'ethers';
 import { zamaConfig, type HexAddress } from '@/lib/zama/config';
 import { isZeroHandle, publicDecrypt, userDecryptUint, type EncryptedInput, type Hex, type TypedDataSigner } from '@/lib/zama/fhe';
@@ -196,20 +196,28 @@ export const hasWinner = (a: Pick<ChainAuction, 'winner'>) => a.winner !== ZeroA
  * Closes an ended auction if nobody did yet, then finalizes it with the KMS-signed outcome. Whoever
  * gets there first does it; a second caller's transaction reverts harmlessly, so this re-reads first.
  */
-export async function closeAndFinalize(api: AuctionApi, instance: Parameters<typeof publicDecrypt>[0], auctionId: bigint): Promise<ChainAuction> {
-  let a = await api.get(auctionId);
+export async function closeAndFinalize(
+  api: AuctionApi,
+  instance: Parameters<typeof publicDecrypt>[0],
+  auctionId: bigint,
+  wait: WaitOptions = {},
+): Promise<ChainAuction> {
+  // Reads are retried on an RPC timeout, and right after a transaction they wait until the RPC
+  // shows it: a lagging node can still say Open, or hand back zero handles the relayer won't decrypt.
+  let a = await retryRead(() => api.get(auctionId), wait);
   if (a.status === 'open') {
     await api.close(auctionId);
-    a = await api.get(auctionId);
+    a = await waitForChain(() => api.get(auctionId), (x) => x.status !== 'open', { what: 'the auction to close', ...wait });
   }
   if (a.status === 'closing') {
-    const handles = await api.revealHandles(auctionId);
+    const [idx, price] = await waitForHandles(() => api.revealHandles(auctionId), wait);
+    const handles: [Hex, Hex] = [idx!, price!];
     // A rejected KMS proof (KMSInvalidSigner) is fetched again and resent.
     await withFreshKmsProof(
       () => publicDecrypt(instance, handles),
       (res) => api.finalize(auctionId, res.abiEncodedClearValues, res.decryptionProof),
     );
-    a = await api.get(auctionId);
+    a = await waitForChain(() => api.get(auctionId), (x) => x.status !== 'closing', { what: 'the auction result', ...wait });
   }
   return a;
 }

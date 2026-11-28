@@ -10,7 +10,9 @@
 import { FogSkirmAbi } from '@skirm/fhevm/generated';
 import {
   FOG_NO_TILE,
+  retryRead,
   verifyFogGame,
+  waitForHandles,
   withFreshKmsProof,
   type FogCheck,
   type FogOutcome,
@@ -272,9 +274,10 @@ type PublicInstance = Parameters<typeof publicDecrypt>[0];
  * false when the game was no longer waiting (the rival's client finalized first).
  */
 export async function finalizePendingRound(api: FogApi, instance: PublicInstance, id: bigint): Promise<boolean> {
-  const g = await api.read(id);
+  const g = await retryRead(() => api.read(id));
   if (g.status !== 'playing' || !g.awaitingReveal) return false;
-  const handles = await api.roundHandles(id);
+  // A lagging RPC node can hand back zero handles just after the resolving move; the relayer won't decrypt those.
+  const handles = [...(await waitForHandles(() => api.roundHandles(id)))];
   try {
     // A rejected KMS proof (KMSInvalidSigner) is fetched again and resent.
     await withFreshKmsProof(
@@ -284,7 +287,7 @@ export async function finalizePendingRound(api: FogApi, instance: PublicInstance
     return true;
   } catch (e) {
     // Lost the race: the rival's tab already finalized it.
-    const after = await api.read(id);
+    const after = await retryRead(() => api.read(id));
     if (after.roundsPlayed > g.roundsPlayed) return false;
     throw e;
   }
@@ -292,17 +295,17 @@ export async function finalizePendingRound(api: FogApi, instance: PublicInstance
 
 /** Opens and stores the full board of an ended game (once; anyone may send it). */
 export async function revealEndedGame(api: FogApi, instance: PublicInstance, id: bigint): Promise<FogRevealed> {
-  const g = await api.read(id);
+  const g = await retryRead(() => api.read(id));
   if (g.status !== 'ended') throw new Error(`Game ${id} has not ended (${g.status}).`);
   if (!g.revealed) {
-    const handles = await api.revealHandles(id);
+    const handles = [...(await waitForHandles(() => api.revealHandles(id)))];
     try {
       await withFreshKmsProof(
         () => publicDecrypt(instance, handles),
         (res) => api.finalizeGameReveal(id, res.abiEncodedClearValues, res.decryptionProof),
       );
     } catch (e) {
-      if (!(await api.read(id)).revealed) throw e;
+      if (!(await retryRead(() => api.read(id))).revealed) throw e;
     }
   }
   return api.replay(id);

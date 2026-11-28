@@ -14,7 +14,7 @@
 // sepolia.json, via @skirm/fhevm/generated), ZAMA_RELAYER_URL (default: the SDK's Sepolia relayer).
 // The key is never logged.
 import { BenchmarkSeedsAbi, sepolia } from '@skirm/fhevm/generated';
-import { benchmarkSeedStatus, resultsHashPreimage, withFreshKmsProof, type BenchmarkSeedStatus } from '@skirm/shared';
+import { benchmarkSeedStatus, resultsHashPreimage, retryRead, withFreshKmsProof, type BenchmarkSeedStatus } from '@skirm/shared';
 import { Contract, JsonRpcProvider, Wallet, keccak256 } from 'ethers';
 import { OPERATOR_KEY_RE } from './settlement';
 import { zamaServerConfig, type ZamaServerConfig } from './sealed-match';
@@ -140,7 +140,7 @@ export class ContractBenchmarkSeeder implements BenchmarkSeeder {
   }
 
   async read(skillRef: string): Promise<ChainBenchmark> {
-    const [b, handle] = await Promise.all([this.contract.getBenchmark(skillRef), this.contract.seedHandle(skillRef)]);
+    const [b, handle] = await Promise.all([retryRead(() => this.contract.getBenchmark(skillRef)), retryRead(() => this.contract.seedHandle(skillRef))]);
     return parseChainBenchmark(b, handle);
   }
 
