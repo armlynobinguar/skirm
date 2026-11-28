@@ -251,6 +251,68 @@ describe('v2 match screen', () => {
     expect(arenaStore().get().view).toEqual(OVERVIEW);
   });
 
+  it('watches through the visor: its inner voice and compass, F back to third person, the choice remembered', () => {
+    localStorage.removeItem('skirm.cam.v1');
+    const { rt } = setup('mat_visor');
+    startMatch(rt, 'mat_visor');
+    const base = v2FrameFixture({ tick: 3 });
+    const [wick, moss] = base.agents as [FrameAgent, FrameAgent];
+    const f: V2Frame = { ...base, agents: [{ ...wick, thought: 'Nobody at the lift. Go.' }, moss] };
+    act(() => rt.emit({ type: 'v2_frame', matchId: 'mat_visor', frame: f }));
+    key('Enter');
+    fireEvent.click(screen.getByTestId('v2-card-wick'));
+    fireEvent.click(screen.getByTestId('v2-visor-toggle'));
+    expect(screen.getByTestId('v2-visor-toggle')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('v2-tpv-toggle')).toHaveAttribute('aria-pressed', 'false');
+    expect(arenaStore().get().view).toEqual({ mode: 'tpv', focus: 'wick' });
+    expect(screen.getByTestId('v2-visor-voice')).toHaveTextContent('Inner voice');
+    expect(screen.getByTestId('v2-visor-voice')).toHaveTextContent('Nobody at the lift. Go.');
+    expect(screen.getByTestId('v2-visor-mark')).toBeInTheDocument();
+    expect(localStorage.getItem('skirm.cam.v1')).toBe('visor');
+    key('f');
+    expect(screen.queryByTestId('v2-visor')).not.toBeInTheDocument();
+    expect(screen.getByTestId('v2-tpv-toggle')).toHaveAttribute('aria-pressed', 'true');
+    expect(localStorage.getItem('skirm.cam.v1')).toBe('chase');
+    key('f');
+    expect(screen.getByTestId('v2-visor')).toBeInTheDocument();
+    // Pressing the camera already showing leaves it.
+    fireEvent.click(screen.getByTestId('v2-visor-toggle'));
+    expect(screen.queryByTestId('v2-tpv')).not.toBeInTheDocument();
+    // V comes back in the remembered camera.
+    key('v');
+    expect(screen.getByTestId('v2-visor')).toBeInTheDocument();
+    localStorage.removeItem('skirm.cam.v1');
+  });
+
+  it('peeks through a crewmate visor while Q or its button is held', () => {
+    localStorage.setItem('skirm.cam.v1', 'visor');
+    const { rt } = setup('mat_peek');
+    startMatch(rt, 'mat_peek');
+    const base = v2FrameFixture({ tick: 3 });
+    const [wick, moss] = base.agents as [FrameAgent, FrameAgent];
+    const f: V2Frame = { ...base, agents: [{ ...wick, thought: 'Nobody at the lift. Go.' }, { ...moss, thought: 'Rubble ahead, digging.' }, wren] };
+    act(() => rt.emit({ type: 'v2_frame', matchId: 'mat_peek', frame: f }));
+    key('Enter');
+    fireEvent.click(screen.getByTestId('v2-card-wick'));
+    key('v');
+    expect(screen.getByTestId('v2-visor')).toBeInTheDocument();
+    // Only your own crewmates are offered.
+    expect(within(screen.getByTestId('v2-visor-peek')).getAllByRole('button').map((b) => b.textContent)).toEqual(['Moss']);
+    key('q');
+    expect(screen.getByTestId('v2-visor-peek-tag')).toHaveTextContent('Moss');
+    expect(screen.getByTestId('v2-visor-voice')).toHaveTextContent('Rubble ahead, digging.');
+    act(() => void fireEvent.keyUp(window, { key: 'q' }));
+    expect(screen.queryByTestId('v2-visor-peek-tag')).not.toBeInTheDocument();
+    expect(screen.getByTestId('v2-visor-voice')).toHaveTextContent('Nobody at the lift. Go.');
+    const btn = screen.getByTestId('v2-visor-peek-moss');
+    fireEvent.pointerDown(btn);
+    expect(btn).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('v2-visor-peek-tag')).toBeInTheDocument();
+    fireEvent.pointerUp(btn);
+    expect(screen.queryByTestId('v2-visor-peek-tag')).not.toBeInTheDocument();
+    localStorage.removeItem('skirm.cam.v1');
+  });
+
   it('replays an ended match from its stored frames at another speed', () => {
     const { rt } = setup('mat_rep');
     act(() => {
