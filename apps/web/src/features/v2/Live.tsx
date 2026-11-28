@@ -443,7 +443,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
         />
       ) : null}
       {watched && use3d ? <ChaseCam className={c.chase} getState={chaseState} onFail={on3dFail} onView={onCamView} /> : null}
-      {visorOn && watched ? <Visor agent={watched.agent} team={team} mapId={view.mapId} view={camView} /> : null}
+      {visorOn && watched ? <Visor agent={watched.agent} team={team} mapId={view.mapId} view={camView} tools={frame?.tools ?? []} /> : null}
       {watched && use3d && !visorOn && watched.inSight ? <TpvEmote lines={comms} agentId={watched.agent.id} tick={tick} /> : null}
       {intro ? (
         <Intro
