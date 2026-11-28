@@ -31,6 +31,8 @@ import { composeV2Arena, liveFx, setLiveFx } from '@/features/arena/live';
 import { OVERVIEW, ZOOM_MAX, ZOOM_MIN, arenaStore, useArena } from '@/features/arena/store';
 import type { ArenaState } from '@/features/arena/world';
 import { useSession } from '@/lib/auth/session';
+import { useSfx } from '@/lib/sfx';
+import { setListener } from '@/lib/sfx/listener';
 import type { FrameAgent, V2Frame } from '@/lib/realtime/protocol';
 import { AgentCards, type CardAgent } from './hud/AgentCards';
 import { GearLegend } from './hud/Gear';
@@ -321,8 +323,10 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   }, []);
   // Where the 3D cam looks, each frame (the visor's compass reads it without re-rendering).
   const camView = useRef<CamView | null>(null);
+  // In the visor the camera is also the ears: match sounds pan and fade from the watched agent.
   const onCamView = useCallback((v: CamView) => {
     camView.current = v;
+    setListener(v.mode === 'visor' ? { x: v.x, z: v.z, yaw: v.yaw } : null);
   }, []);
   const on3dFail = useCallback(() => {
     setUse3d(false);
@@ -337,6 +341,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   const unseen = Math.max(0, (view.rivalAgents ?? 0) - rivals.length);
   const watched = findAgent(tpv);
   const visorOn = !!watched && use3d && camMode === 'visor';
+  useVisorSounds(visorOn);
   const onPick = (id: string) => (tpv ? enterTpv(id) : setFocus((f) => (f === id ? null : id)));
   const cls = [c.hud, intro && c.introing, tpv && c.tpv, (intro || tpv) && c.cine].filter(Boolean).join(' ');
   const tick = frame?.tick ?? 0;
@@ -466,6 +471,18 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
       {banner ? <Banner word={banner} /> : null}
     </div>
   );
+}
+
+/** The visor's own cues: it seals over the eyes when it opens and lifts when it closes; no listener after. */
+function useVisorSounds(on: boolean) {
+  const sfx = useSfx();
+  const was = useRef(on);
+  useEffect(() => {
+    if (was.current !== on) sfx.play(on ? 'visorOn' : 'visorOff');
+    was.current = on;
+    if (!on) setListener(null);
+  }, [on, sfx]);
+  useEffect(() => () => setListener(null), []);
 }
 
 /** The live match: the store's latest frame, or a frozen copy of it while paused. */

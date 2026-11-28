@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PITCH_MAX, VISOR_EYE, bearingTo, headingDeg, tapeCells, tapeMark, tapeShift, visorRig, wrap360 } from './visor';
+import { PITCH_MAX, VISOR_EYE, bearingTo, headingDeg, spatialOf, tapeCells, tapeMark, tapeShift, visorRig, wrap360 } from './visor';
 
 describe('visor rig', () => {
   it('puts the eye at the agent, at eye height, looking along its yaw', () => {
@@ -72,5 +72,22 @@ describe('compass', () => {
     expect(tapeMark(10, 30, 300)).toEqual({ x: 20, off: null });
     expect(tapeMark(120, 30, 300)).toEqual({ x: 150, off: 'right' });
     expect(tapeMark(-120, 30, 300)).toEqual({ x: -150, off: 'left' });
+  });
+});
+
+describe('visor ears (positional sound)', () => {
+  const l = { x: 5, z: 5, yaw: 0 }; // facing +z: the right is -x
+  it('pans a sound to its side and fades it with distance', () => {
+    expect(spatialOf(l, { x: 5, z: 5 })).toEqual({ pan: 0, gain: 1 });
+    const ahead = spatialOf(l, { x: 5, z: 8 });
+    expect(ahead.pan).toBeCloseTo(0);
+    expect(spatialOf(l, { x: 2, z: 5 }).pan).toBeCloseTo(0.85);
+    expect(spatialOf(l, { x: 8, z: 5 }).pan).toBeCloseTo(-0.85);
+    expect(spatialOf(l, { x: 5, z: 12 }).gain).toBeLessThan(ahead.gain);
+    expect(spatialOf(l, { x: 5, z: 400 }).gain).toBe(0.08);
+  });
+
+  it('is a little duller from behind', () => {
+    expect(spatialOf(l, { x: 5, z: 2 }).gain).toBeLessThan(spatialOf(l, { x: 5, z: 8 }).gain);
   });
 });

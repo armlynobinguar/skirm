@@ -218,9 +218,11 @@ describe('match sounds (frameSounds)', () => {
     } as never;
     const prev = { grid: [], agents: [{ id: 'a2', x: 2, y: 2 }] } as never;
     const s = frameSounds(arena, prev, 1000);
-    expect(s).toContainEqual({ delay: 0, sound: { kind: 'voice', syllables: 6, pitch: voicePitch('A', 0), seed: 28 } });
+    expect(s).toContainEqual({ delay: 0, sound: { kind: 'voice', syllables: 6, pitch: voicePitch('A', 0), seed: 28 }, at: [1, 1] });
     expect(s.filter((x) => x.sound.kind === 'step').map((x) => x.delay)).toEqual([300, 800]);
-    expect(s).toContainEqual({ delay: 0, sound: { kind: 'cough' } });
-    expect(s).toContainEqual({ delay: 120, sound: { kind: 'fooled' } });
+    // Each sound knows the tile it comes from, for the visor's positional sound.
+    expect(s.filter((x) => x.sound.kind === 'step').map((x) => x.at)).toEqual([[3, 2], [3, 2]]);
+    expect(s).toContainEqual({ delay: 0, sound: { kind: 'cough' }, at: [5, 2] });
+    expect(s).toContainEqual({ delay: 120, sound: { kind: 'fooled' }, at: [6, 2] });
   });
 });

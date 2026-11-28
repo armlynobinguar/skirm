@@ -108,3 +108,16 @@ export function tapeMark(rel: number, cellPx: number, tapeW: number): TapeMark {
   if (rel < -half) return { x: -half * px, off: 'left' };
   return { x: rel * px, off: null };
 }
+
+/**
+ * How a sound at `src` is heard by a listener at `l` facing `l.yaw` (the visor's ears): panned to
+ * its side, quieter with distance and a little duller from behind. On the listener's own tile it
+ * plays centred at full level.
+ */
+export function spatialOf(l: { x: number; z: number; yaw: number }, src: { x: number; z: number }): { pan: number; gain: number } {
+  const b = bearingTo({ x: l.x, z: l.z }, src, l.yaw);
+  if (b.dist < 0.5) return { pan: 0, gain: 1 };
+  const pan = Math.sin((b.rel * Math.PI) / 180) * 0.85;
+  const gain = (1 / (1 + b.dist * 0.35)) * (Math.abs(b.rel) > 90 ? 0.75 : 1);
+  return { pan: Math.abs(pan) < 1e-9 ? 0 : pan, gain: Math.max(0.08, gain) };
+}
