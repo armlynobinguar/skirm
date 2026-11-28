@@ -21,7 +21,7 @@ import { accounts, lobbies, tournamentEntries, tournaments } from '../schema';
 import { RepoError } from '../types';
 import { LedgerRepo, type LedgerRepoOptions } from './ledger';
 import { insertLobby, type LobbyRow } from './lobby-codes';
-import { tx, type Clock } from './util';
+import { concurrently, tx, type Clock } from './util';
 
 export type TournamentRow = typeof tournaments.$inferSelect;
 export type TournamentEntryRow = typeof tournamentEntries.$inferSelect;
@@ -133,13 +133,17 @@ export class TournamentsRepo {
       .orderBy(desc(tournaments.createdAt))
       .limit(opts.limit ?? 50);
     if (!rows.length) return [];
-    const counts = await this.db
-      .select({ id: tournamentEntries.tournamentId, n: sql<number>`count(*)::int` })
-      .from(tournamentEntries)
-      .where(inArray(tournamentEntries.tournamentId, rows.map((r) => r.id)))
-      .groupBy(tournamentEntries.tournamentId);
+    const [counts, handles] = await concurrently(
+      this.db,
+      () =>
+        this.db
+          .select({ id: tournamentEntries.tournamentId, n: sql<number>`count(*)::int` })
+          .from(tournamentEntries)
+          .where(inArray(tournamentEntries.tournamentId, rows.map((r) => r.id)))
+          .groupBy(tournamentEntries.tournamentId),
+      () => this.handles(rows.flatMap((r) => [r.creatorId, ...(r.championId ? [r.championId] : [])])),
+    );
     const n = new Map(counts.map((c) => [c.id, Number(c.n)]));
-    const handles = await this.handles(rows.flatMap((r) => [r.creatorId, ...(r.championId ? [r.championId] : [])]));
     return rows.map((r) => summary(r, n.get(r.id) ?? 0, handles));
   }
 
@@ -151,19 +155,37 @@ export class TournamentsRepo {
 
   /** The bracket: entries (by seed, then join order) and every match made so far. */
   async detail(id: string): Promise<TournamentDetail | undefined> {
-    const row = await this.get(id);
+    // The row, its entries, its matches and every handle they name, in one round trip: the handles
+    // are read by subquery (creator, champion and entrants of this tournament).
+    const [row, entries, matches, handleRows] = await concurrently(
+      this.db,
+      () => this.get(id),
+      () =>
+        this.db
+          .select()
+          .from(tournamentEntries)
+          .where(eq(tournamentEntries.tournamentId, id))
+          .orderBy(asc(sql`coalesce(${tournamentEntries.seed}, 999)`), asc(tournamentEntries.joinedAt)),
+      () =>
+        this.db
+          .select()
+          .from(lobbies)
+          .where(eq(lobbies.tournamentId, id))
+          .orderBy(asc(lobbies.round), asc(lobbies.slot)),
+      () =>
+        this.db
+          .select({ id: accounts.id, handle: accounts.handle })
+          .from(accounts)
+          .where(
+            sql`${accounts.id} in (
+              select ${tournamentEntries.accountId} from ${tournamentEntries} where ${tournamentEntries.tournamentId} = ${id}
+              union select ${tournaments.creatorId} from ${tournaments} where ${tournaments.id} = ${id}
+              union select ${tournaments.championId} from ${tournaments} where ${tournaments.id} = ${id}
+            )`,
+          ),
+    );
     if (!row) return undefined;
-    const entries = await this.db
-      .select()
-      .from(tournamentEntries)
-      .where(eq(tournamentEntries.tournamentId, id))
-      .orderBy(asc(sql`coalesce(${tournamentEntries.seed}, 999)`), asc(tournamentEntries.joinedAt));
-    const matches = await this.db
-      .select()
-      .from(lobbies)
-      .where(eq(lobbies.tournamentId, id))
-      .orderBy(asc(lobbies.round), asc(lobbies.slot));
-    const handles = await this.handles([row.creatorId, ...(row.championId ? [row.championId] : []), ...entries.map((e) => e.accountId)]);
+    const handles = new Map(handleRows.map((r) => [r.id, r.handle]));
     const who = (a: string) => ({ id: a, handle: handles.get(a) ?? 'player' });
     return {
       ...summary(row, entries.length, handles),
