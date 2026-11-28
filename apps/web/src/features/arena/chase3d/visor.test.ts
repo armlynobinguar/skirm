@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PITCH_MAX, VISOR_EYE, bearingTo, headingDeg, tapeCells, tapeMark, tapeShift, visorRig, wrap360 } from './visor';
+import { PITCH_MAX, STICK_DEAD, STICK_TURN, VISOR_EYE, bearingTo, dragPitch, headingDeg, stickOf, stickTurn, tapeCells, tapeMark, tapeShift, visorRig, wrap360 } from './visor';
 
 describe('visor rig', () => {
   it('puts the eye at the agent, at eye height, looking along its yaw', () => {
@@ -72,5 +72,38 @@ describe('compass', () => {
     expect(tapeMark(10, 30, 300)).toEqual({ x: 20, off: null });
     expect(tapeMark(120, 30, 300)).toEqual({ x: 150, off: 'right' });
     expect(tapeMark(-120, 30, 300)).toEqual({ x: -150, off: 'left' });
+  });
+});
+
+describe('look stick (phones)', () => {
+  it('rests in the dead zone and clamps to the rim', () => {
+    expect(stickOf(0, 0, 50)).toEqual({ x: 0, y: 0 });
+    expect(stickOf(50 * STICK_DEAD * 0.9, 0, 50)).toEqual({ x: 0, y: 0 });
+    const rim = stickOf(500, 0, 50);
+    expect(rim.x).toBeCloseTo(1);
+    expect(rim.y).toBeCloseTo(0);
+    expect(stickOf(10, 0, 0)).toEqual({ x: 0, y: 0 });
+  });
+
+  it('reads up as up (screen y grows down) and answers small pushes finely', () => {
+    expect(stickOf(0, -50, 50).y).toBeCloseTo(1);
+    const half = stickOf(25, 0, 50).x;
+    expect(half).toBeGreaterThan(0);
+    expect(half).toBeLessThan(0.5);
+    const diag = stickOf(100, 100, 50);
+    expect(Math.hypot(diag.x, diag.y)).toBeCloseTo(1);
+  });
+
+  it('turns right for a push right and looks up for a push up, at the stick rate', () => {
+    const t = stickTurn({ x: 1, y: 0 }, 0.5);
+    expect(t.look).toBeCloseTo(-STICK_TURN * 0.5);
+    expect(t.pitch).toBe(0);
+    expect(stickTurn({ x: 0, y: 1 }, 1).pitch).toBeCloseTo(STICK_TURN / 2);
+  });
+
+  it('tilts with a vertical drag, clamped', () => {
+    expect(dragPitch(0, -100)).toBeCloseTo(0.6);
+    expect(dragPitch(0, 100)).toBeCloseTo(-0.6);
+    expect(dragPitch(0, -10_000)).toBe(PITCH_MAX);
   });
 });

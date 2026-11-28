@@ -15,7 +15,7 @@ import { TOOL_INFO } from '../gear';
 import type { LiveArena } from '../live';
 import { MAPS, ROTATION_INDEX, mapById, type Arena, type ArenaState } from '../world';
 import type { CamView, ChaseCamOptions, ChaseCamState } from './index';
-import { CHASE_FOV, VISOR_FOV, visorRig } from './visor';
+import { CHASE_FOV, PITCH_MAX, VISOR_FOV, dragPitch, stickTurn, visorRig } from './visor';
 import {
   DIST_START,
   HEADING_STEPS,
@@ -179,6 +179,8 @@ interface Rig {
   focusAt: { x: number; z: number } | null;
   target: string | null;
   steps: [number, number][];
+  /** The visor's tilt (radians, up positive): from a vertical drag or the look stick; springs back. */
+  pitch: number;
 }
 
 const tmp = new THREE.Object3D();
@@ -991,9 +993,20 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
   const fp: { x: number; z: number } = focus ?? { x: w.W / 2, z: w.H / 2 };
   const yaw0: number = rig.yaw ?? rig.tyaw;
   rig.yaw = still ? rig.tyaw : yaw0 + angDiff(yaw0, rig.tyaw) * approach(dt, 2.4);
-  if (!dragging) rig.look *= still ? 0 : Math.exp(-dt * 1.5);
+  // A held look stick turns and tilts the view at a steady rate; let go and it springs back, as a drag does.
+  const stick = state.stick && (state.stick.x || state.stick.y) ? state.stick : null;
+  if (stick) {
+    const t = stickTurn(stick, dt);
+    rig.look += t.look;
+    rig.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, rig.pitch + t.pitch));
+  }
+  if (!dragging && !stick) {
+    rig.look *= still ? 0 : Math.exp(-dt * 1.5);
+    rig.pitch *= still ? 0 : Math.exp(-dt * 1.5);
+  }
+  if (!visor) rig.pitch = 0;
   const viewYaw = rig.yaw + rig.look;
-  const want = visor ? visorRig(fp, viewYaw) : chaseRig(fp, viewYaw, rig.dist);
+  const want = visor ? visorRig(fp, viewYaw, rig.pitch) : chaseRig(fp, viewYaw, rig.dist);
   // The eye moves with the agent; the chase cam trails behind it.
   if (!rig.pos || still || visor) rig.pos = new THREE.Vector3(want.pos.x, want.pos.y, want.pos.z);
   else rig.pos.lerp(new THREE.Vector3(want.pos.x, want.pos.y, want.pos.z), approach(dt, 6));
@@ -1045,7 +1058,7 @@ export function stepWorld(w: World, rig: Rig, cam: THREE.PerspectiveCamera, f: F
 }
 
 export function newRig(): Rig {
-  return { yaw: null, tyaw: 0, look: 0, dist: DIST_START, pos: null, focusAt: null, target: null, steps: [] };
+  return { yaw: null, tyaw: 0, look: 0, dist: DIST_START, pos: null, focusAt: null, target: null, steps: [], pitch: 0 };
 }
 
 /** Frees every geometry, material and texture the world holds. */
@@ -1116,9 +1129,9 @@ export function startChaseCam(el: HTMLElement, getState: () => ChaseCamState | n
   const rig = newRig();
   let world: World | null = null;
   let held: ChaseCamState | null = null;
-  let drag: { x: number; o: number } | null = null;
+  let drag: { x: number; y: number; o: number; p: number } | null = null;
   const down = (e: PointerEvent) => {
-    drag = { x: e.clientX, o: rig.look };
+    drag = { x: e.clientX, y: e.clientY, o: rig.look, p: rig.pitch };
     cv.style.cursor = 'grabbing';
     try {
       cv.setPointerCapture(e.pointerId);
@@ -1127,7 +1140,10 @@ export function startChaseCam(el: HTMLElement, getState: () => ChaseCamState | n
     }
   };
   const move = (e: PointerEvent) => {
-    if (drag) rig.look = drag.o + (e.clientX - drag.x) * -0.008;
+    if (!drag) return;
+    rig.look = drag.o + (e.clientX - drag.x) * -0.008;
+    // Up and down only tilt the visor (the chase cam stays level).
+    rig.pitch = dragPitch(drag.p, e.clientY - drag.y);
   };
   const up = () => {
     drag = null;

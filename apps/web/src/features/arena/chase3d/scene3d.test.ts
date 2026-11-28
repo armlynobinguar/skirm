@@ -211,6 +211,23 @@ describe('visor (first person)', () => {
     expect(w.agents.get('wick')!.g.visible).toBe(true);
   });
 
+  it('turns and tilts with a held look stick, and springs back when it is let go', () => {
+    const a = arena();
+    const w = buildWorld(a, LOOK);
+    const rig = newRig();
+    const c = cam();
+    const st: ChaseCamState = { arena: a, prev: null, at: 0, focus: 'wick', look: LOOK, mode: 'visor' };
+    const v0 = stepWorld(w, rig, c, input(st));
+    let v = v0;
+    for (let i = 0; i < 10; i++) v = stepWorld(w, rig, c, input({ ...st, stick: { x: 1, y: 1 } }, { still: false, dt: 0.05 }));
+    // Pushed right: turned right (a lower yaw); pushed up: looking up.
+    expect(v.yaw).toBeLessThan(v0.yaw - 0.5);
+    expect(c.getWorldDirection(new THREE.Vector3()).y).toBeGreaterThan(0.2);
+    for (let i = 0; i < 80; i++) v = stepWorld(w, rig, c, input(st, { still: false, dt: 0.05 }));
+    expect(Math.abs(rig.look)).toBeLessThan(0.05);
+    expect(Math.abs(rig.pitch)).toBeLessThan(0.05);
+  });
+
   it('reports the view after each drawn frame', () => {
     let queue: FrameRequestCallback[] = [];
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => queue.push(cb));

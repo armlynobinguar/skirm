@@ -108,3 +108,40 @@ export function tapeMark(rel: number, cellPx: number, tapeW: number): TapeMark {
   if (rel < -half) return { x: -half * px, off: 'left' };
   return { x: rel * px, off: null };
 }
+
+/** A look stick's deflection: x right, y up, each -1..1, inside the unit circle. */
+export interface Stick {
+  x: number;
+  y: number;
+}
+
+/** Stick deflections under this share of the pad's radius do nothing (a resting thumb). */
+export const STICK_DEAD = 0.15;
+/** Full deflection turns this fast (radians a second) and tilts at half that. */
+export const STICK_TURN = 2.4;
+
+/**
+ * The stick for a thumb `dx`, `dy` pixels from the pad's centre (screen y grows downwards): clamped
+ * to the rim, a dead zone in the middle, and a squared response so small pushes aim finely.
+ */
+export function stickOf(dx: number, dy: number, radius: number): Stick {
+  const r = Math.hypot(dx, dy);
+  if (!radius || r < 1e-9) return { x: 0, y: 0 };
+  const m = Math.min(1, r / radius);
+  if (m <= STICK_DEAD) return { x: 0, y: 0 };
+  const k = ((m - STICK_DEAD) / (1 - STICK_DEAD)) ** 2;
+  return { x: (dx / r) * k, y: (-dy / r) * k };
+}
+
+/**
+ * What a held stick does to the view over `dt` seconds: the look offset (pushing right turns
+ * right, which is a lower yaw) and the pitch (pushing up looks up).
+ */
+export function stickTurn(s: Stick, dt: number): { look: number; pitch: number } {
+  return { look: -s.x * STICK_TURN * dt, pitch: s.y * STICK_TURN * 0.5 * dt };
+}
+
+/** Pitch after a drag of `dy` pixels from where it started (dragging up looks up), clamped. */
+export function dragPitch(start: number, dy: number): number {
+  return Math.max(-PITCH_MAX, Math.min(PITCH_MAX, start - dy * 0.006));
+}

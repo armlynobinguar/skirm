@@ -24,6 +24,8 @@ export interface ChaseCamState {
   paused?: boolean;
   /** 'visor': first person from the watched agent's eyes (./visor); default the chase cam behind it. */
   mode?: CamMode;
+  /** A held look stick (the visor's phone joystick), x right and y up, -1..1; absent or zero: none. */
+  stick?: { x: number; y: number } | null;
 }
 
 export type CamMode = 'chase' | 'visor';
