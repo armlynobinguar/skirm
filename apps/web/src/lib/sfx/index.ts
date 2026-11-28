@@ -6,10 +6,14 @@
 //
 //   const sfx = useSfx();
 //   sfx.play('click');
+//   sfx.agent({ kind: 'step', pitch: 1 }, { pan: -0.4, gain: 0.6 });   // placed: left of the listener
+//
+// Positional sound: a match sound can carry where it is heard from (a stereo pan and a distance
+// gain, from ./listener while the visor is on); without one it plays centred at full level.
 import { useMemo } from 'react';
 import { usePreferences } from '@/lib/preferences';
 
-export type SfxCue = 'hover' | 'click' | 'wipe' | 'tick' | 'good' | 'bad' | 'blip' | 'radio';
+export type SfxCue = 'hover' | 'click' | 'wipe' | 'tick' | 'good' | 'bad' | 'blip' | 'radio' | 'visorOn' | 'visorOff';
 
 interface Tone {
   /** Start frequency in Hz. */
@@ -51,10 +55,22 @@ export const CUES: Record<SfxCue, Tone[]> = {
     { f: 900, d: 0.05, type: 'square', g: 0.012 },
     { f: 1200, d: 0.05, type: 'square', g: 0.012, at: 0.06 },
   ],
+  // The visor closing over the eyes: a soft rising sweep and a high click as it seals; reversed to lift it.
+  visorOn: [
+    { f: 220, d: 0.22, type: 'sine', g: 0.035, to: 660 },
+    { f: 1760, d: 0.04, type: 'triangle', g: 0.02, at: 0.2 },
+  ],
+  visorOff: [{ f: 660, d: 0.2, type: 'sine', g: 0.03, to: 240 }],
 };
 
+/** Where a sound is heard from: stereo pan (-1 left to 1 right) and a gain for distance (0 to 1). */
+export interface Spatial {
+  pan: number;
+  gain: number;
+}
+
 type AudioCtx = Pick<AudioContext, 'currentTime' | 'destination' | 'createOscillator' | 'createGain' | 'state' | 'resume'> &
-  Partial<Pick<AudioContext, 'createBuffer' | 'createBufferSource' | 'createBiquadFilter' | 'sampleRate'>>;
+  Partial<Pick<AudioContext, 'createBuffer' | 'createBufferSource' | 'createBiquadFilter' | 'createStereoPanner' | 'sampleRate'>>;
 
 /** Match sounds made per agent (pitch per voice, so crewmates sound different). */
 export type AgentSound =
@@ -73,8 +89,8 @@ export type AgentSound =
 
 export interface SfxEngine {
   play(cue: SfxCue): void;
-  /** Agent sounds in a live match (optional: test fakes may leave it out). */
-  agent?(s: AgentSound): void;
+  /** Agent sounds in a live match, placed when `at` is given (optional: test fakes may leave it out). */
+  agent?(s: AgentSound, at?: Spatial): void;
 }
 
 /** Tones for an agent sound (noise-based ones return none: they use `noiseOf`). */
@@ -128,7 +144,15 @@ export function createSfx(makeContext: () => AudioCtx | null = browserContext): 
     if (ctx && ctx.state === 'suspended') void ctx.resume();
     return ctx ?? null;
   };
-  const tones = (c: AudioCtx, list: readonly Tone[]) => {
+  // The node a sound plays into: a stereo panner for a placed sound (where the browser has one), else the speakers.
+  const outFor = (c: AudioCtx, at: Spatial | undefined): AudioNode => {
+    if (!at || !c.createStereoPanner) return c.destination;
+    const p = c.createStereoPanner();
+    p.pan.value = Math.max(-1, Math.min(1, at.pan));
+    p.connect(c.destination);
+    return p;
+  };
+  const tones = (c: AudioCtx, list: readonly Tone[], out: AudioNode = c.destination, scale = 1) => {
     for (const t of list) {
       const start = c.currentTime + (t.at ?? 0);
       const o = c.createOscillator();
@@ -136,18 +160,21 @@ export function createSfx(makeContext: () => AudioCtx | null = browserContext): 
       o.type = t.type;
       o.frequency.setValueAtTime(t.f, start);
       if (t.to) o.frequency.exponentialRampToValueAtTime(t.to, start + t.d);
-      v.gain.setValueAtTime(t.g * LEVEL, start);
+      v.gain.setValueAtTime(Math.max(0.0002, t.g * LEVEL * scale), start);
       v.gain.exponentialRampToValueAtTime(0.0001, start + t.d);
-      o.connect(v).connect(c.destination);
+      o.connect(v).connect(out);
       o.start(start);
       o.stop(start + t.d + 0.02);
     }
   };
   return {
-    agent(s) {
+    agent(s, at) {
       const c = ready();
       if (!c) return;
       try {
+        const scale = at ? Math.max(0, Math.min(1, at.gain)) : 1;
+        if (scale <= 0.01) return;
+        const out = outFor(c, at);
         const n = noiseOf(s);
         if (n && c.createBuffer && c.createBufferSource && c.createBiquadFilter && c.sampleRate) {
           const [type, hz, d, g] = n;
@@ -160,12 +187,12 @@ export function createSfx(makeContext: () => AudioCtx | null = browserContext): 
           f.type = type;
           f.frequency.value = hz;
           const v = c.createGain();
-          v.gain.value = g * LEVEL;
-          src.connect(f).connect(v).connect(c.destination);
+          v.gain.value = g * LEVEL * scale;
+          src.connect(f).connect(v).connect(out);
           src.start();
           return;
         }
-        tones(c, agentTones(s));
+        tones(c, agentTones(s), out, scale);
       } catch {
         // Audio is a nicety.
       }
@@ -202,7 +229,7 @@ export function useSfx(engine: SfxEngine = sfxEngine()): SfxEngine {
   return useMemo(
     () => ({
       play: (cue: SfxCue) => (on ? engine.play(cue) : undefined),
-      agent: (a: AgentSound) => (on ? engine.agent?.(a) : undefined),
+      agent: (a: AgentSound, at?: Spatial) => (on ? engine.agent?.(a, at) : undefined),
     }),
     [on, engine],
   );
