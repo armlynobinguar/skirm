@@ -34,7 +34,7 @@
   clip-path: var(--clip-cut2);
   transition: transform .3s var(--ease-out), background-color .2s;
 }
-.unit:hover { transform: translateY(-3px); background: #101b21; }
+.unit:hover { transform: translateY(-3px); background: var(--surface-raised); }
 .unitTop { display: flex; justify-content: space-between; gap: 8px; font: 500 11px/14px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .unitTop b { font-weight: 500; color: var(--you); }
 .portrait { display: block; width: 100%; height: 140px; }
@@ -44,7 +44,7 @@
 .stats { display: flex; flex-direction: column; gap: 6px; }
 .stat { display: flex; align-items: center; gap: 8px; font: 500 11px/14px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .statName { width: 48px; flex: none; }
-.bar { flex: 1; height: 6px; background: #1c2a2f; }
+.bar { flex: 1; height: 6px; background: var(--line); }
 .bar span { display: block; height: 100%; background: var(--you); }
 .skill { font-size: 13px; line-height: 18px; color: var(--text); }
 .skillEmpty { font-size: 13px; line-height: 18px; color: var(--muted); }
@@ -88,10 +88,10 @@
   clip-path: var(--clip-cut2-sm);
   transition: background-color .2s;
 }
-.deck a.altYou { color: var(--you); background: rgba(52, 224, 200, .05); box-shadow: inset 0 0 0 1px rgba(52, 224, 200, .7); }
-.deck a.altYou:hover { color: var(--you); background: rgba(52, 224, 200, .12); }
-.deck a.altAmber { color: var(--amber); background: rgba(255, 181, 71, .05); box-shadow: inset 0 0 0 1px rgba(255, 181, 71, .6); }
-.deck a.altAmber:hover { color: var(--amber); background: rgba(255, 181, 71, .12); }
+.deck a.altYou { color: var(--you); background: color-mix(in srgb, var(--you) 5%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--you) 70%, transparent); }
+.deck a.altYou:hover { color: var(--you); background: color-mix(in srgb, var(--you) 12%, transparent); }
+.deck a.altAmber { color: var(--amber); background: color-mix(in srgb, var(--amber) 5%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 60%, transparent); }
+.deck a.altAmber:hover { color: var(--amber); background: color-mix(in srgb, var(--amber) 12%, transparent); }
 .altName { font: 800 24px/1 var(--font-display); letter-spacing: .1em; text-transform: uppercase; }
 .altSub { font-size: 12px; line-height: 16px; color: var(--muted); }
 
@@ -104,7 +104,7 @@
 }
 .seasonHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .seasonName { margin: 0; font: 800 30px/1 var(--font-display); letter-spacing: .04em; text-transform: uppercase; color: var(--bone); }
-.seasonBar { height: 8px; background: #1c2a2f; }
+.seasonBar { height: 8px; background: var(--line); }
 .seasonBar span { display: block; height: 100%; background: linear-gradient(90deg, var(--you), var(--you-hover)); }
 .seasonGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .seasonGrid > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }

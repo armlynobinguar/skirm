@@ -33,10 +33,10 @@
 .card { position: relative; display: grid; grid-template-rows: auto 1fr; min-height: 250px; padding: 0; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--panel-solid); box-shadow: inset 0 0 0 1px var(--line); clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); transform-style: preserve-3d; transition: transform .25s var(--ease-out), box-shadow .25s; }
 .card[aria-pressed='true'] { box-shadow: inset 0 0 0 2px var(--rc); }
 .card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.art { position: relative; display: block; height: 104px; overflow: hidden; background: radial-gradient(120% 100% at 30% 0%, color-mix(in srgb, var(--rc) 45%, transparent), transparent 70%), linear-gradient(180deg, #101a25, #0a1119); }
+.art { position: relative; display: block; height: 104px; overflow: hidden; background: radial-gradient(120% 100% at 30% 0%, color-mix(in srgb, var(--rc) 45%, transparent), transparent 70%), linear-gradient(180deg, var(--surface-raised), var(--surface-sunken)); }
 .artCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .rar { position: absolute; left: 10px; top: 10px; font: 400 10px/14px var(--font-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--rc); }
-.ver { position: absolute; right: 10px; top: 10px; padding: 1px 5px; font: 400 10px/14px var(--font-mono); color: var(--bone); background: rgba(5, 8, 13, .7); }
+.ver { position: absolute; right: 10px; top: 10px; padding: 1px 5px; font: 400 10px/14px var(--font-mono); color: var(--bone); background: color-mix(in srgb, var(--bg) 70%, transparent); }
 .badges { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 6px; }
 .in { display: grid; gap: 6px; align-content: start; padding: 12px; }
 .name { margin: 0; font: 800 23px/.95 var(--font-display); text-transform: uppercase; color: var(--bone); }

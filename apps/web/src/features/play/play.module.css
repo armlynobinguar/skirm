@@ -165,7 +165,7 @@
 
 /* ---------- M03 Coach marks ---------- */
 .coachWrap { position: relative; display: flex; flex-direction: column; gap: var(--space-4); }
-.coachScrim { position: fixed; inset: 0; z-index: 30; background: #0a0d0cb3; }
+.coachScrim { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 70%, transparent); }
 .coachTarget { position: relative; z-index: 31; align-self: flex-start; max-width: 100%; border-radius: var(--radius-3); box-shadow: var(--focus-ring); background: var(--surface); }
 .coachCard { position: relative; z-index: 31; max-width: 420px; background: var(--surface-raised); border-radius: var(--radius-3); box-shadow: var(--elev-3); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
 .coachCard p { margin: 0; }
@@ -191,7 +191,7 @@
 /* Rented agents under the roster (RentShelf): passes to pick, then offers to rent. */
 .rentShelf { display: grid; gap: 8px; margin-top: 10px; }
 .rentList { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.rentList li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; background: rgba(7, 11, 18, .85); box-shadow: inset 0 0 0 1px var(--line); }
+.rentList li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; background: color-mix(in srgb, var(--surface-sunken) 85%, transparent); box-shadow: inset 0 0 0 1px var(--line); }
 .rentList li span { min-width: 0; font: 500 13px/1.3 var(--font-mono); color: var(--ink-muted); }
 .rentList li b { color: var(--bone); }
 .rentList li small { color: var(--faint); }

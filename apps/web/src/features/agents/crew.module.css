@@ -3,7 +3,7 @@
 /* Screen layout: squad and roster left, mode / difficulty / estimate / deploy right */
 .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 350px); gap: 20px; padding-block: 4px 20px; }
 /* Over the live arena (the match lock-in): a dark glass backing so text never sits on the board. */
-.wrap[data-backed] { max-width: 1240px; margin: 2vh auto 0; padding: 18px; background: rgba(5, 8, 13, .84); box-shadow: inset 0 0 0 1px var(--line); backdrop-filter: blur(6px); }
+.wrap[data-backed] { max-width: 1240px; margin: 2vh auto 0; padding: 18px; background: color-mix(in srgb, var(--bg) 84%, transparent); box-shadow: inset 0 0 0 1px var(--line); backdrop-filter: blur(6px); }
 .main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
@@ -30,7 +30,7 @@
 .cls { position: absolute; top: 14px; left: 12px; display: grid; justify-items: center; gap: 4px; color: var(--c); }
 .cls span { font: 400 9px/12px var(--font-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
 .rm,
-.edit { position: absolute; top: 10px; height: 30px; display: flex; align-items: center; justify-content: center; color: var(--muted); background: rgba(5, 8, 13, .6); border: 0; box-shadow: inset 0 0 0 1px var(--line-strong); cursor: pointer; }
+.edit { position: absolute; top: 10px; height: 30px; display: flex; align-items: center; justify-content: center; color: var(--muted); background: color-mix(in srgb, var(--bg) 60%, transparent); border: 0; box-shadow: inset 0 0 0 1px var(--line-strong); cursor: pointer; }
 .rm { right: 26px; width: 30px; font-size: 18px; }
 .rm:hover:not(:disabled) { color: var(--bone); }
 .rm:disabled { opacity: .35; cursor: not-allowed; }
@@ -86,13 +86,13 @@ a.sk:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
 
 /* Roster strip */
 .roster { display: flex; flex-wrap: wrap; gap: 8px; }
-.rpick { position: relative; width: 76px; display: grid; justify-items: center; gap: 3px; padding: 6px 4px; color: inherit; border: 0; background: rgba(7, 11, 18, .85); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; transition: transform .2s var(--ease-out); }
+.rpick { position: relative; width: 76px; display: grid; justify-items: center; gap: 3px; padding: 6px 4px; color: inherit; border: 0; background: color-mix(in srgb, var(--surface-sunken) 85%, transparent); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; transition: transform .2s var(--ease-out); }
 .rpick span { font: 700 15px/1 var(--font-display); text-transform: uppercase; color: var(--bone); }
 .rpick small { font: 400 9px/12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .rpick:hover:not(:disabled) { transform: translateY(-3px); }
 .rpick:disabled { cursor: default; opacity: .6; }
 .rpick:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.rpick[aria-pressed="true"] { background: rgba(14, 22, 32, .95); box-shadow: inset 0 0 0 2px var(--c); }
+.rpick[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-raised) 95%, transparent); box-shadow: inset 0 0 0 2px var(--c); }
 .rpick[aria-pressed="true"]::after { content: "IN"; position: absolute; top: 4px; right: 4px; padding: 0 3px; font: 400 9px/12px var(--font-mono); color: var(--you-ink); background: var(--c); }
 .face { display: block; width: 60px; height: 56px; }
 

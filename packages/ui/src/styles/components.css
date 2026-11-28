@@ -32,11 +32,11 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f
 .sk-btn-primary { background: var(--you); color: var(--you-ink); clip-path: var(--clip-cut2-sm); }
 .sk-btn-primary:hover:not(:disabled) { background: var(--you-hover); }
 /* Secondary: a teal outline (B), the cut drawn by the clip so the border follows it. */
-.sk-btn-secondary { background: rgba(52, 224, 200, .04); color: var(--you); border-color: rgba(52, 224, 200, .7); clip-path: var(--clip-cut2-sm); }
-.sk-btn-secondary:hover:not(:disabled) { background: rgba(52, 224, 200, .12); color: var(--you-hover); }
+.sk-btn-secondary { background: color-mix(in srgb, var(--you) 4%, transparent); color: var(--you); border-color: color-mix(in srgb, var(--you) 70%, transparent); clip-path: var(--clip-cut2-sm); }
+.sk-btn-secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--you) 12%, transparent); color: var(--you-hover); }
 .sk-btn-ghost { background: transparent; color: var(--ink); }
 .sk-btn-ghost:hover:not(:disabled) { background: var(--chalk-soft); }
-.sk-btn-danger { background: var(--rival); color: #2a0408; clip-path: var(--clip-cut2-sm); }
+.sk-btn-danger { background: var(--rival); color: var(--rival-ink); clip-path: var(--clip-cut2-sm); }
 .sk-btn-danger:hover:not(:disabled) { background: var(--rival-hover); }
 .sk-btn-primary, .sk-btn-secondary, .sk-btn-danger { background-image: var(--grain), var(--hatch); background-size: 140px 140px, auto; }
 .sk-btn-primary, .sk-btn-danger { background-image: var(--grain), var(--hatch-dark); }
@@ -74,7 +74,7 @@ textarea.sk-input { resize: vertical; min-height: 88px; }
 @media (max-width: 480px) { .sk-tabs { flex-wrap: wrap; overflow-x: visible; } }
 .sk-tab { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 12px var(--space-4); background: none; border: 0; border-radius: 0; color: var(--ink-muted); font: 800 19px/20px var(--font-display); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
 .sk-tab:hover { color: var(--ink); background: var(--chalk-soft); }
-.sk-tab.is-selected { color: var(--bone); background: linear-gradient(180deg, transparent, rgba(52, 224, 200, .12)); }
+.sk-tab.is-selected { color: var(--bone); background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--you) 12%, transparent)); }
 .sk-tab.is-selected::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--you); }
 .sk-tab:disabled { opacity: .45; cursor: not-allowed; }
 .sk-tab-count { font: 500 11px/14px var(--font-mono); padding: 1px 5px; border-radius: var(--radius-1); background: var(--surface-sunken); color: var(--ink-muted); }
@@ -92,7 +92,7 @@ textarea.sk-input { resize: vertical; min-height: 88px; }
 @keyframes sk-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ---------- Modal ---------- */
-.sk-scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--space-4); background: rgba(3, 5, 8, .72); }
+.sk-scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--space-4); background: color-mix(in srgb, var(--bg) 72%, transparent); }
 .sk-scrim.is-inline { position: relative; inset: auto; z-index: auto; min-height: 100%; box-sizing: border-box; }
 .sk-modal { width: min(460px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--panel-solid); color: var(--ink); border-radius: 0; box-shadow: var(--elev-3); clip-path: var(--clip-cut2); animation: sk-in var(--duration-base) var(--ease-standard) both; outline: none; }
 .sk-modal.is-lg { width: min(720px, 100%); }
@@ -204,7 +204,7 @@ textarea.sk-input { resize: vertical; min-height: 88px; }
 .sk-seg button[aria-pressed="true"] { background: var(--bone); color: var(--bg); }
 .sk-seg button:hover:not([aria-pressed="true"]):not(:disabled) { color: var(--bone); }
 /* Soon: a designed feature that is not live yet. Amber hazard-dashed outline, never a value. */
-.sk-soon { display: inline-flex; align-items: center; min-height: 20px; padding: 0 8px; font: 600 10px/14px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--amber); box-shadow: inset 0 0 0 1px rgba(255, 181, 71, .45); background: rgba(255, 181, 71, .06); white-space: nowrap; }
+.sk-soon { display: inline-flex; align-items: center; min-height: 20px; padding: 0 8px; font: 600 10px/14px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--amber); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 45%, transparent); background: color-mix(in srgb, var(--amber) 6%, transparent); white-space: nowrap; }
 .sk-seg button:disabled { opacity: .35; cursor: not-allowed; }
 .sk-seg button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .sk-seg.is-block { display: flex; width: 100%; }
