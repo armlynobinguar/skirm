@@ -108,3 +108,22 @@ export function tapeMark(rel: number, cellPx: number, tapeW: number): TapeMark {
   if (rel < -half) return { x: -half * px, off: 'left' };
   return { x: rel * px, off: null };
 }
+
+export interface NearMark<T> {
+  of: T;
+  rel: number;
+  dist: number;
+}
+
+/**
+ * The nearest points within `range` tiles of the viewer, nearest first, at most `limit`, with their
+ * bearings (the visor's supply-drop pips).
+ */
+export function nearMarks<T extends { at: readonly [number, number] }>(from: { x: number; z: number }, yaw: number, points: readonly T[], range: number, limit: number): NearMark<T>[] {
+  const out: NearMark<T>[] = [];
+  for (const p of points) {
+    const b = bearingTo(from, { x: p.at[0], z: p.at[1] }, yaw);
+    if (b.dist <= range) out.push({ of: p, rel: b.rel, dist: b.dist });
+  }
+  return out.sort((a, b) => a.dist - b.dist).slice(0, limit);
+}

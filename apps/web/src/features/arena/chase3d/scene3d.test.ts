@@ -181,6 +181,23 @@ describe('chase cam world', () => {
 });
 
 describe('visor (first person)', () => {
+  it('tints each tool on the ground in its own colour, so a drop reads at a glance', () => {
+    const a = arena();
+    const withTools: LiveArena = {
+      ...a,
+      state: { ...a.state, gear: { tools: [{ at: [2, 2], kind: 'sandbag' }, { at: [3, 2], kind: 'pump' }], placed: [] } },
+    };
+    const w = buildWorld(a, LOOK);
+    stepWorld(w, newRig(), cam(), input({ arena: withTools, prev: null, at: 0, focus: 'wick', look: LOOK, mode: 'visor' }));
+    expect(w.dyn.tool.count).toBe(2);
+    const c0 = new THREE.Color();
+    const c1 = new THREE.Color();
+    w.dyn.tool.getColorAt(0, c0);
+    w.dyn.tool.getColorAt(1, c1);
+    expect(c0.getHexString()).toBe('c9a46a');
+    expect(c1.getHexString()).toBe('5fd3ff');
+  });
+
   it('puts the camera at the watched agent eyes, hides its figure and keeps every wall standing', () => {
     const a = arena();
     const w = buildWorld(a, LOOK);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PITCH_MAX, VISOR_EYE, bearingTo, headingDeg, tapeCells, tapeMark, tapeShift, visorRig, wrap360 } from './visor';
+import { PITCH_MAX, VISOR_EYE, bearingTo, nearMarks, headingDeg, tapeCells, tapeMark, tapeShift, visorRig, wrap360 } from './visor';
 
 describe('visor rig', () => {
   it('puts the eye at the agent, at eye height, looking along its yaw', () => {
@@ -72,5 +72,23 @@ describe('compass', () => {
     expect(tapeMark(10, 30, 300)).toEqual({ x: 20, off: null });
     expect(tapeMark(120, 30, 300)).toEqual({ x: 150, off: 'right' });
     expect(tapeMark(-120, 30, 300)).toEqual({ x: -150, off: 'left' });
+  });
+});
+
+describe('supply-drop pips', () => {
+  it('keeps the nearest few in range, nearest first, with bearings', () => {
+    const pts = [
+      { at: [5, 9] as const, kind: 'pump' },
+      { at: [5, 6] as const, kind: 'sandbag' },
+      { at: [20, 20] as const, kind: 'bridge' },
+      { at: [2, 5] as const, kind: 'sandbag' },
+    ];
+    const near = nearMarks({ x: 5, z: 5 }, 0, pts, 8, 2);
+    expect(near.map((m) => m.of.kind)).toEqual(['sandbag', 'sandbag']);
+    expect(near[0]!.dist).toBe(1);
+    expect(near[0]!.rel).toBeCloseTo(0);
+    expect(near[1]!.rel).toBeCloseTo(90);
+    expect(nearMarks({ x: 5, z: 5 }, 0, pts, 8, 5)).toHaveLength(3);
+    expect(nearMarks({ x: 5, z: 5 }, 0, [], 8, 5)).toEqual([]);
   });
 });

@@ -340,7 +340,7 @@ export function buildWorld(arena: LiveArena, look: string): World {
     sandbag: inst(new THREE.CapsuleGeometry(0.14, 0.5, 4, 8).rotateZ(Math.PI / 2), lambert({ color: TOOL_INFO.sandbag.colour }), cap * 2),
     bridge: inst(box, lambert({ color: TOOL_INFO.bridge.colour }), cap * 3),
     pump: inst(new THREE.CylinderGeometry(0.16, 0.2, 0.45, 10).translate(0, 0.225, 0), lambert({ color: '#2a4a5c', emissive: TOOL_INFO.pump.colour, emissiveIntensity: 0.35 }), cap),
-    tool: inst(box, new THREE.MeshBasicMaterial({ color: '#ffd27a' }), cap, true),
+    tool: inst(box, new THREE.MeshBasicMaterial({ color: '#ffffff' }), cap, true),
   };
 
   // The delivery point: a turning ring and a soft beam.
@@ -775,7 +775,13 @@ function layTiles(w: World, state: ArenaState, seen: ((i: number) => boolean) | 
     } else if (p.kind === 'bridge') for (const k of [-0.3, 0, 0.3]) put('bridge', x + k, 0.04, y, 0.24, 0.08, 1.04);
     else put('pump', x, 0, y, 1, 1, 1);
   }
-  for (const g of gear?.tools ?? []) put('tool', g.at[0], 0.15, g.at[1], 0.34, 0.3, 0.34, 0.6);
+  // A tool waiting on the ground glows in its own colour, so a drop's contents read from afar (and in the visor).
+  for (const g of gear?.tools ?? []) {
+    const i = n.tool ?? 0;
+    put('tool', g.at[0], 0.15, g.at[1], 0.34, 0.3, 0.34, 0.6);
+    dyn.tool.setColorAt(i, col.set(TOOL_INFO[g.kind].colour));
+  }
+  if (dyn.tool.instanceColor) dyn.tool.instanceColor.needsUpdate = true;
   for (const key of Object.keys(dyn) as DynKey[]) {
     dyn[key].count = n[key] ?? 0;
     dyn[key].instanceMatrix.needsUpdate = true;
