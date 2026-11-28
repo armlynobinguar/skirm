@@ -4,6 +4,7 @@ import type { Repos } from '@skirm/db';
 import type { Caster } from '@skirm/decision-engine/v2';
 import type { RankedDecayConfig } from '@skirm/shared';
 import type { NearKeyChecker } from './near-link';
+import type { ReadCache } from './read-cache';
 import type { ReplayFrameReader } from './replays';
 import type { RateLimitStore, RateLimits } from './rate-limit';
 import type { RelayDeps } from './relay';
@@ -121,6 +122,8 @@ export interface ApiDeps {
   benchmarkQueue: BenchmarkQueue;
   /** Daily model spend for GET /ops/stats (absent: the route reports it as unavailable). */
   costs?: DailyCostReader;
+  /** Short-lived cache of hot public reads (Redis); absent, every read goes to Postgres. */
+  readCache?: ReadCache;
   /** Allowed CORS origins (default http://localhost:3000). */
   corsOrigins?: string[];
   /** Request rate limits (./rate-limit.ts): Redis counters in production; absent, no limits (tests). */

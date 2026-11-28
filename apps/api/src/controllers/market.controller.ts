@@ -20,6 +20,8 @@ import { DEPS, type ApiDeps } from '../deps';
 import { ApiError, notFound } from '../errors';
 import { agentId, listingBody, optIntQuery, parse, purchaseBody, skillId } from '../validation';
 import { benchmarkView, listingView, saleView, skillPublic, trialView } from '../views';
+import { Invalidates } from '../cache-invalidation';
+import { CACHE, readCacheOf } from '../read-cache';
 import { idOr404 } from './util';
 
 const empty = (v: unknown) => (v === '' ? undefined : v);
@@ -61,39 +63,17 @@ export class MarketController {
   async list(@Query() query: unknown, @CurrentAccount() account?: AccountRow) {
     const q = parse(marketQuery, query);
     const { repos } = this.deps;
-    let versions = await repos.skills.listPublic();
-    if (q.tag) versions = versions.filter((v) => v.handlesTags.includes(q.tag!));
-    if (q.role) versions = versions.filter((v) => skillFitsRole(v.roles, q.role!));
-    const [listings, owned, proof] = await Promise.all([
-      repos.market.activeListings(),
+    // Every public card is the same for everyone (cached, dropped by listing, sale and mint
+    // writes); the filters, the sort and the caller's `owned` are applied per request.
+    const { scope, ttl } = CACHE.market;
+    const [all, owned] = await Promise.all([
+      readCacheOf(this.deps).read(scope, 'cards', ttl, () => this.publicCards()),
       account ? repos.skills.listOwned(account.id) : Promise.resolve([]),
-      repos.proof.marketRates(versions.map((v) => ({ skillId: v.id, version: v.version }))),
     ]);
-    const listingBy = new Map<string, ListingRow>();
-    for (const l of listings)
-      if (!listingBy.has(key({ id: l.skillId, version: l.version })))
-        listingBy.set(key({ id: l.skillId, version: l.version }), l);
     const ownedKeys = new Set(owned.map(key));
-
-
-    const cards = versions.map((v) => {
-      const listing = listingBy.get(key(v));
-      const p = proof.get(key(v));
-      return {
-        skill: skillPublic(v),
-        creator: { id: v.creatorId, handle: v.creatorHandle, nearAccountId: v.creatorNear },
-        priceYocto: listing?.priceYocto ?? null,
-        ...(listing ? { listing: listingView(listing, v) } : {}),
-        /** Ranked v2 record of this version; win rate null before its first ranked match. */
-        rankedWinRate: p?.rankedWinRate ?? null,
-        rankedMatches: p?.rankedMatches ?? 0,
-        /** null when not benchmarked, offline (needs a model key) or not finished. */
-        benchmarkScore: p?.benchmarkScore ?? null,
-        /** On-chain benchmark seed progress (committed, published, revealed); null for keyed seeds. */
-        benchmarkSeeds: p?.benchmarkSeeds ?? null,
-        owned: ownedKeys.has(key(v)),
-      };
-    });
+    let cards = all.map((c) => ({ ...c, owned: ownedKeys.has(key(c.skill)) }));
+    if (q.tag) cards = cards.filter((c) => (c.skill.handles_tags as readonly string[]).includes(q.tag!));
+    if (q.role) cards = cards.filter((c) => skillFitsRole(c.skill.roles, q.role!));
     const price = (c: (typeof cards)[number]) =>
       c.priceYocto === null ? null : BigInt(c.priceYocto);
     cards.sort((a, b) => {
@@ -113,6 +93,37 @@ export class MarketController {
       }
     });
     return cards;
+  }
+
+  /** Every public version as a market card, without the caller's `owned`. */
+  private async publicCards() {
+    const { repos } = this.deps;
+    const versions = await repos.skills.listPublic();
+    const [listings, proof] = await Promise.all([
+      repos.market.activeListings(),
+      repos.proof.marketRates(versions.map((v) => ({ skillId: v.id, version: v.version }))),
+    ]);
+    const listingBy = new Map<string, ListingRow>();
+    for (const l of listings)
+      if (!listingBy.has(key({ id: l.skillId, version: l.version })))
+        listingBy.set(key({ id: l.skillId, version: l.version }), l);
+    return versions.map((v) => {
+      const listing = listingBy.get(key(v));
+      const p = proof.get(key(v));
+      return {
+        skill: skillPublic(v),
+        creator: { id: v.creatorId, handle: v.creatorHandle, nearAccountId: v.creatorNear },
+        priceYocto: listing?.priceYocto ?? null,
+        ...(listing ? { listing: listingView(listing, v) } : {}),
+        /** Ranked v2 record of this version; win rate null before its first ranked match. */
+        rankedWinRate: p?.rankedWinRate ?? null,
+        rankedMatches: p?.rankedMatches ?? 0,
+        /** null when not benchmarked, offline (needs a model key) or not finished. */
+        benchmarkScore: p?.benchmarkScore ?? null,
+        /** On-chain benchmark seed progress (committed, published, revealed); null for keyed seeds. */
+        benchmarkSeeds: p?.benchmarkSeeds ?? null,
+      };
+    });
   }
 
   /** The newest public version (or `?version=`); drafts only for their creator or holder (never signed out). */
@@ -242,6 +253,7 @@ export class MarketController {
 
   /** Records the seller's listing (the onchain `nft_approve` is signed by their wallet). */
   @Post(':skillId/listing')
+  @Invalidates(CACHE.market.scope)
   @HttpCode(200)
   async listing(
     @Param('skillId') id: string,
@@ -296,6 +308,7 @@ export class MarketController {
    * there (`market.delist`, then optionally `skills.nft_revoke` to drop the approval).
    */
   @Delete(':skillId/listing')
+  @Invalidates(CACHE.market.scope)
   async cancelListing(
     @Param('skillId') id: string,
     @Query() query: unknown,
@@ -345,6 +358,7 @@ export class MarketController {
 
   /** `{ owned: true }` once the purchase is verified (dev mode: a `dev:<yocto>` hash is trusted). */
   @Post(':skillId/purchase')
+  @Invalidates(CACHE.market.scope)
   @HttpCode(200)
   async purchase(
     @Param('skillId') id: string,

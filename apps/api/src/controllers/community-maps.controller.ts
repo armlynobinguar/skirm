@@ -21,6 +21,8 @@ import { CurrentAccount, Public, mustAccount } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
 import { ApiError, notFound } from '../errors';
 import { parse } from '../validation';
+import { Invalidates } from '../cache-invalidation';
+import { CACHE, readCacheOf } from '../read-cache';
 import { idOr404 } from './util';
 
 /** Maps a player may publish per UTC day. */
@@ -108,9 +110,14 @@ export class CommunityMapsController {
   @Get()
   async browse(@Query() query: unknown, @CurrentAccount() acc?: AccountRow) {
     const q = parse(browseQuery, query);
-    const rows = await this.deps.repos.communityMaps.browse(q);
-    const liked = acc ? new Set(await this.deps.repos.communityMaps.likedBy(acc.id, rows.map((r) => r.id))) : null;
-    return { sort: q.sort, maps: rows.map((r) => communityMapPublic(r, liked ? liked.has(r.id) : undefined)) };
+    // The page is the same for everyone (cached); which maps the caller liked is not.
+    const { scope, ttl } = CACHE.communityMaps;
+    const maps = await readCacheOf(this.deps).read(scope, `browse:${q.sort}:${q.limit}:${q.offset}`, ttl, async () =>
+      (await this.deps.repos.communityMaps.browse(q)).map((r) => communityMapPublic(r)),
+    );
+    if (!acc) return { sort: q.sort, maps };
+    const liked = new Set(await this.deps.repos.communityMaps.likedBy(acc.id, maps.map((m) => m.id)));
+    return { sort: q.sort, maps: maps.map((m) => ({ ...m, liked: liked.has(m.id) })) };
   }
 
   @Get('mine')
@@ -138,6 +145,7 @@ export class CommunityMapsController {
   }
 
   @Put(':id')
+  @Invalidates(CACHE.communityMaps.scope)
   async update(@Param('id') id: string, @Body() body: unknown, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
     const mid = idOr404(communityMapId, id, 'map');
@@ -148,6 +156,7 @@ export class CommunityMapsController {
   }
 
   @Delete(':id')
+  @Invalidates(CACHE.communityMaps.scope)
   async remove(@Param('id') id: string, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
     const mid = idOr404(communityMapId, id, 'map');
@@ -171,6 +180,7 @@ export class CommunityMapsController {
    * the speech filter, and the player must be under the daily cap. A published map never changes.
    */
   @Post(':id/publish')
+  @Invalidates(CACHE.communityMaps.scope)
   @HttpCode(200)
   async publish(@Param('id') id: string, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
@@ -194,12 +204,14 @@ export class CommunityMapsController {
   }
 
   @Post(':id/like')
+  @Invalidates(CACHE.communityMaps.scope)
   @HttpCode(200)
   async like(@Param('id') id: string, @CurrentAccount() acc?: AccountRow) {
     return this.setLike(id, true, acc);
   }
 
   @Delete(':id/like')
+  @Invalidates(CACHE.communityMaps.scope)
   async unlike(@Param('id') id: string, @CurrentAccount() acc?: AccountRow) {
     return this.setLike(id, false, acc);
   }

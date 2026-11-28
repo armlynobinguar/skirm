@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Public } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
 import { notFound } from '../errors';
+import { CACHE, readCacheOf } from '../read-cache';
 import { intQuery, parse } from '../validation';
 
 const mapQuery = z.object({ limit: intQuery(1, 200, 100) });
@@ -38,8 +39,11 @@ export class RankedController {
   async map(@Param('mapId') mapId: string, @Query() query: unknown) {
     const { limit } = parse(mapQuery, query);
     if (!mapV2(mapId)) throw notFound('map');
-    const rows = await this.deps.repos.ranked.mapLadder(mapId, limit);
-    return { mapId, rows: rows.map((r) => ({ ...r, tier: playerTier(r.elo, r.rankedMatches) })) };
+    const { scope, ttl } = CACHE.leaderboards;
+    const rows = await readCacheOf(this.deps).read(scope, `map:${mapId}:${limit}`, ttl, async () =>
+      (await this.deps.repos.ranked.mapLadder(mapId, limit)).map((r) => ({ ...r, tier: playerTier(r.elo, r.rankedMatches) })),
+    );
+    return { mapId, rows };
   }
 
   /**
@@ -51,7 +55,10 @@ export class RankedController {
     const { limit, mapId } = parse(skillsQuery, query);
     if (mapId !== undefined && !mapV2(mapId)) throw notFound('map');
     const minMatches = DEFAULTS.ranked.skillMinMatches;
-    const rows = await this.deps.repos.ranked.skillLadder({ minMatches, limit, ...(mapId !== undefined ? { mapId } : {}) });
+    const { scope, ttl } = CACHE.leaderboards;
+    const rows = await readCacheOf(this.deps).read(scope, `skills:${mapId ?? '*'}:${limit}`, ttl, () =>
+      this.deps.repos.ranked.skillLadder({ minMatches, limit, ...(mapId !== undefined ? { mapId } : {}) }),
+    );
     return { minMatches, ...(mapId !== undefined ? { mapId } : {}), rows };
   }
 }

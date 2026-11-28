@@ -21,6 +21,7 @@ import {
 import { createApp } from './app.module';
 import type { ApiDeps } from './deps';
 import { BullBenchmarkQueue, RedisDailyCosts } from './infra';
+import { RedisReadCache } from './read-cache';
 import { RpcNearKeyChecker } from './near-link';
 import { RedisRateLimitStore, rateLimitsFromEnv } from './rate-limit';
 import { RedisReplayFrames, createApiCaster } from './replays';
@@ -100,6 +101,8 @@ async function main(): Promise<void> {
     ...(auctions ? { auctions } : {}),
     benchmarkQueue,
     costs: new RedisDailyCosts(readRedis),
+    // Hot public reads (ladders, seasons, market, tournaments, community maps) for a few seconds.
+    readCache: new RedisReadCache(readRedis),
     // Bring your own agent: pull turns realtime publishes, shared through Redis.
     externalTurns: new RedisExternalTurnStore(queueRedis),
     // Shared replays read realtime's stored frames; the caster's spend joins the daily cost total.

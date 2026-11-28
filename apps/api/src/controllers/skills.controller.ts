@@ -11,6 +11,8 @@ import { DEPS, type ApiDeps } from '../deps';
 import { ApiError, notFound } from '../errors';
 import { optIntQuery, parse, skillBody, skillId } from '../validation';
 import { skillPublic } from '../views';
+import { Invalidates } from '../cache-invalidation';
+import { CACHE } from '../read-cache';
 import { idOr404 } from './util';
 
 const tabQuery = z.object({ tab: z.enum(['written', 'owned']).default('written') });
@@ -85,6 +87,7 @@ export class SkillsController {
   }
 
   @Put(':id')
+  @Invalidates(CACHE.market.scope)
   async update(@Param('id') id: string, @Body() body: unknown, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
     const sid = idOr404(skillId, id, 'skill');
@@ -123,6 +126,7 @@ export class SkillsController {
    * recorded as minted.
    */
   @Post(':id/mint')
+  @Invalidates(CACHE.market.scope)
   @HttpCode(200)
   async mint(@Param('id') id: string, @Body() body: unknown, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
