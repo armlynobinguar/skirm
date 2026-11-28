@@ -25,6 +25,8 @@ import { CurrentAccount, Public, mustAccount } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
 import { ApiError, notFound } from '../errors';
 import { parse } from '../validation';
+import { Invalidates } from '../cache-invalidation';
+import { CACHE, readCacheOf } from '../read-cache';
 import { idOr404 } from './util';
 
 const lobbyId = z.string().regex(/^lby_[0-9A-HJKMNP-TV-Z]{26}$/);
@@ -153,7 +155,9 @@ export class LobbiesController {
     const { status } = parse(listQuery, query);
     const { tournaments } = this.deps.repos;
     const [rows, joined] = await Promise.all([
-      tournaments.list(status ? { status: [status] } : {}),
+      readCacheOf(this.deps).read(CACHE.tournaments.scope, `list:${status ?? '*'}`, CACHE.tournaments.ttl, () =>
+        tournaments.list(status ? { status: [status] } : {}),
+      ),
       account ? tournaments.joinedBy(account.id) : Promise.resolve([] as string[]),
     ]);
     const mine = new Set(joined);
@@ -161,6 +165,7 @@ export class LobbiesController {
   }
 
   @Post('tournaments')
+  @Invalidates(CACHE.tournaments.scope)
   async createTournament(@Body() body: unknown, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
     const b = parse(tournamentBody, body);
@@ -177,6 +182,7 @@ export class LobbiesController {
   }
 
   @Post('tournaments/:id/join')
+  @Invalidates(CACHE.tournaments.scope)
   @HttpCode(200)
   async joinTournament(@Param('id') id: string, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
@@ -186,6 +192,7 @@ export class LobbiesController {
   }
 
   @Post('tournaments/:id/leave')
+  @Invalidates(CACHE.tournaments.scope)
   @HttpCode(200)
   async leaveTournament(@Param('id') id: string, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);
@@ -195,6 +202,7 @@ export class LobbiesController {
   }
 
   @Post('tournaments/:id/cancel')
+  @Invalidates(CACHE.tournaments.scope)
   @HttpCode(200)
   async cancelTournament(@Param('id') id: string, @CurrentAccount() acc?: AccountRow) {
     const account = mustAccount(acc);

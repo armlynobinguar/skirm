@@ -9,6 +9,7 @@ import { CurrentAccount, Public } from '../auth';
 import { DEPS, type ApiDeps } from '../deps';
 import { ApiError, notFound } from '../errors';
 import { intQuery, matchId, optIntQuery, parse } from '../validation';
+import { CACHE, readCacheOf } from '../read-cache';
 import { messageView, v2LiveView, v2MatchView } from '../views';
 import { idOr404 } from './util';
 
@@ -33,11 +34,14 @@ export class PublicController {
   async players(@Query() query: unknown, @CurrentAccount() account?: AccountRow) {
     const { limit } = parse(z.object({ limit: intQuery(1, 200, 100) }), query);
     const { leaderboards } = this.deps.repos;
+    const { scope, ttl } = CACHE.leaderboards;
     const [rows, you] = await Promise.all([
-      leaderboards.playerLadder(limit),
+      readCacheOf(this.deps).read(scope, `players:${limit}`, ttl, async () =>
+        (await leaderboards.playerLadder(limit)).map(playerView),
+      ),
       account ? leaderboards.playerRowFor(account.id) : Promise.resolve(undefined),
     ]);
-    return { rows: rows.map(playerView), ...(you ? { you: playerView(you) } : {}) };
+    return { rows, ...(you ? { you: playerView(you) } : {}) };
   }
 
   /**
@@ -82,6 +86,11 @@ export class PublicController {
    */
   @Get('v2/matches/recorded')
   async v2Recorded() {
+    const { scope, ttl } = CACHE.recordedMatches;
+    return readCacheOf(this.deps).read(scope, 'latest:5', ttl, () => this.loadRecorded());
+  }
+
+  private async loadRecorded() {
     const { repos } = this.deps;
     const rows = await repos.v2Matches.listRecorded(5);
     const ids = new Set(rows.flatMap((m) => [m.teamAAccountId, m.teamBAccountId]));
