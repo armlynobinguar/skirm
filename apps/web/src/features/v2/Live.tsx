@@ -13,6 +13,7 @@
 // third person subtitles up for their full time, and the speed control shows only for a replay.
 // Watching one agent is the 3D chase cam behind it or the Visor, first person from its eyes (the
 // HUD frame in hud/Visor.tsx); the last one picked is remembered (hud/camPref.ts).
+// In the visor, holding Q (or a crewmate's button) peeks through a crewmate's visor (hud/peek.ts).
 // Keys: Space pause, V third person (in the remembered camera), F visor / chase cam, ← → next agent
 // while watching one, Enter / Esc skip the intro,
 // Esc leaves third person, 1 / 2 / 4 replay speed. While you steer an agent: WASD / arrows step, E
@@ -46,6 +47,7 @@ import { Banner, CalloutBar, CountIn } from './hud/parts';
 import { ThirdPerson } from './hud/ThirdPerson';
 import { Visor } from './hud/Visor';
 import { readCamMode, writeCamMode } from './hud/camPref';
+import { nextPeek, peekMates } from './hud/peek';
 import { Inspect } from './hud/Inspect';
 import { ZamaPredictSlot } from '@/features/zama/predictions/ZamaPredictionSlots';
 import { ZamaRandomnessSlot } from '@/features/zama/randomness/ZamaRandomnessSlot';
@@ -111,6 +113,8 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   const [held, setHeld] = useState(false);
   const [use3d, setUse3d] = useState(true);
   const [camMode, setCamMode] = useState<CamMode>('chase');
+  const [peek, setPeek] = useState<string | null>(null);
+  const lastPeek = useRef<string | null>(null);
   // The remembered camera (read after mount: storage is the browser's).
   useEffect(() => setCamMode(readCamMode()), []);
   const [intro, setIntro] = useState(() => !replay && !watch && view.phase === 'live' && !introPlayed.has(view.matchId) && (frame?.tick ?? 0) <= 2);
@@ -269,6 +273,12 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
     } else if (e.key === 'v' || e.key === 'V') {
       take();
       toggleTpv();
+    } else if ((e.key === 'q' || e.key === 'Q') && visorOn) {
+      take();
+      if (e.repeat) return;
+      const id = nextPeek(mates, lastPeek.current);
+      lastPeek.current = id;
+      setPeek(id);
     } else if ((e.key === 'f' || e.key === 'F') && use3d) {
       take();
       pickCam(tpv && camMode === 'visor' ? 'chase' : 'visor');
@@ -304,6 +314,15 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => window.removeEventListener('wheel', onWheel);
   }, [tpv, intro]);
+  // Letting go of Q ends the peek; leaving the visor or switching agent drops it too.
+  useEffect(() => {
+    const up = (e: KeyboardEvent) => {
+      if (e.key === 'q' || e.key === 'Q') setPeek(null);
+    };
+    window.addEventListener('keyup', up, true);
+    return () => window.removeEventListener('keyup', up, true);
+  }, []);
+  useEffect(() => setPeek(null), [tpv, camMode]);
   useEffect(() => {
     const on = (e: KeyboardEvent) => keys.current(e);
     window.addEventListener('keydown', on, true);
@@ -311,11 +330,12 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   }, []);
 
   // The 3D chase cam reads the arena every frame (lazy: `three` loads only in third person).
-  const chase = useRef({ tpv, paused, camMode });
-  chase.current = { tpv, paused, camMode };
+  const chase = useRef({ tpv, paused, camMode, peek });
+  chase.current = { tpv, paused, camMode, peek };
   const chaseState = useCallback((): ChaseCamState | null => {
     const live = arenaStore().get().live;
-    const id = chase.current.tpv;
+    // A peek looks through the crewmate's eyes only while it is held.
+    const id = (chase.current.camMode === 'visor' && chase.current.peek) || chase.current.tpv;
     if (!live || !id) return null;
     return { arena: live.arena, prev: prevArena.current, at: live.at, focus: id, look: live.look, paused: chase.current.paused, mode: chase.current.camMode };
   }, []);
@@ -337,6 +357,8 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   const unseen = Math.max(0, (view.rivalAgents ?? 0) - rivals.length);
   const watched = findAgent(tpv);
   const visorOn = !!watched && use3d && camMode === 'visor';
+  const mates = visorOn ? peekMates(agents, tpv, team) : [];
+  const peeked = visorOn && peek ? (mates.find((m) => m.id === peek) ?? null) : null;
   const onPick = (id: string) => (tpv ? enterTpv(id) : setFocus((f) => (f === id ? null : id)));
   const cls = [c.hud, intro && c.introing, tpv && c.tpv, (intro || tpv) && c.cine].filter(Boolean).join(' ');
   const tick = frame?.tick ?? 0;
@@ -443,7 +465,9 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
         />
       ) : null}
       {watched && use3d ? <ChaseCam className={c.chase} getState={chaseState} onFail={on3dFail} onView={onCamView} /> : null}
-      {visorOn && watched ? <Visor agent={watched.agent} team={team} mapId={view.mapId} view={camView} /> : null}
+      {visorOn && watched ? (
+        <Visor agent={peeked ?? watched.agent} team={team} mapId={view.mapId} view={camView} mates={mates} peeking={peeked?.id ?? null} onPeek={setPeek} />
+      ) : null}
       {watched && use3d && !visorOn && watched.inSight ? <TpvEmote lines={comms} agentId={watched.agent.id} tick={tick} /> : null}
       {intro ? (
         <Intro
