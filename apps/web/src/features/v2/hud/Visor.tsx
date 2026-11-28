@@ -3,6 +3,7 @@
 // visor). The 3D cam draws the world from its eyes (chase3d, mode 'visor'); this draws skirm's
 // Tactical HUD frame over it: corner brackets, a compass tape that turns with the view, a marker
 // for the delivery point, a cut reticle, and the inner voice from what the agent is going for.
+// Danger edges (./visorDanger): the screen edge facing a nearby hazard glows amber, a rival red.
 // The compass reads the camera through `view` every animation frame and moves the DOM directly,
 // so turning the view never re-renders React.
 import { mapV2, type FrameAgent, type Team } from '@skirm/engine/v2';
@@ -10,6 +11,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { CamView } from '@/features/arena/chase3d';
 import { bearingTo, headingDeg, tapeCells, tapeMark, tapeShift } from '@/features/arena/chase3d/visor';
 import c from './visor.module.css';
+import { EDGES, dangerEdges, threatsNear, type DangerBoard, type Edge } from './visorDanger';
 import { innerVoiceOf } from './visorVoice';
 
 const CELL = 30;
@@ -20,9 +22,11 @@ export interface VisorProps {
   mapId: string;
   /** Where the camera looks right now (written by the 3D cam each frame). */
   view: { current: CamView | null };
+  /** The board as drawn now, for the danger edges (null: none). Read every animation frame. */
+  board?: () => DangerBoard | null;
 }
 
-export function Visor({ agent, team, mapId, view }: VisorProps) {
+export function Visor({ agent, team, mapId, view, board }: VisorProps) {
   const def = mapV2(mapId);
   const item = def?.item ?? 'Item';
   const deliverTo = def?.deliverTo ?? 'Drop point';
@@ -30,6 +34,11 @@ export function Visor({ agent, team, mapId, view }: VisorProps) {
   const tape = useRef<HTMLDivElement>(null);
   const ticks = useRef<HTMLDivElement>(null);
   const mark = useRef<HTMLDivElement>(null);
+  const edges = useRef<Partial<Record<Edge, HTMLDivElement | null>>>({});
+  const readBoard = useRef(board);
+  readBoard.current = board;
+  const watchedTeam = useRef(agent.team);
+  watchedTeam.current = agent.team;
   const cells = useMemo(() => [0, 1, 2].flatMap((r) => tapeCells().map((t) => ({ ...t, key: `${r}-${t.deg}` }))), []);
 
   useEffect(() => {
@@ -46,6 +55,17 @@ export function Visor({ agent, team, mapId, view }: VisorProps) {
         const text = `${m.off === 'left' ? '◂ ' : ''}${deliverTo} · ${Math.round(b.dist)} m${m.off === 'right' ? ' ▸' : ''}`;
         if (text !== last) mark.current.textContent = last = text;
       }
+      const b = readBoard.current?.() ?? null;
+      if (v) {
+        const glow = dangerEdges({ x: v.x, z: v.z }, v.yaw, b ? threatsNear(b, { x: v.x, y: v.z }, watchedTeam.current) : []);
+        for (const e of EDGES) {
+          const el = edges.current[e];
+          if (!el) continue;
+          el.style.opacity = glow[e].level.toFixed(2);
+          if (glow[e].rival) el.dataset.rival = '';
+          else delete el.dataset.rival;
+        }
+      }
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
@@ -58,6 +78,17 @@ export function Visor({ agent, team, mapId, view }: VisorProps) {
   return (
     <div className={`${c.visor} ${rival ? c.rival : ''}`} data-testid="v2-visor">
       <div className={c.scan} />
+      {EDGES.map((e) => (
+        <div
+          key={e}
+          ref={(el) => {
+            edges.current[e] = el;
+          }}
+          className={`${c.edge} ${c[e]}`}
+          aria-hidden="true"
+          data-testid={`v2-visor-edge-${e}`}
+        />
+      ))}
       <div className={`${c.br} ${c.tl}`} />
       <div className={`${c.br} ${c.tr}`} />
       <div className={`${c.br} ${c.bl}`} />

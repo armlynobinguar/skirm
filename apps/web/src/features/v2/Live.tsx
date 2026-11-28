@@ -45,6 +45,7 @@ import { calloutOf, difficultyOf, type Callout, type FeedFilter } from './hud/mo
 import { Banner, CalloutBar, CountIn } from './hud/parts';
 import { ThirdPerson } from './hud/ThirdPerson';
 import { Visor } from './hud/Visor';
+import type { DangerBoard } from './hud/visorDanger';
 import { readCamMode, writeCamMode } from './hud/camPref';
 import { Inspect } from './hud/Inspect';
 import { ZamaPredictSlot } from '@/features/zama/predictions/ZamaPredictionSlots';
@@ -324,6 +325,13 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   const onCamView = useCallback((v: CamView) => {
     camView.current = v;
   }, []);
+  // The board the visor's danger edges read (hazard tiles, gas, live current, agents in sight).
+  const visorBoard = useCallback((): DangerBoard | null => {
+    const live = arenaStore().get().live;
+    if (!live) return null;
+    const { A, state } = live.arena;
+    return { w: A.w, h: A.h, grid: state.grid, gas: state.gas, shock: state.shock, agents: state.agents };
+  }, []);
   const on3dFail = useCallback(() => {
     setUse3d(false);
     toast.show({ tone: 'warning', title: 'No 3D view', message: 'The 3D view could not load here, so third person is showing the tilted map instead.' });
@@ -443,7 +451,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
         />
       ) : null}
       {watched && use3d ? <ChaseCam className={c.chase} getState={chaseState} onFail={on3dFail} onView={onCamView} /> : null}
-      {visorOn && watched ? <Visor agent={watched.agent} team={team} mapId={view.mapId} view={camView} /> : null}
+      {visorOn && watched ? <Visor agent={watched.agent} team={team} mapId={view.mapId} view={camView} board={visorBoard} /> : null}
       {watched && use3d && !visorOn && watched.inSight ? <TpvEmote lines={comms} agentId={watched.agent.id} tick={tick} /> : null}
       {intro ? (
         <Intro
