@@ -45,6 +45,7 @@ import { calloutOf, difficultyOf, type Callout, type FeedFilter } from './hud/mo
 import { Banner, CalloutBar, CountIn } from './hud/parts';
 import { ThirdPerson } from './hud/ThirdPerson';
 import { Visor } from './hud/Visor';
+import { LookStick } from './hud/LookStick';
 import { readCamMode, writeCamMode } from './hud/camPref';
 import { Inspect } from './hud/Inspect';
 import { ZamaPredictSlot } from '@/features/zama/predictions/ZamaPredictionSlots';
@@ -311,13 +312,15 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
   }, []);
 
   // The 3D chase cam reads the arena every frame (lazy: `three` loads only in third person).
+  // The visor's look stick (touch screens): its deflection, read by the 3D cam every frame.
+  const lookStick = useRef<{ x: number; y: number } | null>(null);
   const chase = useRef({ tpv, paused, camMode });
   chase.current = { tpv, paused, camMode };
   const chaseState = useCallback((): ChaseCamState | null => {
     const live = arenaStore().get().live;
     const id = chase.current.tpv;
     if (!live || !id) return null;
-    return { arena: live.arena, prev: prevArena.current, at: live.at, focus: id, look: live.look, paused: chase.current.paused, mode: chase.current.camMode };
+    return { arena: live.arena, prev: prevArena.current, at: live.at, focus: id, look: live.look, paused: chase.current.paused, mode: chase.current.camMode, stick: chase.current.camMode === 'visor' ? lookStick.current : null };
   }, []);
   // Where the 3D cam looks, each frame (the visor's compass reads it without re-rendering).
   const camView = useRef<CamView | null>(null);
@@ -444,6 +447,7 @@ export function MatchHud({ view, source, paused, onPause, replay, onEnded }: Mat
       ) : null}
       {watched && use3d ? <ChaseCam className={c.chase} getState={chaseState} onFail={on3dFail} onView={onCamView} /> : null}
       {visorOn && watched ? <Visor agent={watched.agent} team={team} mapId={view.mapId} view={camView} /> : null}
+      {visorOn ? <LookStick stick={lookStick} /> : null}
       {watched && use3d && !visorOn && watched.inSight ? <TpvEmote lines={comms} agentId={watched.agent.id} tick={tick} /> : null}
       {intro ? (
         <Intro
