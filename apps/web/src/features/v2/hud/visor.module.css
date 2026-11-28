@@ -1,0 +1,49 @@
+/* The visor (first person in the live match), after the voxel-pov prototype: corner brackets, faint
+   scan lines, a compass tape with the delivery marker, a cut reticle and the inner voice. It sits
+   over the 3D view and never takes the pointer (dragging looks around). Tokens only. */
+
+div.visor { position: fixed; inset: 0; pointer-events: none; }
+div.visor * { pointer-events: none; }
+.scan { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(52, 224, 200, .025) 0 1px, transparent 1px 4px); }
+
+/* Danger edges: opacity set per frame from ./visorDanger (0 hides them). */
+.edge { position: absolute; opacity: 0; transition: opacity .25s linear; --dc: 255, 181, 71; }
+.edge[data-rival] { --dc: 255, 70, 85; }
+.top { left: 0; right: 0; top: 0; height: 20vh; background: linear-gradient(to bottom, rgba(var(--dc), .5), transparent); box-shadow: inset 0 3px 0 rgba(var(--dc), .9); }
+.bottom { left: 0; right: 0; bottom: 0; height: 20vh; background: linear-gradient(to top, rgba(var(--dc), .5), transparent); box-shadow: inset 0 -3px 0 rgba(var(--dc), .9); }
+.left { top: 0; bottom: 0; left: 0; width: 14vw; background: linear-gradient(to right, rgba(var(--dc), .5), transparent); box-shadow: inset 3px 0 0 rgba(var(--dc), .9); }
+.right { top: 0; bottom: 0; right: 0; width: 14vw; background: linear-gradient(to left, rgba(var(--dc), .5), transparent); box-shadow: inset -3px 0 0 rgba(var(--dc), .9); }
+@media (prefers-reduced-motion: reduce) { .edge { transition: none; } }
+
+.br { position: absolute; width: 46px; height: 46px; border: 2px solid rgba(52, 224, 200, .55); }
+.tl { left: 6%; top: 22%; border-right: 0; border-bottom: 0; }
+.tr { right: 6%; top: 22%; border-left: 0; border-bottom: 0; }
+.bl { left: 6%; bottom: 24%; border-right: 0; border-top: 0; }
+.brr { right: 6%; bottom: 24%; border-left: 0; border-top: 0; }
+
+.tape { position: absolute; left: 50%; top: calc(6vh + 176px + var(--topbar-extra, 0px)); width: min(460px, 70vw); height: 34px; transform: translateX(-50%); overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); }
+.ticks { position: absolute; top: 0; left: 0; height: 100%; display: flex; will-change: transform; }
+.t { width: 30px; flex: none; text-align: center; font: 700 11px/14px var(--font-mono); color: rgba(223, 230, 234, .7); box-shadow: inset 0 -8px 0 -7px rgba(223, 230, 234, .35); padding-bottom: 12px; }
+.card { color: var(--you); }
+.tape::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 2px; height: 12px; background: var(--you); transform: translateX(-50%); }
+.mark { position: absolute; left: 50%; top: calc(6vh + 212px + var(--topbar-extra, 0px)); transform: translateX(-50%); font: 700 11px/14px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--amber); white-space: nowrap; padding: 3px 8px; background: rgba(12, 19, 24, .8); clip-path: var(--clip-cut2-sm); }
+
+.reticle { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; transform: translate(-50%, -50%) rotate(45deg); box-shadow: inset 0 0 0 2px var(--you); clip-path: polygon(0 0, 70% 0, 100% 30%, 100% 100%, 30% 100%, 0 70%); }
+.reticle::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; background: var(--you); transform: translate(-50%, -50%); }
+.rival .br { border-color: rgba(255, 70, 85, .55); }
+.rival .reticle { box-shadow: inset 0 0 0 2px var(--rival); }
+.rival .reticle::after, .rival .tape::after { background: var(--rival); }
+
+.voice { position: absolute; left: 50%; bottom: calc(6vh + 186px); transform: translateX(-50%); width: max-content; max-width: min(560px, calc(100vw - 32px)); margin: 0; text-align: center; font: italic 400 15px/21px var(--font-sans); color: var(--bone); text-shadow: 0 1px 6px #000; text-wrap: balance; }
+.voice span { display: block; font: 500 10px/14px var(--font-mono); font-style: normal; letter-spacing: .14em; text-transform: uppercase; color: var(--you); }
+.rival .voice span { color: var(--rival); }
+
+@media (max-width: 820px) {
+  .tape { top: calc(250px + var(--topbar-extra, 0px)); }
+  .mark { top: calc(286px + var(--topbar-extra, 0px)); }
+  .voice { bottom: 316px; font-size: 13px; line-height: 18px; }
+  .tl, .tr { top: 30%; }
+  .bl, .brr { bottom: 38%; }
+  .br { width: 32px; height: 32px; }
+}
